@@ -576,7 +576,6 @@ void IdentifyVersion (void)
     char*	plutoniawad;
     char*	tntwad;
 
-    char *home;
     char *doomwaddir;
     doomwaddir = getenv("DOOMWADDIR");
     if (!doomwaddir)
@@ -611,13 +610,8 @@ void IdentifyVersion (void)
     doom2fwad = malloc(strlen(doomwaddir)+1+10+1);
     sprintf(doom2fwad, "%s/doom2f.wad", doomwaddir);
 
-    home = getenv("HOME");
-    if (!home)
-      home = ".";
-    sprintf(basedefault, "%s/.doomrc", home);
-#ifdef _WIN32
-    strcpy(basedefault, "doom.cfg");	// keep the config in the working (run) dir
-#endif
+    // Single config file in the working directory (next to the binary).
+    strcpy (basedefault, "aidoom.cfg");
 
     if (M_CheckParm ("-shdev"))
     {

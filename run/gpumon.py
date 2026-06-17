@@ -20,11 +20,13 @@ SMI_QUERY = "utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw
 def _aidoom_cfg():
     import os
     cfg = {}
+    here = os.path.dirname(os.path.abspath(__file__))
     try:
-        with open(os.path.expanduser("~/.aidoom.cfg")) as f:
+        with open(os.path.join(here, "aidoom.cfg")) as f:
             for line in f:
-                if "=" in line:
-                    k, v = line.split("=", 1); cfg[k.strip()] = v.strip()
+                p = line.split()
+                if len(p) >= 2:
+                    cfg[p[0]] = p[1].strip('"')
     except OSError:
         pass
     return cfg

@@ -95,19 +95,23 @@ in **AGENT_CONTROL.md** §12–13 and **MONSTER_AGENT_GUIDE.md**.
 
 ## Configuration
 
-A small **SDL3 settings editor** puts everything in one window — no config-file
-editing by hand:
+Everything lives in **one file, `aidoom.cfg`, in the working folder** (next to the
+binary — i.e. `run/`). A small **SDL3 settings editor** edits it in a window:
 
 ```sh
-tools/build_config.sh && tools/aidoom_config
+tools/build_config.sh        # builds tools/aidoom_config and copies it into run/
+run/aidoom_config            # run it from run/ (reads/writes run/aidoom.cfg)
 ```
 
 - **Action keys** (click a binding, then press a key — or the mouse wheel), mouse
-  sensitivity, resolution, screen size, fullscreen → `~/.doomrc` (the game config).
-- **Ollama host / port / model** → `~/.aidoom.cfg`, read by the AI-Director tools
-  (`ollama_director.py`, `run/gpumon.py`, `run/start_aidoom.sh`).
+  sensitivity, resolution, screen size, fullscreen — the game's settings.
+- **Ollama host / port / model** — read by the AI-Director tools
+  (`ollama_director.py`, `run/gpumon.py`, `run/start_aidoom.{sh,ps1}`).
 
-It preserves any settings it doesn't manage and reads the current values on open.
+The **game** reads/writes the same `aidoom.cfg` from its working directory, and the
+config app preserves any keys it doesn't manage (so neither side clobbers the
+other). If `aidoom.cfg` is missing, the game starts with built-in defaults and
+writes one on exit; the editor shows those defaults too.
 
 ## Documentation
 

@@ -26,6 +26,25 @@ $ErrorActionPreference = "Stop"
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $here
 
+# aidoom.cfg (next to this script, written by the SDL3 config app) sets the
+# defaults for host/port/model; explicit -Ollama / -Model still win.
+# Format: "key<whitespace>value".
+$cfgFile = Join-Path $here "aidoom.cfg"
+if (Test-Path $cfgFile) {
+    $cfg = @{}
+    foreach ($line in Get-Content $cfgFile) {
+        $p = $line -split '\s+', 2 | Where-Object { $_ -ne '' }
+        if ($p.Count -ge 2) { $cfg[$p[0]] = $p[1].Trim('"') }
+    }
+    if (-not $PSBoundParameters.ContainsKey('Ollama') -and $cfg.ContainsKey('ollama_host')) {
+        $port = if ($cfg.ContainsKey('ollama_port')) { $cfg['ollama_port'] } else { '11434' }
+        $Ollama = "http://$($cfg['ollama_host']):$port"
+    }
+    if (-not $PSBoundParameters.ContainsKey('Model') -and $cfg.ContainsKey('ollama_model')) {
+        $Model = $cfg['ollama_model']
+    }
+}
+
 function Info($m){ Write-Host "[start] $m" -ForegroundColor Cyan }
 function Warn($m){ Write-Host "[start] $m" -ForegroundColor Yellow }
 function Die ($m){ Write-Host "[start] $m" -ForegroundColor Red; Read-Host "Press Enter to exit"; exit 1 }

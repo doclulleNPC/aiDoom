@@ -146,67 +146,86 @@ static void set_default_text(setting_t* s)
     else if (!strcmp(s->name,"ollama_model")) strcpy(s->sval,"mistral:7b-instruct");
 }
 
-static void load_file(const char* path, int file, char sep)
+// Built-in defaults matching the engine's m_misc.c defaults[] -- used when no
+// aidoom.cfg exists yet, so a first save doesn't zero the bindings.
+static void set_default_int(setting_t* s)
 {
+    const char* n = s->name; int v = 0;
+    if      (!strcmp(n,"key_right"))        v = K_RIGHT;
+    else if (!strcmp(n,"key_left"))         v = K_LEFT;
+    else if (!strcmp(n,"key_up"))           v = K_UP;
+    else if (!strcmp(n,"key_down"))         v = K_DOWN;
+    else if (!strcmp(n,"key_strafeleft"))   v = ',';
+    else if (!strcmp(n,"key_straferight"))  v = '.';
+    else if (!strcmp(n,"key_fire"))         v = K_RCTRL;
+    else if (!strcmp(n,"key_use"))          v = ' ';
+    else if (!strcmp(n,"key_strafe"))       v = K_RALT;
+    else if (!strcmp(n,"key_speed"))        v = K_RSHIFT;
+    else if (!strcmp(n,"key_nextweapon"))   v = K_MWHEELUP;
+    else if (!strcmp(n,"key_prevweapon"))   v = K_MWHEELDOWN;
+    else if (!strcmp(n,"mouse_sensitivity"))v = 5;
+    else if (!strcmp(n,"screen_resolution"))v = 1;
+    else if (!strcmp(n,"screenblocks"))     v = 9;
+    else if (!strcmp(n,"sfx_volume"))       v = 8;
+    else if (!strcmp(n,"music_volume"))     v = 8;
+    else if (!strcmp(n,"fullscreen"))       v = 0;
+    s->ival = v;
+}
+
+// Single config file "aidoom.cfg" next to this binary (the run/ folder).
+static void cfg_path(char* out, int n)
+{
+    const char* base = SDL_GetBasePath();	// exe dir (trailing sep), cached by SDL
+    snprintf(out, n, "%saidoom.cfg", base ? base : "./");
+}
+
+static void load_cfg(void)
+{
+    char path[1024]; cfg_path(path,sizeof(path));
     FILE* f = fopen(path,"r"); if (!f) return;
     char line[512];
     while (fgets(line,sizeof(line),f)) {
-        char name[128]; char val[256];
-        // "name<ws or '='>value"
-        if (sep=='=') { if (sscanf(line," %127[^=] = %255[^\n]",name,val)!=2) continue; }
-        else          { if (sscanf(line," %127s %255[^\n]",name,val)!=2) continue; }
-        // trim trailing spaces in name
-        for (int i=(int)strlen(name)-1;i>=0 && (name[i]==' '||name[i]=='\t');i--) name[i]=0;
+        char name[128], val[256];
+        if (sscanf(line," %127s %255[^\n]",name,val)!=2) continue;
+        char* v = val; size_t L = strlen(v);		// strip quotes the engine may add
+        if (L>=2 && v[0]=='"' && v[L-1]=='"') { v[L-1]=0; v++; }
         for (int i=0;i<NSET;i++) {
-            if (settings[i].file!=file || strcmp(settings[i].name,name)) continue;
-            if (settings[i].type==T_TEXT) { val[sizeof(settings[i].sval)-1]=0; strncpy(settings[i].sval,val,sizeof(settings[i].sval)-1); }
-            else settings[i].ival = atoi(val);
+            if (strcmp(settings[i].name,name)) continue;
+            if (settings[i].type==T_TEXT) { strncpy(settings[i].sval,v,sizeof(settings[i].sval)-1); settings[i].sval[sizeof(settings[i].sval)-1]=0; }
+            else settings[i].ival = atoi(v);
         }
     }
     fclose(f);
 }
 
-// ----------------------------------------------------------------- save
-static void path_for(int file, char* out, int n)
+// Rewrite aidoom.cfg preserving lines we don't manage (engine-only keys);
+// update/append the ones we do.
+static void save_cfg(void)
 {
-    const char* home = getenv("HOME"); if (!home) home=".";
-    snprintf(out,n,"%s/%s", home, file==F_DOOMRC ? ".doomrc" : ".aidoom.cfg");
-}
-
-// Rewrite a config file preserving unmanaged lines; update/append managed ones.
-static int save_file(int file, char sep)
-{
-    char path[512]; path_for(file,path,sizeof(path));
-    char (*lines)[512] = malloc(1024*512); int nl=0;
+    char path[1024]; cfg_path(path,sizeof(path));
+    char (*lines)[512] = malloc(2048*512); int nl=0;
     FILE* f = fopen(path,"r");
-    if (f) { while (nl<1024 && fgets(lines[nl],512,f)) nl++; fclose(f); }
+    if (f) { while (nl<2048 && fgets(lines[nl],512,f)) nl++; fclose(f); }
     int handled[NSET]; for (int i=0;i<NSET;i++) handled[i]=0;
 
-    f = fopen(path,"w"); if (!f) { free(lines); return 0; }
+    f = fopen(path,"w"); if (!f) { free(lines); return; }
     for (int l=0;l<nl;l++) {
         char name[128];
-        if (sscanf(lines[l]," %127[^=\t \n]",name)!=1) { fputs(lines[l],f); continue; }
+        if (sscanf(lines[l]," %127s",name)!=1) { fputs(lines[l],f); continue; }
         int m=-1;
-        for (int i=0;i<NSET;i++) if (settings[i].file==file && !strcmp(settings[i].name,name)) { m=i; break; }
-        if (m<0) { fputs(lines[l],f); continue; }
+        for (int i=0;i<NSET;i++) if (!strcmp(settings[i].name,name)) { m=i; break; }
+        if (m<0) { fputs(lines[l],f); continue; }	// keep engine-only line verbatim
         handled[m]=1;
-        if (settings[m].type==T_TEXT) {
-            if (sep=='=') fprintf(f,"%s=%s\n",settings[m].name,settings[m].sval);
-            else          fprintf(f,"%s\t\t%s\n",settings[m].name,settings[m].sval);
-        } else fprintf(f,"%s\t\t%d\n",settings[m].name,settings[m].ival);
+        if (settings[m].type==T_TEXT) fprintf(f,"%s\t\t%s\n",settings[m].name,settings[m].sval);
+        else fprintf(f,"%s\t\t%d\n",settings[m].name,settings[m].ival);
     }
     for (int i=0;i<NSET;i++) {
-        if (settings[i].file!=file || handled[i]) continue;
-        if (settings[i].type==T_TEXT) {
-            if (sep=='=') fprintf(f,"%s=%s\n",settings[i].name,settings[i].sval);
-            else          fprintf(f,"%s\t\t%s\n",settings[i].name,settings[i].sval);
-        } else fprintf(f,"%s\t\t%d\n",settings[i].name,settings[i].ival);
+        if (handled[i]) continue;
+        if (settings[i].type==T_TEXT) fprintf(f,"%s\t\t%s\n",settings[i].name,settings[i].sval);
+        else fprintf(f,"%s\t\t%d\n",settings[i].name,settings[i].ival);
     }
     fclose(f); free(lines);
-    return 1;
 }
-
-static void save_all(void){ save_file(F_DOOMRC,'\t'); save_file(F_AIDOOM,'='); }
 
 // ----------------------------------------------------------------- UI state
 static int mode=0;            // 0 normal, 1 capture key, 2 edit text
@@ -268,7 +287,7 @@ static int hit(float mx,float my, SDL_FRect r){ return mx>=r.x&&mx<r.x+r.w&&my>=
 
 static void click(float mx,float my)
 {
-    if (hit(mx,my,btn_save)) { save_all(); snprintf(status,sizeof(status),"Saved ~/.doomrc and ~/.aidoom.cfg"); return; }
+    if (hit(mx,my,btn_save)) { save_cfg(); snprintf(status,sizeof(status),"Saved aidoom.cfg (next to the binary)"); return; }
     if (hit(mx,my,btn_quit)) { SDL_Event q={.type=SDL_EVENT_QUIT}; SDL_PushEvent(&q); return; }
     for (int i=0;i<NSET;i++) {
         setting_t* s=&settings[i];
@@ -289,9 +308,10 @@ static void click(float mx,float my)
 int main(int argc, char** argv)
 {
     (void)argc;(void)argv;
-    for (int i=0;i<NSET;i++) if (settings[i].type==T_TEXT) set_default_text(&settings[i]);
-    { char p[512]; path_for(F_DOOMRC,p,sizeof(p)); load_file(p,F_DOOMRC,'\t');
-      path_for(F_AIDOOM,p,sizeof(p)); load_file(p,F_AIDOOM,'='); }
+    for (int i=0;i<NSET;i++)
+        if (settings[i].type==T_TEXT) set_default_text(&settings[i]);
+        else set_default_int(&settings[i]);
+    load_cfg();
 
     if (!SDL_Init(SDL_INIT_VIDEO)) { fprintf(stderr,"SDL_Init: %s\n",SDL_GetError()); return 1; }
     win = SDL_CreateWindow("aiDoom Config", WINW, WINH, 0);

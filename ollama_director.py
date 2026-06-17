@@ -18,13 +18,15 @@ import socket, json, time, sys, os, argparse, urllib.request
 # Config from ~/.aidoom.cfg (written by the SDL3 config app, tools/aidoom_config),
 # overridable on the CLI. Falls back to these built-in defaults.
 def _load_aidoom_cfg():
+    # aidoom.cfg sits next to this script (the run/ folder), same file the game uses.
     cfg = {}
+    here = os.path.dirname(os.path.abspath(__file__))
     try:
-        with open(os.path.expanduser("~/.aidoom.cfg")) as f:
+        with open(os.path.join(here, "aidoom.cfg")) as f:
             for line in f:
-                if "=" in line:
-                    k, v = line.split("=", 1)
-                    cfg[k.strip()] = v.strip()
+                p = line.split()
+                if len(p) >= 2:
+                    cfg[p[0]] = p[1].strip('"')
     except OSError:
         pass
     return cfg

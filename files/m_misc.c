@@ -298,11 +298,31 @@ void M_SaveDefaults (void)
     int		i;
     int		v;
     FILE*	f;
-	
+    // Preserve config lines we don't manage (e.g. ollama_* written by the SDL3
+    // config app) so quitting the game doesn't wipe them from aidoom.cfg.
+    char	keep[64][256];
+    int		nkeep = 0;
+
+    f = fopen (defaultfile, "r");
+    if (f)
+    {
+	char line[256], name[80];
+	while (nkeep < 64 && fgets(line, sizeof(line), f))
+	{
+	    int known = 0;
+	    if (sscanf(line, " %79s", name) != 1)
+		continue;
+	    for (i=0 ; i<numdefaults ; i++)
+		if (!strcmp(defaults[i].name, name)) { known = 1; break; }
+	    if (!known) { strncpy(keep[nkeep], line, 255); keep[nkeep][255]=0; nkeep++; }
+	}
+	fclose(f);
+    }
+
     f = fopen (defaultfile, "w");
     if (!f)
 	return; // can't write the file, but don't complain
-		
+
     for (i=0 ; i<numdefaults ; i++)
     {
 	if (defaults[i].defaultvalue > -0xfff
@@ -315,7 +335,9 @@ void M_SaveDefaults (void)
 		     * (char **) (defaults[i].location));
 	}
     }
-	
+    for (i=0 ; i<nkeep ; i++)
+	fputs (keep[i], f);
+
     fclose (f);
 }
 

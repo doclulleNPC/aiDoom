@@ -16,6 +16,8 @@ director client that drives the monsters' tactics.
 | `start_aidoom.ps1` | Windows | Main launcher (PowerShell). |
 | `ollama_director.py` | all | The director client (talks to Ollama + the game). Mirror of the repo-root copy. |
 | `gpumon.py` | all | Live GPU monitor for the remote Ollama machine (see below). |
+| `aidoom_config` | Linux/macOS | SDL3 settings editor (built by `tools/build_config.sh`); reads/writes `aidoom.cfg` here. |
+| `aidoom.cfg` | all | The single config file (game keys/video + Ollama), read by the game and all tools from this folder. |
 | `aidoom.ico` | Windows | Icon for the launcher/shortcut. |
 
 ## What the launcher does
@@ -93,9 +95,10 @@ The server URL is configurable and defaults differ by platform:
 URL (which the launchers pass through). Its built-in default host is
 `OLLAMA_HOST = "192.168.2.114"`.
 
-**`~/.aidoom.cfg`** (written by the SDL3 config app `tools/aidoom_config`) sets the
-defaults for `ollama_host` / `ollama_port` / `ollama_model`. `ollama_director.py`,
-`gpumon.py` and `start_aidoom.sh` all read it on startup (CLI flags still override).
+**`aidoom.cfg`** (in this folder, written by the SDL3 config app `aidoom_config`)
+sets `ollama_host` / `ollama_port` / `ollama_model`. `ollama_director.py`,
+`gpumon.py` and `start_aidoom.sh`/`.ps1` read it (next to themselves) on startup;
+CLI flags still override. It's the same file the game uses for keys/video.
 
 ## GPU monitor (`gpumon.py`)
 
