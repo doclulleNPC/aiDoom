@@ -156,6 +156,8 @@ int             key_fire;
 int		key_use;
 int		key_strafe;
 int		key_speed;
+int		key_nextweapon;		// default: mouse wheel up
+int		key_prevweapon;		// default: mouse wheel down
 int		autorun = 1;	// always-run; the run key toggles this (G_Responder)
  
 int             mousebfire; 
@@ -503,6 +505,37 @@ void G_DoLoadLevel (void)
 // G_Responder  
 // Get info needed to make ticcmd_ts for the players.
 // 
+//
+// G_CycleWeapon
+// Switch to the next (dir=+1) / previous (dir=-1) owned weapon. Used by the
+// mouse-wheel bindings. Sets pendingweapon directly (single-player).
+//
+void G_CycleWeapon (int dir)
+{
+    player_t*		p = &players[consoleplayer];
+    weapontype_t	w;
+    int			n;
+
+    if (gamestate != GS_LEVEL || p->playerstate != PST_LIVE)
+	return;
+
+    w = (p->pendingweapon != wp_nochange) ? p->pendingweapon : p->readyweapon;
+
+    for (n = 0 ; n < NUMWEAPONS ; n++)
+    {
+	w = (weapontype_t)(((int)w + dir + NUMWEAPONS) % NUMWEAPONS);
+	if (!p->weaponowned[w])
+	    continue;
+	if (w == wp_supershotgun && gamemode != commercial)
+	    continue;					// Doom II only
+	if ((w == wp_plasma || w == wp_bfg) && gamemode == shareware)
+	    continue;					// not in shareware
+	p->pendingweapon = w;
+	return;
+    }
+}
+
+
 boolean G_Responder (event_t* ev) 
 { 
     // allow spy mode changes even during the demo
@@ -560,6 +593,16 @@ boolean G_Responder (event_t* ev)
     switch (ev->type) 
     { 
       case ev_keydown:
+	if (ev->data1 == key_nextweapon)
+	{
+	    G_CycleWeapon (1);
+	    return true;
+	}
+	if (ev->data1 == key_prevweapon)
+	{
+	    G_CycleWeapon (-1);
+	    return true;
+	}
 	if (ev->data1 == KEY_PAUSE)
 	{
 	    sendpause = true;
@@ -584,8 +627,9 @@ boolean G_Responder (event_t* ev)
 	mousebuttons[0] = ev->data1 & 1; 
 	mousebuttons[1] = ev->data1 & 2; 
 	mousebuttons[2] = ev->data1 & 4; 
-	mousex = ev->data2*(mouseSensitivity+5)/10; 
-	mousey = ev->data3*(mouseSensitivity+5)/10; 
+	// mouse speed: 10% faster than the classic (mouseSensitivity+5)/10 factor
+	mousex = ev->data2*(mouseSensitivity+5)*11/100;
+	mousey = ev->data3*(mouseSensitivity+5)*11/100;
 	return true;    // eat events 
  
       case ev_joystick: 

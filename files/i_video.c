@@ -185,6 +185,18 @@ void I_GetEvent(SDL_Event *Event)
 	D_PostEvent(&event);
 	break;
 
+      case SDL_EVENT_MOUSE_WHEEL:
+	// wheel up/down -> a one-shot key press (default: next/prev weapon)
+	if (Event->wheel.y != 0)
+	{
+	    event.type = ev_keydown;
+	    event.data1 = (Event->wheel.y > 0) ? KEY_MWHEELUP : KEY_MWHEELDOWN;
+	    D_PostEvent(&event);
+	    event.type = ev_keyup;
+	    D_PostEvent(&event);
+	}
+	break;
+
       case SDL_EVENT_WINDOW_FOCUS_GAINED:
 	window_focused = 1;
 	I_ApplyMouseGrab();

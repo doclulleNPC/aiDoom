@@ -259,6 +259,10 @@ typedef enum
 #define KEY_LEFTARROW	0xac
 #define KEY_UPARROW	0xad
 #define KEY_DOWNARROW	0xaf
+
+// Mouse wheel, posted as key events by i_video.c (default-bound to weapon cycle).
+#define KEY_MWHEELUP	0xb0
+#define KEY_MWHEELDOWN	0xb1
 #define KEY_ESCAPE	27
 #define KEY_ENTER	13
 #define KEY_TAB		9
