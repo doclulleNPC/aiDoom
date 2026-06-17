@@ -32,6 +32,7 @@ echo "[build] compiling aidoom.exe (MinGW) ..."
 ( cd "$src" && "$CC" -O2 -fcommon -fno-strict-aliasing -std=gnu11 \
     -Wno-implicit-int -Wno-implicit-function-declaration \
     -Wno-int-conversion -Wno-return-mismatch \
+    -Wno-incompatible-pointer-types \
     -DSDL_MAIN_HANDLED -DWIN32 -I"$SDL3/include" \
     *.c aidoom_res.o \
     -L"$SDL3/lib" -lSDL3 -lws2_32 -lm -mconsole \
