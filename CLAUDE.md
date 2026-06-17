@@ -53,6 +53,9 @@ IWAD). To launch with the LLM AI Director, use `run/start_aidoom.sh`
 
 ### 64-bit portability (LP64) caveats
 
+> A full running log of age-of-the-code fixes (64-bit, modern compiler, hi-res,
+> undersized buffers, tooling) lives in **`LEGACY_FIXES.md`** — add new ones there.
+
 The code assumes `sizeof(ptr) == sizeof(int) == 4` (1996 DOS/x86). Building 64-bit
 required fixing these; the **same class of bug still lurks** in the netcode
 (`d_net.c`) — watch the `-Wpointer-to-int-cast` / `-Wint-to-pointer-cast`
