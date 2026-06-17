@@ -27,9 +27,12 @@ is a real bug.**
 | Garbage textures / crash in `R_InitTextures` | on-disk `maptexture_t` had a `void **columndirectory` (8 B on 64-bit) that shifted every following field off the on-disk layout | make it a 4-byte placeholder | `r_data.c` |
 | Zone-heap corruption → crash in `P_LoadThings` on every level load | pointer arrays allocated as `Z_Malloc(n*4)` (DOS pointer size) under-allocate | `Z_Malloc(n*sizeof(*p))` | `p_setup.c` (`linebuffer`), `r_data.c` (texture arrays) |
 | Savegame load misbehaves | index⇄pointer swizzle cast through `int` | cast through `intptr_t`; save buffer is large because `screens[]` are `MAXWIDTH*MAXHEIGHT` | `p_saveg.c` |
+| Spurious `Z_ChangeTag: an owner is required for purgable blocks` | the purge-owner test `(unsigned)block->user < 0x100` truncates a 64-bit `user` pointer to 32 bits before comparing | cast through `uintptr_t` | `z_zone.c` (`Z_ChangeTag2`) |
 
-**Still lurking:** the netcode (`d_net.c`) has the same pattern — pointers packed
-into `int`/`doomdata`. Fix when multiplayer is revived.
+**Checked, benign:** `d_net.c` uses `(int)&((doomdata_t*)0)->field` — that's the
+old `offsetof` idiom (a small offset, not a real pointer), so it's correct on
+64-bit despite the cast warning. If real multiplayer with packed pointers is
+revived, re-audit it.
 
 **Load-bearing detail:** `doomtype.h` keeps `typedef int boolean` (4 bytes), *not*
 1-byte `bool` — several on-disk/in-memory struct layouts depend on it.
@@ -110,6 +113,22 @@ hi-res.
   This masked a `visplane_t` (`r_defs.h`) change during the hi-res work.
 
 ---
+
+## 6. Pre-existing portability scaffolding (already in the original — not bugs)
+
+The 1996 source already carried portability workarounds for *its* era. These are
+**not** things to "fix" — know they exist so you don't mistake them for bugs:
+
+- **Endianness:** `m_swap.h` byte-swaps because WAD lumps are little-endian; the
+  `SHORT()`/`LONG()` macros are no-ops on little-endian hosts. Keep using them on
+  on-disk data.
+- **`__BEOS__` / `__SVR4` / `linux` guards** in `w_wad.c`, `r_data.c`, `m_swap.h`,
+  `doomtype.h` — old per-OS branches.
+- **Solaris BUS-error workaround** (`r_data.c`): the texture name is copied
+  byte-by-byte instead of `memcpy` because "memcpy() generates a BUS error on
+  Solaris with optimization on". Harmless; leave it.
+- **DOS remnants** in `i_sound.c`/`s_sound.c` (comments + dead 8-bit paths) — the
+  audio is fully reimplemented in the `i_*` SDL layer; the comments are historical.
 
 ## How to spot the next one
 
