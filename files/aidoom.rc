@@ -1,5 +1,4 @@
-/* aiDoom application resources */
-/* id 1 -> Explorer/taskbar exe icon; "SDL_app" -> the name SDL 1.2 windib
-   loads for the window class icon (LoadImage(.., SDL_Appname) in SDL). */
-1       ICON "aidoom.ico"
-SDL_app ICON "aidoom.ico"
+/* aiDoom application resources.
+   Icon id 1 (the lowest id) is what Explorer and the taskbar use for aidoom.exe.
+   The live window icon is set at runtime via SDL_SetWindowIcon (i_video.c). */
+1 ICON "aidoom.ico"
