@@ -9,7 +9,7 @@ a language model drive monster tactics in real time.
 > the new work lives in the platform layer (`files/i_*.c`) and a few self-contained
 > modules.
 
-![aiDoom — hi-res software renderer, E1M1 at 1280×800](screen.png)
+![aiDoom — hi-res DOOM with the LLM AI Director and GPU monitor](hero.png)
 
 ## Features
 
