@@ -13,12 +13,26 @@ Orders: chase hold fallback flank_left flank_right ambush focus_fire use_door
 
 Usage:  python ollama_director.py [--port 31666] [--model mistral:7b-instruct]
 """
-import socket, json, time, sys, argparse, urllib.request
+import socket, json, time, sys, os, argparse, urllib.request
 
-# Ollama server location (override on the CLI with --host / --ollama-port,
-# or give a full URL with --ollama).
-OLLAMA_HOST = "192.168.2.114"
-OLLAMA_PORT = 11434
+# Config from ~/.aidoom.cfg (written by the SDL3 config app, tools/aidoom_config),
+# overridable on the CLI. Falls back to these built-in defaults.
+def _load_aidoom_cfg():
+    cfg = {}
+    try:
+        with open(os.path.expanduser("~/.aidoom.cfg")) as f:
+            for line in f:
+                if "=" in line:
+                    k, v = line.split("=", 1)
+                    cfg[k.strip()] = v.strip()
+    except OSError:
+        pass
+    return cfg
+
+_CFG = _load_aidoom_cfg()
+OLLAMA_HOST  = _CFG.get("ollama_host",  "192.168.2.114")
+OLLAMA_PORT  = int(_CFG.get("ollama_port", "11434"))
+DEFAULT_MODEL = _CFG.get("ollama_model", "mistral:7b-instruct")
 
 ORDERS = {"chase", "hold", "fallback", "flank_left", "flank_right",
           "ambush", "focus_fire", "use_door"}
@@ -83,7 +97,7 @@ def connect(port, tries=40):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=31666)
-    ap.add_argument("--model", default="mistral:7b-instruct")
+    ap.add_argument("--model", default=DEFAULT_MODEL)
     ap.add_argument("--host", default=OLLAMA_HOST, help="Ollama server IP/host")
     ap.add_argument("--ollama-port", type=int, default=OLLAMA_PORT,
                     help="Ollama server port")

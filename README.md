@@ -93,6 +93,22 @@ run/start_aidoom.sh --skill 4 --friendlyfire
 The director protocol (`observe` / `act` / `wake`) and design rationale are documented
 in **AGENT_CONTROL.md** §12–13 and **MONSTER_AGENT_GUIDE.md**.
 
+## Configuration
+
+A small **SDL3 settings editor** puts everything in one window — no config-file
+editing by hand:
+
+```sh
+tools/build_config.sh && tools/aidoom_config
+```
+
+- **Action keys** (click a binding, then press a key — or the mouse wheel), mouse
+  sensitivity, resolution, screen size, fullscreen → `~/.doomrc` (the game config).
+- **Ollama host / port / model** → `~/.aidoom.cfg`, read by the AI-Director tools
+  (`ollama_director.py`, `run/gpumon.py`, `run/start_aidoom.sh`).
+
+It preserves any settings it doesn't manage and reads the current values on open.
+
 ## Documentation
 
 - `AGENT_CONTROL.md` — full player- and monster-control API & TCP protocol

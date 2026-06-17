@@ -52,3 +52,5 @@ files/doom
 # build.sh copies the binary here too
 run/aidoom
 run/doom
+# SDL3 config tool binary (built by tools/build_config.sh)
+tools/aidoom_config

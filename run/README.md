@@ -93,6 +93,10 @@ The server URL is configurable and defaults differ by platform:
 URL (which the launchers pass through). Its built-in default host is
 `OLLAMA_HOST = "192.168.2.114"`.
 
+**`~/.aidoom.cfg`** (written by the SDL3 config app `tools/aidoom_config`) sets the
+defaults for `ollama_host` / `ollama_port` / `ollama_model`. `ollama_director.py`,
+`gpumon.py` and `start_aidoom.sh` all read it on startup (CLI flags still override).
+
 ## GPU monitor (`gpumon.py`)
 
 Small live monitor for the GPU on the (remote) Ollama machine — handy while the

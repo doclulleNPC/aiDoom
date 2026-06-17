@@ -31,6 +31,16 @@ NODIRECTOR=0
 NOWARM=0
 GAME_EXTRA=()
 
+# ~/.aidoom.cfg (written by the SDL3 config app, tools/aidoom_config) overrides the
+# built-in defaults; explicit CLI flags below still win.
+if [ -f "$HOME/.aidoom.cfg" ]; then
+    _h=$(sed -n 's/^ollama_host=//p'  "$HOME/.aidoom.cfg" | tail -1)
+    _p=$(sed -n 's/^ollama_port=//p'  "$HOME/.aidoom.cfg" | tail -1)
+    _m=$(sed -n 's/^ollama_model=//p' "$HOME/.aidoom.cfg" | tail -1)
+    [ -n "$_h" ] && OLLAMA="http://${_h}:${_p:-11434}"
+    [ -n "$_m" ] && MODEL="$_m"
+fi
+
 while [ $# -gt 0 ]; do
     case "$1" in
         --model)        MODEL="$2"; shift 2;;

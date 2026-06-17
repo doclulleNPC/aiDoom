@@ -16,6 +16,22 @@ import argparse, json, subprocess, sys, time, urllib.request
 
 SMI_QUERY = "utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw,name"
 
+# Defaults from ~/.aidoom.cfg (SDL3 config app), overridable on the CLI.
+def _aidoom_cfg():
+    import os
+    cfg = {}
+    try:
+        with open(os.path.expanduser("~/.aidoom.cfg")) as f:
+            for line in f:
+                if "=" in line:
+                    k, v = line.split("=", 1); cfg[k.strip()] = v.strip()
+    except OSError:
+        pass
+    return cfg
+_CFG = _aidoom_cfg()
+DEF_HOST = _CFG.get("ollama_host", "192.168.2.114")
+DEF_OPORT = int(_CFG.get("ollama_port", "11434"))
+
 CLR = "\033[2J\033[H"          # clear screen + home
 DIM = "\033[2m"; RST = "\033[0m"; BOLD = "\033[1m"
 
@@ -84,12 +100,12 @@ def render_ollama(models, host):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--host", default="192.168.2.114")
+    ap.add_argument("--host", default=DEF_HOST)
     ap.add_argument("--user", default="lubee",
                     help="SSH username for true GPU% (default: lubee; '' to disable SSH)")
     ap.add_argument("--ssh-port", type=int, default=22)
     ap.add_argument("--key", default=None, help="SSH private key (default: ssh's own)")
-    ap.add_argument("--ollama-port", type=int, default=11434)
+    ap.add_argument("--ollama-port", type=int, default=DEF_OPORT)
     ap.add_argument("--ollama-only", action="store_true")
     ap.add_argument("--once", action="store_true", help="print one snapshot and exit")
     ap.add_argument("--interval", type=float, default=2.0)
