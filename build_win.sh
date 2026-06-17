@@ -35,6 +35,7 @@ echo "[build] compiling aidoom.exe (MinGW) ..."
     -DSDL_MAIN_HANDLED -DWIN32 -I"$SDL3/include" \
     *.c aidoom_res.o \
     -L"$SDL3/lib" -lSDL3 -lws2_32 -lm -mconsole \
+    -static-libgcc \
     -o aidoom.exe )
 
 mkdir -p "$run"
