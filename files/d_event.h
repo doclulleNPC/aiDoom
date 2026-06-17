@@ -76,6 +76,9 @@ typedef enum
     // Use button, to open doors, activate switches.
     BT_USE		= 2,
 
+    // MOD: jump (bit 6 -- free between the weapon mask and BT_SPECIAL).
+    BT_JUMP		= 64,
+
     // Flag: game events, not really buttons.
     BT_SPECIAL		= 128,
     BT_SPECIALMASK	= 3,

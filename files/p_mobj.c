@@ -962,7 +962,7 @@ P_SpawnPlayerMissile
 	if (!linetarget)
 	{
 	    an = source->angle;
-	    slope = 0;
+	    slope = P_PlayerLookSlope (source);	// MOD: shoot where you look
 	}
     }
 		

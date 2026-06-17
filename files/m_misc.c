@@ -179,6 +179,7 @@ extern int	key_strafe;
 extern int	key_speed;
 extern int	key_nextweapon;
 extern int	key_prevweapon;
+extern int	key_jump;
 extern int	autorun;
 
 extern int	mousebfire;
@@ -244,6 +245,7 @@ default_t	defaults[] =
     {"key_speed",&key_speed, KEY_RSHIFT},
     {"key_nextweapon",&key_nextweapon, KEY_MWHEELUP},
     {"key_prevweapon",&key_prevweapon, KEY_MWHEELDOWN},
+    {"key_jump",&key_jump, ' '},
     {"autorun",&autorun, 1},
 
     {"use_mouse",&usemouse, 1},

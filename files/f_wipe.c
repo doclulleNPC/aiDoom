@@ -185,6 +185,8 @@ wipe_doMelt
 
     width/=2;
 
+    ticks <<= 1;		// MOD: run the melt twice as fast (~half the time)
+
     while (ticks--)
     {
 	for (i=0;i<width;i++)

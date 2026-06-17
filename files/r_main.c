@@ -841,7 +841,24 @@ void R_SetupFrame (player_t* player)
     extralight = player->extralight;
 
     viewz = player->viewz;
-    
+
+    // MOD: free-look.  Shift the projection's horizon (centery) by the player's
+    // pitch and rebuild the floor/ceiling slope table to match.  lookdir is in
+    // BASE-resolution pixels, so scale by hires for the real framebuffer.
+    {
+	int	look = player->lookdir * hires;
+	fixed_t	dy;
+
+	centery = viewheight/2 + look;
+	centeryfrac = centery<<FRACBITS;
+	for (i=0 ; i<viewheight ; i++)
+	{
+	    dy = ((i-centery)<<FRACBITS)+FRACUNIT/2;
+	    if (dy < 0) dy = -dy;
+	    yslope[i] = FixedDiv ( (viewwidth<<detailshift)/2*FRACUNIT, dy);
+	}
+    }
+
     viewsin = finesine[viewangle>>ANGLETOFINESHIFT];
     viewcos = finecosine[viewangle>>ANGLETOFINESHIFT];
 	

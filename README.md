@@ -19,8 +19,9 @@ a language model drive monster tactics in real time.
 - **Variable internal resolution** — the software renderer draws natively at
   320×200 … 1920×1200 (`hires` 1–6), switchable at runtime from an **Options → Video**
   menu (no upscaling of a fixed 320×200 image).
-- **Mouse look**, toggle **autorun**, and an optional **`-friendlyfire`** flag that
-  enables same-species monster infighting.
+- **Free-look** (mouse aims the view up/down and your shots follow), **jump**
+  (default **Space**, with a grunt), toggle **autorun**, and an optional
+  **`-friendlyfire`** flag that enables same-species monster infighting.
 - **LLM AI Director** (`files/p_ai_llm.c`) — an external director drives monster
   *tactics* (flank, fall back, ambush, focus-fire, …) over a small TCP line protocol,
   or via a built-in scripted `-aidemo` director. A ready-to-run **Ollama** client is
@@ -119,8 +120,9 @@ tools/build_config.sh        # builds tools/aidoom_config and copies it into run
 run/aidoom_config            # run it from run/ (reads/writes run/aidoom.cfg)
 ```
 
-- **Action keys** (click a binding, then press a key — or the mouse wheel), mouse
-  sensitivity, resolution, screen size, fullscreen — the game's settings.
+- **Action keys** (click a binding, then press a key — or the mouse wheel),
+  including **Jump** (default Space), mouse sensitivity, resolution, screen size,
+  fullscreen — the game's settings.
 - **IWAD** — pick which WAD to play from the ones it finds (`iwads/`, the folder,
   Steam) or leave it on *auto*; the choice is saved as `iwad` and the game uses it.
 - **Ollama host / port / model** — read by the AI-Director tools

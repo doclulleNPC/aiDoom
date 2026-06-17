@@ -34,6 +34,8 @@ rcsid[] = "$Id: p_user.c,v 1.3 1997/01/28 22:08:29 b1 Exp $";
 #include "p_local.h"
 
 #include "doomstat.h"
+#include "s_sound.h"
+#include "sounds.h"
 
 
 
@@ -46,9 +48,25 @@ rcsid[] = "$Id: p_user.c,v 1.3 1997/01/28 22:08:29 b1 Exp $";
 //
 
 // 16 pixels of bob
-#define MAXBOB	0x100000	
+#define MAXBOB	0x100000
+
+// MOD: upward impulse applied by a jump.
+#define JUMPVELOCITY	(8*FRACUNIT)
 
 boolean		onground;
+
+
+//
+// P_PlayerLookSlope
+// MOD: convert the player's free-look pitch into an aiming slope (16.16 fixed).
+// 160 = BASE half-screen width = focal length, so this is tan(pitch).
+//
+fixed_t P_PlayerLookSlope (mobj_t* mo)
+{
+    if (!mo->player)
+	return 0;
+    return (mo->player->lookdir << FRACBITS) / 160;
+}
 
 
 //
@@ -156,7 +174,14 @@ void P_MovePlayer (player_t* player)
     // Do not let the player control movement
     //  if not onground.
     onground = (player->mo->z <= player->mo->floorz);
-	
+
+    // MOD: jump -- an upward impulse while on the ground, with a pain grunt.
+    if ((cmd->buttons & BT_JUMP) && onground)
+    {
+	player->mo->momz = JUMPVELOCITY;
+	S_StartSound (player->mo, sfx_plpain);
+    }
+
     if (cmd->forwardmove && onground)
 	P_Thrust (player, player->mo->angle, cmd->forwardmove*2048);
     

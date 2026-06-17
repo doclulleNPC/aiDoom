@@ -158,7 +158,11 @@ int		key_strafe;
 int		key_speed;
 int		key_nextweapon;		// default: mouse wheel up
 int		key_prevweapon;		// default: mouse wheel down
+int		key_jump;		// MOD: jump (default: space)
 int		autorun = 1;	// always-run; the run key toggles this (G_Responder)
+
+// MOD: free-look pitch clamp, in BASE-resolution horizon-shift pixels.
+#define LOOKDIRMAX	56
  
 int             mousebfire; 
 int             mousebstrafe; 
@@ -335,14 +339,18 @@ void G_BuildTiccmd (ticcmd_t* cmd)
 	|| joybuttons[joybfire]) 
 	cmd->buttons |= BT_ATTACK; 
  
-    if (gamekeydown[key_use] || joybuttons[joybuse] ) 
-    { 
+    if (gamekeydown[key_use] || joybuttons[joybuse] )
+    {
 	cmd->buttons |= BT_USE;
-	// clear double clicks if hit use button 
-	dclicks = 0;                   
-    } 
+	// clear double clicks if hit use button
+	dclicks = 0;
+    }
 
-    // chainsaw overrides 
+    // MOD: jump.  Disabled in net games (BT_JUMP would desync a vanilla peer).
+    if (!netgame && gamekeydown[key_jump])
+	cmd->buttons |= BT_JUMP;
+
+    // chainsaw overrides
     for (i=0 ; i<NUMWEAPONS-1 ; i++)        
 	if (gamekeydown['1'+i]) 
 	{ 
@@ -406,10 +414,20 @@ void G_BuildTiccmd (ticcmd_t* cmd)
 	} 
     } 
  
-    forward += mousey; 
-    if (strafe) 
-	side += mousex*2; 
-    else 
+    // MOD: free-look -- vertical mouse aims the view (lookdir) instead of moving
+    // forward/back.  Disabled in net games (lookdir isn't carried in the ticcmd).
+    if (!netgame)
+    {
+	player_t* plr = &players[consoleplayer];
+	plr->lookdir += mousey >> 3;
+	if (plr->lookdir > LOOKDIRMAX)  plr->lookdir = LOOKDIRMAX;
+	if (plr->lookdir < -LOOKDIRMAX) plr->lookdir = -LOOKDIRMAX;
+    }
+    else
+	forward += mousey;
+    if (strafe)
+	side += mousex*2;
+    else
 	cmd->angleturn -= mousex*0x8; 
 
     mousex = mousey = 0; 
