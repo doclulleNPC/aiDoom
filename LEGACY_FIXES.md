@@ -26,7 +26,7 @@ is a real bug.**
 | Garbage colormaps / corrupt light | pointer aligned via `(int)ptr` truncation | use `uintptr_t`/`intptr_t` | `colormaps`, `translationtables` |
 | Garbage textures / crash in `R_InitTextures` | on-disk `maptexture_t` had a `void **columndirectory` (8 B on 64-bit) that shifted every following field off the on-disk layout | make it a 4-byte placeholder | `r_data.c` |
 | Zone-heap corruption → crash in `P_LoadThings` on every level load | pointer arrays allocated as `Z_Malloc(n*4)` (DOS pointer size) under-allocate | `Z_Malloc(n*sizeof(*p))` | `p_setup.c` (`linebuffer`), `r_data.c` (texture arrays) |
-| Savegame load misbehaves | index⇄pointer swizzle cast through `int` | cast through `intptr_t`; save buffer is large because `screens[]` are `MAXWIDTH*MAXHEIGHT` | `p_saveg.c` |
+| Load a savegame → crash or corrupted actors/sectors | mobj/player/sector/state references are archived as array *indices* stuffed into the struct's pointer fields, then read back with `(int)` — which truncates the 8-byte field on 64-bit | swizzle both directions through `intptr_t`; save buffer is ample (`screens[]` are `MAXWIDTH*MAXHEIGHT`). **Verified: save+load works on 64-bit** | `p_saveg.c` |
 | Spurious `Z_ChangeTag: an owner is required for purgable blocks` | the purge-owner test `(unsigned)block->user < 0x100` truncates a 64-bit `user` pointer to 32 bits before comparing | cast through `uintptr_t` | `z_zone.c` (`Z_ChangeTag2`) |
 
 **Checked, benign:** `d_net.c` uses `(int)&((doomdata_t*)0)->field` — that's the
