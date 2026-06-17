@@ -1,0 +1,5 @@
+/* aiDoom application resources */
+/* id 1 -> Explorer/taskbar exe icon; "SDL_app" -> the name SDL 1.2 windib
+   loads for the window class icon (LoadImage(.., SDL_Appname) in SDL). */
+1       ICON "aidoom.ico"
+SDL_app ICON "aidoom.ico"

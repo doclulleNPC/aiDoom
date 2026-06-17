@@ -1,0 +1,47 @@
+# --- Build artifacts (MSVC + autotools/gcc) ---
+*.o
+*.obj
+*.res
+*.exe
+*.dll
+*.pdb
+*.ilk
+*.exp
+*.lib
+*.a
+*.lo
+.deps/
+.libs/
+build.log
+
+# --- autotools generated output (the *.in / configure templates stay) ---
+files/Makefile
+config.cache
+config.log
+config.status
+
+# --- Game data & runtime-generated files ---
+# IWADs are copyrighted id Software data -- bring your own, never commit them.
+*.wad
+*.WAD
+doom.cfg
+.doomrc
+doomsav*.dsg
+*.log
+
+# --- Local scratch (screenshots, icon previews) ---
+*Datei-Explorer*.png
+icon_preview.png
+exe_icon_check.png
+
+# --- Editor / OS noise ---
+*~
+*.swp
+.DS_Store
+Thumbs.db
+.vs/
+*.err
+
+# bare (extensionless) build outputs
+files/aidoom
+files/doom
