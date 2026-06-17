@@ -751,10 +751,21 @@ void R_DrawPlayerSprites (void)
     int		i;
     int		lightnum;
     pspdef_t*	psp;
-    
+    fixed_t	savecenteryfrac;
+    int		savecentery;
+
+    // MOD/free-look: the weapon is attached to the screen, not the world, so
+    // draw it against the un-pitched view centre.  Otherwise the pitch-shifted
+    // centeryfrac floats the weapon up and opens a gap to the status bar when
+    // looking down (and slides it off the bottom when looking up).
+    savecenteryfrac = centeryfrac;
+    savecentery = centery;
+    centery = viewheight/2;
+    centeryfrac = centery<<FRACBITS;
+
     // get light level
     lightnum =
-	(viewplayer->mo->subsector->sector->lightlevel >> LIGHTSEGSHIFT) 
+	(viewplayer->mo->subsector->sector->lightlevel >> LIGHTSEGSHIFT)
 	+extralight;
 
     if (lightnum < 0)		
@@ -776,6 +787,9 @@ void R_DrawPlayerSprites (void)
 	if (psp->state)
 	    R_DrawPSprite (psp);
     }
+
+    centeryfrac = savecenteryfrac;
+    centery = savecentery;
 }
 
 
