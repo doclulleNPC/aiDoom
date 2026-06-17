@@ -15,6 +15,11 @@ Usage:  python ollama_director.py [--port 31666] [--model mistral:7b-instruct]
 """
 import socket, json, time, sys, argparse, urllib.request
 
+# Ollama server location (override on the CLI with --host / --ollama-port,
+# or give a full URL with --ollama).
+OLLAMA_HOST = "192.168.2.114"
+OLLAMA_PORT = 11434
+
 ORDERS = {"chase", "hold", "fallback", "flank_left", "flank_right",
           "ambush", "focus_fire", "use_door"}
 
@@ -79,14 +84,20 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=31666)
     ap.add_argument("--model", default="mistral:7b-instruct")
-    ap.add_argument("--ollama", default="http://localhost:11434/api/chat")
+    ap.add_argument("--host", default=OLLAMA_HOST, help="Ollama server IP/host")
+    ap.add_argument("--ollama-port", type=int, default=OLLAMA_PORT,
+                    help="Ollama server port")
+    ap.add_argument("--ollama", default=None,
+                    help="full chat API URL (overrides --host/--ollama-port)")
     ap.add_argument("--period", type=float, default=1.0,
                     help="seconds to wait between planning rounds")
     args = ap.parse_args()
 
+    api = args.ollama or f"http://{args.host}:{args.ollama_port}/api/chat"
+
     sock = connect(args.port)
     sock.settimeout(15)              # tolerate the game briefly not ticking
-    print(f"[director] connected. model={args.model}")
+    print(f"[director] connected. model={args.model} ollama={api}")
     sock.sendall(b"wake\n")          # make the monsters engage the player
     try:
         recv_line(sock)              # "ok"
@@ -120,7 +131,7 @@ def main():
 
         t0 = time.time()
         try:
-            plan = ask_ollama(args.ollama, args.model, state)
+            plan = ask_ollama(api, args.model, state)
         except Exception as e:
             print(f"[director] ollama error: {e}")
             time.sleep(args.period)

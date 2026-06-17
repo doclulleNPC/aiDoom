@@ -33,6 +33,8 @@
 
 #include "doomdef.h"
 
+#include "aidoom_icon.h"
+
 
 static SDL_Window*	window = NULL;
 static SDL_Renderer*	renderer = NULL;
@@ -416,6 +418,20 @@ void I_InitGraphics(void)
 			      window_flags);
     if ( window == NULL )
 	I_Error("Could not create window: %s", SDL_GetError());
+
+    // Application/window icon (embedded from aidoom.ico; see aidoom_icon.h).
+    // On Windows the .exe icon comes from aidoom.rc; this sets the live
+    // window/taskbar icon on every platform.
+    {
+	SDL_Surface* icon = SDL_CreateSurfaceFrom(
+	    AIDOOM_ICON_W, AIDOOM_ICON_H, SDL_PIXELFORMAT_RGBA32,
+	    (void *)aidoom_icon_rgba, AIDOOM_ICON_W*4);
+	if (icon)
+	{
+	    SDL_SetWindowIcon(window, icon);
+	    SDL_DestroySurface(icon);
+	}
+    }
 
     renderer = SDL_CreateRenderer(window, NULL);
     if ( renderer == NULL )

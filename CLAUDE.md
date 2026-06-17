@@ -14,40 +14,42 @@ lives in `files/`. The window title / app name is set to "aiDoom" in
 
 ## Build & run
 
-Uses the original autotools setup. The README describes a **32-bit** build
-(`-m32` against 32-bit SDL 1.2); use that only if 32-bit SDL 1.2 is actually
-installed. On a typical modern x86-64 box only **64-bit SDL 1.2** is present, so
-build natively 64-bit instead. Either way the legacy K&R-ish C needs permissive
-flags for modern gcc (gcc 14 makes implicit-int / implicit-function-declaration /
-int-conversion hard errors), and `-fno-strict-aliasing` is **required** — the
-engine type-puns all over (e.g. `*(int *)lump->name`) and `-O2` will miscompile
-it otherwise (manifests as bogus runtime errors like "missing rotations").
+This is the **SDL3** codebase (`files/i_*.c` use `<SDL3/SDL.h>`). The legacy
+autotools files (`configure.in`, `Makefile.am/.in`) are **stale** — they target
+SDL 1.x and won't link SDL3. Use one of:
 
-Build natively 64-bit from inside `files/` (note: this old `configure` takes
-`CFLAGS` from the environment, not as a `./configure CFLAGS=...` argument):
+- **Linux/macOS:** `./build.sh` — compiles `files/*.c` against system SDL3
+  (pkg-config) and **copies the `aidoom` binary into `run/`** (so the launcher
+  finds it there). Requires the SDL3 dev package.
+- **Windows:** `nmake /f files\Makefile.msvc` (VS 2019 + SDL3 SDK) → `aidoom.exe`
+  + `SDL3.dll`, with the exe icon from `files/aidoom.rc`.
+
+`build.sh` is just this (and a `cp` to `run/`):
 
 ```sh
-export CFLAGS="-O2 -g -fcommon -fno-strict-aliasing -std=gnu89 \
+cd files && gcc -O2 -g -fcommon -fno-strict-aliasing -std=gnu11 \
   -Wno-implicit-int -Wno-implicit-function-declaration \
-  -Wno-int-conversion -Wno-return-mismatch"
-./configure --disable-sdltest
-make            # produces ./aidoom
+  -Wno-int-conversion -Wno-return-mismatch \
+  -DSDL_MAIN_HANDLED $(pkg-config --cflags sdl3) \
+  *.c -o aidoom $(pkg-config --libs sdl3) -lm
 ```
 
-The original 32-bit recipe (only works with 32-bit SDL 1.2 installed):
+Why the odd flags: the 1996 id source is K&R-ish, so modern gcc needs the
+`-Wno-*` set (gcc 14 makes implicit-int / implicit-function-declaration /
+int-conversion hard errors), and **`-fno-strict-aliasing` is required** — the
+engine type-puns all over (e.g. `*(int *)lump->name`) and `-O2` miscompiles it
+otherwise (symptom: bogus errors like "missing rotations"). `-DSDL_MAIN_HANDLED`
+because `i_main.c` owns `main()`. `build.sh` recompiles every `.c`, so there's no
+header-dependency-tracking pitfall.
 
-```sh
-./configure --disable-sdltest \
-  && sed -i s/'^CPPFLAGS ='/'CPPFLAGS = -m32'/g Makefile \
-  && sed -i s/'^LDFLAGS = '/'LDFLAGS = -m32'/g Makefile
-make
-```
+**App icon:** the live window/taskbar icon is embedded from `files/aidoom.ico`
+into `files/aidoom_icon.h` (a 64×64 RGBA array) and set via `SDL_SetWindowIcon`
+in `i_video.c`; the Windows `.exe` icon comes from `files/aidoom.rc`. Regenerate
+the header from the `.ico` with ImageMagick if the icon art changes.
 
-`make` does **not** track `CFLAGS` changes — after editing flags, `make clean`
-(or `rm -f config.cache` and re-`configure`) before rebuilding. If `configure` is
-missing or `*.in` files change, regenerate with `autoreconf` (autotools:
-`configure.in`, `acinclude.m4`/`aclocal.m4`, `Makefile.in`). The single output is
-the `doom` executable (`bin_PROGRAMS = doom`, `-lm`).
+Output binary is `aidoom` (`-iwad <wad>` / auto-detected IWAD; **bring your own**
+IWAD). To launch with the LLM AI Director, use `run/start_aidoom.sh`
+(Linux/macOS) or `run/start_aidoom.bat` (Windows) — see `run/README.md`.
 
 ### 64-bit portability (LP64) caveats
 

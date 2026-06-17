@@ -45,3 +45,6 @@ Thumbs.db
 # bare (extensionless) build outputs
 files/aidoom
 files/doom
+# build.sh copies the binary here too
+run/aidoom
+run/doom
