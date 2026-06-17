@@ -9,6 +9,8 @@ a language model drive monster tactics in real time.
 > the new work lives in the platform layer (`files/i_*.c`) and a few self-contained
 > modules.
 
+![aiDoom — hi-res software renderer, E1M1 at 1280×800](screen.png)
+
 ## Features
 
 - **SDL3 renderer** — `SDL_Window` + `SDL_Renderer` + a streaming texture; the 8-bit
@@ -26,7 +28,19 @@ a language model drive monster tactics in real time.
 - Native **Windows build** with Visual Studio 2019 (MSVC) + SDL3; the legacy autotools
   Linux build is still present.
 
-## Build (Windows, MSVC + SDL3)
+## Build
+
+### Linux / macOS (SDL3)
+
+Needs `gcc` and the **SDL3** development package (`pkg-config sdl3`). From the repo root:
+
+```sh
+./build.sh        # compiles files/*.c against system SDL3 and copies the binary into run/
+```
+
+(The legacy autotools files target SDL 1.x and won't link SDL3 — use `build.sh`.)
+
+### Windows (MSVC + SDL3)
 
 You need Visual Studio 2019 (or the Build Tools) and the **SDL3 SDK**
 (<https://github.com/libsdl-org/SDL/releases>). Point the `SDL` variable at it.
@@ -52,6 +66,12 @@ aidoom.exe -warp 1 1 -skill 4 -aidemo            REM built-in scripted director
 aidoom.exe -warp 1 1 -skill 4 -aidirector 31666  REM open the TCP director server
 ```
 
+On Linux/macOS it's the same flags, `./aidoom` (the binary `build.sh` puts in `run/`):
+
+```sh
+./aidoom -warp 1 1 -skill 4 -aidemo
+```
+
 ### LLM-driven monsters (Ollama)
 
 With a local [Ollama](https://ollama.com) running, the `run\start_aidoom.bat` launcher
@@ -61,6 +81,13 @@ waits for Ollama, then starts the game with the AI director and connects the cli
 run\start_aidoom.bat                       REM default model mistral:7b-instruct
 run\start_aidoom.bat -Skill 4 -FriendlyFire
 run\start_aidoom.bat -NoDirector           REM just the game
+```
+
+On Linux/macOS use `run/start_aidoom.sh` (same idea — waits for Ollama, then starts
+game + director; see `run/README.md`):
+
+```sh
+run/start_aidoom.sh --skill 4 --friendlyfire
 ```
 
 The director protocol (`observe` / `act` / `wake`) and design rationale are documented
