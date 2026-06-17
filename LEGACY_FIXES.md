@@ -84,6 +84,15 @@ hires`, 1–6 → up to 1920×1200). That exposes every place that baked in 320/
   scaled by the runtime `SCREENWIDTH` at the use site (`r_draw.c`).
 - `pspritescale`/`pspriteiscale` use `BASE_WIDTH` (weapon sprites authored in base
   coords) (`r_main.c`).
+- **`D_Display` (`d_main.c`) hardcoded the base resolution** — `viewheight == 200`
+  (fullscreen-HUD test) and `scaledviewwidth != 320` (border-redraw test). At
+  hi-res `viewheight` is never 200 and `scaledviewwidth` never 320, so the
+  status-bar refresh/fullscreen logic misfired. Use `SCREENHEIGHT`/`SCREENWIDTH`.
+  Compounding it: the menu can **overdraw the status bar** (the 2x "Video" item in
+  `M_DrawOptions` bleeds below base y=168 into the bar), and nothing forced a full
+  bar repaint when the menu closed → leftover red "VIDEO" baked into the HUD over
+  HEALTH/ARMS. Fix: set `redrawsbar = true` whenever the menu was active
+  (`menuactivestate`), so `ST_Drawer` does a full `ST_refreshBackground`.
 
 The reliable tell for this class: `Patch at X,Y exceeds LFB` where `X > 320`, or a
 HUD/menu element that's off-screen or missing at hires > 1.
