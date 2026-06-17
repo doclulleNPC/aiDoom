@@ -26,8 +26,8 @@ director client that drives the monsters' tactics.
 2. **Check the model** is pulled (`/api/tags`); warns (doesn't abort) if missing.
 3. **Warm the model** into memory (`/api/generate` with a tiny prompt) so the
    first in-game planning round isn't slow. Skip with `--no-warm` / `-NoWarm`.
-4. **Start aiDoom** with `-aidirector <port>` (and `-warp`, `-skill`, optional
-   `-friendlyfire`).
+4. **Start aiDoom** with `-aidirector <port>` (and `-warp`, `-skill`, the AI co-op
+   companion `-aicoop` by default, optional `-friendlyfire`).
 5. **Start the Python director** (`ollama_director.py`), which loops
    observe → ask the LLM → issue squad orders. The game keeps running if Python
    or the model is unavailable. Closing the director (or Ctrl-C) stops the game.
@@ -69,6 +69,7 @@ Flags (unrecognized args are passed straight through to `aidoom`):
 | `--skill <n>` | `4` | difficulty (1–5) |
 | `--ollama <url>` | `http://192.168.2.114:11434` | Ollama base URL |
 | `--friendlyfire` | off | enable monster infighting (`-friendlyfire`) |
+| `--no-coop` | off | disable the AI co-op companion (player 2, on by default) |
 | `--no-director` | off | launch only the game |
 | `--no-warm` | off | skip model warm-up |
 
@@ -82,7 +83,10 @@ Double-click **`start_aidoom.bat`**, or run the PowerShell script with params:
 .\start_aidoom.ps1 -NoDirector
 ```
 
-Params: `-Model -Port -Episode -Map -Skill -Ollama -FriendlyFire -NoDirector -NoWarm`.
+Params: `-Model -Port -Episode -Map -Skill -Ollama -FriendlyFire -NoCoop -NoDirector -NoWarm`.
+
+The **AI co-op companion** (player 2) is launched **by default**; pass `--no-coop`
+(`-NoCoop` on Windows) to play solo.
 
 ## Ollama server location
 

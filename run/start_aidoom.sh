@@ -11,7 +11,9 @@
 #   ./start_aidoom.sh
 #   ./start_aidoom.sh --model qwen3:8b --skill 4 --friendlyfire
 #   ./start_aidoom.sh --no-director            # just the game, no LLM
+#   ./start_aidoom.sh --no-coop                # disable the AI co-op companion
 #   ./start_aidoom.sh --ollama http://localhost:11434
+# The AI co-op companion (player 2) is ON by default; disable it with --no-coop.
 # Unrecognized args are passed straight through to aidoom.
 #
 # Requires: SDL3 installed (to run the binary) and the aidoom binary built
@@ -29,6 +31,7 @@ OLLAMA="http://192.168.2.114:11434"
 FRIENDLYFIRE=0
 NODIRECTOR=0
 NOWARM=0
+COOP=1			# AI co-op companion (player 2) on by default; --no-coop to disable
 GAME_EXTRA=()
 
 # aidoom.cfg (next to this script, written by the SDL3 config app) overrides the
@@ -53,6 +56,8 @@ while [ $# -gt 0 ]; do
         --friendlyfire) FRIENDLYFIRE=1; shift;;
         --no-director)  NODIRECTOR=1; shift;;
         --no-warm)      NOWARM=1; shift;;
+        --no-coop)      COOP=0; shift;;
+        --coop)         COOP=1; shift;;
         -h|--help)
             sed -n '3,20p' "$0"; exit 0;;
         *)              GAME_EXTRA+=("$1"); shift;;
@@ -116,6 +121,7 @@ fi
 
 # --- 4. start aiDoom with the AI director TCP server ---
 gameargs=( -warp "$EPISODE" "$MAP" -skill "$SKILL" -aidirector "$PORT" )
+[ "$COOP" = 1 ]        && gameargs+=( -aicoop )
 [ "$FRIENDLYFIRE" = 1 ] && gameargs+=( -friendlyfire )
 [ ${#GAME_EXTRA[@]} -gt 0 ] && gameargs+=( "${GAME_EXTRA[@]}" )
 

@@ -9,6 +9,8 @@
     .\start_aidoom.ps1
     .\start_aidoom.ps1 -Model qwen2.5-coder:1.5b -Skill 4 -FriendlyFire
     .\start_aidoom.ps1 -NoDirector        # just the game, no LLM
+    .\start_aidoom.ps1 -NoCoop            # disable the AI co-op companion
+  The AI co-op companion (player 2) is ON by default; -NoCoop turns it off.
 #>
 param(
     [string]$Model     = "mistral:7b-instruct",
@@ -19,7 +21,8 @@ param(
     [string]$Ollama    = "http://localhost:11434",
     [switch]$FriendlyFire,
     [switch]$NoDirector,
-    [switch]$NoWarm
+    [switch]$NoWarm,
+    [switch]$NoCoop          # AI co-op companion (player 2) is on by default
 )
 
 $ErrorActionPreference = "Stop"
@@ -94,6 +97,7 @@ if (-not (Test-Path (Join-Path $here "SDL3.dll"))) { Die "SDL3.dll missing next 
 # IWAD selection is handled by the engine itself, in this order:
 #   -iwad <file>  >  aidoom.cfg "iwad"  >  iwads\  >  this folder  >  Steam.
 $gameArgs = @("-warp","$Episode","$Map","-skill","$Skill","-aidirector","$Port")
+if (-not $NoCoop)  { $gameArgs += "-aicoop" }
 if ($FriendlyFire) { $gameArgs += "-friendlyfire" }
 Info "launching aidoom.exe $($gameArgs -join ' ')"
 Start-Process -FilePath (Join-Path $here "aidoom.exe") -ArgumentList $gameArgs -WorkingDirectory $here
