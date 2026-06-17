@@ -296,9 +296,14 @@ static void click(float mx,float my)
         if (s->type==T_KEY) { mode=1; active=i; snprintf(status,sizeof(status),"Press a key (or mouse wheel) for \"%s\"  -  Esc cancels", s->label); }
         else if (s->type==T_TOGGLE) s->ival = !s->ival;
         else if (s->type==T_INT) {
-            float mid = VALX-4 + (WINW-VALX)/2.0f;
-            s->ival += (mx<mid)? -1 : 1;
-            if (s->ival<s->vmin) s->ival=s->vmin; if (s->ival>s->vmax) s->ival=s->vmax;
+            // hit-test against the actual "< N >" text: left half = '<', right = '>'
+            char tmp[32]; snprintf(tmp,sizeof(tmp),"< %d >", s->ival);
+            float w = (float)strlen(tmp)*FONT_CW;
+            if (mx <= VALX + w) {
+                s->ival += (mx < VALX + w/2.0f) ? -1 : 1;
+                if (s->ival<s->vmin) s->ival=s->vmin;
+                if (s->ival>s->vmax) s->ival=s->vmax;
+            }
         }
         else if (s->type==T_TEXT) { mode=2; active=i; strncpy(editbuf,s->sval,sizeof(editbuf)-1); editbuf[sizeof(editbuf)-1]=0; SDL_StartTextInput(win); snprintf(status,sizeof(status),"Type, Enter to confirm"); }
         return;
