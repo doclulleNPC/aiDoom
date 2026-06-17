@@ -83,6 +83,7 @@ static int access(char *file, int mode)
 #include "am_map.h"
 
 #include "p_setup.h"
+#include "p_ai_coop.h"
 #include "r_local.h"
 
 
@@ -1141,6 +1142,10 @@ printf("added\n");
 
     printf ("D_CheckNetGame: Checking network game status.\n");
     D_CheckNetGame ();
+
+    // -aicoop: add an AI-controlled co-op companion (player 2).  Must run after
+    // D_CheckNetGame (which sets playeringame[]) and before the first level.
+    P_AICoop_Init ();
 
     printf ("S_Init: Setting up sound.\n");
     S_Init (snd_SfxVolume /* *8 */, snd_MusicVolume /* *8*/ );

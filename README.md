@@ -22,6 +22,10 @@ a language model drive monster tactics in real time.
 - **Free-look** (mouse aims the view up/down and your shots follow), **jump**
   (default **Space**, with a grunt), toggle **autorun**, and an optional
   **`-friendlyfire`** flag that enables same-species monster infighting.
+- **AI co-op companion** (`files/p_ai_coop.c`, `-aicoop`) — spawns a second marine
+  (player 2) driven by a built-in bot: it acquires the nearest visible monster and
+  fires, otherwise follows you. Drives a real co-op player through the normal ticcmd
+  path (weapons, damage, pickups, reborn all work). Single-machine, off by default.
 - **LLM AI Director** (`files/p_ai_llm.c`) — an external director drives monster
   *tactics* (flank, fall back, ambush, focus-fire, …) over a small TCP line protocol,
   or via a built-in scripted `-aidemo` director. A ready-to-run **Ollama** client is
@@ -87,6 +91,7 @@ On Linux/macOS it's the same flags, `./aidoom` (the binary `build.sh` puts in `r
 
 ```sh
 ./aidoom -warp 1 1 -skill 4 -aidemo
+./aidoom -warp 1 1 -skill 3 -aicoop          # add an AI-controlled co-op buddy
 ```
 
 ### LLM-driven monsters (Ollama)
