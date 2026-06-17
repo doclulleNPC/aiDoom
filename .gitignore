@@ -34,6 +34,10 @@ doomsav*.dsg
 icon_preview.png
 exe_icon_check.png
 
+# --- Python (ollama_director.py / gpumon.py) ---
+__pycache__/
+*.pyc
+
 # --- Editor / OS noise ---
 *~
 *.swp

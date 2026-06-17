@@ -15,6 +15,7 @@ director client that drives the monsters' tactics.
 | `start_aidoom.bat` | Windows | Double-click shim → calls the PowerShell script. |
 | `start_aidoom.ps1` | Windows | Main launcher (PowerShell). |
 | `ollama_director.py` | all | The director client (talks to Ollama + the game). Mirror of the repo-root copy. |
+| `gpumon.py` | all | Live GPU monitor for the remote Ollama machine (see below). |
 | `aidoom.ico` | Windows | Icon for the launcher/shortcut. |
 
 ## What the launcher does
@@ -91,6 +92,24 @@ The server URL is configurable and defaults differ by platform:
 `ollama_director.py` itself takes `--host` / `--ollama-port`, or a full `--ollama`
 URL (which the launchers pass through). Its built-in default host is
 `OLLAMA_HOST = "192.168.2.114"`.
+
+## GPU monitor (`gpumon.py`)
+
+Small live monitor for the GPU on the (remote) Ollama machine — handy while the
+AI Director is running. Two sources:
+
+- **`nvidia-smi` over SSH** → true GPU load %, VRAM, temperature, power.
+- **Ollama `/api/ps`** (`--ollama-only`) → only the VRAM of loaded models (no SSH).
+
+```sh
+python3 gpumon.py                 # defaults: host 192.168.2.114, user lubee (SSH)
+python3 gpumon.py --once          # one snapshot instead of the live loop
+python3 gpumon.py --ollama-only   # no SSH, model VRAM only
+```
+
+On startup it self-tests the SSH read; if that fails it automatically falls back
+to the Ollama mode. Override with `--host` / `--user` / `--interval`. (The remote
+SSH details are in the project memory; SSH is Windows-OpenSSH as user `lubee`.)
 
 ## Without the launcher (manual)
 
