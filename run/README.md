@@ -39,9 +39,10 @@ director client that drives the monsters' tactics.
     copies the `aidoom` binary into `run/`. (SDL3 is linked from the system, so
     there's no library to copy alongside it.)
   - Windows: build `files/Makefile.msvc`, then put `aidoom.exe` + `SDL3.dll` in `run/`.
-- A DOOM **IWAD** (`doom1.wad` / `doom.wad` / `doom2.wad`) in `run/` or the
-  binary's folder. The `.sh` passes it via `-iwad` if found; otherwise the engine
-  auto-detects one in its working directory. **Bring your own** — IWADs are not shipped.
+- A DOOM **IWAD**. The engine finds one via `-iwad <file>` → the `iwad` key in
+  `aidoom.cfg` → an `iwads/` subfolder → `run/` (the binary's folder) → a Steam
+  install. Pick which to use in the config app, or drop a `.wad` in `run/iwads/`.
+  **Bring your own** — IWADs are not shipped.
 - An **Ollama** server reachable over HTTP, with the chosen model pulled
   (`ollama pull mistral:7b-instruct`). For a *remote* server it must listen on the
   network (`OLLAMA_HOST=0.0.0.0 ollama serve`), not just localhost.
@@ -96,7 +97,8 @@ URL (which the launchers pass through). Its built-in default host is
 `OLLAMA_HOST = "192.168.2.114"`.
 
 **`aidoom.cfg`** (in this folder, written by the SDL3 config app `aidoom_config`)
-sets `ollama_host` / `ollama_port` / `ollama_model`. `ollama_director.py`,
+sets `ollama_host` / `ollama_port` / `ollama_model`, the chosen `iwad`, and the GPU
+monitor's `gpu_host` / `gpu_user` / `gpu_ssh_port`. `ollama_director.py`,
 `gpumon.py` and `start_aidoom.sh`/`.ps1` read it (next to themselves) on startup;
 CLI flags still override. It's the same file the game uses for keys/video.
 
@@ -109,7 +111,7 @@ AI Director is running. Two sources:
 - **Ollama `/api/ps`** (`--ollama-only`) → only the VRAM of loaded models (no SSH).
 
 ```sh
-python3 gpumon.py                 # defaults: host 192.168.2.114, user lubee (SSH)
+python3 gpumon.py                 # host/user from aidoom.cfg (gpu_host/gpu_user), else 192.168.2.114 / lubee
 python3 gpumon.py --once          # one snapshot instead of the live loop
 python3 gpumon.py --ollama-only   # no SSH, model VRAM only
 ```

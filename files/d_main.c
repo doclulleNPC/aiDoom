@@ -564,70 +564,107 @@ void D_AddFile (char *file)
 // to determine whether registered/commercial features
 // should be executed (notably loading PWAD's).
 //
+// Known IWAD filenames in detection priority, with the game mode they imply.
+static const struct { const char* name; int mode; } known_iwads[] = {
+    { "doom2.wad",     commercial },
+    { "plutonia.wad",  commercial },
+    { "tnt.wad",       commercial },
+    { "doomu.wad",     retail     },
+    { "doom.wad",      registered },
+    { "doom1.wad",     shareware  },
+    { "freedoom2.wad", commercial },
+    { "freedoom1.wad", retail     },
+    { "freedm.wad",    commercial },
+};
+
+// Steam install locations (relative to steamapps/common) + game mode.
+static const struct { const char* rel; int mode; } steam_iwads[] = {
+    { "Ultimate Doom/base/DOOM.WAD",       retail     },
+    { "Ultimate Doom/rerelease/DOOM.WAD",  retail     },
+    { "Ultimate Doom/base/doom.wad",       retail     },
+    { "DOOM 2/base/DOOM2.WAD",             commercial },
+    { "Doom 2/base/DOOM2.WAD",             commercial },
+    { "Doom 2/finaldoombase/TNT.WAD",      commercial },
+    { "Doom 2/finaldoombase/PLUTONIA.WAD", commercial },
+    { "Final Doom/base/TNT.WAD",           commercial },
+    { "Final Doom/base/PLUTONIA.WAD",      commercial },
+};
+
+static char* IWAD_Strdup (const char* s)
+{
+    char* d = malloc(strlen(s)+1);
+    if (d) strcpy(d, s);
+    return d;
+}
+
+// Read a value for "key" from aidoom.cfg (working dir). Returns 1 if found.
+static int IWAD_CfgGet (const char* key, char* out, int n)
+{
+    FILE* f = fopen("aidoom.cfg", "r");
+    char line[256], k[64], v[192];
+    int found = 0;
+    if (!f) return 0;
+    while (fgets(line, sizeof(line), f))
+    {
+	if (sscanf(line, " %63s %191[^\n]", k, v) == 2 && !strcmp(k, key))
+	{
+	    char* p = v; int L = (int)strlen(p);
+	    if (L >= 2 && p[0]=='"' && p[L-1]=='"') { p[L-1]=0; p++; }
+	    strncpy(out, p, n-1); out[n-1]=0; found = 1;
+	}
+    }
+    fclose(f);
+    return found;
+}
+
+// Best-effort game mode from an IWAD path's basename.
+static int IWAD_ModeFromName (const char* path)
+{
+    const char* b = path; const char* s;
+    char low[64]; int i, c;
+    if ((s = strrchr(b,'/')))  b = s+1;
+    if ((s = strrchr(b,'\\'))) b = s+1;
+    for (i=0; b[i] && i<63; i++) { c = b[i]; if (c>='A'&&c<='Z') c+=32; low[i]=(char)c; }
+    low[i] = 0;
+    if (strstr(low,"doom2") || strstr(low,"plutonia") || strstr(low,"tnt")
+	|| strstr(low,"freedoom2") || strstr(low,"freedm")) return commercial;
+    if (strstr(low,"doomu") || strstr(low,"freedoom1")) return retail;
+    if (strstr(low,"doom1")) return shareware;
+    if (strstr(low,"doom"))  return registered;
+    return commercial;
+}
+
+//
+// IdentifyVersion
+// Locate an IWAD and set the game mode.  Search order:
+//   -iwad <file>  >  "iwad" in aidoom.cfg  >  iwads/  >  .  >  $DOOMWADDIR  >  Steam
+//
 void IdentifyVersion (void)
 {
+    char	path[1024];
+    char	cfgval[512];
+    int		mode = indetermined;
+    char*	found = NULL;
+    char*	doomwaddir;
+    int		i, d, r, p;
 
-    char*	doom1wad;
-    char*	doomwad;
-    char*	doomuwad;
-    char*	doom2wad;
-
-    char*	doom2fwad;
-    char*	plutoniawad;
-    char*	tntwad;
-
-    char *doomwaddir;
     doomwaddir = getenv("DOOMWADDIR");
-    if (!doomwaddir)
-	doomwaddir = ".";
-
-    // Commercial.
-    doom2wad = malloc(strlen(doomwaddir)+1+9+1);
-    sprintf(doom2wad, "%s/doom2.wad", doomwaddir);
-
-    // Retail.
-    doomuwad = malloc(strlen(doomwaddir)+1+9+1); // edited -> georg
-    sprintf(doomuwad, "%s/doomu.wad", doomwaddir);
-    
-    // Registered.
-    doomwad = malloc(strlen(doomwaddir)+1+8+1);
-    sprintf(doomwad, "%s/doom.wad", doomwaddir);
-    
-    // Shareware.
-    doom1wad = malloc(strlen(doomwaddir)+1+9+1);
-    sprintf(doom1wad, "%s/doom1.wad", doomwaddir);
-
-     // Bug, dear Shawn.
-    // Insufficient malloc, caused spurious realloc errors.
-    plutoniawad = malloc(strlen(doomwaddir)+1+/*9*/12+1);
-    sprintf(plutoniawad, "%s/plutonia.wad", doomwaddir);
-
-    tntwad = malloc(strlen(doomwaddir)+1+9+1);
-    sprintf(tntwad, "%s/tnt.wad", doomwaddir);
-
-
-    // French stuff.
-    doom2fwad = malloc(strlen(doomwaddir)+1+10+1);
-    sprintf(doom2fwad, "%s/doom2f.wad", doomwaddir);
 
     // Single config file in the working directory (next to the binary).
     strcpy (basedefault, "aidoom.cfg");
 
     if (M_CheckParm ("-shdev"))
     {
-	gamemode = shareware;
-	devparm = true;
+	gamemode = shareware; devparm = true;
 	D_AddFile (DEVDATA"doom1.wad");
 	D_AddFile (DEVMAPS"data_se/texture1.lmp");
 	D_AddFile (DEVMAPS"data_se/pnames.lmp");
 	strcpy (basedefault,DEVDATA"default.cfg");
 	return;
     }
-
     if (M_CheckParm ("-regdev"))
     {
-	gamemode = registered;
-	devparm = true;
+	gamemode = registered; devparm = true;
 	D_AddFile (DEVDATA"doom.wad");
 	D_AddFile (DEVMAPS"data_se/texture1.lmp");
 	D_AddFile (DEVMAPS"data_se/texture2.lmp");
@@ -635,84 +672,92 @@ void IdentifyVersion (void)
 	strcpy (basedefault,DEVDATA"default.cfg");
 	return;
     }
-
     if (M_CheckParm ("-comdev"))
     {
-	gamemode = commercial;
-	devparm = true;
-	/* I don't bother
-	if(plutonia)
-	    D_AddFile (DEVDATA"plutonia.wad");
-	else if(tnt)
-	    D_AddFile (DEVDATA"tnt.wad");
-	else*/
-	    D_AddFile (DEVDATA"doom2.wad");
-	    
+	gamemode = commercial; devparm = true;
+	D_AddFile (DEVDATA"doom2.wad");
 	D_AddFile (DEVMAPS"cdata/texture1.lmp");
 	D_AddFile (DEVMAPS"cdata/pnames.lmp");
 	strcpy (basedefault,DEVDATA"default.cfg");
 	return;
     }
 
-    if ( !access (doom2fwad,R_OK) )
+    // 1) explicit -iwad <file>
+    p = M_CheckParm ("-iwad");
+    if (p && p < myargc-1 && !access (myargv[p+1], R_OK))
     {
-	gamemode = commercial;
-	// C'est ridicule!
-	// Let's handle languages in config files, okay?
-	language = french;
-	printf("French version\n");
-	D_AddFile (doom2fwad);
+	found = IWAD_Strdup (myargv[p+1]);
+	mode  = IWAD_ModeFromName (found);
+    }
+
+    // 2) "iwad <path>" from aidoom.cfg (written by the config app)
+    if (!found && IWAD_CfgGet ("iwad", cfgval, sizeof(cfgval))
+	&& cfgval[0] && !access (cfgval, R_OK))
+    {
+	found = IWAD_Strdup (cfgval);
+	mode  = IWAD_ModeFromName (found);
+    }
+
+    // 3) known names in:  iwads/  ->  .  ->  $DOOMWADDIR  (plus french doom2f.wad)
+    if (!found)
+    {
+	const char* dirs[3]; int nd = 0;
+	dirs[nd++] = "iwads";
+	dirs[nd++] = ".";
+	if (doomwaddir && strcmp (doomwaddir, ".")) dirs[nd++] = doomwaddir;
+
+	for (d=0; !found && d<nd; d++)
+	{
+	    snprintf (path, sizeof(path), "%s/doom2f.wad", dirs[d]);
+	    if (!access (path, R_OK))
+	    {
+		found = IWAD_Strdup (path); mode = commercial;
+		language = french; printf ("French version\n");
+		break;
+	    }
+	    for (i=0; i < (int)(sizeof(known_iwads)/sizeof(known_iwads[0])); i++)
+	    {
+		snprintf (path, sizeof(path), "%s/%s", dirs[d], known_iwads[i].name);
+		if (!access (path, R_OK))
+		{ found = IWAD_Strdup (path); mode = known_iwads[i].mode; break; }
+	    }
+	}
+    }
+
+    // 4) Steam install locations
+    if (!found)
+    {
+	char roots[6][512]; int nr = 0;
+	char* home = getenv ("HOME");
+	if (home)
+	{
+	    snprintf (roots[nr++], 512, "%s/.steam/steam/steamapps/common", home);
+	    snprintf (roots[nr++], 512, "%s/.local/share/Steam/steamapps/common", home);
+	    snprintf (roots[nr++], 512, "%s/.steam/root/steamapps/common", home);
+	}
+	snprintf (roots[nr++], 512, "C:/Program Files (x86)/Steam/steamapps/common");
+	snprintf (roots[nr++], 512, "C:/Program Files/Steam/steamapps/common");
+
+	for (i=0; !found && i < (int)(sizeof(steam_iwads)/sizeof(steam_iwads[0])); i++)
+	    for (r=0; r<nr; r++)
+	    {
+		snprintf (path, sizeof(path), "%s/%s", roots[r], steam_iwads[i].rel);
+		if (!access (path, R_OK))
+		{ found = IWAD_Strdup (path); mode = steam_iwads[i].mode; break; }
+	    }
+    }
+
+    if (found)
+    {
+	printf ("IWAD: %s\n", found);
+	gamemode = mode;
+	D_AddFile (found);
 	return;
     }
 
-    if ( !access (doom2wad,R_OK) )
-    {
-	gamemode = commercial;
-	D_AddFile (doom2wad);
-	return;
-    }
-
-    if ( !access (plutoniawad, R_OK ) )
-    {
-      gamemode = commercial;
-      D_AddFile (plutoniawad);
-      return;
-    }
-
-    if ( !access ( tntwad, R_OK ) )
-    {
-      gamemode = commercial;
-      D_AddFile (tntwad);
-      return;
-    }
-
-    if ( !access (doomuwad,R_OK) )
-    {
-      gamemode = retail;
-      D_AddFile (doomuwad);
-      return;
-    }
-
-    if ( !access (doomwad,R_OK) )
-    {
-      gamemode = registered;
-      D_AddFile (doomwad);
-      return;
-    }
-
-    if ( !access (doom1wad,R_OK) )
-    {
-      gamemode = shareware;
-      D_AddFile (doom1wad);
-      return;
-    }
-
-    printf("Game mode indeterminate.\n");
+    printf ("Game mode indeterminate -- no IWAD found "
+	    "(looked in iwads/, ., $DOOMWADDIR, Steam).\n");
     gamemode = indetermined;
-
-    // We don't abort. Let's see what the PWAD contains.
-    //exit(1);
-    //I_Error ("Game mode indeterminate\n");
 }
 
 //

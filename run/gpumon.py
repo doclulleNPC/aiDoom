@@ -31,8 +31,11 @@ def _aidoom_cfg():
         pass
     return cfg
 _CFG = _aidoom_cfg()
-DEF_HOST = _CFG.get("ollama_host", "192.168.2.114")
+# gpu_host / gpu_user fall back to the Ollama host (same machine) and "lubee".
+DEF_HOST = _CFG.get("gpu_host", _CFG.get("ollama_host", "192.168.2.114"))
 DEF_OPORT = int(_CFG.get("ollama_port", "11434"))
+DEF_USER = _CFG.get("gpu_user", "lubee")
+DEF_SSH_PORT = int(_CFG.get("gpu_ssh_port", "22"))
 
 CLR = "\033[2J\033[H"          # clear screen + home
 DIM = "\033[2m"; RST = "\033[0m"; BOLD = "\033[1m"
@@ -103,9 +106,9 @@ def render_ollama(models, host):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--host", default=DEF_HOST)
-    ap.add_argument("--user", default="lubee",
-                    help="SSH username for true GPU% (default: lubee; '' to disable SSH)")
-    ap.add_argument("--ssh-port", type=int, default=22)
+    ap.add_argument("--user", default=DEF_USER,
+                    help="SSH username for true GPU%% (from aidoom.cfg gpu_user; '' to disable SSH)")
+    ap.add_argument("--ssh-port", type=int, default=DEF_SSH_PORT)
     ap.add_argument("--key", default=None, help="SSH private key (default: ssh's own)")
     ap.add_argument("--ollama-port", type=int, default=DEF_OPORT)
     ap.add_argument("--ollama-only", action="store_true")

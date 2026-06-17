@@ -52,13 +52,29 @@ nmake /f Makefile.msvc                 REM SDL = C:\Source\SDL3 by default
 nmake /f Makefile.msvc SDL=C:\path\to\SDL3
 ```
 
-This produces `aidoom.exe` and copies `SDL3.dll` next to it.
+This produces `aidoom.exe` (with the app icon embedded from `aidoom.rc`/`aidoom.ico`)
+and copies `SDL3.dll` next to it.
+
+Alternatively, build with **MinGW-w64** (on Windows in MSYS2, or cross-compiling from
+Linux) — this also embeds the icon, via `windres`:
+
+```sh
+SDL3=/path/to/SDL3-devel-3.x.y-mingw/x86_64-w64-mingw32 ./build_win.sh
+```
 
 ## Run
 
-aiDoom needs a DOOM **IWAD** (`doom1.wad`, `doom.wad`, `doom2.wad`, …) in the working
-directory — **bring your own**; IWADs are copyrighted id Software data and are not
-distributed here. The shareware `doom1.wad` is freely available.
+aiDoom needs a DOOM **IWAD** (`doom1.wad`, `doom.wad`, `doom2.wad`, `tnt.wad`,
+`plutonia.wad`, Freedoom, …) — **bring your own**; IWADs are copyrighted id Software
+data and are not distributed here. The shareware `doom1.wad` is freely available.
+
+The engine looks for one in this order:
+
+1. **`-iwad <file>`** on the command line
+2. the **`iwad`** value in `aidoom.cfg` (set it in the config app — see below)
+3. an **`iwads/`** subfolder of the working directory
+4. the working directory itself (and `$DOOMWADDIR`)
+5. a **Steam** install (Ultimate Doom / Doom 2 / Final Doom, Linux & Windows paths)
 
 ```bat
 aidoom.exe -warp 1 1 -skill 4
@@ -105,6 +121,8 @@ run/aidoom_config            # run it from run/ (reads/writes run/aidoom.cfg)
 
 - **Action keys** (click a binding, then press a key — or the mouse wheel), mouse
   sensitivity, resolution, screen size, fullscreen — the game's settings.
+- **IWAD** — pick which WAD to play from the ones it finds (`iwads/`, the folder,
+  Steam) or leave it on *auto*; the choice is saved as `iwad` and the game uses it.
 - **Ollama host / port / model** — read by the AI-Director tools
   (`ollama_director.py`, `run/gpumon.py`, `run/start_aidoom.{sh,ps1}`).
 

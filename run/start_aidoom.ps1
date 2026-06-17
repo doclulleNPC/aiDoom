@@ -91,15 +91,9 @@ if (-not $NoDirector) {
 # --- 4. start aiDoom with the AI director TCP server ---
 if (-not (Test-Path (Join-Path $here "SDL3.dll"))) { Die "SDL3.dll missing next to aidoom.exe in $here" }
 
-# Find any known IWAD in this folder (commercial, shareware, or Freedoom).
-$iwads = @("doom2.wad","doom.wad","doomu.wad","plutonia.wad","tnt.wad","doom1.wad",
-           "freedoom2.wad","freedoom1.wad","freedm.wad")
-$wad = $null
-foreach ($w in $iwads) { if (Test-Path (Join-Path $here $w)) { $wad = $w; break } }
-if (-not $wad) { Die "No IWAD found in $here (e.g. doom.wad / doom2.wad / doom1.wad / freedoom*.wad)" }
-Info "using IWAD: $wad"
-
-$gameArgs = @("-iwad",$wad,"-warp","$Episode","$Map","-skill","$Skill","-aidirector","$Port")
+# IWAD selection is handled by the engine itself, in this order:
+#   -iwad <file>  >  aidoom.cfg "iwad"  >  iwads\  >  this folder  >  Steam.
+$gameArgs = @("-warp","$Episode","$Map","-skill","$Skill","-aidirector","$Port")
 if ($FriendlyFire) { $gameArgs += "-friendlyfire" }
 Info "launching aidoom.exe $($gameArgs -join ' ')"
 Start-Process -FilePath (Join-Path $here "aidoom.exe") -ArgumentList $gameArgs -WorkingDirectory $here

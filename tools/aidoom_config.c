@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <unistd.h>
 
 #include "font_atlas.h"
 
@@ -26,7 +27,7 @@ enum { K_RIGHT=0xae,K_LEFT=0xac,K_UP=0xad,K_DOWN=0xaf,
        K_RCTRL=0x9d,K_RSHIFT=0xb6,K_RALT=0xb8,
        K_MWHEELUP=0xb0,K_MWHEELDOWN=0xb1,K_ESC=27,K_ENTER=13,K_TAB=9,K_BKSP=127 };
 
-enum { T_KEY, T_INT, T_TOGGLE, T_TEXT };
+enum { T_KEY, T_INT, T_TOGGLE, T_TEXT, T_CHOICE };
 enum { F_DOOMRC, F_AIDOOM };
 
 typedef struct {
@@ -59,6 +60,8 @@ static setting_t settings[] = {
     {"Video / mouse","SFX volume",       "sfx_volume",       T_INT,0,15,F_DOOMRC},
     {"Video / mouse","Music volume",     "music_volume",     T_INT,0,15,F_DOOMRC},
     {"Video / mouse","Fullscreen",       "fullscreen",       T_TOGGLE,0,1,F_DOOMRC},
+
+    {"Game","IWAD",                      "iwad",             T_CHOICE,0,0,F_DOOMRC},
 
     {"AI Director (Ollama)","Ollama host", "ollama_host",  T_TEXT,0,0,F_AIDOOM},
     {"AI Director (Ollama)","Ollama port", "ollama_port",  T_TEXT,0,0,F_AIDOOM},
@@ -172,6 +175,69 @@ static void set_default_int(setting_t* s)
     s->ival = v;
 }
 
+// ----------------------------------------------------------------- IWAD scan
+// Same search order as the engine: iwads/ -> . -> Steam. [0] is "" = auto-detect.
+static char iwadlist[64][512];
+static int  niwad = 0;
+static int  iwadsel = 0;
+
+static const char* base_name(const char* p)
+{
+    const char* b = p, *s;
+    if ((s = strrchr(b,'/')))  b = s+1;
+    if ((s = strrchr(b,'\\'))) b = s+1;
+    return b;
+}
+
+static void iwad_add(const char* p)
+{
+    for (int i=0;i<niwad;i++) if (!strcmp(iwadlist[i],p)) return;	// dedup
+    if (niwad < 64) { strncpy(iwadlist[niwad],p,511); iwadlist[niwad][511]=0; niwad++; }
+}
+
+static void scan_iwads(void)
+{
+    static const char* names[] = {"doom2.wad","plutonia.wad","tnt.wad","doomu.wad",
+        "doom.wad","doom1.wad","freedoom2.wad","freedoom1.wad","freedm.wad","doom2f.wad"};
+    static const char* rel[] = {
+        "Ultimate Doom/base/DOOM.WAD","Ultimate Doom/rerelease/DOOM.WAD",
+        "DOOM 2/base/DOOM2.WAD","Doom 2/base/DOOM2.WAD",
+        "Final Doom/base/TNT.WAD","Final Doom/base/PLUTONIA.WAD",
+        "Doom 2/finaldoombase/TNT.WAD","Doom 2/finaldoombase/PLUTONIA.WAD"};
+    const char* dirs[2] = {"iwads","."};
+    char path[512];
+
+    niwad = 0; iwad_add("");				// [0] = auto
+
+    for (int d=0; d<2; d++)
+        for (int i=0; i<(int)(sizeof(names)/sizeof(names[0])); i++) {
+            snprintf(path,sizeof(path),"%s/%s",dirs[d],names[i]);
+            if (!access(path,F_OK)) iwad_add(path);
+        }
+
+    const char* home = getenv("HOME");
+    char roots[3][512]; int nr=0;
+    if (home) {
+        snprintf(roots[nr++],512,"%s/.steam/steam/steamapps/common",home);
+        snprintf(roots[nr++],512,"%s/.local/share/Steam/steamapps/common",home);
+        snprintf(roots[nr++],512,"%s/.steam/root/steamapps/common",home);
+    }
+    for (int r=0; r<nr; r++)
+        for (int i=0; i<(int)(sizeof(rel)/sizeof(rel[0])); i++) {
+            snprintf(path,sizeof(path),"%s/%s",roots[r],rel[i]);
+            if (!access(path,F_OK)) iwad_add(path);
+        }
+}
+
+// Point iwadsel at the entry matching the loaded "iwad" value (add it if unseen).
+static void iwad_sync_selection(const char* val)
+{
+    iwadsel = 0;
+    if (!val || !val[0]) return;
+    for (int i=0;i<niwad;i++) if (!strcmp(iwadlist[i],val)) { iwadsel=i; return; }
+    iwad_add(val); iwadsel = niwad-1;
+}
+
 // Single config file "aidoom.cfg" next to this binary (the run/ folder).
 static void cfg_path(char* out, int n)
 {
@@ -191,7 +257,7 @@ static void load_cfg(void)
         if (L>=2 && v[0]=='"' && v[L-1]=='"') { v[L-1]=0; v++; }
         for (int i=0;i<NSET;i++) {
             if (strcmp(settings[i].name,name)) continue;
-            if (settings[i].type==T_TEXT) { strncpy(settings[i].sval,v,sizeof(settings[i].sval)-1); settings[i].sval[sizeof(settings[i].sval)-1]=0; }
+            if (settings[i].type==T_TEXT || settings[i].type==T_CHOICE) { strncpy(settings[i].sval,v,sizeof(settings[i].sval)-1); settings[i].sval[sizeof(settings[i].sval)-1]=0; }
             else settings[i].ival = atoi(v);
         }
     }
@@ -216,12 +282,12 @@ static void save_cfg(void)
         for (int i=0;i<NSET;i++) if (!strcmp(settings[i].name,name)) { m=i; break; }
         if (m<0) { fputs(lines[l],f); continue; }	// keep engine-only line verbatim
         handled[m]=1;
-        if (settings[m].type==T_TEXT) fprintf(f,"%s\t\t%s\n",settings[m].name,settings[m].sval);
+        if (settings[m].type==T_TEXT || settings[m].type==T_CHOICE) fprintf(f,"%s\t\t%s\n",settings[m].name,settings[m].sval);
         else fprintf(f,"%s\t\t%d\n",settings[m].name,settings[m].ival);
     }
     for (int i=0;i<NSET;i++) {
         if (handled[i]) continue;
-        if (settings[i].type==T_TEXT) fprintf(f,"%s\t\t%s\n",settings[i].name,settings[i].sval);
+        if (settings[i].type==T_TEXT || settings[i].type==T_CHOICE) fprintf(f,"%s\t\t%s\n",settings[i].name,settings[i].sval);
         else fprintf(f,"%s\t\t%d\n",settings[i].name,settings[i].ival);
     }
     fclose(f); free(lines);
@@ -269,6 +335,7 @@ static void draw(void)
         if (s->type==T_KEY)      keyname(s->ival,buf,sizeof(buf));
         else if (s->type==T_TOGGLE) snprintf(buf,sizeof(buf), s->ival?"On":"Off");
         else if (s->type==T_INT) snprintf(buf,sizeof(buf),"< %d >", s->ival);
+        else if (s->type==T_CHOICE) snprintf(buf,sizeof(buf),"< %s >", s->sval[0]?base_name(s->sval):"auto (detect)");
         else                     snprintf(buf,sizeof(buf),"%s", (mode==2&&active==i)?editbuf:s->sval);
         if (hot) rect(VALX-4, s->y+1, WINW-VALX-LABELX+4, ROWH-4, 50,50,70);
         if (mode==2&&active==i) { // text cursor
@@ -305,6 +372,17 @@ static void click(float mx,float my)
                 if (s->ival>s->vmax) s->ival=s->vmax;
             }
         }
+        else if (s->type==T_CHOICE) {
+            char t[160]; snprintf(t,sizeof(t),"< %s >", s->sval[0]?base_name(s->sval):"auto (detect)");
+            float w = (float)strlen(t)*FONT_CW;
+            if (mx <= VALX + w && niwad>0) {
+                iwadsel += (mx < VALX + w/2.0f) ? -1 : 1;
+                if (iwadsel<0) iwadsel = niwad-1;
+                if (iwadsel>=niwad) iwadsel = 0;
+                strncpy(s->sval, iwadlist[iwadsel], sizeof(s->sval)-1); s->sval[sizeof(s->sval)-1]=0;
+                snprintf(status,sizeof(status),"IWAD: %s", s->sval[0]?s->sval:"auto-detect");
+            }
+        }
         else if (s->type==T_TEXT) { mode=2; active=i; strncpy(editbuf,s->sval,sizeof(editbuf)-1); editbuf[sizeof(editbuf)-1]=0; SDL_StartTextInput(win); snprintf(status,sizeof(status),"Type, Enter to confirm"); }
         return;
     }
@@ -314,9 +392,12 @@ int main(int argc, char** argv)
 {
     (void)argc;(void)argv;
     for (int i=0;i<NSET;i++)
-        if (settings[i].type==T_TEXT) set_default_text(&settings[i]);
+        if (settings[i].type==T_TEXT || settings[i].type==T_CHOICE) set_default_text(&settings[i]);
         else set_default_int(&settings[i]);
+    scan_iwads();
     load_cfg();
+    for (int i=0;i<NSET;i++)
+        if (settings[i].type==T_CHOICE) iwad_sync_selection(settings[i].sval);
 
     if (!SDL_Init(SDL_INIT_VIDEO)) { fprintf(stderr,"SDL_Init: %s\n",SDL_GetError()); return 1; }
     win = SDL_CreateWindow("aiDoom Config", WINW, WINH, 0);

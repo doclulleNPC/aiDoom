@@ -74,12 +74,8 @@ done
 [ -n "$AIDOOM" ] || die "aidoom binary not found. Build it first (see README), e.g. in files/."
 GAMEDIR="$(cd "$(dirname "$AIDOOM")" && pwd)"
 
-# --- locate an IWAD (optional: the engine also auto-detects one in its cwd) ---
-WAD=""
-for w in "$here"/doom1.wad "$here"/doom.wad "$here"/doom2.wad \
-         "$GAMEDIR"/doom1.wad "$GAMEDIR"/doom.wad "$GAMEDIR"/doom2.wad; do
-    [ -f "$w" ] && { WAD="$w"; break; }
-done
+# IWAD selection is handled by the engine: -iwad / aidoom.cfg "iwad" / iwads\/ /
+# the game folder / Steam (see IdentifyVersion). The game runs from GAMEDIR below.
 
 # --- locate python (the director uses only the stdlib) ---
 PY=""
@@ -120,7 +116,6 @@ fi
 
 # --- 4. start aiDoom with the AI director TCP server ---
 gameargs=( -warp "$EPISODE" "$MAP" -skill "$SKILL" -aidirector "$PORT" )
-[ -n "$WAD" ] && gameargs=( -iwad "$WAD" "${gameargs[@]}" )
 [ "$FRIENDLYFIRE" = 1 ] && gameargs+=( -friendlyfire )
 [ ${#GAME_EXTRA[@]} -gt 0 ] && gameargs+=( "${GAME_EXTRA[@]}" )
 
