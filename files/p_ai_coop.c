@@ -171,6 +171,28 @@ void P_AICoop_BuildCmd (void)
     mo = bot->mo;
     memset (cmd, 0, sizeof(*cmd));
 
+    // --- stuck / wall-escape state (single companion) ---
+    static fixed_t	lastx, lasty;
+    static int		stuck, unstick, unstick_dir, healban;
+    fixed_t		moved = P_AproxDistance (mo->x - lastx, mo->y - lasty);
+
+    if (healban > 0) healban--;
+
+    // Wedged against a wall: stop chasing the goal and wiggle free -- turn while
+    // running and strafing to one side (alternating side per attempt) so we slide
+    // along the wall / around the corner.
+    if (unstick > 0)
+    {
+	unstick--;
+	cmd->angleturn   = (short)(unstick_dir * COOP_TURN);
+	cmd->forwardmove = COOP_RUN;
+	cmd->sidemove    = (signed char)(unstick_dir * COOP_RUN);
+	if (!(leveltime & 1)) cmd->buttons |= BT_USE;	// in case it's a door
+	if (moved > 8*FRACUNIT) unstick = 0;		// broke free early
+	lastx = mo->x; lasty = mo->y;
+	return;
+    }
+
     // Health-tiered behaviour:
     //   < 30 HP : break off and grab the nearest med-pack.
     //   < 50 HP : defensive -- still shoots, but doesn't charge; hangs back
@@ -178,7 +200,7 @@ void P_AICoop_BuildCmd (void)
     //   healthy : chase the nearest monster, else follow the player.
     int defensive = (bot->health < COOP_DEFEND_HP);
 
-    heal   = (bot->health < COOP_HEAL_HP) ? AICoop_FindHealth (mo) : NULL;
+    heal   = (bot->health < COOP_HEAL_HP && !healban) ? AICoop_FindHealth (mo) : NULL;
     tgt    = heal ? NULL : AICoop_FindTarget (mo);
     follow = playeringame[0] ? players[0].mo : NULL;
 
@@ -238,23 +260,26 @@ void P_AICoop_BuildCmd (void)
 	    cmd->forwardmove = COOP_RUN;
     }
 
-    // Door/switch opener: if we're trying to move but barely getting anywhere,
-    // we're probably against a closed door -- pulse Use (on/off, so P_PlayerThink
-    // sees fresh presses) to open it.  Harmless against plain walls.
+    // Progress check.  If we're trying to move but barely advancing, first pulse
+    // Use (a closed door?); if still wedged after a bit it's a wall, so kick off
+    // an escape wiggle -- and abandon an unreachable med-pack so we don't suicide
+    // running at it.
+    if (cmd->forwardmove && moved < 4*FRACUNIT)
+	stuck++;
+    else
+	stuck = 0;
+
+    if (stuck >= 3 && !(leveltime & 1))
+	cmd->buttons |= BT_USE;			// probably a door
+
+    if (stuck >= 7)
     {
-	static fixed_t	lastx, lasty;
-	static int	stuck;
-	fixed_t		moved = P_AproxDistance (mo->x - lastx, mo->y - lasty);
-
-	if (cmd->forwardmove && moved < 4*FRACUNIT)
-	    stuck++;
-	else
-	    stuck = 0;
-
-	if (stuck >= 3 && !(leveltime & 1))
-	    cmd->buttons |= BT_USE;
-
-	lastx = mo->x;
-	lasty = mo->y;
+	unstick     = 16;			// ~0.5 s of wiggling free
+	unstick_dir = (unstick_dir >= 0) ? -1 : 1;	// alternate side each time
+	stuck       = 0;
+	if (heal) healban = 175;		// give up that med-pack for ~5 s
     }
+
+    lastx = mo->x;
+    lasty = mo->y;
 }
