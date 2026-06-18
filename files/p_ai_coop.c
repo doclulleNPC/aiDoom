@@ -436,6 +436,11 @@ void P_AICoop_BuildCmd (void)
     if (summon > 0)     summon--;
     if (forceaggro > 0) forceaggro--;
 
+    // "come" ends as soon as the buddy has reached the player (don't run the
+    // whole timer once it's already next to you).
+    if (summon > 0 && pl && P_AproxDistance (pl->x - mo->x, pl->y - mo->y) <= COOP_NEAR/2)
+	summon = 0;
+
     coop_state = 0;
 
     // (attack) ordered: charge the forced target until it (or the timer) dies
