@@ -43,6 +43,7 @@
 // engine internals (p_enemy.c -- no public header)
 extern void	P_NewChaseDir (mobj_t* actor);
 extern boolean	P_Move (mobj_t* actor);
+extern boolean	P_SetMobjState (mobj_t* mobj, statenum_t state);
 
 static int	aicoop;			// -aicoop given
 static int	coop_state;		// what we're doing (for the console "where")
@@ -193,7 +194,8 @@ void P_AICoop_BuildCmd (void)
     mobj_t*	item;
     ticcmd_t*	cmd;
     fixed_t	dist;
-    static int	healtic, fleeing, idletic;
+    fixed_t	ml;			// distance moved during the previous tic
+    static int	healtic, fleeing, idletic, curspeed;
     static fixed_t lastx, lasty;
 
     if (!aicoop || !playeringame[1])
@@ -231,6 +233,16 @@ void P_AICoop_BuildCmd (void)
 
     coop_state = 0;
     wantmove   = 0;
+
+    // Acceleration ramp: measure how far we moved last tic; if we kept moving,
+    // wind P_Move's step size up toward coop_speed, otherwise start slow.  This
+    // gives a gradual run-up instead of snapping to full speed in one tic.
+    ml = P_AproxDistance (mo->x - lastx, mo->y - lasty);
+    lastx = mo->x; lasty = mo->y;
+    if (ml > FRACUNIT) { curspeed += 3; if (curspeed > coop_speed) curspeed = coop_speed; }
+    else                 curspeed = coop_speed / 3;
+    if (curspeed < 4) curspeed = 4;
+    mobjinfo[MT_PLAYER].speed = curspeed;
 
     // (2,5) yield: the human is right on top of us -> step aside (top priority)
     if (pl && P_AproxDistance (pl->x - mo->x, pl->y - mo->y) < YIELD_DIST)
@@ -326,20 +338,30 @@ void P_AICoop_BuildCmd (void)
 	}
     }
 
-    // (3) Anti-stuck only: if we were *trying* to move but didn't get anywhere
-    // for ~3 s, shuffle sideways to break free.  When there's genuinely nothing
-    // to do (no monster, no item, player nearby) we set no goal, so we just
-    // stand calmly instead of fidgeting.
+    // Walk animation: P_Move drives the mobj directly (forwardmove stays 0), so
+    // P_MovePlayer never starts the run frames -- do it here.  Only touch the
+    // locomotion states so we don't stomp on attack/pain/death animations.
     {
-	fixed_t moved = P_AproxDistance (mo->x - lastx, mo->y - lasty);
-	if (wantmove && moved < 2*FRACUNIT) idletic++; else idletic = 0;
-	if (idletic >= IDLE_TICS)
+	statenum_t st = (statenum_t)(mo->state - states);
+	if (st == S_PLAY || (st >= S_PLAY_RUN1 && st <= S_PLAY_RUN4))
 	{
-	    mo->movedir = (mo->movedir + 2) & 7;	// perpendicular step
-	    P_Move (mo);
-	    idletic = 0;
+	    if (wantmove)
+	    {
+		if (st == S_PLAY) P_SetMobjState (mo, S_PLAY_RUN1);
+	    }
+	    else if (st != S_PLAY)
+		P_SetMobjState (mo, S_PLAY);
 	}
-	lastx = mo->x; lasty = mo->y;
+    }
+
+    // (3) Anti-stuck only: trying to move but no progress for ~3 s -> shuffle.
+    // When there's nothing to do (no goal) we just stand calmly.
+    if (wantmove && ml < 2*FRACUNIT) idletic++; else idletic = 0;
+    if (idletic >= IDLE_TICS)
+    {
+	mo->movedir = (mo->movedir + 2) & 7;	// perpendicular step
+	P_Move (mo);
+	idletic = 0;
     }
 }
 
