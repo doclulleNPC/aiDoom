@@ -18,9 +18,10 @@
 #include "../files/aidoom_icon.h"	// shared 64x64 RGBA window icon (from aidoom.ico)
 
 #ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>	// CreateProcess (run commands without a console window)
 #include <io.h>		// _access (locate nvidia-smi past WoW64 redirection)
-#define popen  _popen
-#define pclose _pclose
 #endif
 
 #define WINW 460
@@ -116,6 +117,53 @@ static void bar(float y, const char* label, float frac, const char* valstr)
     text(bx+6, y+1, valstr, 235,235,240);              // value (readable on track + fill)
 }
 
+// Run a shell command and capture its first output line.  gpumon is a GUI app,
+// so _popen/system would flash a console window on every poll -- on Windows we
+// use CreateProcess with CREATE_NO_WINDOW instead.  Returns 1 if a line was read.
+#ifdef _WIN32
+static int run_query(const char* cmd, char* line, int n)
+{
+    SECURITY_ATTRIBUTES sa = { sizeof(sa), NULL, TRUE };
+    HANDLE rd = NULL, wr = NULL;
+    if (!CreatePipe(&rd, &wr, &sa, 0)) return 0;
+    SetHandleInformation(rd, HANDLE_FLAG_INHERIT, 0);
+
+    STARTUPINFOA si; memset(&si, 0, sizeof(si)); si.cb = sizeof(si);
+    si.dwFlags    = STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW;
+    si.hStdOutput = wr; si.hStdError = wr; si.wShowWindow = SW_HIDE;
+    PROCESS_INFORMATION pi; memset(&pi, 0, sizeof(pi));
+
+    char cl[600]; snprintf(cl, sizeof(cl), "cmd /c %s", cmd);
+    BOOL ok = CreateProcessA(NULL, cl, NULL, NULL, TRUE,
+                             CREATE_NO_WINDOW, NULL, NULL, &si, &pi);
+    CloseHandle(wr);
+    if (!ok) { CloseHandle(rd); return 0; }
+
+    char buf[1024]; DWORD got = 0; int total = 0;
+    while (total < (int)sizeof(buf)-1 &&
+           ReadFile(rd, buf+total, sizeof(buf)-1-total, &got, NULL) && got > 0)
+        total += (int)got;
+    buf[total] = 0;
+    CloseHandle(rd);
+    WaitForSingleObject(pi.hProcess, INFINITE);
+    CloseHandle(pi.hProcess); CloseHandle(pi.hThread);
+
+    if (total <= 0) return 0;
+    int i = 0;
+    for (; i < n-1 && buf[i] && buf[i] != '\n' && buf[i] != '\r'; i++) line[i] = buf[i];
+    line[i] = 0;
+    return 1;
+}
+#else
+static int run_query(const char* cmd, char* line, int n)
+{
+    FILE* p = popen(cmd, "r");
+    int ok = (p && fgets(line, n, p)) ? 1 : 0;
+    if (p) pclose(p);
+    return ok;
+}
+#endif
+
 // ----------------------------------------------------------------- worker
 static int fetch_thread(void* unused)
 {
@@ -150,8 +198,7 @@ static int fetch_thread(void* unused)
                 sshport, user, host, smiargs);
 
         gpustat_t s; memset(&s, 0, sizeof(s));
-        FILE* p = popen(cmd, "r");
-        if (p && fgets(line, sizeof(line), p)) {
+        if (run_query(cmd, line, sizeof(line))) {
             if (sscanf(line, "%d, %d, %d, %d, %f, %63[^\r\n]",
                        &s.util,&s.mem_used,&s.mem_total,&s.temp,&s.power,s.name) >= 5)
                 s.valid = 1;
@@ -161,7 +208,6 @@ static int fetch_thread(void* unused)
         } else {
             snprintf(s.err, sizeof(s.err), "ssh/nvidia-smi failed (%s@%s)", user, host);
         }
-        if (p) pclose(p);
 
         SDL_LockMutex(g_lock); g_stat = s; SDL_UnlockMutex(g_lock);
 
