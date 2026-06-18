@@ -16,7 +16,7 @@ director client that drives the monsters' tactics.
 | `start_aidoom.ps1` | Windows | Main launcher (PowerShell). |
 | `ollama_director.py` | all | The director client (talks to Ollama + the game). Mirror of the repo-root copy. |
 | `gpumon.py` | all | Live GPU monitor for the remote Ollama machine (see below). |
-| `aidoom_config` | Linux/macOS | SDL3 settings editor (built by `tools/build_config.sh`); reads/writes `aidoom.cfg` here. |
+| `aidoom_config` / `aidoom_config.exe` | Linux / Windows | SDL3 settings editor (built by `tools/build_config.sh` / `tools/build_config_win.sh`); reads/writes `aidoom.cfg` here. |
 | `aidoom.cfg` | all | The single config file (game keys/video + Ollama), read by the game and all tools from this folder. |
 | `aidoom.ico` | Windows | Icon for the launcher/shortcut. |
 

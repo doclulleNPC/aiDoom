@@ -7,6 +7,7 @@
 // Build: see tools/build_config.sh  (gcc + pkg-config sdl3)
 
 #include <SDL3/SDL.h>
+#include <SDL3/SDL_main.h>	// for SDL_SetMainReady (not pulled in by SDL.h in SDL3)
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -393,6 +394,7 @@ static void click(float mx,float my)
 int main(int argc, char** argv)
 {
     (void)argc;(void)argv;
+    SDL_SetMainReady();		// we own main() (built with -DSDL_MAIN_HANDLED)
     for (int i=0;i<NSET;i++)
         if (settings[i].type==T_TEXT || settings[i].type==T_CHOICE) set_default_text(&settings[i]);
         else set_default_int(&settings[i]);

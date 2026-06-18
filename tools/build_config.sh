@@ -3,7 +3,7 @@
 set -eu
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 [ -f "$here/font_atlas.h" ] || python3 "$here/bake_font.py"
-gcc -O2 -o "$here/aidoom_config" "$here/aidoom_config.c" \
+gcc -O2 -DSDL_MAIN_HANDLED -o "$here/aidoom_config" "$here/aidoom_config.c" \
     -I"$here" $(pkg-config --cflags --libs sdl3)
 # place the binary next to the game in run/ (it reads aidoom.cfg from there)
 mkdir -p "$here/../run"

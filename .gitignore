@@ -58,3 +58,5 @@ run/aidoom_config
 # runtime config (written by the game / config app; user-specific)
 aidoom.cfg
 run/aidoom.cfg
+tools/aidoom_config.exe
+run/aidoom_config.exe

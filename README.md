@@ -121,8 +121,14 @@ Everything lives in **one file, `aidoom.cfg`, in the working folder** (next to t
 binary — i.e. `run/`). A small **SDL3 settings editor** edits it in a window:
 
 ```sh
-tools/build_config.sh        # builds tools/aidoom_config and copies it into run/
+tools/build_config.sh        # Linux: builds tools/aidoom_config and copies it into run/
 run/aidoom_config            # run it from run/ (reads/writes run/aidoom.cfg)
+```
+
+Windows build of the config tool (MinGW, like `build_win.sh`):
+
+```sh
+SDL3=/path/to/SDL3-devel-3.x.y-mingw/x86_64-w64-mingw32 ./tools/build_config_win.sh
 ```
 
 - **Action keys** (click a binding, then press a key — or the mouse wheel),
