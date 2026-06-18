@@ -87,6 +87,7 @@ int	coop_heal_range = 1024;		// pickup search range (map units)
 int	coop_speed      = 13;		// step size per tic for P_Move (player run ~= 16-17)
 #define COOP_SIGHT	((fixed_t)coop_sight      * FRACUNIT)
 #define COOP_NEAR	((fixed_t)coop_follow     * FRACUNIT)
+#define COOP_LEASH	((fixed_t)(coop_follow*2) * FRACUNIT)	// max distance from the player
 #define COOP_ITEM_RANGE	((fixed_t)coop_heal_range * FRACUNIT)
 
 
@@ -151,6 +152,32 @@ static mobj_t* AICoop_FindItem (mobj_t* self)
 	}
 	d = P_AproxDistance (m->x - self->x, m->y - self->y);
 	if (d > COOP_ITEM_RANGE)	continue;
+	if (!best || d < bestd) { best = m; bestd = d; }
+    }
+    return best;
+}
+
+// Nearest visible monster that is hunting the player (for "defend the player").
+static mobj_t* AICoop_FindDefend (mobj_t* self, mobj_t* pl)
+{
+    thinker_t*	th;
+    mobj_t*	best = NULL;
+    fixed_t	bestd = 0;
+
+    if (!pl) return NULL;
+    for (th = thinkercap.next; th != &thinkercap; th = th->next)
+    {
+	mobj_t*	m; fixed_t d;
+	if (th->function.acp1 != (actionf_p1)P_MobjThinker) continue;
+	m = (mobj_t*)th;
+	if (m->type == MT_PLAYER)		continue;
+	if (!(m->flags & MF_COUNTKILL))		continue;
+	if (!(m->flags & MF_SHOOTABLE))		continue;
+	if (m->flags & MF_CORPSE || m->health <= 0) continue;
+	if (m->target != pl)			continue;	// only things after the player
+	if (P_AproxDistance (m->x - pl->x, m->y - pl->y) > COOP_LEASH) continue;
+	if (!P_CheckSight (self, m))		continue;
+	d = P_AproxDistance (m->x - self->x, m->y - self->y);
 	if (!best || d < bestd) { best = m; bestd = d; }
     }
     return best;
@@ -407,7 +434,7 @@ static int PF_Next (mobj_t* mo, fixed_t dxf, fixed_t dyf, fixed_t* outx, fixed_t
 
 // Route to a goal mobj: A* waypoints (global) + P_Move stepping (local).  Falls
 // back to the plain chase if no route is found.
-static void AICoop_PathChase (mobj_t* mo, mobj_t* goal)
+static void AICoop_PathChase (mobj_t* mo, mobj_t* goal, int optional)
 {
     PF_Ensure (mo);
     if (goal != pf_goal || --pf_timer <= 0
@@ -416,8 +443,12 @@ static void AICoop_PathChase (mobj_t* mo, mobj_t* goal)
 	pf_goal = goal; pf_timer = 12;
 	if (!PF_Next (mo, goal->x, goal->y, &pf_wpx, &pf_wpy))
 	{
-	    pf_goal = NULL;			// no route -> retry next tic
-	    AICoop_MoveToPoint (mo, goal->x, goal->y);	// head straight (also opens doors)
+	    pf_goal = NULL;			// no A* route
+	    // Already next to it -> step on; an important goal -> head straight
+	    // (also opens doors).  An OPTIONAL goal (item) that's unreachable
+	    // (e.g. armor across a window) is ignored -- don't ram the wall.
+	    if (!optional || P_AproxDistance (mo->x - goal->x, mo->y - goal->y) < 2*PF_CELL*FRACUNIT)
+		AICoop_MoveToPoint (mo, goal->x, goal->y);
 	    return;
 	}
     }
@@ -504,7 +535,7 @@ void P_AICoop_BuildCmd (void)
 	    if (P_CheckSight (mo, t))
 		cmd->buttons |= BT_ATTACK;
 	    if (dist > COOP_KEEP)
-		AICoop_PathChase (mo, t);			// always close in (forced)
+		AICoop_PathChase (mo, t, 0);			// always close in (forced)
 	}
 	else
 	    forceaggro = 0;				// nothing left to attack
@@ -532,7 +563,7 @@ void P_AICoop_BuildCmd (void)
 	}
 	else if (pl)
 	{
-	    AICoop_PathChase (mo, pl);
+	    AICoop_PathChase (mo, pl, 0);
 	    mo->angle = R_PointToAngle2 (mo->x, mo->y, pl->x, pl->y);
 	}
     }
@@ -540,40 +571,59 @@ void P_AICoop_BuildCmd (void)
     else if (summon > 0 && pl)
     {
 	summon--;
-	AICoop_PathChase (mo, pl);
+	AICoop_PathChase (mo, pl, 0);
 	mo->angle = R_PointToAngle2 (mo->x, mo->y, pl->x, pl->y);
 	coop_state = 1;
     }
-    // fight: aim and fire; charge when healthy, kite when low
-    else if (mon)
-    {
-	coop_state = 2;
-	int defensive = (bot->health < coop_defend_hp);
-	dist = P_AproxDistance (mon->x - mo->x, mon->y - mo->y);
-	mo->angle = R_PointToAngle2 (mo->x, mo->y, mon->x, mon->y);
-	if (P_CheckSight (mo, mon))
-	    cmd->buttons |= BT_ATTACK;
-	if (defensive)
-	{
-	    if (dist < COOP_KEEP) AICoop_MoveAway (mo, mon->x, mon->y);	// back off
-	}
-	else if (dist > COOP_KEEP)
-	    AICoop_PathChase (mo, mon);					// close in
-    }
-    // (4) no monster in sight: fetch nearby pickups, else follow the human
-    else if ((item = AICoop_FindItem (mo)) != NULL)
-    {
-	AICoop_PathChase (mo, item);
-	mo->angle = R_PointToAngle2 (mo->x, mo->y, item->x, item->y);
-	coop_state = 4;
-    }
-    else if (pl)
+    // --- autonomous goals, in priority order --------------------------------
+    // (1) primary: stay within leash range of the player
+    else if (pl && P_AproxDistance (pl->x - mo->x, pl->y - mo->y) > COOP_LEASH)
     {
 	coop_state = 1;
-	if (P_AproxDistance (pl->x - mo->x, pl->y - mo->y) > COOP_NEAR)
+	AICoop_PathChase (mo, pl, 0);
+	mo->angle = R_PointToAngle2 (mo->x, mo->y, pl->x, pl->y);
+    }
+    else
+    {
+	// (2) defend: whatever is attacking the player; (3) else nearest monster.
+	// Restricted to near the player, so the companion never strays to chase.
+	mobj_t*	tgt = AICoop_FindDefend (mo, pl);
+	if (!tgt) tgt = mon;
+	if (tgt && pl && P_AproxDistance (tgt->x - pl->x, tgt->y - pl->y) > COOP_LEASH)
+	    tgt = NULL;
+
+	if (tgt)
 	{
-	    AICoop_PathChase (mo, pl);
-	    mo->angle = R_PointToAngle2 (mo->x, mo->y, pl->x, pl->y);
+	    int defensive = (bot->health < coop_defend_hp);
+	    coop_state = 2;
+	    dist = P_AproxDistance (tgt->x - mo->x, tgt->y - mo->y);
+	    mo->angle = R_PointToAngle2 (mo->x, mo->y, tgt->x, tgt->y);
+	    if (P_CheckSight (mo, tgt))
+		cmd->buttons |= BT_ATTACK;
+	    if (defensive)
+	    {
+		if (dist < COOP_KEEP) AICoop_MoveAway (mo, tgt->x, tgt->y);	// kite
+	    }
+	    else if (dist > COOP_KEEP)
+		AICoop_PathChase (mo, tgt, 0);					// close in
+	}
+	// (4) collect a nearby, *reachable* item (skipped if blocked by a window)
+	else if ((item = AICoop_FindItem (mo)) != NULL
+		 && pl && P_AproxDistance (item->x - pl->x, item->y - pl->y) <= COOP_LEASH)
+	{
+	    coop_state = 4;
+	    mo->angle = R_PointToAngle2 (mo->x, mo->y, item->x, item->y);
+	    AICoop_PathChase (mo, item, 1);		// optional: dropped if unreachable
+	}
+	// otherwise just stay close to the player
+	else if (pl)
+	{
+	    coop_state = 1;
+	    if (P_AproxDistance (pl->x - mo->x, pl->y - mo->y) > COOP_NEAR)
+	    {
+		AICoop_PathChase (mo, pl, 0);
+		mo->angle = R_PointToAngle2 (mo->x, mo->y, pl->x, pl->y);
+	    }
 	}
     }
 
