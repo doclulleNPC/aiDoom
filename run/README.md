@@ -15,7 +15,8 @@ director client that drives the monsters' tactics.
 | `start_aidoom.bat` | Windows | Double-click shim → calls the PowerShell script. |
 | `start_aidoom.ps1` | Windows | Main launcher (PowerShell). |
 | `ollama_director.py` | all | The director client (talks to Ollama + the game). Mirror of the repo-root copy. |
-| `gpumon.py` | all | Live GPU monitor for the remote Ollama machine (see below). |
+| `gpumon.py` | all | Live GPU monitor for the remote Ollama machine, terminal (see below). |
+| `gpumon_sdl` / `gpumon_sdl.exe` | Linux / Windows | Same monitor as a small **SDL window** (bars for load/VRAM/temp/power); built by `tools/build_gpumon.sh` / `tools/build_gpumon_win.sh`. |
 | `aidoom_config` / `aidoom_config.exe` | Linux / Windows | SDL3 settings editor (built by `tools/build_config.sh` / `tools/build_config_win.sh`); reads/writes `aidoom.cfg` here. |
 | `aidoom.cfg` | all | The single config file (game keys/video + Ollama), read by the game and all tools from this folder. |
 | `aidoom.ico` | Windows | Icon for the launcher/shortcut. |
@@ -123,6 +124,12 @@ python3 gpumon.py --ollama-only   # no SSH, model VRAM only
 On startup it self-tests the SSH read; if that fails it automatically falls back
 to the Ollama mode. Override with `--host` / `--user` / `--interval`. (The remote
 SSH details are in the project memory; SSH is Windows-OpenSSH as user `lubee`.)
+
+There's also a **graphical version**, `gpumon_sdl` (SDL3 window with live bars for
+GPU load / VRAM / temperature / power). It reads the same `aidoom.cfg`
+(`gpu_host` / `gpu_user` / `gpu_ssh_port`) and accepts `--host` / `--user` /
+`--port`; build it with `tools/build_gpumon.sh` (Linux) or
+`tools/build_gpumon_win.sh` (Windows/MinGW).
 
 ## Without the launcher (manual)
 

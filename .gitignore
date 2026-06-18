@@ -60,3 +60,7 @@ aidoom.cfg
 run/aidoom.cfg
 tools/aidoom_config.exe
 run/aidoom_config.exe
+tools/gpumon_sdl
+run/gpumon_sdl
+tools/gpumon_sdl.exe
+run/gpumon_sdl.exe
