@@ -18,6 +18,7 @@
 #include "../files/aidoom_icon.h"	// shared 64x64 RGBA window icon (from aidoom.ico)
 
 #ifdef _WIN32
+#include <io.h>		// _access (locate nvidia-smi past WoW64 redirection)
 #define popen  _popen
 #define pclose _pclose
 #endif
@@ -120,8 +121,8 @@ static int fetch_thread(void* unused)
 {
     (void)unused;
     char cmd[512], line[256];
-    const char* query =
-        "nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total,"
+    const char* smiargs =
+        "--query-gpu=utilization.gpu,memory.used,memory.total,"
         "temperature.gpu,power.draw,name --format=csv,noheader,nounits";
     while (SDL_GetAtomicInt(&g_running)) {
         // Paused after an error -- wait for the user to hit Reconnect.
@@ -129,12 +130,24 @@ static int fetch_thread(void* unused)
 
         // localhost runs nvidia-smi directly (no SSH/key needed); otherwise SSH.
         int is_local = (!host[0] || !strcmp(host,"localhost") || !strcmp(host,"127.0.0.1"));
-        if (is_local)
-            snprintf(cmd, sizeof(cmd), "%s 2>&1", query);
+        if (is_local) {
+#ifdef _WIN32
+            // This is a 32-bit process, so the PATH's C:\Windows\System32 is
+            // redirected to SysWOW64 -- where nvidia-smi.exe isn't.  Reach the
+            // real System32 via the Sysnative alias; fall back to PATH otherwise.
+            const char* root = getenv("SystemRoot"); if (!root) root = "C:\\Windows";
+            char smi[320];
+            snprintf(smi, sizeof(smi), "%s\\Sysnative\\nvidia-smi.exe", root);
+            if (_access(smi, 0) != 0) snprintf(smi, sizeof(smi), "nvidia-smi");
+            snprintf(cmd, sizeof(cmd), "\"%s\" %s 2>&1", smi, smiargs);
+#else
+            snprintf(cmd, sizeof(cmd), "nvidia-smi %s 2>&1", smiargs);
+#endif
+        }
         else
             snprintf(cmd, sizeof(cmd),
-                "ssh -o BatchMode=yes -o ConnectTimeout=5 -p %d %s@%s \"%s\" 2>&1",
-                sshport, user, host, query);
+                "ssh -o BatchMode=yes -o ConnectTimeout=5 -p %d %s@%s \"nvidia-smi %s\" 2>&1",
+                sshport, user, host, smiargs);
 
         gpustat_t s; memset(&s, 0, sizeof(s));
         FILE* p = popen(cmd, "r");
