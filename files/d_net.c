@@ -26,13 +26,33 @@
 static const char rcsid[] = "$Id: d_net.c,v 1.3 1997/02/03 22:01:47 b1 Exp $";
 
 
+#include <stdlib.h>
+
 #include "m_menu.h"
+#include "m_argv.h"
 #include "i_system.h"
 #include "i_video.h"
 #include "i_net.h"
 #include "g_game.h"
 #include "doomdef.h"
 #include "doomstat.h"
+#include "d_netcl.h"	// MOD: Chocolate/Crispy client tic exchange (stage 4)
+
+// MOD: when set, this engine plays as a Chocolate/Crispy network client; the
+// tic exchange is sourced through d_netcl instead of the vanilla doomcom path.
+boolean		choc_client = false;
+char		choc_host[256];
+char		choc_version[128] = "Chocolate Doom 3.1.1";
+
+// startup config parsed in D_DoomMain, needed to seed the join request.
+extern skill_t	startskill;
+extern int	startepisode;
+extern int	startmap;
+extern boolean	autostart;
+
+static void	NetUpdate_Vanilla (void);
+static void	TryRunTics_Vanilla (void);
+extern boolean	advancedemo;
 
 #define	NCMD_EXIT		0x80000000
 #define	NCMD_RETRANSMIT		0x40000000
@@ -365,7 +385,129 @@ void GetPackets (void)
 //
 int      gametime;
 
+//
+// MOD: Chocolate/Crispy client tic exchange (stage 4).  These mirror the
+// vanilla NetUpdate/TryRunTics structure but source/sink tics through d_netcl.
+//
+static void NetUpdate_Choc (void)
+{
+    int		nowtime, newtics, i, gameticdiv;
+
+    if (D_NetCl_IsDisconnected ())
+	return;
+
+    nowtime = I_GetTime () / ticdup;
+    newtics = nowtime - gametime;
+    gametime = nowtime;
+    if (newtics <= 0)
+	goto listen;
+
+    if (skiptics <= newtics) { newtics -= skiptics; skiptics = 0; }
+    else { skiptics -= newtics; newtics = 0; }
+
+    gameticdiv = gametic / ticdup;
+    for (i = 0 ; i < newtics ; i++)
+    {
+	I_StartTic ();
+	D_ProcessEvents ();
+	if (maketic - gameticdiv >= BACKUPTICS/2-1)
+	    break;				// can't hold any more
+	G_BuildTiccmd (&localcmds[maketic%BACKUPTICS]);
+	D_NetCl_SendTiccmd (&localcmds[maketic%BACKUPTICS], maketic);
+	maketic++;
+    }
+
+  listen:
+    D_NetCl_Run ();				// pump network + drain merged tics
+}
+
+static void TryRunTics_Choc (void)
+{
+    int			entertic, realtics, availabletics, counts, lowtic, i;
+    static int		oldentertics_c;
+
+    entertic = I_GetTime () / ticdup;
+    realtics = entertic - oldentertics_c;
+    oldentertics_c = entertic;
+
+    NetUpdate_Choc ();
+
+    lowtic = D_NetCl_RecvTic ();		// merged tics available from server
+    availabletics = lowtic - gametic/ticdup;
+
+    if (realtics < availabletics-1)	counts = realtics+1;
+    else if (realtics < availabletics)	counts = realtics;
+    else				counts = availabletics;
+    if (counts < 1) counts = 1;
+
+    // wait for new tics if needed
+    while (lowtic < gametic/ticdup + counts)
+    {
+	NetUpdate_Choc ();
+	lowtic = D_NetCl_RecvTic ();
+	if (D_NetCl_IsDisconnected ())
+	    I_Error ("Network game disconnected from %s.", choc_host);
+	if (lowtic < gametic/ticdup)
+	    I_Error ("TryRunTics: lowtic < gametic");
+	// don't stay in here forever -- give the menu a chance to work
+	if (I_GetTime ()/ticdup - entertic >= 20)
+	{ M_Ticker (); return; }
+    }
+
+    // run the count * ticdup tics
+    while (counts--)
+    {
+	for (i = 0 ; i < ticdup ; i++)
+	{
+	    int		g = gametic/ticdup;
+	    ticcmd_t	cmds[MAXPLAYERS];
+	    boolean	ing[MAXPLAYERS];
+	    int		p;
+
+	    if (g > lowtic)
+		I_Error ("gametic>lowtic");
+
+	    // pull the merged tic into netcmds[] for G_Ticker.  playeringame is
+	    // set once at game start (D_CheckNetGame_Choc) and left stable, as in
+	    // vanilla -- NOT clobbered from the per-tic mask (which is 0 for the
+	    // first tics and would wipe out the local player, hanging A_Look).
+	    D_NetCl_GetTic (g, cmds, ing, MAXPLAYERS);
+	    (void) ing;
+	    for (p = 0 ; p < MAXPLAYERS ; p++)
+		netcmds[p][g%BACKUPTICS] = cmds[p];
+
+	    if (advancedemo)
+		D_DoAdvanceDemo ();
+	    M_Ticker ();
+	    G_Ticker ();
+	    gametic++;
+
+	    // modify command for duplicated tics
+	    if (i != ticdup-1)
+	    {
+		ticcmd_t*	cmd;
+		int		buf = (gametic/ticdup)%BACKUPTICS;
+		int		j;
+		for (j = 0 ; j < MAXPLAYERS ; j++)
+		{
+		    cmd = &netcmds[j][buf];
+		    cmd->chatchar = 0;
+		    if (cmd->buttons & BT_SPECIAL)
+			cmd->buttons = 0;
+		}
+	    }
+	}
+	NetUpdate_Choc ();
+    }
+}
+
 void NetUpdate (void)
+{
+    if (choc_client) { NetUpdate_Choc (); return; }
+    NetUpdate_Vanilla ();
+}
+
+static void NetUpdate_Vanilla (void)
 {
     int             nowtime;
     int             newtics;
@@ -552,10 +694,71 @@ void D_ArbitrateNetStart (void)
 //
 extern	int			viewangleoffset;
 
+//
+// MOD: join a Chocolate/Crispy server as a client (stage 4).  Acts as the
+// controller: requests game start with our skill/episode/map, then adopts the
+// server's authoritative settings (player index, ticdup, deathmatch, map).
+//
+static void D_CheckNetGame_Choc (void)
+{
+    netcl_settings_t	want, got;
+    int			i;
+    int			mission;
+    int			min_players = 1;
+    int			pp;
+
+    // This engine hardwires gamemission=doom; derive a mission valid for the
+    // protocol's D_ValidGameMode check (commercial mode requires doom2/tnt/plut).
+    mission = (gamemode == commercial) ? doom2 : doom;
+
+    memset (&want, 0, sizeof(want));
+    want.ticdup = 1;
+    want.extratics = 1;
+    want.new_sync = 1;
+    want.deathmatch = deathmatch;
+    want.episode = startepisode;
+    want.map = startmap;
+    want.skill = startskill;
+    want.num_players = 1;
+    want.consoleplayer = 0;
+
+    // -netplayers <n>: wait for n players in the lobby before launching (the
+    // controller hosts; other peers join and follow).  Default 1 (solo/relay).
+    pp = M_CheckParm ("-netplayers");
+    if (pp && pp < myargc-1)
+	min_players = atoi (myargv[pp+1]);
+
+    printf ("Connecting to %s as a Chocolate/Crispy client (waiting for %d player(s))...\n",
+	    choc_host, min_players);
+    if (!D_NetCl_JoinGame (choc_host, choc_version, gamemode, mission,
+			   "sdldoom", min_players, &want, &got))
+	I_Error ("Failed to join network game at %s", choc_host);
+
+    netgame = true;
+    deathmatch = got.deathmatch;
+    consoleplayer = displayplayer = got.consoleplayer;
+    if (consoleplayer < 0) consoleplayer = displayplayer = 0;	// (no drones yet)
+    ticdup = got.ticdup > 0 ? got.ticdup : 1;
+    maxsend = BACKUPTICS/(2*ticdup)-1;
+    if (maxsend < 1) maxsend = 1;
+    for (i = 0 ; i < got.num_players && i < MAXPLAYERS ; i++)
+	playeringame[i] = true;
+    startskill = got.skill;
+    startepisode = got.episode;
+    startmap = got.map;
+    autostart = true;
+
+    gametime = I_GetTime () / ticdup;		// seed the tic clock
+
+    printf ("Joined: player %i of %i  skill %i  map E%iM%i  deathmatch %i  ticdup %i\n",
+	    consoleplayer+1, got.num_players, startskill,
+	    startepisode, startmap, deathmatch, ticdup);
+}
+
 void D_CheckNetGame (void)
 {
     int             i;
-	
+
     for (i=0 ; i<MAXNETNODES ; i++)
     {
 	nodeingame[i] = false;
@@ -563,7 +766,10 @@ void D_CheckNetGame (void)
 	remoteresend[i] = false;	// set when local needs tics
 	resendto[i] = 0;		// which tic to start sending
     }
-	
+
+    if (choc_client)
+    { D_CheckNetGame_Choc (); return; }
+
     // I_InitNetwork sets doomcom and netgame
     I_InitNetwork ();
     if (doomcom->id != DOOMCOM_ID)
@@ -602,10 +808,13 @@ void D_CheckNetGame (void)
 void D_QuitNetGame (void)
 {
     int             i, j;
-	
+
     if (debugfile)
 	fclose (debugfile);
-		
+
+    if (choc_client)
+    { D_NetCl_Disconnect (); return; }
+
     if (!netgame || !usergame || consoleplayer == -1 || demoplayback)
 	return;
 	
@@ -634,6 +843,12 @@ int	oldnettics;
 extern	boolean	advancedemo;
 
 void TryRunTics (void)
+{
+    if (choc_client) { TryRunTics_Choc (); return; }
+    TryRunTics_Vanilla ();
+}
+
+static void TryRunTics_Vanilla (void)
 {
     int		i;
     int		lowtic;

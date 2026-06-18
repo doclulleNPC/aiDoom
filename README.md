@@ -138,6 +138,33 @@ run/start_aidoom.sh --skill 4 --friendlyfire
 The director protocol (`observe` / `act` / `wake`) and design rationale are documented
 in **AGENT_CONTROL.md** §12–13 and **MONSTER_AGENT_GUIDE.md**.
 
+## Networked multiplayer (Chocolate/Crispy-compatible)
+
+aiDoom speaks the **Chocolate-Doom network protocol** (a clean-room reimplementation
+in `files/i_udp.c` + `files/d_netcl.c` — packet/UDP layer and the client connection
+state machine: SYN → lobby → launch → gamestart → lockstep GAMEDATA). It connects as
+a **client to a `chocolate-server`** (the relay shipped with Chocolate Doom), so it
+can play alongside Chocolate/Crispy Doom peers.
+
+```sh
+chocolate-server &                                   # the relay (UDP :2342)
+./aidoom -connect <host[:port]> -warp 1 1 -skill 3   # join and play
+./aidoom -connect host "Chocolate Doom 3.1.0"        # match the server's version string
+./aidoom -connect host -minplayers 2                 # wait for N players before launch (default 1)
+```
+
+Diagnostics (connect, print, exit — no game):
+
+```sh
+./aidoom -querychoc <host[:port]>          # query a server (name/version/players)
+./aidoom -chocsyn   <host[:port]> [ver]    # SYN handshake test
+./aidoom -netclient <host[:port]> [ver]    # full connect→launch→gamestart→GAMEDATA self-test
+```
+
+Verified against the real `chocolate-server` (wire query, full join, and a clean
+GAMEDATA tic round-trip). The old vanilla peer-to-peer `-net` path is unchanged
+(and, like the original, not 64-bit-clean — use `-connect` for netplay).
+
 ## AI co-op companion (`-aicoop`)
 
 Adds a second marine (player 2) controlled by a built-in bot — a real co-op peer,

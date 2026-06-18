@@ -85,6 +85,8 @@ static int access(char *file, int mode)
 #include "p_setup.h"
 #include "p_ai_coop.h"
 #include "c_console.h"
+#include "i_udp.h"		// Chocolate/Crispy net: UDP + packet layer (-querychoc/-chocsyn)
+#include "d_netcl.h"		// Chocolate/Crispy net client (-connect/-netclient)
 #include "r_local.h"
 
 
@@ -848,7 +850,30 @@ void D_DoomMain (void)
     char                    file[256];
 
     FindResponseFile ();
-	
+
+    // Chocolate/Crispy multiplayer interop (clean-room reimpl; see i_udp.c/d_netcl.c).
+    // -querychoc <host[:port]>           query a server and exit
+    p = M_CheckParm ("-querychoc");
+    if (p && p < myargc-1) { I_QueryChocServer (myargv[p+1]); exit (0); }
+
+    // -chocsyn <host[:port]> [version]   SYN handshake test and exit
+    p = M_CheckParm ("-chocsyn");
+    if (p && p < myargc-1)
+    {
+	const char* ver = (p < myargc-2 && myargv[p+2][0] != '-') ? myargv[p+2] : "Chocolate Doom 3.1.1";
+	I_ConnectChocServer (myargv[p+1], ver, 2 /*commercial*/, 1 /*doom2*/);
+	exit (0);
+    }
+
+    // -netclient <host[:port]> [version] full connect/launch/gamestart self-test, exit
+    p = M_CheckParm ("-netclient");
+    if (p && p < myargc-1)
+    {
+	const char* ver = (p < myargc-2 && myargv[p+2][0] != '-') ? myargv[p+2] : "Chocolate Doom 3.1.1";
+	I_NetClientTest (myargv[p+1], ver, 2 /*commercial*/, 1 /*doom2*/);
+	exit (0);
+    }
+
     IdentifyVersion ();
 	
     setbuf (stdout, NULL);
@@ -1143,6 +1168,20 @@ printf("added\n");
 
     printf ("I_Init: Setting up machine state.\n");
     I_Init ();
+
+    // -connect <host[:port]> [version] -- join a Chocolate/Crispy server as a
+    // client; flags D_CheckNetGame onto the choc path (d_net.c / d_netcl.c).
+    p = M_CheckParm ("-connect");
+    if (p && p < myargc-1)
+    {
+	extern boolean	choc_client;
+	extern char	choc_host[];
+	extern char	choc_version[];
+	choc_client = true;
+	strncpy (choc_host, myargv[p+1], 255);  choc_host[255] = 0;
+	if (p < myargc-2 && myargv[p+2][0] != '-')
+	{ strncpy (choc_version, myargv[p+2], 127);  choc_version[127] = 0; }
+    }
 
     printf ("D_CheckNetGame: Checking network game status.\n");
     D_CheckNetGame ();

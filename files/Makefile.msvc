@@ -21,9 +21,9 @@ LDFLAGS = /link /SUBSYSTEM:CONSOLE
 RES = aidoom.res
 
 OBJS = \
-	am_map.obj c_console.obj d_items.obj d_main.obj d_net.obj doomdef.obj doomstat.obj \
+	am_map.obj c_console.obj d_items.obj d_main.obj d_net.obj d_netcl.obj doomdef.obj doomstat.obj \
 	dstrings.obj f_finale.obj f_wipe.obj g_game.obj hu_lib.obj hu_stuff.obj \
-	i_main.obj i_net.obj i_sound.obj i_system.obj i_video.obj info.obj \
+	i_main.obj i_net.obj i_udp.obj i_sound.obj i_system.obj i_video.obj info.obj \
 	m_argv.obj m_bbox.obj m_cheat.obj m_fixed.obj m_menu.obj m_misc.obj \
 	m_random.obj m_swap.obj p_ai_llm.obj p_ai_coop.obj p_ceilng.obj p_doors.obj p_enemy.obj \
 	p_floor.obj p_inter.obj p_lights.obj p_map.obj p_maputl.obj p_mobj.obj \
