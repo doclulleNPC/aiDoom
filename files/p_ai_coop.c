@@ -58,6 +58,7 @@ static mobj_t*	forcetarget;		// the forced attack target
 #define PF_MAXEXP	4000		// cap A* expansions (cost bound)
 #define PF_LOOKAHEAD	4		// waypoint this many cells ahead
 static byte*	pf_walk;		// 1 = the companion fits in this cell
+static byte*	pf_edge;		// per cell: 8-bit "edge open" mask (traversable)
 static byte*	pf_state;		// A* per-node: 0 none, 1 open, 2 closed
 static int*	pf_g;			// A* cost-so-far
 static int*	pf_came;		// A* predecessor cell
@@ -230,13 +231,15 @@ static void PF_Build (mobj_t* probe)
     if (pf_h < 1) pf_h = 1;
     n = pf_w * pf_h;
 
-    free (pf_walk); free (pf_state); free (pf_g); free (pf_came); free (pf_olist);
+    free (pf_walk); free (pf_edge); free (pf_state); free (pf_g); free (pf_came); free (pf_olist);
     pf_walk  = malloc (n);
+    pf_edge  = malloc (n);
     pf_state = malloc (n);
     pf_g     = malloc (n * sizeof(int));
     pf_came  = malloc (n * sizeof(int));
     pf_olist = malloc (n * sizeof(int));
 
+    // 1) which cells the marine fits in (centre probe + head-room)
     for (j = 0; j < pf_h; j++)
 	for (i = 0; i < pf_w; i++)
 	{
@@ -247,6 +250,37 @@ static void PF_Build (mobj_t* probe)
 		w = 1;
 	    pf_walk[j*pf_w + i] = w;
 	}
+
+    // 2) which edges are actually traversable.  A wall/window between two
+    // fits-here cells is caught by probing the cell *boundary* (the midpoint
+    // between centres): a blocking line there makes the marine not fit, so the
+    // edge is closed.  This stops A* routing through walls/windows.
+    {
+	static const int dx[8] = { 1,1,0,-1,-1,-1,0,1 };
+	static const int dy[8] = { 0,1,1,1,0,-1,-1,-1 };
+	for (j = 0; j < pf_h; j++)
+	  for (i = 0; i < pf_w; i++)
+	  {
+	    int  c = j*pf_w + i, d;
+	    byte e = 0;
+	    if (pf_walk[c])
+	      for (d = 0; d < 8; d++)
+	      {
+		int ni = i+dx[d], nj = j+dy[d];
+		if (ni<0 || nj<0 || ni>=pf_w || nj>=pf_h) continue;
+		if (!pf_walk[nj*pf_w+ni]) continue;
+		if (d & 1)				// diagonal: don't clip a corner
+		    if (!pf_walk[j*pf_w+ni] || !pf_walk[nj*pf_w+i]) continue;
+		{
+		    fixed_t mx = pf_orgx + (i*PF_CELL + PF_CELL/2 + dx[d]*PF_CELL/2)*FRACUNIT;
+		    fixed_t my = pf_orgy + (j*PF_CELL + PF_CELL/2 + dy[d]*PF_CELL/2)*FRACUNIT;
+		    if (P_CheckPosition (probe, mx, my) && (tmceilingz - tmfloorz >= 56*FRACUNIT))
+			e |= (1 << d);
+		}
+	      }
+	    pf_edge[c] = e;
+	  }
+    }
 }
 
 static void PF_Ensure (mobj_t* probe)
@@ -329,11 +363,9 @@ static int PF_Next (mobj_t* mo, fixed_t dxf, fixed_t dyf, fixed_t* outx, fixed_t
 	for (d = 0; d < 8; d++)
 	{
 	    int ci = cur%pf_w + dirx[d], cj = cur/pf_w + diry[d], nb, ng;
-	    if (ci<0 || cj<0 || ci>=pf_w || cj>=pf_h) continue;
+	    if (!(pf_edge[cur] & (1 << d))) continue;	// edge blocked (wall/window)
 	    nb = cj*pf_w + ci;
-	    if (!pf_walk[nb] || pf_state[nb] == 2) continue;
-	    if (d & 1)					// diagonal: no corner cutting
-		if (!pf_walk[cur + dirx[d]] || !pf_walk[cur + diry[d]*pf_w]) continue;
+	    if (pf_state[nb] == 2) continue;
 	    ng = pf_g[cur] + ((d & 1) ? 14 : 10);
 	    if (ng < pf_g[nb])
 	    {
