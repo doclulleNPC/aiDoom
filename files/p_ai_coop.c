@@ -60,22 +60,75 @@ static mobj_t*	forcetarget;		// the forced attack target
 #define COOP_ATTACK_TICS (10*TICRATE)	// "attack" charges the target for this long
 
 
+static int	coop_slot = 1;		// player index the buddy occupies
+
+// Call after D_CheckNetGame (so netgame/playeringame are settled).  In a netgame
+// the buddy takes the first free slot after the human players; every node runs
+// the SAME deterministic brain for it (no ticcmd is sent over the wire), so all
+// nodes stay in lockstep.  NOTE: every client must pass -aicoop, or they will
+// disagree on the slot and desync.
 void P_AICoop_Init (void)
 {
+    int	i, n;
+
     if (!M_CheckParm ("-aicoop"))
 	return;
+
+    if (netgame)
+    {
+	n = 0;					// first free slot after the humans
+	for (i = 0 ; i < MAXPLAYERS ; i++)
+	    if (playeringame[i]) n = i+1;
+	if (n >= MAXPLAYERS)
+	{
+	    printf ("P_AICoop: no free player slot for the buddy (game full)\n");
+	    return;
+	}
+	coop_slot = n;
+    }
+    else
+	coop_slot = 1;
+
     aicoop = 1;
-    playeringame[1] = true;		// spawn player 2 at the map's co-op start
-    printf ("P_AICoop: AI co-op companion (player 2) enabled\n");
+    playeringame[coop_slot] = true;		// spawn the buddy at its co-op start
+    printf ("P_AICoop: AI co-op companion enabled (player %d)\n", coop_slot+1);
+}
+
+// The slot the buddy occupies (-1 if disabled).  Used by g_game.c to skip the
+// netgame consistency check for it -- the buddy is local-but-deterministic, never
+// networked, so there is no remote command to validate against.
+int P_AICoop_Slot (void)
+{
+    return aicoop ? coop_slot : -1;
 }
 
 
 // The live companion mobj, or NULL if there isn't one right now.
 static mobj_t* AICoop_Mo (void)
 {
-    if (!aicoop || !playeringame[1])		return NULL;
-    if (players[1].playerstate != PST_LIVE)	return NULL;
-    return players[1].mo;
+    if (!aicoop || !playeringame[coop_slot])		return NULL;
+    if (players[coop_slot].playerstate != PST_LIVE)	return NULL;
+    return players[coop_slot].mo;
+}
+
+// Nearest live human player to (x,y) -- the buddy follows/defends whoever's near
+// (in single-player that's just player 0).  Deterministic (index tie-break).
+static mobj_t* AICoop_NearestHuman (fixed_t x, fixed_t y)
+{
+    mobj_t*	best = NULL;
+    fixed_t	bestd = 0;
+    int		i;
+
+    for (i = 0 ; i < MAXPLAYERS ; i++)
+    {
+	mobj_t*	m; fixed_t d;
+	if (i == coop_slot || !playeringame[i])		continue;
+	if (players[i].playerstate != PST_LIVE || !players[i].mo) continue;
+	m = players[i].mo;
+	d = P_AproxDistance (m->x - x, m->y - y);
+	if (!best || d < bestd) { best = m; bestd = d; }
+    }
+    return best;
 }
 
 
@@ -297,10 +350,11 @@ const char* P_AICoop_Report (void)
     static const char*	compass[8] = { "east","north-east","north","north-west",
 				       "west","south-west","south","south-east" };
     mobj_t*	mo = AICoop_Mo ();
-    mobj_t*	pl = playeringame[0] ? players[0].mo : NULL;
+    mobj_t*	pl;
 
     if (!mo)
 	return "[Buddy] (no companion -- launch with -aicoop)";
+    pl = AICoop_NearestHuman (mo->x, mo->y);
 
     if (pl)
     {
@@ -308,18 +362,20 @@ const char* P_AICoop_Report (void)
 	angle_t	a     = R_PointToAngle2 (pl->x, pl->y, mo->x, mo->y);
 	int	oct   = (int)((a + (1u<<28)) >> 29) & 7;
 	snprintf (buf, sizeof(buf), "[Buddy] %d units to your %s, %d HP -- %s.",
-		  units, compass[oct], players[1].health, what[coop_state]);
+		  units, compass[oct], players[coop_slot].health, what[coop_state]);
     }
     else
-	snprintf (buf, sizeof(buf), "[Buddy] %d HP -- %s.", players[1].health, what[coop_state]);
+	snprintf (buf, sizeof(buf), "[Buddy] %d HP -- %s.", players[coop_slot].health, what[coop_state]);
 
     return buf;
 }
 
+// Order commands are single-machine only: in a netgame they would set state on
+// just one node and desync the lockstep, so they are refused there.
 int P_AICoop_Summon (void)
 {
-    if (!AICoop_Mo ())
-	return 0;
+    if (!AICoop_Mo ())		return 0;
+    if (netgame)		return 0;
     summon = COOP_SUMMON_TICS;
     hold   = 0;
     return 1;
@@ -329,6 +385,8 @@ const char* P_AICoop_Wait (void)
 {
     if (!AICoop_Mo ())
 	return "[Buddy] (no companion -- launch with -aicoop)";
+    if (netgame)
+	return "[Buddy] (orders unavailable in netplay)";
     hold = !hold;
     if (hold) summon = 0;
     return hold ? "[Buddy] Holding position." : "[Buddy] Moving out.";
@@ -337,11 +395,14 @@ const char* P_AICoop_Wait (void)
 const char* P_AICoop_Attack (void)
 {
     mobj_t*	mo = AICoop_Mo ();
-    mobj_t*	pl = playeringame[0] ? players[0].mo : NULL;
+    mobj_t*	pl;
     mobj_t*	t;
 
     if (!mo)
 	return "[Buddy] (no companion -- launch with -aicoop)";
+    if (netgame)
+	return "[Buddy] (orders unavailable in netplay)";
+    pl = AICoop_NearestHuman (mo->x, mo->y);
     t = AICoop_NearestMonsterTo (pl ? pl->x : mo->x, pl ? pl->y : mo->y);
     if (!t)
 	return "[Buddy] No targets around.";
@@ -356,7 +417,7 @@ const char* P_AICoop_StatusReport (void)
     static char		buf[120];
     static const char*	wn[NUMWEAPONS] = { "fists","pistol","shotgun","chaingun",
 				"rocket launcher","plasma rifle","BFG9000","chainsaw","super shotgun" };
-    player_t*	bot = &players[1];
+    player_t*	bot = &players[coop_slot];
     int		w, am;
 
     if (!AICoop_Mo ())
@@ -584,10 +645,10 @@ void P_AICoop_BuildCmd (void)
     static fixed_t navwx, navwy;	// cached waypoint
     static boolean navok;
 
-    if (!aicoop || !playeringame[1])
+    if (!aicoop || !playeringame[coop_slot])
 	return;
 
-    bot = &players[1];
+    bot = &players[coop_slot];
     cmd = &bot->cmd;
 
     // Dead: tap "use" so co-op reborns the companion at its start.
@@ -609,7 +670,7 @@ void P_AICoop_BuildCmd (void)
     lastx = mo->x; lasty = mo->y;
     if (doorwait > 0) doorwait--;
 
-    pl = playeringame[0] ? players[0].mo : NULL;
+    pl = AICoop_NearestHuman (mo->x, mo->y);
 
     // Yield (top priority): the human is bumping into us -> get out of the way by
     // stepping straight away from them.  Use forward+side move so we slide aside

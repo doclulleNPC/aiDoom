@@ -1070,7 +1070,9 @@ void D_DoomMain (void)
 	else
 	{
 	    startepisode = myargv[p+1][0]-'0';
-	    startmap = myargv[p+2][0]-'0';
+	    // "-warp E" (no map) is allowed -> default to map 1.  Reading
+	    // myargv[p+2] unconditionally walked off the end of argv (crash).
+	    startmap = (p < myargc-2 && myargv[p+2][0] != '-') ? myargv[p+2][0]-'0' : 1;
 	}
 	autostart = true;
     }

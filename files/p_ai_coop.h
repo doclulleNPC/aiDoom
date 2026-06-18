@@ -15,9 +15,14 @@
 // D_CheckNetGame (so it isn't clobbered) and before the first level loads.
 void P_AICoop_Init (void);
 
-// Build players[1].cmd for this tic.  Call from P_Ticker *before* the
-// P_PlayerThink loop.  No-op unless -aicoop is active.
+// Build the buddy's ticcmd for this tic.  Call from P_Ticker *before* the
+// P_PlayerThink loop.  No-op unless -aicoop is active.  Deterministic, so in a
+// netgame every node computes the same command and the buddy stays in lockstep.
 void P_AICoop_BuildCmd (void);
+
+// Player slot the buddy occupies, or -1 if disabled.  g_game.c skips the netgame
+// consistency check for it (the buddy is local-but-deterministic, never sent).
+int  P_AICoop_Slot (void);
 
 // Console commands (used by c_console.c).  The const char* ones return a short
 // "[Buddy] ..." reply to print; P_AICoop_Summon returns 1 if a companion exists.

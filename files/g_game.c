@@ -69,6 +69,7 @@ rcsid[] = "$Id: g_game.c,v 1.8 1997/02/03 22:45:09 b1 Exp $";
 
 
 #include "g_game.h"
+#include "p_ai_coop.h"		// P_AICoop_Slot (skip consistency check for the buddy)
 
 
 #define SAVEGAMESIZE	0x2c000
@@ -748,14 +749,17 @@ void G_Ticker (void)
 		players[consoleplayer].message = turbomessage;
 	    }
 			
-	    if (netgame && !netdemo && !(gametic%ticdup) ) 
-	    { 
-		if (gametic > BACKUPTICS 
-		    && consistancy[i][buf] != cmd->consistancy) 
-		{ 
+	    if (netgame && !netdemo && !(gametic%ticdup) && i != P_AICoop_Slot() )
+	    {
+		// The Chocolate-Doom protocol only carries the low 8 bits of the
+		// consistancy stamp, so compare masked -- otherwise a remote
+		// player's full-width value never matches and every netgame fails.
+		if (gametic > BACKUPTICS
+		    && (consistancy[i][buf] & 0xff) != (cmd->consistancy & 0xff))
+		{
 		    I_Error ("consistency failure (%i should be %i)",
-			     cmd->consistancy, consistancy[i][buf]); 
-		} 
+			     cmd->consistancy & 0xff, consistancy[i][buf] & 0xff);
+		}
 		if (players[i].mo) 
 		    consistancy[i][buf] = players[i].mo->x; 
 		else 

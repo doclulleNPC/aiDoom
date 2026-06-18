@@ -150,8 +150,14 @@ can play alongside Chocolate/Crispy Doom peers.
 chocolate-server &                                   # the relay (UDP :2342)
 ./aidoom -connect <host[:port]> -warp 1 1 -skill 3   # join and play
 ./aidoom -connect host "Chocolate Doom 3.1.0"        # match the server's version string
-./aidoom -connect host -minplayers 2                 # wait for N players before launch (default 1)
+./aidoom -connect host -netplayers 2                 # wait for N players before launch (default 1)
 ```
+
+**AI co-op buddy in netgames:** pass `-aicoop` on **every** client. The buddy takes
+the first free player slot after the humans and is simulated *identically and
+deterministically on every node* (its ticcmd is never sent over the wire), so it
+stays in lockstep. Its console orders (`come`/`wait`/`attack`) are disabled in
+netplay (they would desync); `where`/`report` still work.
 
 Diagnostics (connect, print, exit — no game):
 
