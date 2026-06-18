@@ -153,11 +153,9 @@ chocolate-server &                                   # the relay (UDP :2342)
 ./aidoom -connect host -netplayers 2                 # wait for N players before launch (default 1)
 ```
 
-**AI co-op buddy in netgames:** pass `-aicoop` on **every** client. The buddy takes
-the first free player slot after the humans and is simulated *identically and
-deterministically on every node* (its ticcmd is never sent over the wire), so it
-stays in lockstep. Its console orders (`come`/`wait`/`attack`) are disabled in
-netplay (they would desync); `where`/`report` still work.
+**AI co-op buddy:** single-player only. `-aicoop` is **ignored in netgames** — network
+games run without the buddy (clean lockstep, no extra player slot). Use the buddy in
+solo play (`./aidoom -aicoop -warp 1 1`).
 
 Diagnostics (connect, print, exit — no game):
 

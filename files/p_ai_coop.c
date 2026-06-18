@@ -60,38 +60,25 @@ static mobj_t*	forcetarget;		// the forced attack target
 #define COOP_ATTACK_TICS (10*TICRATE)	// "attack" charges the target for this long
 
 
-static int	coop_slot = 1;		// player index the buddy occupies
+static int	coop_slot = 1;		// player index the buddy occupies (single-player: 1)
 
-// Call after D_CheckNetGame (so netgame/playeringame are settled).  In a netgame
-// the buddy takes the first free slot after the human players; every node runs
-// the SAME deterministic brain for it (no ticcmd is sent over the wire), so all
-// nodes stay in lockstep.  NOTE: every client must pass -aicoop, or they will
-// disagree on the slot and desync.
+// Call after D_CheckNetGame.  The buddy is SINGLE-PLAYER ONLY: in a netgame it is
+// disabled, so real network games run without it (clean lockstep, no extra slot).
 void P_AICoop_Init (void)
 {
-    int	i, n;
-
     if (!M_CheckParm ("-aicoop"))
 	return;
 
     if (netgame)
     {
-	n = 0;					// first free slot after the humans
-	for (i = 0 ; i < MAXPLAYERS ; i++)
-	    if (playeringame[i]) n = i+1;
-	if (n >= MAXPLAYERS)
-	{
-	    printf ("P_AICoop: no free player slot for the buddy (game full)\n");
-	    return;
-	}
-	coop_slot = n;
+	printf ("P_AICoop: AI co-op buddy is single-player only -- disabled in netgames.\n");
+	return;
     }
-    else
-	coop_slot = 1;
 
+    coop_slot = 1;
     aicoop = 1;
-    playeringame[coop_slot] = true;		// spawn the buddy at its co-op start
-    printf ("P_AICoop: AI co-op companion enabled (player %d)\n", coop_slot+1);
+    playeringame[1] = true;		// spawn the buddy at the co-op start
+    printf ("P_AICoop: AI co-op companion enabled (player 2)\n");
 }
 
 // The slot the buddy occupies (-1 if disabled).  Used by g_game.c to skip the
