@@ -227,4 +227,24 @@ void P_AICoop_BuildCmd (void)
 	if (dist > (defensive ? COOP_NEAR_DEF : COOP_NEAR))
 	    cmd->forwardmove = COOP_RUN;
     }
+
+    // Door/switch opener: if we're trying to move but barely getting anywhere,
+    // we're probably against a closed door -- pulse Use (on/off, so P_PlayerThink
+    // sees fresh presses) to open it.  Harmless against plain walls.
+    {
+	static fixed_t	lastx, lasty;
+	static int	stuck;
+	fixed_t		moved = P_AproxDistance (mo->x - lastx, mo->y - lasty);
+
+	if (cmd->forwardmove && moved < 4*FRACUNIT)
+	    stuck++;
+	else
+	    stuck = 0;
+
+	if (stuck >= 3 && !(leveltime & 1))
+	    cmd->buttons |= BT_USE;
+
+	lastx = mo->x;
+	lasty = mo->y;
+    }
 }
