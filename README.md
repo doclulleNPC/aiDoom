@@ -155,6 +155,10 @@ Behaviour (intentionally simple — straight-line movement, no pathfinding):
   ammo, weapons, backpack — never keys) that it can **actually reach** (a straight
   feet-level trace must be clear of walls and steeper-than-24-unit steps), otherwise
   follows you.
+- **Doors** — when blocked (e.g. pushing a closed door) it taps *Use* **once** and
+  waits for it to open, instead of spamming Use and bouncing the door open/shut.
+- **Hazards** — avoids stepping onto **damaging floors** (nukage/lava/blood) while
+  following, and won't fetch pickups that sit on or behind them.
 
 In the launchers it's on by default; disable with `--no-coop` (`-NoCoop` on Windows).
 

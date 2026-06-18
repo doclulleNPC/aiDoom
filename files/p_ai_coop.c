@@ -31,6 +31,8 @@
 #include "p_mobj.h"
 #include "info.h"
 #include "r_main.h"
+#include "r_state.h"
+#include "tables.h"
 #include "m_fixed.h"
 
 #include "p_ai_coop.h"
@@ -139,6 +141,23 @@ static mobj_t* AICoop_NearestMonsterTo (fixed_t x, fixed_t y)
 }
 
 
+// Is the floor at (x,y) a damaging sector (nukage / lava / blood / death exit)?
+static boolean AICoop_DamagingFloor (fixed_t x, fixed_t y)
+{
+    sector_t* s = R_PointInSubsector (x, y)->sector;
+    switch (s->special)
+    {
+      case 4:		// lightning + 20% damage
+      case 5:		// 10% damage
+      case 7:		// 5% damage (nukage)
+      case 11:		// 20% damage + end level on death
+      case 16:		// 20% damage
+	return true;
+    }
+    return false;
+}
+
+
 //
 // AICoop_CanReach
 // Can the companion walk in a straight line from its feet to a pickup?  We
@@ -170,6 +189,7 @@ static boolean AICoop_CanReach (mobj_t* self, mobj_t* it)
 	if (!P_CheckPosition (self, px, py))		return false;	// wall/obstacle
 	if (tmceilingz - tmfloorz < 56*FRACUNIT)	return false;	// won't fit
 	if (tmfloorz - fz > 24*FRACUNIT)		return false;	// step up too high
+	if (AICoop_DamagingFloor (px, py))		return false;	// nukage/lava in the way
 	fz = tmfloorz;
     }
     return true;
@@ -363,7 +383,10 @@ void P_AICoop_BuildCmd (void)
     angle_t	want, delta;
     fixed_t	tx = 0, ty = 0, dist;
     fixed_t	movethresh = -1;	// move when dist > this; -1 = stand still
-    int		rem, turn, haveaim = 0, fire = 0;
+    int		rem, turn, haveaim = 0, fire = 0, avoiddamage = 0;
+    boolean	stuck;
+    static fixed_t lastx, lasty;	// where we were last tic (progress check)
+    static int	doorwait, triedmove;	// door pulse cooldown / did we try to move
 
     if (!aicoop || !playeringame[1])
 	return;
@@ -383,6 +406,12 @@ void P_AICoop_BuildCmd (void)
 
     mo = bot->mo;
     memset (cmd, 0, sizeof(*cmd));
+
+    // Progress check (movement applied last tic): if we asked to move but barely
+    // moved, we're stuck -- maybe against a door.
+    stuck = (triedmove && P_AproxDistance (mo->x - lastx, mo->y - lasty) < 2*FRACUNIT);
+    lastx = mo->x; lasty = mo->y;
+    if (doorwait > 0) doorwait--;
 
     pl   = playeringame[0] ? players[0].mo : NULL;
     tgt  = AICoop_FindTarget (mo);
@@ -445,13 +474,13 @@ void P_AICoop_BuildCmd (void)
 	}
 	else if (pl)
 	{
-	    coop_state = 0; haveaim = 1; movethresh = COOP_NEAR;
+	    coop_state = 0; haveaim = 1; movethresh = COOP_NEAR; avoiddamage = 1;
 	    tx = pl->x; ty = pl->y;
 	}
     }
 
     if (!haveaim)
-	return;					// nothing to do -> stand still
+	{ triedmove = 0; return; }		// nothing to do -> stand still
 
     // turn toward the aim point, clamped to a sane rate
     want  = R_PointToAngle2 (mo->x, mo->y, tx, ty);
@@ -467,6 +496,28 @@ void P_AICoop_BuildCmd (void)
     if (fire && aimmon && abs(rem) < COOP_FACING && P_CheckSight (mo, aimmon))
 	cmd->buttons |= BT_ATTACK;
 
-    if (movethresh >= 0 && dist > movethresh)
+    triedmove = (movethresh >= 0 && dist > movethresh);
+
+    // For low-priority moves (following), don't step onto a damaging floor.
+    if (triedmove && avoiddamage)
+    {
+	unsigned fa = mo->angle >> ANGLETOFINESHIFT;
+	fixed_t  ax = mo->x + FixedMul (32*FRACUNIT, finecosine[fa]);
+	fixed_t  ay = mo->y + FixedMul (32*FRACUNIT, finesine[fa]);
+	if (AICoop_DamagingFloor (ax, ay))
+	    triedmove = 0;
+    }
+
+    if (triedmove)
 	cmd->forwardmove = COOP_RUN;
+
+    // Doors: if we're trying to move but stuck (e.g. pushing a closed door), tap
+    // Use *once*, then leave it alone for a bit -- spamming Use re-triggers a DR
+    // door every tic and it just bounces open/shut.  Monsters open doors the same
+    // way (in P_Move); here we do it through the player's Use line.
+    if (triedmove && stuck && doorwait == 0)
+    {
+	cmd->buttons |= BT_USE;
+	doorwait = 40;				// ~ door open time; no Use until then
+    }
 }
