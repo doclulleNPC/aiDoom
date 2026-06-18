@@ -32,4 +32,8 @@ int	P_AI_Active (mobj_t* actor);
 // attack/upkeep), using the engine's own P_Move / A_FaceTarget / attack states.
 void	A_LLMChase (mobj_t* actor);
 
+// Console: toggle the LLM<->Doom monster director.  arg "on"/"off"/"demo"/""(toggle).
+// Returns a one-line status string.
+const char* P_AI_Console (const char* arg);
+
 #endif

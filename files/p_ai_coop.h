@@ -19,8 +19,11 @@ void P_AICoop_Init (void);
 // P_PlayerThink loop.  No-op unless -aicoop is active.
 void P_AICoop_BuildCmd (void);
 
-// Console helpers (c_console.c "where" / "come").
-const char* P_AICoop_Report (void);	// one-line status answer
-int	    P_AICoop_Summon (void);	// order it to come; 0 if no companion
+// Console helpers (c_console.c).
+const char* P_AICoop_Report (void);		// "where" -- location + state
+int	    P_AICoop_Summon (void);		// "come"  -- run to player; 0 if none
+const char* P_AICoop_Wait (void);		// "wait/stay" -- toggle hold position
+const char* P_AICoop_Attack (void);		// "attack" -- charge nearest threat
+const char* P_AICoop_StatusReport (void);	// "report" -- ammo/HP/armor
 
 #endif

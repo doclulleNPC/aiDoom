@@ -25,6 +25,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <ctype.h>
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN	/* keep rpcndr.h out: its byte/boolean clash with doomtype.h */
@@ -104,7 +105,8 @@ static aientry_t	aient[AI_MAX];
 static int		aient_count;
 
 // runtime config
-static int	ai_on;			// -aidirector given
+static int	ai_on;			// transport exists (-aidirector/-aidemo or console)
+static int	ai_enabled = 1;		// runtime toggle (console "director on/off")
 static int	ai_demo;		// -aidemo given
 static int	ai_inited;
 static int	ai_port = 31666;
@@ -322,7 +324,7 @@ int P_AI_Active (mobj_t* actor)
 {
     aientry_t* e;
 
-    if (!ai_on)
+    if (!ai_on || !ai_enabled)
 	return 0;
     e = AI_FindByMobj (actor);
     if (!e || e->order <= AIO_CHASE)
@@ -654,7 +656,7 @@ void P_AI_Ticker (void)
 
     if (!ai_inited)
 	P_AI_Init ();
-    if (!ai_on)
+    if (!ai_on || !ai_enabled)
 	return;
 
     AI_PollSocket ();
@@ -674,4 +676,50 @@ void P_AI_Ticker (void)
 		aient[i].order = AIO_NONE;	// expired -> back to vanilla
 	}
     }
+}
+
+// ---------------------------------------------------------------------------
+// Console: turn the LLM<->Doom monster director on/off at runtime.
+//   arg: "on" | "off" | "demo" | "" (toggle)
+// ---------------------------------------------------------------------------
+const char* P_AI_Console (const char* arg)
+{
+    static char	msg[160];
+    char	a[16];
+    int		i, want;
+
+    if (!ai_inited)
+	P_AI_Init ();
+
+    for (i = 0; arg && arg[i] && i < 15; i++) a[i] = (char)tolower((unsigned char)arg[i]);
+    a[i] = 0;
+
+    if (!strcmp(a, "demo"))
+    {
+	ai_demo = !ai_demo;
+	if (ai_demo) { ai_on = 1; ai_enabled = 1; }
+	snprintf (msg, sizeof(msg), "AI director: built-in demo %s", ai_demo ? "ON" : "off");
+	return msg;
+    }
+
+    if      (!strcmp(a, "on"))  want = 1;
+    else if (!strcmp(a, "off")) want = 0;
+    else                        want = !ai_enabled;	// toggle
+
+    if (want)
+    {
+	if (listen_fd < 0)		// no transport yet -> open the TCP server
+	    AI_OpenSocket ();
+	ai_on = 1;
+	ai_enabled = 1;
+	snprintf (msg, sizeof(msg),
+		  "AI director ON -- monsters under director control (TCP port %d)", ai_port);
+    }
+    else
+    {
+	ai_enabled = 0;
+	aient_count = 0;		// drop directives -> monsters revert to vanilla now
+	snprintf (msg, sizeof(msg), "AI director OFF -- monsters use vanilla AI");
+    }
+    return msg;
 }

@@ -48,6 +48,9 @@ static int	aicoop;			// -aicoop given
 static int	coop_state;		// what we're doing (for the console "where")
 static int	summon;			// >0: "come" was ordered -- run to the player
 static int	wantmove;		// set when we actually tried to move this tic
+static int	hold;			// "wait/stay" -- hold position
+static int	forceaggro;		// >0: "attack" ordered -- charge forcetarget
+static mobj_t*	forcetarget;		// the forced attack target
 // coop_state codes (index into the report text): 0 hold 1 follow 2 fight 3 flee
 //                                                4 items 5 yield
 
@@ -133,6 +136,28 @@ static mobj_t* AICoop_FindItem (mobj_t* self)
     return best;
 }
 
+// Nearest live shootable monster to a point (used by the "attack" order).
+static mobj_t* AICoop_NearestMonsterTo (fixed_t x, fixed_t y)
+{
+    thinker_t*	th;
+    mobj_t*	best = NULL;
+    fixed_t	bestd = 0;
+
+    for (th = thinkercap.next; th != &thinkercap; th = th->next)
+    {
+	mobj_t*	m; fixed_t d;
+	if (th->function.acp1 != (actionf_p1)P_MobjThinker) continue;
+	m = (mobj_t*)th;
+	if (m->type == MT_PLAYER)		continue;
+	if (!(m->flags & MF_COUNTKILL))		continue;
+	if (!(m->flags & MF_SHOOTABLE))		continue;
+	if (m->flags & MF_CORPSE || m->health <= 0) continue;
+	d = P_AproxDistance (m->x - x, m->y - y);
+	if (!best || d < bestd) { best = m; bestd = d; }
+    }
+    return best;
+}
+
 // Move toward a goal mobj using the monster pathing (walls + doors handled).
 static void AICoop_Chase (mobj_t* mo, mobj_t* goal)
 {
@@ -212,6 +237,38 @@ void P_AICoop_BuildCmd (void)
     {
 	AICoop_MoveAway (mo, pl->x, pl->y);
 	coop_state = 5;
+    }
+    // "attack" ordered: charge the forced target until it (or the timer) dies
+    else if (forceaggro > 0)
+    {
+	mobj_t* t = forcetarget;
+	forceaggro--;
+	if (!t || t->health <= 0 || (t->flags & MF_CORPSE) || !(t->flags & MF_SHOOTABLE))
+	    t = forcetarget = AICoop_FindTarget (mo);	// target down -> reacquire
+	if (t)
+	{
+	    coop_state = 2;
+	    dist = P_AproxDistance (t->x - mo->x, t->y - mo->y);
+	    mo->angle = R_PointToAngle2 (mo->x, mo->y, t->x, t->y);
+	    if (P_CheckSight (mo, t))
+		cmd->buttons |= BT_ATTACK;
+	    if (dist > COOP_KEEP)
+		AICoop_Chase (mo, t);			// always close in (forced)
+	}
+	else
+	    forceaggro = 0;				// nothing left to attack
+    }
+    // "wait/stay" ordered: hold position; still face & fire at anything in sight
+    else if (hold)
+    {
+	coop_state = 0;
+	if (mon)
+	{
+	    coop_state = 2;
+	    mo->angle = R_PointToAngle2 (mo->x, mo->y, mon->x, mon->y);
+	    if (P_CheckSight (mo, mon))
+		cmd->buttons |= BT_ATTACK;
+	}
     }
     // (7) flee & hide: run from monsters, regroup on the player when clear
     else if (fleeing)
@@ -326,5 +383,65 @@ int P_AICoop_Summon (void)
     if (!aicoop || !playeringame[1] || players[1].playerstate == PST_DEAD || !players[1].mo)
 	return 0;
     summon = 245;		// ~7 s of coming to the player
+    hold = 0;
     return 1;
+}
+
+#define COOP_NONE	"[Buddy] (no companion -- launch with -aicoop)"
+static int AICoop_Here (void)
+{
+    return aicoop && playeringame[1]
+	&& players[1].playerstate != PST_DEAD && players[1].mo;
+}
+
+// Console "wait" / "stay": toggle holding position.
+const char* P_AICoop_Wait (void)
+{
+    if (!AICoop_Here ()) return COOP_NONE;
+    hold = !hold;
+    forceaggro = 0; summon = 0;		// holding cancels other orders
+    return hold ? "[Buddy] Holding position." : "[Buddy] Moving out.";
+}
+
+// Console "attack": charge the monster nearest the player.
+const char* P_AICoop_Attack (void)
+{
+    mobj_t* pl;
+    if (!AICoop_Here ()) return COOP_NONE;
+    pl = playeringame[0] ? players[0].mo : players[1].mo;
+    forcetarget = AICoop_NearestMonsterTo (pl->x, pl->y);
+    if (!forcetarget) return "[Buddy] No targets around.";
+    forceaggro = 350;			// ~10 s
+    hold = 0;
+    return "[Buddy] Attacking!";
+}
+
+// Console "report": ammo / status line.
+const char* P_AICoop_StatusReport (void)
+{
+    static char		buf[160];
+    static const char*	wn[NUMWEAPONS] = { "fists","pistol","shotgun","chaingun",
+	"rocket launcher","plasma rifle","BFG9000","chainsaw","super shotgun" };
+    player_t*	bot = &players[1];
+    int		w, at;
+    char	ammo[40];
+
+    if (!AICoop_Here ()) return COOP_NONE;
+
+    w = bot->readyweapon;
+    switch (w)
+    {
+      case wp_pistol: case wp_chaingun:      at = am_clip;   break;
+      case wp_shotgun: case wp_supershotgun: at = am_shell;  break;
+      case wp_missile:                       at = am_misl;   break;
+      case wp_plasma: case wp_bfg:           at = am_cell;   break;
+      default:                               at = am_noammo; break;
+    }
+    if (at == am_noammo) snprintf (ammo, sizeof(ammo), "no ammo");
+    else                 snprintf (ammo, sizeof(ammo), "%d rounds", bot->ammo[at]);
+
+    if (w < 0 || w >= NUMWEAPONS) w = 0;
+    snprintf (buf, sizeof(buf), "[Buddy] %d HP, %d%% armor, %s, %s.",
+	      bot->health, bot->armorpoints, wn[w], ammo);
+    return buf;
 }

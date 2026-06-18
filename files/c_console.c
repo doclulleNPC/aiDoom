@@ -31,7 +31,8 @@
 #include "m_fixed.h"		// FixedMul
 
 #include "c_console.h"
-#include "p_ai_coop.h"		// companion "where" / "come" commands
+#include "p_ai_coop.h"		// companion commands (where/come/wait/attack/report)
+#include "p_ai_llm.h"		// director on/off toggle
 
 extern patch_t*		hu_font[HU_FONTSIZE];
 extern const char*	shiftxform;
@@ -103,7 +104,7 @@ void C_Init (void)
 {
     con_head = con_count = con_inlen = con_open = con_shift = con_scroll = 0;
     con_input[0] = '\0';
-    C_Printf ("aiDoom console.  Type 'help'.  Toggle with the console key (default ^).");
+    C_Printf ("aiDoom console.  Type 'help'.  Toggle with ` (backquote) or the console key.");
 }
 
 
@@ -158,7 +159,8 @@ static void C_Execute (char* line)
     {
 	C_Printf ("cheats: god  noclip  give  kill  health <n>  armor <n>  ammo");
 	C_Printf ("world:  spawn <thing>  skill <1-5>  map <e> <m> / warp <m>");
-	C_Printf ("buddy:  where (status)  come");
+	C_Printf ("buddy:  where  come  wait/stay  attack  report");
+	C_Printf ("monsterAI: director on|off|demo  (LLM<->Doom)");
 	C_Printf ("misc:   clear  echo <text>  quit");
     }
     else if (!strcmp(cmd, "clear"))
@@ -259,6 +261,14 @@ static void C_Execute (char* line)
     else if (!strcmp(cmd, "come") || !strcmp(cmd, "follow"))
 	C_Printf ("%s", P_AICoop_Summon () ? "[Buddy] On my way!"
 					   : "[Buddy] (no companion -- launch with -aicoop)");
+    else if (!strcmp(cmd, "wait") || !strcmp(cmd, "stay"))
+	C_Printf ("%s", P_AICoop_Wait ());
+    else if (!strcmp(cmd, "attack"))
+	C_Printf ("%s", P_AICoop_Attack ());
+    else if (!strcmp(cmd, "report") || !strcmp(cmd, "status"))
+	C_Printf ("%s", P_AICoop_StatusReport ());
+    else if (!strcmp(cmd, "director") || !strcmp(cmd, "ai") || !strcmp(cmd, "llm"))
+	C_Printf ("%s", P_AI_Console (args));
     else
 	C_Printf ("unknown command: %s", cmd);
 }
@@ -266,8 +276,9 @@ static void C_Execute (char* line)
 
 // ---------------------------------------------------------------- input
 
-// Key that toggles the console.  Default '^' (the key left of 1 on many
-// non-US layouts); configurable via "key_console" in the config (m_misc.c).
+// Key that toggles the console.  Configurable via "key_console" (m_misc.c).
+// Backquote/tilde (`) is always accepted as well: on Linux/SDL the top-left
+// key (labelled ^ on many layouts) reports as KEY_BACKQUOTE, not '^'.
 int	key_console = '^';
 
 boolean C_Responder (event_t* ev)
@@ -275,7 +286,7 @@ boolean C_Responder (event_t* ev)
     int c;
 
     // toggle (consume the key press; ignore its key-up)
-    if (ev->data1 == key_console)
+    if (ev->data1 == key_console || ev->data1 == KEY_BACKQUOTE)
     {
 	if (ev->type == ev_keydown) { con_open = !con_open; con_shift = 0; }
 	return true;

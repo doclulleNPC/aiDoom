@@ -177,8 +177,18 @@ Tunable with the `aicoop_config` tool (or the `coop_*` keys in `aidoom.cfg`):
 
 In the launchers it's on by default; disable with `--no-coop` (`-NoCoop` on Windows).
 
-From the **console** (toggle key, default `^`): `where` — the companion answers with
-its distance, direction, HP and what it's doing; `come` — it runs to you.
+From the **console** (toggle key, default `^`) you can talk to it:
+
+| command | effect |
+|---|---|
+| `where` | answers with distance, direction, HP and what it's doing |
+| `come` | runs to you (ignores fights/items for ~7 s) |
+| `wait` / `stay` | holds position (still faces & fires); repeat to release |
+| `attack` | charges the monster nearest you for ~10 s |
+| `report` | HP, armor, current weapon and ammo |
+
+The **monster** LLM director (separate system — it drives the *monsters*, not the
+companion) can be toggled live: `director on` / `director off` / `director demo`.
 
 ## Configuration
 
