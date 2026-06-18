@@ -152,7 +152,9 @@ Behaviour (intentionally simple — straight-line movement, no pathfinding):
 - **Combat** — acquires the nearest visible monster, turns to face it and fires.
 - **Health** — when hurt it heads for the nearest health pickup.
 - **Idle** — with nothing to fight it collects nearby items (health, armor, bonuses,
-  ammo, weapons, backpack — never keys), otherwise follows you.
+  ammo, weapons, backpack — never keys) that it can **actually reach** (a straight
+  feet-level trace must be clear of walls and steeper-than-24-unit steps), otherwise
+  follows you.
 
 In the launchers it's on by default; disable with `--no-coop` (`-NoCoop` on Windows).
 

@@ -31,6 +31,7 @@
 #include "p_mobj.h"
 #include "info.h"
 #include "r_main.h"
+#include "m_fixed.h"
 
 #include "p_ai_coop.h"
 
@@ -139,6 +140,43 @@ static mobj_t* AICoop_NearestMonsterTo (fixed_t x, fixed_t y)
 
 
 //
+// AICoop_CanReach
+// Can the companion walk in a straight line from its feet to a pickup?  We
+// march the segment in ~24-unit steps and at each point require that the marine
+// fits (P_CheckPosition: no wall/obstacle, head-room) and that the floor never
+// rises more than a 24-unit step.  Rejects items behind a wall or up a ledge so
+// the bot doesn't run face-first into geometry trying to fetch them.
+//
+static boolean AICoop_CanReach (mobj_t* self, mobj_t* it)
+{
+    fixed_t	dx = it->x - self->x;
+    fixed_t	dy = it->y - self->y;
+    fixed_t	dist = P_AproxDistance (dx, dy);
+    fixed_t	fz = self->z;			// start at the buddy's feet
+    int		steps, i;
+
+    if (dist < 24*FRACUNIT)
+	return true;				// practically on it
+    steps = dist / (24*FRACUNIT);
+    if (steps > 64)
+	return false;				// too far -- don't bother (bounds cost)
+
+    for (i = 1; i <= steps; i++)
+    {
+	fixed_t	frac = (i << 16) / steps;	// i/steps as 16.16
+	fixed_t	px   = self->x + FixedMul (dx, frac);
+	fixed_t	py   = self->y + FixedMul (dy, frac);
+
+	if (!P_CheckPosition (self, px, py))		return false;	// wall/obstacle
+	if (tmceilingz - tmfloorz < 56*FRACUNIT)	return false;	// won't fit
+	if (tmfloorz - fz > 24*FRACUNIT)		return false;	// step up too high
+	fz = tmfloorz;
+    }
+    return true;
+}
+
+
+//
 // AICoop_FindHealth
 // Nearest health pickup still lying in the world (stimpack/medikit/soul/mega).
 //
@@ -169,8 +207,10 @@ static mobj_t* AICoop_FindHealth (mobj_t* self)
 
 	d = P_AproxDistance (m->x - self->x, m->y - self->y);
 	if (d > COOP_HEAL_RANGE)	continue;
+	if (best && d >= bestd)		continue;	// not closer -> skip the trace
+	if (!AICoop_CanReach (self, m))	continue;	// can't actually walk there
 
-	if (!best || d < bestd) { best = m; bestd = d; }
+	best = m; bestd = d;
     }
     return best;
 }
@@ -214,8 +254,10 @@ static mobj_t* AICoop_FindItem (mobj_t* self)
 
 	d = P_AproxDistance (m->x - self->x, m->y - self->y);
 	if (d > COOP_ITEM_RANGE)	continue;
+	if (best && d >= bestd)		continue;	// not closer -> skip the trace
+	if (!AICoop_CanReach (self, m))	continue;	// can't actually walk there
 
-	if (!best || d < bestd) { best = m; bestd = d; }
+	best = m; bestd = d;
     }
     return best;
 }
