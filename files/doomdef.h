@@ -285,6 +285,8 @@ typedef enum
 #define KEY_EQUALS	0x3d
 #define KEY_MINUS	0x2d
 
+#define KEY_BACKQUOTE	0x60		// '`' -- toggles the Quake-style console
+
 #define KEY_RSHIFT	(0x80+0x36)
 #define KEY_RCTRL	(0x80+0x1d)
 #define KEY_RALT	(0x80+0x38)

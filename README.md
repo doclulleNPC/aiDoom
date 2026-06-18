@@ -19,6 +19,9 @@ a language model drive monster tactics in real time.
 - **Variable internal resolution** — the software renderer draws natively at
   320×200 … 1920×1200 (`hires` 1–6), switchable at runtime from an **Options → Video**
   menu (no upscaling of a fixed 320×200 image).
+- **Quake-style console** (`files/c_console.c`) — toggle with **`` ` ``** (backquote);
+  scrollback + input line over a dimmed view, commands: `help clear echo quit god
+  noclip give map`/`warp`.
 - **Free-look** (mouse aims the view up/down and your shots follow), **jump**
   (default **Space**, with a grunt), toggle **autorun**, and an optional
   **`-friendlyfire`** flag that enables same-species monster infighting.

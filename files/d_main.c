@@ -84,6 +84,7 @@ static int access(char *file, int mode)
 
 #include "p_setup.h"
 #include "p_ai_coop.h"
+#include "c_console.h"
 #include "r_local.h"
 
 
@@ -182,6 +183,8 @@ void D_ProcessEvents (void)
     for ( ; eventtail != eventhead ; eventtail = (++eventtail)&(MAXEVENTS-1) )
     {
 	ev = &events[eventtail];
+	if (C_Responder (ev))
+	    continue;               // console ate the event
 	if (M_Responder (ev))
 	    continue;               // menu ate the event
 	G_Responder (ev);
@@ -328,6 +331,7 @@ void D_Display (void)
 
     // menus go directly to the screen
     M_Drawer ();          // menu is drawn even on top of everything
+    C_Drawer ();          // console overlays everything
     NetUpdate ();         // send out any new accumulation
 
 
@@ -1152,6 +1156,8 @@ printf("added\n");
 
     printf ("HU_Init: Setting up heads up display.\n");
     HU_Init ();
+
+    C_Init ();		// developer console (toggle with `)
 
     printf ("ST_Init: Init status bar.\n");
     ST_Init ();
