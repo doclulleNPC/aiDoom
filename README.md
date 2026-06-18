@@ -151,8 +151,10 @@ so weapons, damage, item pickups and respawning all work.
 
 Behaviour:
 
-- **Navigation** uses the engine's monster path-finding (`P_NewChaseDir`/`P_Move`),
-  so it steers around walls and opens doors instead of running into them.
+- **Navigation** uses **grid A\* path-finding** (no LLM): a walkability grid is
+  built per level (where the marine fits), A\* routes global waypoints, and the
+  engine mover (`P_Move`) walks them — so it routes around walls/obstacles and
+  opens doors instead of getting stuck. Falls back to the local pather if no route.
 - **Speed** matches the player's run speed (~16.7 units/tic) — it keeps up without
   outrunning you.
 - **Combat** — with a monster in sight it aims and fires: charges to close range when

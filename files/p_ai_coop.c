@@ -52,6 +52,22 @@ static int	wantmove;		// set when we actually tried to move this tic
 static int	hold;			// "wait/stay" -- hold position
 static int	forceaggro;		// >0: "attack" ordered -- charge forcetarget
 static mobj_t*	forcetarget;		// the forced attack target
+
+// ---- grid A* pathfinding (no LLM) -----------------------------------------
+#define PF_CELL		64		// nav-cell size in map units
+#define PF_MAXEXP	4000		// cap A* expansions (cost bound)
+#define PF_LOOKAHEAD	4		// waypoint this many cells ahead
+static byte*	pf_walk;		// 1 = the companion fits in this cell
+static byte*	pf_state;		// A* per-node: 0 none, 1 open, 2 closed
+static int*	pf_g;			// A* cost-so-far
+static int*	pf_came;		// A* predecessor cell
+static int*	pf_olist;		// A* open set (cell indices)
+static int	pf_w, pf_h;		// grid dimensions
+static fixed_t	pf_orgx, pf_orgy;	// grid origin (map units, fixed)
+static int	pf_level = -1;		// episode*100+map the grid was built for
+static fixed_t	pf_wpx, pf_wpy;		// current waypoint
+static mobj_t*	pf_goal;		// goal the waypoint was computed for
+static int	pf_timer;		// tics until the next re-path
 // coop_state codes (index into the report text): 0 hold 1 follow 2 fight 3 flee
 //                                                4 items 5 yield
 
@@ -185,6 +201,181 @@ static void AICoop_MoveAway (mobj_t* mo, fixed_t fx, fixed_t fy)
 }
 
 
+// Step toward a point with the engine mover (handles fine collision + doors).
+static void AICoop_MoveToPoint (mobj_t* mo, fixed_t tx, fixed_t ty)
+{
+    angle_t	a = R_PointToAngle2 (mo->x, mo->y, tx, ty);
+    int		base = (int)((a + (1u<<28)) >> 29) & 7;
+    static const int off[5] = { 0, 1, 7, 2, 6 };
+    int		i;
+    wantmove = 1;
+    for (i = 0; i < 5; i++)
+    {
+	mo->movedir = (base + off[i]) & 7;
+	if (P_Move (mo)) return;
+    }
+    mo->movedir = 8;
+}
+
+// Build the walkability grid for the current level by probing where the
+// companion fits (P_CheckPosition + head-room).  Cheap, done once per level.
+static void PF_Build (mobj_t* probe)
+{
+    int	i, j, n;
+    pf_orgx = bmaporgx;
+    pf_orgy = bmaporgy;
+    pf_w = bmapwidth  * (128 / PF_CELL);
+    pf_h = bmapheight * (128 / PF_CELL);
+    if (pf_w < 1) pf_w = 1;
+    if (pf_h < 1) pf_h = 1;
+    n = pf_w * pf_h;
+
+    free (pf_walk); free (pf_state); free (pf_g); free (pf_came); free (pf_olist);
+    pf_walk  = malloc (n);
+    pf_state = malloc (n);
+    pf_g     = malloc (n * sizeof(int));
+    pf_came  = malloc (n * sizeof(int));
+    pf_olist = malloc (n * sizeof(int));
+
+    for (j = 0; j < pf_h; j++)
+	for (i = 0; i < pf_w; i++)
+	{
+	    fixed_t cx = pf_orgx + (i*PF_CELL + PF_CELL/2)*FRACUNIT;
+	    fixed_t cy = pf_orgy + (j*PF_CELL + PF_CELL/2)*FRACUNIT;
+	    byte    w  = 0;
+	    if (P_CheckPosition (probe, cx, cy) && (tmceilingz - tmfloorz >= 56*FRACUNIT))
+		w = 1;
+	    pf_walk[j*pf_w + i] = w;
+	}
+}
+
+static void PF_Ensure (mobj_t* probe)
+{
+    int lvl = gameepisode*100 + gamemap;
+    if (lvl != pf_level || !pf_walk)
+    {
+	PF_Build (probe);
+	pf_level = lvl;
+	pf_goal = NULL;
+    }
+}
+
+static int PF_Cell (fixed_t x, fixed_t y)
+{
+    int i = ((x - pf_orgx) >> FRACBITS) / PF_CELL;
+    int j = ((y - pf_orgy) >> FRACBITS) / PF_CELL;
+    if (i < 0 || j < 0 || i >= pf_w || j >= pf_h) return -1;
+    return j*pf_w + i;
+}
+
+static int PF_Heur (int a, int b)		// octile distance * 10
+{
+    int dx = abs (a%pf_w - b%pf_w);
+    int dy = abs (a/pf_w - b/pf_w);
+    return 10*(dx+dy) - 6*(dx < dy ? dx : dy);
+}
+
+// A* from (sx,sy) to (dx,dy); set *outx/*outy to a waypoint a few cells ahead.
+// Returns 1 if a route was found, 0 otherwise (caller falls back to direct).
+static int PF_Next (mobj_t* mo, fixed_t dxf, fixed_t dyf, fixed_t* outx, fixed_t* outy)
+{
+    int		start, dest, n, on, exp, cur, k;
+    static const int dirx[8] = { 1,1,0,-1,-1,-1,0,1 };
+    static const int diry[8] = { 0,1,1,1,0,-1,-1,-1 };
+
+    if (!pf_walk) return 0;
+    start = PF_Cell (mo->x, mo->y);
+    dest  = PF_Cell (dxf, dyf);
+    if (start < 0 || dest < 0 || start == dest) return 0;
+
+    n = pf_w * pf_h;
+    if (!pf_walk[dest])			// snap goal to a nearby walkable cell
+    {
+	int di = dest%pf_w, dj = dest/pf_w, r, found = -1;
+	for (r = 1; r <= 4 && found < 0; r++)
+	{
+	    int oi, oj;
+	    for (oj = -r; oj <= r && found < 0; oj++)
+	      for (oi = -r; oi <= r; oi++)
+	      {
+		int ii = di+oi, jj = dj+oj;
+		if (ii>=0 && jj>=0 && ii<pf_w && jj<pf_h && pf_walk[jj*pf_w+ii])
+		    { found = jj*pf_w+ii; break; }
+	      }
+	}
+	if (found < 0) return 0;
+	dest = found;
+    }
+    if (!pf_walk[start]) return 0;
+
+    for (k = 0; k < n; k++) { pf_state[k] = 0; pf_g[k] = 0x7fffffff; }
+    pf_g[start] = 0; pf_state[start] = 1;
+    pf_olist[0] = start; on = 1; exp = 0;
+
+    while (on > 0 && exp < PF_MAXEXP)
+    {
+	int bi = 0, bf = 0x7fffffff, d;
+	for (k = 0; k < on; k++)			// pop lowest f
+	{
+	    int f = pf_g[pf_olist[k]] + PF_Heur (pf_olist[k], dest);
+	    if (f < bf) { bf = f; bi = k; }
+	}
+	cur = pf_olist[bi];
+	if (cur == dest) break;
+	pf_olist[bi] = pf_olist[--on];
+	pf_state[cur] = 2;
+	exp++;
+
+	for (d = 0; d < 8; d++)
+	{
+	    int ci = cur%pf_w + dirx[d], cj = cur/pf_w + diry[d], nb, ng;
+	    if (ci<0 || cj<0 || ci>=pf_w || cj>=pf_h) continue;
+	    nb = cj*pf_w + ci;
+	    if (!pf_walk[nb] || pf_state[nb] == 2) continue;
+	    if (d & 1)					// diagonal: no corner cutting
+		if (!pf_walk[cur + dirx[d]] || !pf_walk[cur + diry[d]*pf_w]) continue;
+	    ng = pf_g[cur] + ((d & 1) ? 14 : 10);
+	    if (ng < pf_g[nb])
+	    {
+		pf_g[nb] = ng; pf_came[nb] = cur;
+		if (pf_state[nb] != 1) { pf_state[nb] = 1; pf_olist[on++] = nb; }
+	    }
+	}
+    }
+
+    if (cur != dest) return 0;				// no route
+
+    // walk back to a cell PF_LOOKAHEAD steps from start
+    {
+	int path[PF_MAXEXP], len = 0, c = dest, wp;
+	while (c != start && len < PF_MAXEXP) { path[len++] = c; c = pf_came[c]; }
+	if (len == 0) return 0;
+	wp = path[len > PF_LOOKAHEAD ? len - PF_LOOKAHEAD : 0];	// reversed: index from start side
+	*outx = pf_orgx + ((wp%pf_w)*PF_CELL + PF_CELL/2)*FRACUNIT;
+	*outy = pf_orgy + ((wp/pf_w)*PF_CELL + PF_CELL/2)*FRACUNIT;
+	return 1;
+    }
+}
+
+// Route to a goal mobj: A* waypoints (global) + P_Move stepping (local).  Falls
+// back to the plain chase if no route is found.
+static void AICoop_PathChase (mobj_t* mo, mobj_t* goal)
+{
+    PF_Ensure (mo);
+    if (goal != pf_goal || --pf_timer <= 0
+	|| P_AproxDistance (mo->x - pf_wpx, mo->y - pf_wpy) < PF_CELL*FRACUNIT)
+    {
+	pf_goal = goal; pf_timer = 12;
+	if (!PF_Next (mo, goal->x, goal->y, &pf_wpx, &pf_wpy))
+	{
+	    pf_goal = NULL;			// no route -> retry next tic
+	    AICoop_Chase (mo, goal);		// fall back to the engine local pather
+	    return;
+	}
+    }
+    AICoop_MoveToPoint (mo, pf_wpx, pf_wpy);
+}
+
 void P_AICoop_BuildCmd (void)
 {
     player_t*	bot;
@@ -265,7 +456,7 @@ void P_AICoop_BuildCmd (void)
 	    if (P_CheckSight (mo, t))
 		cmd->buttons |= BT_ATTACK;
 	    if (dist > COOP_KEEP)
-		AICoop_Chase (mo, t);			// always close in (forced)
+		AICoop_PathChase (mo, t);			// always close in (forced)
 	}
 	else
 	    forceaggro = 0;				// nothing left to attack
@@ -293,7 +484,7 @@ void P_AICoop_BuildCmd (void)
 	}
 	else if (pl)
 	{
-	    AICoop_Chase (mo, pl);
+	    AICoop_PathChase (mo, pl);
 	    mo->angle = R_PointToAngle2 (mo->x, mo->y, pl->x, pl->y);
 	}
     }
@@ -301,7 +492,7 @@ void P_AICoop_BuildCmd (void)
     else if (summon > 0 && pl)
     {
 	summon--;
-	AICoop_Chase (mo, pl);
+	AICoop_PathChase (mo, pl);
 	mo->angle = R_PointToAngle2 (mo->x, mo->y, pl->x, pl->y);
 	coop_state = 1;
     }
@@ -319,12 +510,12 @@ void P_AICoop_BuildCmd (void)
 	    if (dist < COOP_KEEP) AICoop_MoveAway (mo, mon->x, mon->y);	// back off
 	}
 	else if (dist > COOP_KEEP)
-	    AICoop_Chase (mo, mon);					// close in
+	    AICoop_PathChase (mo, mon);					// close in
     }
     // (4) no monster in sight: fetch nearby pickups, else follow the human
     else if ((item = AICoop_FindItem (mo)) != NULL)
     {
-	AICoop_Chase (mo, item);
+	AICoop_PathChase (mo, item);
 	mo->angle = R_PointToAngle2 (mo->x, mo->y, item->x, item->y);
 	coop_state = 4;
     }
@@ -333,7 +524,7 @@ void P_AICoop_BuildCmd (void)
 	coop_state = 1;
 	if (P_AproxDistance (pl->x - mo->x, pl->y - mo->y) > COOP_NEAR)
 	{
-	    AICoop_Chase (mo, pl);
+	    AICoop_PathChase (mo, pl);
 	    mo->angle = R_PointToAngle2 (mo->x, mo->y, pl->x, pl->y);
 	}
     }
