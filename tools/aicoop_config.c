@@ -38,11 +38,12 @@ static setting_t settings[] = {
     {"AI co-op companion (-aicoop)","Sight range",      "coop_sight",     1280,256, 4096, 128, "mu"},
     {"AI co-op companion (-aicoop)","Follow distance",  "coop_follow",     256, 64, 1024,  32, "mu"},
     {"AI co-op companion (-aicoop)","Heal search range","coop_heal_range",1024,256, 4096, 128, "mu"},
+    {"AI co-op companion (-aicoop)","Move speed",       "coop_speed",       13,  4,   30,   1, "u/t"},
     {"Monsters (pack hunt)","Pack hunt  0=off 1=on","monster_pack",          1,  0,    1,   1, ""},
     {"Monsters (pack hunt)","Search / group range", "monster_pack_range", 2048,256, 8192, 256, "mu"},
 };
 #define NSET ((int)(sizeof(settings)/sizeof(settings[0])))
-static const int DEFVAL[NSET] = { 50, 30, 1280, 256, 1024, 1, 2048 };
+static const int DEFVAL[NSET] = { 35, 20, 1280, 256, 1024, 13, 1, 2048 };
 
 static SDL_Window*   win;
 static SDL_Renderer* ren;

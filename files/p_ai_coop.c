@@ -47,14 +47,13 @@ extern boolean	P_Move (mobj_t* actor);
 static int	aicoop;			// -aicoop given
 static int	coop_state;		// what we're doing (for the console "where")
 static int	summon;			// >0: "come" was ordered -- run to the player
+static int	wantmove;		// set when we actually tried to move this tic
 // coop_state codes (index into the report text): 0 hold 1 follow 2 fight 3 flee
 //                                                4 items 5 yield
 
-#define COOP_SPEED	17		// move speed (u/tic) for P_Move; matches the
-					// player's run terminal speed (~16.7 u/tic)
 #define COOP_KEEP	(192*FRACUNIT)	// fight: hold this far from a monster
 #define YIELD_DIST	(48*FRACUNIT)	// step aside when the human is this close
-#define IDLE_TICS	105		// ~3 s: never stand still longer than this
+#define IDLE_TICS	105		// ~3 s: don't stay stuck longer than this
 
 // --- Behaviour knobs (loaded from aidoom.cfg via m_misc.c, edited by aicoop_config) ---
 int	coop_defend_hp  = 35;		// below this HP: don't charge / kite
@@ -62,6 +61,7 @@ int	coop_heal_hp    = 20;		// below this HP: flee & hide until coop_defend_hp
 int	coop_sight      = 1280;		// monster acquisition range (map units)
 int	coop_follow     = 256;		// follow distance to the human (map units)
 int	coop_heal_range = 1024;		// pickup search range (map units)
+int	coop_speed      = 13;		// step size per tic for P_Move (player run ~= 16-17)
 #define COOP_SIGHT	((fixed_t)coop_sight      * FRACUNIT)
 #define COOP_NEAR	((fixed_t)coop_follow     * FRACUNIT)
 #define COOP_ITEM_RANGE	((fixed_t)coop_heal_range * FRACUNIT)
@@ -73,7 +73,9 @@ void P_AICoop_Init (void)
 	return;
     aicoop = 1;
     playeringame[1] = true;		// spawn player 2 at the map's co-op start
-    mobjinfo[MT_PLAYER].speed = COOP_SPEED;	// give P_Move something to work with
+    if (coop_speed < 4)  coop_speed = 4;
+    if (coop_speed > 30) coop_speed = 30;
+    mobjinfo[MT_PLAYER].speed = coop_speed;	// step size for P_Move (tunable)
     printf ("P_AICoop: AI co-op companion (player 2) enabled\n");
 }
 
@@ -134,6 +136,7 @@ static mobj_t* AICoop_FindItem (mobj_t* self)
 // Move toward a goal mobj using the monster pathing (walls + doors handled).
 static void AICoop_Chase (mobj_t* mo, mobj_t* goal)
 {
+    wantmove = 1;
     mo->target = goal;
     if (--mo->movecount < 0 || !P_Move (mo))
 	P_NewChaseDir (mo);
@@ -143,6 +146,7 @@ static void AICoop_Chase (mobj_t* mo, mobj_t* goal)
 static void AICoop_MoveAway (mobj_t* mo, fixed_t fx, fixed_t fy)
 {
     angle_t	a = R_PointToAngle2 (fx, fy, mo->x, mo->y);	// from threat -> us
+    wantmove = 1;
     int		base = (int)((a + (1u<<28)) >> 29) & 7;		// nearest of 8 dirs
     static const int off[5] = { 0, 1, 7, 2, 6 };		// straight, +-45, +-90
     int		i;
@@ -201,6 +205,7 @@ void P_AICoop_BuildCmd (void)
     else if (bot->health >= coop_defend_hp)    fleeing = 0;
 
     coop_state = 0;
+    wantmove   = 0;
 
     // (2,5) yield: the human is right on top of us -> step aside (top priority)
     if (pl && P_AproxDistance (pl->x - mo->x, pl->y - mo->y) < YIELD_DIST)
@@ -264,10 +269,13 @@ void P_AICoop_BuildCmd (void)
 	}
     }
 
-    // (3) never stand still > ~3 s: if we didn't move, shuffle sideways
+    // (3) Anti-stuck only: if we were *trying* to move but didn't get anywhere
+    // for ~3 s, shuffle sideways to break free.  When there's genuinely nothing
+    // to do (no monster, no item, player nearby) we set no goal, so we just
+    // stand calmly instead of fidgeting.
     {
 	fixed_t moved = P_AproxDistance (mo->x - lastx, mo->y - lasty);
-	if (moved < 2*FRACUNIT) idletic++; else idletic = 0;
+	if (wantmove && moved < 2*FRACUNIT) idletic++; else idletic = 0;
 	if (idletic >= IDLE_TICS)
 	{
 	    mo->movedir = (mo->movedir + 2) & 7;	// perpendicular step
