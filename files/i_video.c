@@ -34,6 +34,8 @@
 #include "doomdef.h"
 
 #include "aidoom_icon.h"
+#include "c_console.h"			// console overlay state (C_Active / C_GetLine)
+#include "../tools/font_atlas.h"		// baked DejaVuSansMono atlas (TTF console font)
 
 
 static SDL_Window*	window = NULL;
@@ -234,6 +236,76 @@ void I_UpdateNoBlit (void)
 //
 // I_FinishUpdate
 //
+//
+// Console overlay -- drawn with SDL using the baked DejaVuSansMono atlas, so the
+// console text is crisp/anti-aliased over a translucent panel (drawn in the
+// renderer's logical space = SCREENWIDTH x SCREENHEIGHT, after the game blit).
+//
+static SDL_Texture* confont = NULL;
+
+static void I_ConDrawText (float x, float y, const char* s, float cw, float ch)
+{
+    if (!s) return;
+    for ( ; *s ; s++)
+    {
+	int c = (unsigned char)*s;
+	if (c < FONT_FIRST || c >= FONT_FIRST+FONT_COUNT) c = '?';
+	SDL_FRect src = { (float)((c-FONT_FIRST)*FONT_CW), 0, FONT_CW, FONT_CH };
+	SDL_FRect dst = { x, y, cw, ch };
+	SDL_RenderTexture (renderer, confont, &src, &dst);
+	x += cw;
+    }
+}
+
+static void I_DrawConsoleOverlay (void)
+{
+    float	W, H, conH, fs, cw, ch, y;
+    int		row;
+    const char*	line;
+
+    if (!C_Active())
+	return;
+
+    if (!confont)
+    {
+	Uint32* px = malloc (FONT_AW*FONT_CH*4);
+	int i;
+	for (i=0 ; i<FONT_AW*FONT_CH ; i++)
+	    px[i] = 0x00FFFFFFu | ((Uint32)font_alpha[i] << 24);	// white, alpha=coverage
+	SDL_Surface* s = SDL_CreateSurfaceFrom (FONT_AW, FONT_CH, SDL_PIXELFORMAT_ARGB8888, px, FONT_AW*4);
+	confont = SDL_CreateTextureFromSurface (renderer, s);
+	SDL_SetTextureBlendMode (confont, SDL_BLENDMODE_BLEND);
+	SDL_SetTextureScaleMode (confont, SDL_SCALEMODE_LINEAR);
+	SDL_DestroySurface (s); free (px);
+    }
+
+    W = SCREENWIDTH; H = SCREENHEIGHT;
+    conH = H * 0.55f;
+
+    // translucent panel + red separator
+    SDL_SetRenderDrawBlendMode (renderer, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor (renderer, 8, 10, 16, 205);
+    { SDL_FRect p = {0, 0, W, conH};        SDL_RenderFillRect (renderer, &p); }
+    SDL_SetRenderDrawColor (renderer, 180, 40, 40, 255);
+    { SDL_FRect b = {0, conH-2, W, 2};      SDL_RenderFillRect (renderer, &b); }
+
+    // size the font so ~13 lines fit; advance keeps the monospace aspect
+    ch = H / 24.0f; if (ch < 8) ch = 8;
+    fs = ch / FONT_CH;
+    cw = FONT_CW * fs;
+
+    SDL_SetTextureColorMod (confont, 255, 236, 160);	// amber text
+    y = conH - 4 - ch;					// input line at the bottom
+    I_ConDrawText (cw*0.5f, y, C_GetLine(0), cw, ch);
+
+    for (row = 1, y -= ch + 2 ; y > 2 ; y -= ch + 2, row++)
+    {
+	line = C_GetLine (row);
+	if (!line) break;
+	I_ConDrawText (cw*0.5f, y, line, cw, ch);
+    }
+}
+
 void I_FinishUpdate (void)
 {
     static int	lasttic;
@@ -276,6 +348,7 @@ void I_FinishUpdate (void)
 
     SDL_RenderClear(renderer);
     SDL_RenderTexture(renderer, texture, NULL, NULL);
+    I_DrawConsoleOverlay();		// crisp SDL/TTF console on top of the frame
     SDL_RenderPresent(renderer);
 }
 

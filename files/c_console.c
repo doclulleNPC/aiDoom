@@ -357,58 +357,28 @@ boolean C_Responder (event_t* ev)
 
 
 // ---------------------------------------------------------------- drawing
+// Console rendering now lives in the platform layer (i_video.c) as an SDL
+// overlay drawn with the baked DejaVuSansMono ("TrueType") atlas -- crisp,
+// anti-aliased and translucent.  c_console only owns state; i_video pulls the
+// display lines via C_GetLine().
+void C_Drawer (void) { }		// (legacy hook; SDL overlay does the drawing)
 
-// Draw a string in the full-size hu_font (crisp, readable).  BASE coords --
-// V_DrawPatch scales to the current resolution.
-static void C_DrawString (int x, int y, const char* s)
+// Text for display row r: row 0 = input line (with blinking cursor); rows 1..
+// = scrollback, newest first (honouring the scroll offset).  NULL past the end.
+const char* C_GetLine (int r)
 {
-    for (; *s; s++)
+    static char	inbuf[CON_INPUTW+8];
+    int		idx;
+
+    if (r == 0)
     {
-	int ch = toupper((unsigned char)*s);
-	if (ch == ' ' || ch < HU_FONTSTART || ch > HU_FONTEND) { x += 4; continue; }
-	patch_t* p = hu_font[ch - HU_FONTSTART];
-	if (x + SHORT(p->width) > BASE_WIDTH) break;
-	V_DrawPatch (x, y, 0, p);
-	x += SHORT(p->width);
+	con_blink++;
+	snprintf (inbuf, sizeof(inbuf), "]%s%s", con_input, ((con_blink>>4)&1) ? "_" : "");
+	return inbuf;
     }
-}
-
-void C_Drawer (void)
-{
-    int		rows, npix, i, y, line, vis;
-    byte*	dst;
-    char	inbuf[CON_INPUTW+4];
-
-    if (!con_open)
-	return;
-
-    // dim the view behind the console
-    rows = CON_H * hires;
-    if (rows > SCREENHEIGHT) rows = SCREENHEIGHT;
-    npix = rows * SCREENWIDTH;
-    dst = screens[0];
-    if (colormaps)
-	for (i=0 ; i<npix ; i++)
-	    dst[i] = colormaps[CON_DARK*256 + dst[i]];
-    // a separator line at the bottom edge
-    if (rows >= 2)
-	memset (dst + (rows-2)*SCREENWIDTH, 176, 2*SCREENWIDTH);
-
-    // input line at the bottom of the console
-    con_blink++;
-    snprintf (inbuf, sizeof(inbuf), "]%s%s", con_input,
-	      ((con_blink>>4)&1) ? "_" : "");
-    C_DrawString (2, CON_H - 10, inbuf);
-
-    // scrollback above it, newest at the bottom
-    vis  = (CON_H - 14) / LINE_STEP;
-    y    = CON_H - 10 - LINE_STEP;
-    for (line = 0 ; line < vis ; line++)
-    {
-	int idx = line + con_scroll;
-	if (idx >= con_count) break;
-	idx = (con_head - 1 - idx + CON_LINES*64) % CON_LINES;
-	C_DrawString (2, y, con_text[idx]);
-	y -= LINE_STEP;
-    }
+    idx = (r - 1) + con_scroll;
+    if (idx >= con_count)
+	return NULL;
+    idx = (con_head - 1 - idx + CON_LINES*64) % CON_LINES;
+    return con_text[idx];
 }
