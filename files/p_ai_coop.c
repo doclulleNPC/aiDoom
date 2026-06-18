@@ -37,6 +37,8 @@ static int	aicoop;			// -aicoop given
 #define COOP_NEAR	(256*FRACUNIT)	// follow distance to the human
 #define COOP_KEEP	(192*FRACUNIT)	// advance toward a monster until this close
 #define COOP_RUN	0x32		// forwardmove "run" magnitude
+#define COOP_HEAL_HP	50		// seek a med-pack below this health
+#define COOP_HEAL_RANGE	(1024*FRACUNIT)	// how far to look for one
 
 
 void P_AICoop_Init (void)
@@ -85,11 +87,50 @@ static mobj_t* AICoop_FindTarget (mobj_t* self)
 }
 
 
+//
+// AICoop_FindHealth
+// Nearest health pickup still lying in the world (stimpack/medikit/soul/mega).
+//
+static mobj_t* AICoop_FindHealth (mobj_t* self)
+{
+    thinker_t*	th;
+    mobj_t*	best = NULL;
+    fixed_t	bestd = 0;
+
+    for (th = thinkercap.next; th != &thinkercap; th = th->next)
+    {
+	mobj_t*	m;
+	fixed_t	d;
+
+	if (th->function.acp1 != (actionf_p1)P_MobjThinker)
+	    continue;
+	m = (mobj_t*)th;
+
+	if (!(m->flags & MF_SPECIAL))	continue;	// not a pickup (or already taken)
+	switch (m->sprite)
+	{
+	  case SPR_STIM: case SPR_MEDI:
+	  case SPR_SOUL: case SPR_MEGA:
+	    break;
+	  default:
+	    continue;
+	}
+
+	d = P_AproxDistance (m->x - self->x, m->y - self->y);
+	if (d > COOP_HEAL_RANGE)	continue;
+
+	if (!best || d < bestd) { best = m; bestd = d; }
+    }
+    return best;
+}
+
+
 void P_AICoop_BuildCmd (void)
 {
     player_t*	bot;
     mobj_t*	mo;
     mobj_t*	tgt;
+    mobj_t*	heal;
     mobj_t*	follow;
     ticcmd_t*	cmd;
     angle_t	want, delta;
@@ -115,10 +156,14 @@ void P_AICoop_BuildCmd (void)
     mo = bot->mo;
     memset (cmd, 0, sizeof(*cmd));
 
-    tgt    = AICoop_FindTarget (mo);
+    // Priority: when hurt, break off and grab the nearest med-pack.  Otherwise
+    // fight the nearest monster, else follow the human.
+    heal   = (bot->health < COOP_HEAL_HP) ? AICoop_FindHealth (mo) : NULL;
+    tgt    = heal ? NULL : AICoop_FindTarget (mo);
     follow = playeringame[0] ? players[0].mo : NULL;
 
-    if (tgt)		{ tx = tgt->x;    ty = tgt->y; }
+    if (heal)		{ tx = heal->x;   ty = heal->y; }
+    else if (tgt)	{ tx = tgt->x;    ty = tgt->y; }
     else if (follow)	{ tx = follow->x; ty = follow->y; }
     else		return;
 
@@ -133,7 +178,12 @@ void P_AICoop_BuildCmd (void)
 
     dist = P_AproxDistance (tx - mo->x, ty - mo->y);
 
-    if (tgt)
+    if (heal)
+    {
+	if (dist > 16*FRACUNIT)
+	    cmd->forwardmove = COOP_RUN;	// walk onto the pickup (no firing)
+    }
+    else if (tgt)
     {
 	if (abs(rem) < COOP_FACING && P_CheckSight (mo, tgt))
 	    cmd->buttons |= BT_ATTACK;
