@@ -175,11 +175,11 @@ void P_MovePlayer (player_t* player)
     //  if not onground.
     onground = (player->mo->z <= player->mo->floorz);
 
-    // MOD: jump -- an upward impulse while on the ground, with a pain grunt.
+    // MOD: jump -- an upward impulse while on the ground, with an "oof" grunt.
     if ((cmd->buttons & BT_JUMP) && onground)
     {
 	player->mo->momz = JUMPVELOCITY;
-	S_StartSound (player->mo, sfx_plpain);
+	S_StartSound (player->mo, sfx_oof);
     }
 
     if (cmd->forwardmove && onground)

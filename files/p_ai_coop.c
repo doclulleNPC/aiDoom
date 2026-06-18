@@ -45,7 +45,8 @@ extern boolean	P_Move (mobj_t* actor);
 
 static int	aicoop;			// -aicoop given
 
-#define COOP_SPEED	18		// mobj move speed (units/tic) for P_Move
+#define COOP_SPEED	17		// move speed (u/tic) for P_Move; matches the
+					// player's run terminal speed (~16.7 u/tic)
 #define COOP_KEEP	(192*FRACUNIT)	// fight: hold this far from a monster
 #define YIELD_DIST	(48*FRACUNIT)	// step aside when the human is this close
 #define IDLE_TICS	105		// ~3 s: never stand still longer than this

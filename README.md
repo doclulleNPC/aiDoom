@@ -25,10 +25,11 @@ a language model drive monster tactics in real time.
 - **Free-look** (mouse aims the view up/down and your shots follow), **jump**
   (default **Space**, with a grunt), toggle **autorun**, and an optional
   **`-friendlyfire`** flag that enables same-species monster infighting.
-- **AI co-op companion** (`files/p_ai_coop.c`, `-aicoop`) — spawns a second marine
-  (player 2) driven by a built-in bot: it acquires the nearest visible monster and
-  fires, otherwise follows you. Drives a real co-op player through the normal ticcmd
-  path (weapons, damage, pickups, reborn all work). Single-machine, off by default.
+- **AI co-op companion** (`files/p_ai_coop.c`, `-aicoop`) — a second marine (player 2)
+  driven by a built-in bot that **navigates with the engine's monster path-finding**
+  (walks around walls, opens doors), fights, fetches items, auto-heals and retreats
+  when hurt. A real co-op player (weapons, damage, pickups, reborn all work). Off by
+  default; tunable in `aicoop_config`. See [AI co-op companion](#ai-co-op-companion--aicoop) below.
 - **Pack-hunt monster AI** (`files/p_ai_coop.c`… `p_enemy.c`, `monster_pack`) — an
   optional aggressive mode (on by default): monsters acquire the player the instant
   they spawn (searching even with no line of sight) and steer toward nearby allies en
@@ -138,6 +139,43 @@ run/start_aidoom.sh --skill 4 --friendlyfire
 
 The director protocol (`observe` / `act` / `wake`) and design rationale are documented
 in **AGENT_CONTROL.md** §12–13 and **MONSTER_AGENT_GUIDE.md**.
+
+## AI co-op companion (`-aicoop`)
+
+Adds a second marine (player 2) controlled by a built-in bot — a real co-op peer,
+so weapons, damage, item pickups and respawning all work.
+
+```sh
+./aidoom -warp 1 1 -skill 3 -aicoop      # or run/start_aidoom.sh (on by default)
+```
+
+Behaviour:
+
+- **Navigation** uses the engine's monster path-finding (`P_NewChaseDir`/`P_Move`),
+  so it steers around walls and opens doors instead of running into them.
+- **Speed** matches the player's run speed (~16.7 units/tic) — it keeps up without
+  outrunning you.
+- **Combat** — with a monster in sight it aims and fires: charges to close range when
+  healthy, kites (keeps its distance) when hurt.
+- **Items** — with no monster in sight it fetches nearby health, health/armor bonuses
+  and armor; otherwise it follows you.
+- **Auto-heal** — regenerates +1 HP/s up to 100.
+- **Self-preservation** — below `coop_heal_hp` it flees and hides from monsters until
+  auto-heal brings it back to `coop_defend_hp`.
+- **Stays out of the way** — steps aside when you bump into it, and never stands still
+  for more than ~3 s.
+
+Tunable with the `aicoop_config` tool (or the `coop_*` keys in `aidoom.cfg`):
+
+| key | default | meaning |
+|-----|---------|---------|
+| `coop_defend_hp` | 35 | below this HP: stop charging, kite |
+| `coop_heal_hp` | 20 | below this HP: flee & hide until back to `coop_defend_hp` |
+| `coop_sight` | 1280 | monster acquisition range (map units) |
+| `coop_follow` | 256 | follow distance to the player |
+| `coop_heal_range` | 1024 | item search range |
+
+In the launchers it's on by default; disable with `--no-coop` (`-NoCoop` on Windows).
 
 ## Configuration
 
