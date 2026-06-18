@@ -19,4 +19,12 @@ void P_AICoop_Init (void);
 // P_PlayerThink loop.  No-op unless -aicoop is active.
 void P_AICoop_BuildCmd (void);
 
+// Console commands (used by c_console.c).  The const char* ones return a short
+// "[Buddy] ..." reply to print; P_AICoop_Summon returns 1 if a companion exists.
+const char*	P_AICoop_Report (void);		// "where"  -- distance/dir/HP/doing
+int		P_AICoop_Summon (void);		// "come"   -- run to the player
+const char*	P_AICoop_Wait (void);		// "wait"/"stay" -- toggle hold
+const char*	P_AICoop_Attack (void);		// "attack" -- charge nearest monster
+const char*	P_AICoop_StatusReport (void);	// "report" -- HP/armor/weapon/ammo
+
 #endif

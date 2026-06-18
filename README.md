@@ -147,13 +147,24 @@ so weapons, damage, item pickups and respawning all work.
 ./aidoom -warp 1 1 -skill 3 -aicoop      # or run/start_aidoom.sh (on by default)
 ```
 
-Behaviour (intentionally simple):
+Behaviour (intentionally simple — straight-line movement, no pathfinding):
 
 - **Combat** — acquires the nearest visible monster, turns to face it and fires.
 - **Health** — when hurt it heads for the nearest health pickup.
-- **Follow** — with nothing to fight it follows you.
+- **Idle** — with nothing to fight it collects nearby items (health, armor, bonuses,
+  ammo, weapons, backpack — never keys), otherwise follows you.
 
 In the launchers it's on by default; disable with `--no-coop` (`-NoCoop` on Windows).
+
+From the **console** (open with **F12** or `` ` ``) you can direct it:
+
+| command | effect |
+|---|---|
+| `where` | distance, compass direction, HP and what it's doing |
+| `come` | runs to you for ~7 s (ignores fights/items) |
+| `wait` / `stay` | holds position (still faces & fires); repeat to release |
+| `attack` | charges the monster nearest you for ~10 s |
+| `report` | HP, armor, current weapon and ammo |
 
 The **monster** LLM director (a separate system — it drives the *monsters*, not the
 companion) can be toggled live from the console: `director on` / `director off` /
