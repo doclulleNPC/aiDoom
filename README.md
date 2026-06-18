@@ -155,6 +155,11 @@ Behaviour (intentionally simple — straight-line movement, no pathfinding):
   ammo, weapons, backpack — never keys) that it can **actually reach** (a straight
   feet-level trace must be clear of walls and steeper-than-24-unit steps), otherwise
   follows you.
+- **Navigation** — when coming to you (`come`) or following, it routes with a
+  **Dijkstra search over the BSP sub-sector graph** (centroids as nodes, two-sided
+  segs as edges, penalties for closed doors / damaging floors), then string-pulls
+  to the furthest straight-reachable waypoint — so it finds you around walls and
+  corners instead of just walking into the nearest wall. See `Pathfinding.md`.
 - **Yields** — when you bump into it (e.g. it's blocking a doorway/exit) it steps
   straight away from you so you can get past, rather than standing in the way.
 - **Doors** — when blocked (e.g. pushing a closed door) it taps *Use* **once** and

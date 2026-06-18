@@ -21,8 +21,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdint.h>
 
 #include "doomdef.h"
+#include "doomdata.h"
 #include "doomstat.h"
 #include "d_event.h"
 #include "d_items.h"
@@ -167,16 +169,16 @@ static boolean AICoop_DamagingFloor (fixed_t x, fixed_t y)
 // rises more than a 24-unit step.  Rejects items behind a wall or up a ledge so
 // the bot doesn't run face-first into geometry trying to fetch them.
 //
-static boolean AICoop_CanReach (mobj_t* self, mobj_t* it)
+static boolean AICoop_CanReach (mobj_t* self, fixed_t tx, fixed_t ty, boolean avoiddmg)
 {
-    fixed_t	dx = it->x - self->x;
-    fixed_t	dy = it->y - self->y;
+    fixed_t	dx = tx - self->x;
+    fixed_t	dy = ty - self->y;
     fixed_t	dist = P_AproxDistance (dx, dy);
     fixed_t	fz = self->z;			// start at the buddy's feet
     int		steps, i;
 
     if (dist < 24*FRACUNIT)
-	return true;				// practically on it
+	return true;				// practically there
     steps = dist / (24*FRACUNIT);
     if (steps > 64)
 	return false;				// too far -- don't bother (bounds cost)
@@ -190,7 +192,7 @@ static boolean AICoop_CanReach (mobj_t* self, mobj_t* it)
 	if (!P_CheckPosition (self, px, py))		return false;	// wall/obstacle
 	if (tmceilingz - tmfloorz < 56*FRACUNIT)	return false;	// won't fit
 	if (tmfloorz - fz > 24*FRACUNIT)		return false;	// step up too high
-	if (AICoop_DamagingFloor (px, py))		return false;	// nukage/lava in the way
+	if (avoiddmg && AICoop_DamagingFloor (px, py))	return false;	// nukage/lava
 	fz = tmfloorz;
     }
     return true;
@@ -229,7 +231,7 @@ static mobj_t* AICoop_FindHealth (mobj_t* self)
 	d = P_AproxDistance (m->x - self->x, m->y - self->y);
 	if (d > COOP_HEAL_RANGE)	continue;
 	if (best && d >= bestd)		continue;	// not closer -> skip the trace
-	if (!AICoop_CanReach (self, m))	continue;	// can't actually walk there
+	if (!AICoop_CanReach (self, m->x, m->y, true)) continue;	// can't walk there
 
 	best = m; bestd = d;
     }
@@ -276,7 +278,7 @@ static mobj_t* AICoop_FindItem (mobj_t* self)
 	d = P_AproxDistance (m->x - self->x, m->y - self->y);
 	if (d > COOP_ITEM_RANGE)	continue;
 	if (best && d >= bestd)		continue;	// not closer -> skip the trace
-	if (!AICoop_CanReach (self, m))	continue;	// can't actually walk there
+	if (!AICoop_CanReach (self, m->x, m->y, true)) continue;	// can't walk there
 
 	best = m; bestd = d;
     }
@@ -371,6 +373,196 @@ const char* P_AICoop_StatusReport (void)
 }
 
 
+// ================ BSP sub-sector Dijkstra pathfinder (Pathfinding.md) =======
+// Nodes  = walkable sub-sectors, represented by their centroid.
+// Edges  = two-sided segs to the neighbouring sub-sector.
+// Weight = centroid distance + penalties (closed door, damaging floor).
+// A straight-line "string pull" then picks the furthest reachable waypoint.
+
+#define PF_DOOR_PEN	200		// extra cost (units) to route through a door
+#define PF_HAZARD_PEN	1000		// extra cost to route over a damaging floor
+#define PF_MAXPOP	3000		// cap on Dijkstra node expansions
+#define PF_PATHMAX	256		// max sub-sectors in a reconstructed path
+#define PF_INF		0x7fffffff
+
+static int	pf_level = -1;		// episode*100+map the graph was built for
+static int	pf_n;			// sub-sector count
+static fixed_t*	pf_cx;			// centroid x / y per sub-sector
+static fixed_t*	pf_cy;
+static int*	pf_segss;		// sub-sector each seg belongs to
+static int*	pf_segnb;		// neighbour sub-sector across each seg (-1 none)
+static int*	pf_dist;		// Dijkstra cost-so-far
+static int*	pf_prev;		// Dijkstra predecessor
+static byte*	pf_done;		// Dijkstra closed flag
+static int	pf_path[PF_PATHMAX];
+
+static int PF_SS (fixed_t x, fixed_t y)
+{
+    return (int)(R_PointInSubsector (x, y) - subsectors);
+}
+
+static boolean PF_IsDoorSpecial (int sp)	// push (DR) doors with no key
+{
+    return (sp == 1 || sp == 31 || sp == 117 || sp == 118);
+}
+
+static void PF_Build (void)
+{
+    int	i, j;
+
+    free (pf_cx); free (pf_cy); free (pf_segss); free (pf_segnb);
+    free (pf_dist); free (pf_prev); free (pf_done);
+
+    pf_n     = numsubsectors;
+    pf_cx    = malloc (pf_n * sizeof(fixed_t));
+    pf_cy    = malloc (pf_n * sizeof(fixed_t));
+    pf_dist  = malloc (pf_n * sizeof(int));
+    pf_prev  = malloc (pf_n * sizeof(int));
+    pf_done  = malloc (pf_n);
+    pf_segss = malloc (numsegs * sizeof(int));
+    pf_segnb = malloc (numsegs * sizeof(int));
+
+    // centroid of each sub-sector (mean of its segs' endpoints) + seg->ss map
+    for (i = 0; i < pf_n; i++)
+    {
+	subsector_t*	ss = &subsectors[i];
+	int64_t		sx = 0, sy = 0;
+	int		cnt = 0, s;
+	for (s = 0; s < ss->numlines; s++)
+	{
+	    seg_t* sg = &segs[ss->firstline + s];
+	    sx += sg->v1->x; sy += sg->v1->y;
+	    sx += sg->v2->x; sy += sg->v2->y;
+	    cnt += 2;
+	    pf_segss[ss->firstline + s] = i;
+	}
+	pf_cx[i] = cnt ? (fixed_t)(sx / cnt) : 0;
+	pf_cy[i] = cnt ? (fixed_t)(sy / cnt) : 0;
+    }
+
+    // neighbour sub-sector across each two-sided seg: probe a point ~4 units off
+    // the seg midpoint on each side; the side that isn't our own sub-sector is it
+    for (j = 0; j < numsegs; j++)
+    {
+	seg_t*	sg = &segs[j];
+	fixed_t	mx, my, nx, ny, len, ox, oy;
+	int	a, b, self;
+
+	pf_segnb[j] = -1;
+	if (!sg->backsector) continue;			// one-sided wall
+
+	mx = (sg->v1->x + sg->v2->x) >> 1;
+	my = (sg->v1->y + sg->v2->y) >> 1;
+	nx = -(sg->v2->y - sg->v1->y);			// perpendicular to the seg
+	ny =  (sg->v2->x - sg->v1->x);
+	len = P_AproxDistance (nx, ny);
+	if (len < FRACUNIT) continue;
+	ox = (fixed_t)(((int64_t)nx * (4*FRACUNIT)) / len);	// ~4-unit offset
+	oy = (fixed_t)(((int64_t)ny * (4*FRACUNIT)) / len);
+
+	self = pf_segss[j];
+	a = PF_SS (mx + ox, my + oy);
+	b = PF_SS (mx - ox, my - oy);
+	pf_segnb[j] = (a != self) ? a : (b != self ? b : -1);
+    }
+}
+
+// Cost of crossing seg `sg` from sub-sector u to its neighbour v; -1 = blocked.
+static int PF_EdgeWeight (seg_t* sg, int u, int v)
+{
+    int	w = (int)(P_AproxDistance (pf_cx[u]-pf_cx[v], pf_cy[u]-pf_cy[v]) >> FRACBITS);
+    line_t* ld = sg->linedef;
+
+    if (w < 1) w = 1;
+    if (ld)						// real wall line (not a BSP miniseg)
+    {
+	sector_t*	fs = sg->frontsector;
+	sector_t*	bs = sg->backsector;
+	fixed_t		opening, step;
+
+	if (ld->flags & ML_BLOCKING) return -1;		// impassable rail
+	opening = (fs->ceilingheight < bs->ceilingheight ? fs->ceilingheight : bs->ceilingheight)
+		- (fs->floorheight   > bs->floorheight   ? fs->floorheight   : bs->floorheight);
+	step    = bs->floorheight - fs->floorheight;
+
+	if (opening < 56*FRACUNIT)			// won't fit right now
+	{
+	    if (PF_IsDoorSpecial (ld->special)) w += PF_DOOR_PEN;	// can open it
+	    else return -1;
+	}
+	else if (step > 24*FRACUNIT)
+	    return -1;					// step up too high (no lifts)
+    }
+    if (AICoop_DamagingFloor (pf_cx[v], pf_cy[v]))
+	w += PF_HAZARD_PEN;
+    return w;
+}
+
+static boolean PF_Dijkstra (int start, int goal)
+{
+    int	i, pop = 0;
+
+    for (i = 0; i < pf_n; i++) { pf_dist[i] = PF_INF; pf_prev[i] = -1; pf_done[i] = 0; }
+    pf_dist[start] = 0;
+
+    while (pop < PF_MAXPOP)
+    {
+	int		u = -1, best = PF_INF, s;
+	subsector_t*	ss;
+
+	for (i = 0; i < pf_n; i++)			// pop nearest unvisited
+	    if (!pf_done[i] && pf_dist[i] < best) { best = pf_dist[i]; u = i; }
+	if (u < 0) break;				// nothing left reachable
+	if (u == goal) return true;
+	pf_done[u] = 1; pop++;
+
+	ss = &subsectors[u];
+	for (s = 0; s < ss->numlines; s++)
+	{
+	    int	segi = ss->firstline + s;
+	    int	v = pf_segnb[segi];
+	    int	w;
+	    if (v < 0 || pf_done[v]) continue;
+	    w = PF_EdgeWeight (&segs[segi], u, v);
+	    if (w < 0) continue;
+	    if (pf_dist[u] + w < pf_dist[v]) { pf_dist[v] = pf_dist[u] + w; pf_prev[v] = u; }
+	}
+    }
+    return pf_dist[goal] < PF_INF;
+}
+
+// Next point to steer toward to reach (dx,dy).  Returns false if unreachable.
+static boolean PF_NextWaypoint (mobj_t* mo, fixed_t dx, fixed_t dy, fixed_t* wx, fixed_t* wy)
+{
+    int	start, goal, len, i, pick, c;
+
+    if (pf_level != gameepisode*100 + gamemap || !pf_cx)
+    { PF_Build (); pf_level = gameepisode*100 + gamemap; }
+
+    start = PF_SS (mo->x, mo->y);
+    goal  = PF_SS (dx, dy);
+    if (start == goal) { *wx = dx; *wy = dy; return true; }
+    if (!PF_Dijkstra (start, goal)) return false;
+
+    // reconstruct goal -> ... -> first step (pf_path[len-1] is adjacent to start)
+    len = 0; c = goal;
+    while (c != -1 && c != start && len < PF_PATHMAX) { pf_path[len++] = c; c = pf_prev[c]; }
+    if (len == 0) { *wx = dx; *wy = dy; return true; }
+
+    // string pull: steer to the furthest path node reachable in a straight walk
+    pick = len - 1;					// fallback: the first step
+    for (i = 0; i < len; i++)				// i=0 is the goal end
+    {
+	fixed_t px = (i == 0) ? dx : pf_cx[pf_path[i]];
+	fixed_t py = (i == 0) ? dy : pf_cy[pf_path[i]];
+	if (AICoop_CanReach (mo, px, py, true)) { pick = i; break; }
+    }
+    if (pick == 0) { *wx = dx; *wy = dy; }
+    else { *wx = pf_cx[pf_path[pick]]; *wy = pf_cy[pf_path[pick]]; }
+    return true;
+}
+
+
 void P_AICoop_BuildCmd (void)
 {
     player_t*	bot;
@@ -382,12 +574,15 @@ void P_AICoop_BuildCmd (void)
     mobj_t*	aimmon = NULL;		// the monster we're firing at (for the sight test)
     ticcmd_t*	cmd;
     angle_t	want, delta;
-    fixed_t	tx = 0, ty = 0, dist;
+    fixed_t	tx = 0, ty = 0, stx, sty, dist;
     fixed_t	movethresh = -1;	// move when dist > this; -1 = stand still
-    int		rem, turn, haveaim = 0, fire = 0, avoiddamage = 0;
+    int		rem, turn, haveaim = 0, fire = 0, avoiddamage = 0, navigate = 0;
     boolean	stuck;
     static fixed_t lastx, lasty;	// where we were last tic (progress check)
     static int	doorwait, triedmove;	// door pulse cooldown / did we try to move
+    static int	navtimer, navgoal = -1;	// pathfinder re-path cooldown / cached goal ss
+    static fixed_t navwx, navwy;	// cached waypoint
+    static boolean navok;
 
     if (!aicoop || !playeringame[1])
 	return;
@@ -471,7 +666,7 @@ void P_AICoop_BuildCmd (void)
 	// (come) ordered: run to the player, ignoring fights/items
 	else if (summon > 0 && pl)
 	{
-	    coop_state = 4; haveaim = 1; movethresh = COOP_NEAR/2;
+	    coop_state = 4; haveaim = 1; movethresh = COOP_NEAR/2; navigate = 1;
 	    tx = pl->x; ty = pl->y;
 	}
 	// hurt: break off and grab the nearest med-pack
@@ -495,7 +690,7 @@ void P_AICoop_BuildCmd (void)
 	}
 	else if (pl)
 	{
-	    coop_state = 0; haveaim = 1; movethresh = COOP_NEAR; avoiddamage = 1;
+	    coop_state = 0; haveaim = 1; movethresh = COOP_NEAR; avoiddamage = 1; navigate = 1;
 	    tx = pl->x; ty = pl->y;
 	}
     }
@@ -503,8 +698,23 @@ void P_AICoop_BuildCmd (void)
     if (!haveaim)
 	{ triedmove = 0; return; }		// nothing to do -> stand still
 
-    // turn toward the aim point, clamped to a sane rate
-    want  = R_PointToAngle2 (mo->x, mo->y, tx, ty);
+    // Navigate: if asked to walk somewhere, route there via the BSP pathfinder and
+    // steer toward the next waypoint (re-pathed every ~10 tics / on goal change).
+    // Combat aims directly (monsters are in sight), so it leaves stx/sty == tx/ty.
+    stx = tx; sty = ty;
+    if (navigate)
+    {
+	int gss = PF_SS (tx, ty);
+	if (--navtimer <= 0 || gss != navgoal)
+	{
+	    navtimer = 10; navgoal = gss;
+	    navok = PF_NextWaypoint (mo, tx, ty, &navwx, &navwy);
+	}
+	if (navok) { stx = navwx; sty = navwy; }
+    }
+
+    // turn toward the steer point (waypoint when navigating), clamped
+    want  = R_PointToAngle2 (mo->x, mo->y, stx, sty);
     delta = want - mo->angle;
     rem   = (short)(delta >> 16);		// shortest signed turn (BAM>>16)
     turn  = rem;
