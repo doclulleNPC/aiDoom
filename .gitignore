@@ -72,3 +72,7 @@ build_cmake_build.log
 CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake
+tools/aicoop_config
+run/aicoop_config
+tools/gpumon
+run/gpumon
