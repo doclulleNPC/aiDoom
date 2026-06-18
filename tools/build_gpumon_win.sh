@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Cross-build the SDL3 GPU monitor (gpumon_sdl.exe) for Windows with MinGW-w64.
+# Cross-build the SDL3 GPU monitor (gpumon.exe) for Windows with MinGW-w64.
 #   SDL3=/path/to/SDL3-devel-3.x.y-mingw/x86_64-w64-mingw32 ./tools/build_gpumon_win.sh
 set -eu
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -8,7 +8,7 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 [ -f "$here/font_atlas.h" ] || python3 "$here/bake_font.py"
 "$CC" -O2 -DSDL_MAIN_HANDLED -I"$here" -I"$SDL3/include" \
     "$here/gpumon_sdl.c" -L"$SDL3/lib" -lSDL3 -mwindows -static-libgcc \
-    -o "$here/gpumon_sdl.exe"
+    -o "$here/gpumon.exe"
 mkdir -p "$here/../run"
-cp -f "$here/gpumon_sdl.exe" "$here/../run/gpumon_sdl.exe"
-echo "built $here/gpumon_sdl.exe (copied to run/gpumon_sdl.exe)"
+cp -f "$here/gpumon.exe" "$here/../run/gpumon.exe"
+echo "built $here/gpumon.exe (copied to run/gpumon.exe)"

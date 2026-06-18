@@ -25,5 +25,5 @@ cd /d "%ROOT%tools"
 nmake /nologo /f Makefile.msvc %* || exit /b 1
 
 echo.
-echo [build] OK -- aidoom.exe + aidoom_config.exe + gpumon_sdl.exe built and copied to run\.
+echo [build] OK -- aidoom.exe + aidoom_config.exe + gpumon.exe built and copied to run\.
 endlocal

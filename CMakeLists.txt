@@ -5,10 +5,11 @@
 #   aidoom_config   - SDL3 settings editor (GUI)
 #   gpumon_sdl      - SDL3 GPU monitor (GUI)
 #
-# Configure (point CMAKE_PREFIX_PATH at the SDL3 SDK if not system-installed):
-#   cmake -B build -DCMAKE_PREFIX_PATH=C:/Source/SDL3      # Windows (run in a VS env)
-#   cmake -B build                                          # Linux/macOS (system SDL3)
-#   cmake --build build
+# SDL3 is found via find_package; by default it looks for a sibling ../SDL3 SDK
+# (next to this repo) and then system locations.  Override with CMAKE_PREFIX_PATH.
+# Configure + build:
+#   cmake -B build           # Windows: uses ../SDL3 SDK (run in a VS env)
+#   cmake --build build      # Linux/macOS: uses system SDL3
 #
 cmake_minimum_required(VERSION 3.16)
 project(aiDoom C)
@@ -18,6 +19,9 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
+# SDL3: prefer a system install, else a sibling ../SDL3 SDK (relative to the
+# repo root, i.e. next to this checkout).  Override with -DCMAKE_PREFIX_PATH=...
+list(APPEND CMAKE_PREFIX_PATH "${CMAKE_SOURCE_DIR}/../SDL3")
 find_package(SDL3 REQUIRED CONFIG)
 
 set(RUNDIR ${CMAKE_SOURCE_DIR}/run)
@@ -78,6 +82,9 @@ foreach(tool aidoom_config gpumon_sdl)
         target_link_options(${tool} PRIVATE /ENTRY:mainCRTStartup)
     endif()
 endforeach()
+
+# The GPU monitor ships as plain "gpumon" (source file is gpumon_sdl.c).
+set_target_properties(gpumon_sdl PROPERTIES OUTPUT_NAME gpumon)
 
 # tools: embed the shared aidoom.ico as the .exe icon on Windows.
 if(WIN32)

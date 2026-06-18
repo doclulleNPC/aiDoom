@@ -39,7 +39,7 @@ aidoom.exe: $(OBJS) $(RES)
 	$(CC) $(CFLAGS) /Fe:aidoom.exe $(OBJS) $(RES) $(LDFLAGS) $(LIBS)
 	@if exist "$(SDL)\lib\x86\SDL3.dll" copy /Y "$(SDL)\lib\x86\SDL3.dll" SDL3.dll >nul
 
-$(RES): aidoom.rc aidoom.ico
+$(RES): aidoom.rc ..\aidoom.ico
 	rc /nologo /fo $(RES) aidoom.rc
 
 .c.obj:

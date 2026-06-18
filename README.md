@@ -38,6 +38,18 @@ a language model drive monster tactics in real time.
 
 ## Build
 
+### Everything at once (CMake — any platform/toolchain)
+
+One `CMakeLists.txt` builds the game **and** both tools (`aidoom_config`,
+`gpumon`), finds SDL3 via `find_package` (defaults to a sibling `../SDL3` SDK on
+Windows, else a system install), and stages every binary + `SDL3.dll` into `run/`:
+
+```sh
+cmake -B build && cmake --build build
+```
+
+The per-platform scripts below still work if you prefer them.
+
 ### Linux / macOS (SDL3)
 
 Needs `gcc` and the **SDL3** development package (`pkg-config sdl3`). From the repo root:
@@ -62,6 +74,10 @@ nmake /f Makefile.msvc SDL=C:\path\to\SDL3
 
 This produces `aidoom.exe` (with the app icon embedded from `aidoom.rc`/`aidoom.ico`)
 and copies `SDL3.dll` next to it.
+
+To build the game **and** both tools (`aidoom_config`, `gpumon`) in one go and stage
+everything into `run\`, run **`build_all_win.bat`** from the repo root (it locates VS
+2019 automatically). All three exes embed the aiDoom icon.
 
 Alternatively, build with **MinGW-w64** (on Windows in MSYS2, or cross-compiling from
 Linux) — this also embeds the icon, via `windres`:
@@ -128,11 +144,8 @@ tools/build_config.sh        # Linux: builds tools/aidoom_config and copies it i
 run/aidoom_config            # run it from run/ (reads/writes run/aidoom.cfg)
 ```
 
-Windows build of the config tool (MinGW, like `build_win.sh`):
-
-```sh
-SDL3=/path/to/SDL3-devel-3.x.y-mingw/x86_64-w64-mingw32 ./tools/build_config_win.sh
-```
+On Windows the config editor (and the GPU monitor) are built by the CMake build or
+`build_all_win.bat` above; the MinGW `tools/build_config_win.sh` is a legacy alternative.
 
 - **Action keys** (click a binding, then press a key — or the mouse wheel),
   including **Jump** (default Space), mouse sensitivity, resolution, screen size,
@@ -141,6 +154,14 @@ SDL3=/path/to/SDL3-devel-3.x.y-mingw/x86_64-w64-mingw32 ./tools/build_config_win
   Steam) or leave it on *auto*; the choice is saved as `iwad` and the game uses it.
 - **Ollama host / port / model** — read by the AI-Director tools
   (`ollama_director.py`, `run/gpumon.py`, `run/start_aidoom.{sh,ps1}`).
+- **GPU monitor (SSH)** — host / user / port of the (remote) Ollama machine, plus a
+  **Copy SSH key** button that installs your public key there (so the GPU monitor's
+  `nvidia-smi`-over-SSH works without a password).
+
+A small **GPU monitor** (`gpumon`, an SDL3 window) shows live load / VRAM / temperature
+/ power of the Ollama machine via `nvidia-smi` — over SSH, or directly when the host is
+`localhost` (no SSH/key needed). On a connection error it stops and offers a
+**Reconnect** button. See `run/README.md`.
 
 The **game** reads/writes the same `aidoom.cfg` from its working directory, and the
 config app preserves any keys it doesn't manage (so neither side clobbers the

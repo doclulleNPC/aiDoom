@@ -26,7 +26,7 @@
 #include "../files/aidoom_icon.h"	// shared 64x64 RGBA window icon (from aidoom.ico)
 
 #define WINW 680
-#define WINH 860
+#define WINH 960
 #define ROWH 26
 #define HEADH 30
 #define LABELX 28
@@ -77,6 +77,10 @@ static setting_t settings[] = {
     {"AI Director (Ollama)","Ollama host", "ollama_host",  T_TEXT,0,0,F_AIDOOM},
     {"AI Director (Ollama)","Ollama port", "ollama_port",  T_TEXT,0,0,F_AIDOOM},
     {"AI Director (Ollama)","Ollama model","ollama_model", T_TEXT,0,0,F_AIDOOM},
+
+    {"GPU monitor (SSH)","SSH host", "gpu_host",     T_TEXT,0,0,F_AIDOOM},
+    {"GPU monitor (SSH)","SSH user", "gpu_user",     T_TEXT,0,0,F_AIDOOM},
+    {"GPU monitor (SSH)","SSH port", "gpu_ssh_port", T_TEXT,0,0,F_AIDOOM},
 };
 #define NSET ((int)(sizeof(settings)/sizeof(settings[0])))
 
@@ -158,6 +162,9 @@ static void set_default_text(setting_t* s)
     if (!strcmp(s->name,"ollama_host"))  strcpy(s->sval,"192.168.2.114");
     else if (!strcmp(s->name,"ollama_port"))  strcpy(s->sval,"11434");
     else if (!strcmp(s->name,"ollama_model")) strcpy(s->sval,"mistral:7b-instruct");
+    else if (!strcmp(s->name,"gpu_host"))     strcpy(s->sval,"192.168.2.114");
+    else if (!strcmp(s->name,"gpu_user"))     strcpy(s->sval,"lubee");
+    else if (!strcmp(s->name,"gpu_ssh_port")) strcpy(s->sval,"22");
 }
 
 // Built-in defaults matching the engine's m_misc.c defaults[] -- used when no
@@ -311,7 +318,49 @@ static int active=-1;         // setting being captured/edited
 static char editbuf[128];
 static char status[160]="";
 
-static SDL_FRect btn_save, btn_quit;
+static SDL_FRect btn_save, btn_quit, btn_sshkey;
+
+static const char* find_sval(const char* name)
+{
+    for (int i=0;i<NSET;i++) if (!strcmp(settings[i].name,name)) return settings[i].sval;
+    return "";
+}
+
+// Copy the local SSH public key to <user>@<host> so the GPU monitor's
+// "nvidia-smi over ssh" works without a password.  Windows has no ssh-copy-id,
+// so we generate a key if needed and append the .pub via a piped ssh command,
+// run in a visible console window for the (one-time) password prompt.
+static void copy_ssh_key(const char* host, const char* user, const char* port)
+{
+    if (!host || !host[0] || !user || !user[0]) {
+        snprintf(status,sizeof(status),"Set the SSH host and user first");
+        return;
+    }
+    if (!port || !port[0]) port = "22";
+#ifdef _WIN32
+    const char* tmp = getenv("TEMP"); if (!tmp) tmp = ".";
+    char bat[700]; snprintf(bat,sizeof(bat),"%s\\aidoom_sshkey.bat", tmp);
+    FILE* f = fopen(bat,"w");
+    if (!f) { snprintf(status,sizeof(status),"could not write %s", bat); return; }
+    fprintf(f,"@echo off\r\n");
+    fprintf(f,"echo Copying SSH public key to %s@%s (port %s) ...\r\n", user, host, port);
+    fprintf(f,"if not exist \"%%USERPROFILE%%\\.ssh\\id_ed25519.pub\" "
+              "ssh-keygen -t ed25519 -N \"\" -f \"%%USERPROFILE%%\\.ssh\\id_ed25519\"\r\n");
+    fprintf(f,"type \"%%USERPROFILE%%\\.ssh\\id_ed25519.pub\" | "
+              "ssh -p %s %s@%s \"mkdir -p .ssh && cat >> .ssh/authorized_keys\"\r\n", port, user, host);
+    fprintf(f,"if errorlevel 1 (echo. & echo FAILED.) else (echo. & echo OK - key installed.)\r\n");
+    fprintf(f,"echo. & pause\r\n");
+    fclose(f);
+    char cmd[800]; snprintf(cmd,sizeof(cmd),"start \"aiDoom SSH key copy\" cmd /c \"%s\"", bat);
+    system(cmd);
+    snprintf(status,sizeof(status),"Launched key copy to %s@%s -- enter the password in the console", user, host);
+#else
+    char cmd[512]; snprintf(cmd,sizeof(cmd),"ssh-copy-id -p %s %s@%s", port, user, host);
+    int rc = system(cmd);
+    if (rc==0) snprintf(status,sizeof(status),"SSH key copied to %s@%s", user, host);
+    else       snprintf(status,sizeof(status),"ssh-copy-id failed -- run from a terminal");
+#endif
+}
 
 static float layout(void)	// returns y of bottom; fills setting.y
 {
@@ -358,6 +407,7 @@ static void draw(void)
     // buttons
     rect(btn_save.x,btn_save.y,btn_save.w,btn_save.h, 40,110,40); text(btn_save.x+18,btn_save.y+8,"Save",230,255,230);
     rect(btn_quit.x,btn_quit.y,btn_quit.w,btn_quit.h, 110,40,40); text(btn_quit.x+18,btn_quit.y+8,"Quit",255,230,230);
+    rect(btn_sshkey.x,btn_sshkey.y,btn_sshkey.w,btn_sshkey.h, 40,80,120); text(btn_sshkey.x+12,btn_sshkey.y+8,"Copy SSH key",210,230,255);
     if (status[0]) text(LABELX, WINH-26, status, 160,255,160);
     SDL_RenderPresent(ren);
 }
@@ -368,6 +418,7 @@ static void click(float mx,float my)
 {
     if (hit(mx,my,btn_save)) { save_cfg(); snprintf(status,sizeof(status),"Saved aidoom.cfg (next to the binary)"); return; }
     if (hit(mx,my,btn_quit)) { SDL_Event q={.type=SDL_EVENT_QUIT}; SDL_PushEvent(&q); return; }
+    if (hit(mx,my,btn_sshkey)) { copy_ssh_key(find_sval("gpu_host"), find_sval("gpu_user"), find_sval("gpu_ssh_port")); return; }
     for (int i=0;i<NSET;i++) {
         setting_t* s=&settings[i];
         SDL_FRect vr={VALX-4,s->y,WINW-VALX,ROWH};
@@ -426,8 +477,9 @@ int main(int argc, char** argv)
 
     float bottom = layout();
     float by = bottom + 18; if (by > WINH-40) by = WINH-40;
-    btn_save = (SDL_FRect){ LABELX, by, 90, 30 };
-    btn_quit = (SDL_FRect){ WINW-LABELX-90, by, 90, 30 };
+    btn_save   = (SDL_FRect){ LABELX, by, 90, 30 };
+    btn_quit   = (SDL_FRect){ WINW-LABELX-90, by, 90, 30 };
+    btn_sshkey = (SDL_FRect){ WINW/2.0f-90, by, 180, 30 };
 
     draw();		// show the UI before the first event arrives
     int run=1;

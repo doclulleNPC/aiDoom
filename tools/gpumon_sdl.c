@@ -44,6 +44,10 @@ typedef struct {
 static gpustat_t   g_stat;
 static SDL_Mutex*  g_lock;
 static SDL_AtomicInt g_running;
+static SDL_AtomicInt g_paused;   // 1 = stop auto-polling after an error; cleared by Reconnect
+
+// Reconnect button (only shown/active in the error state).
+static const SDL_FRect btn_reconnect = { WINW/2.0f-70, WINH-66, 140, 28 };
 
 // ----------------------------------------------------------------- config
 static void load_cfg(void)
@@ -116,12 +120,22 @@ static int fetch_thread(void* unused)
 {
     (void)unused;
     char cmd[512], line[256];
+    const char* query =
+        "nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total,"
+        "temperature.gpu,power.draw,name --format=csv,noheader,nounits";
     while (SDL_GetAtomicInt(&g_running)) {
-        snprintf(cmd, sizeof(cmd),
-            "ssh -o BatchMode=yes -o ConnectTimeout=5 -p %d %s@%s "
-            "\"nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total,"
-            "temperature.gpu,power.draw,name --format=csv,noheader,nounits\" 2>&1",
-            sshport, user, host);
+        // Paused after an error -- wait for the user to hit Reconnect.
+        if (SDL_GetAtomicInt(&g_paused)) { SDL_Delay(100); continue; }
+
+        // localhost runs nvidia-smi directly (no SSH/key needed); otherwise SSH.
+        int is_local = (!host[0] || !strcmp(host,"localhost") || !strcmp(host,"127.0.0.1"));
+        if (is_local)
+            snprintf(cmd, sizeof(cmd), "%s 2>&1", query);
+        else
+            snprintf(cmd, sizeof(cmd),
+                "ssh -o BatchMode=yes -o ConnectTimeout=5 -p %d %s@%s \"%s\" 2>&1",
+                sshport, user, host, query);
+
         gpustat_t s; memset(&s, 0, sizeof(s));
         FILE* p = popen(cmd, "r");
         if (p && fgets(line, sizeof(line), p)) {
@@ -129,6 +143,8 @@ static int fetch_thread(void* unused)
                        &s.util,&s.mem_used,&s.mem_total,&s.temp,&s.power,s.name) >= 5)
                 s.valid = 1;
             else { line[sizeof(s.err)-1]=0; snprintf(s.err,sizeof(s.err),"%s",line); }
+        } else if (is_local) {
+            snprintf(s.err, sizeof(s.err), "nvidia-smi failed (local)");
         } else {
             snprintf(s.err, sizeof(s.err), "ssh/nvidia-smi failed (%s@%s)", user, host);
         }
@@ -136,10 +152,23 @@ static int fetch_thread(void* unused)
 
         SDL_LockMutex(g_lock); g_stat = s; SDL_UnlockMutex(g_lock);
 
-        for (int i=0; i<POLL_SECS*10 && SDL_GetAtomicInt(&g_running); i++)
+        // On error: stop here (no auto-reconnect) until the user hits Reconnect.
+        if (!s.valid) { SDL_SetAtomicInt(&g_paused, 1); continue; }
+
+        for (int i=0; i<POLL_SECS*10 && SDL_GetAtomicInt(&g_running)
+                      && !SDL_GetAtomicInt(&g_paused); i++)
             SDL_Delay(100);
     }
     return 0;
+}
+
+// Clear the error and let the worker poll again (manual reconnect).
+static void do_reconnect(void)
+{
+    SDL_LockMutex(g_lock);
+    g_stat.err[0] = 0; g_stat.valid = 0;
+    SDL_UnlockMutex(g_lock);
+    SDL_SetAtomicInt(&g_paused, 0);
 }
 
 static void draw(void)
@@ -154,9 +183,11 @@ static void draw(void)
     fillrect(16, 32, WINW-32, 1, 60,60,72);
 
     if (s.err[0]) {
-        text(16, 60, "no data:", 220,80,70);
+        text(16, 60, "disconnected:", 220,80,70);
         text(16, 80, s.err, 200,160,160);
-        text(16, WINH-22, "retrying...  (configure host in aidoom.cfg)", 120,120,130);
+        text(16, 110, "(host/user from aidoom.cfg)", 120,120,130);
+        fillrect(btn_reconnect.x,btn_reconnect.y,btn_reconnect.w,btn_reconnect.h, 40,80,120);
+        text(btn_reconnect.x+24, btn_reconnect.y+6, "Reconnect", 210,230,255);
         SDL_RenderPresent(ren);
         return;
     }
@@ -208,6 +239,7 @@ int main(int argc, char** argv)
 
     g_lock = SDL_CreateMutex();
     SDL_SetAtomicInt(&g_running, 1);
+    SDL_SetAtomicInt(&g_paused, 0);
     SDL_Thread* th = SDL_CreateThread(fetch_thread, "gpufetch", NULL);
 
     int run = 1;
@@ -216,6 +248,13 @@ int main(int argc, char** argv)
         while (SDL_PollEvent(&e)) {
             if (e.type == SDL_EVENT_QUIT) run = 0;
             else if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_ESCAPE) run = 0;
+            else if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN && e.button.button == SDL_BUTTON_LEFT) {
+                int err; SDL_LockMutex(g_lock); err = (g_stat.err[0]!=0); SDL_UnlockMutex(g_lock);
+                float mx=e.button.x, my=e.button.y;
+                if (err && mx>=btn_reconnect.x && mx<btn_reconnect.x+btn_reconnect.w
+                        && my>=btn_reconnect.y && my<btn_reconnect.y+btn_reconnect.h)
+                    do_reconnect();
+            }
         }
         draw();
         SDL_Delay(100);

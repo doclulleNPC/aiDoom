@@ -16,7 +16,7 @@ director client that drives the monsters' tactics.
 | `start_aidoom.ps1` | Windows | Main launcher (PowerShell). |
 | `ollama_director.py` | all | The director client (talks to Ollama + the game). Mirror of the repo-root copy. |
 | `gpumon.py` | all | Live GPU monitor for the remote Ollama machine, terminal (see below). |
-| `gpumon_sdl` / `gpumon_sdl.exe` | Linux / Windows | Same monitor as a small **SDL window** (bars for load/VRAM/temp/power). Build: Linux `tools/build_gpumon.sh`; Windows via CMake or `build_all_win.bat` (below). |
+| `gpumon` / `gpumon.exe` | Linux / Windows | Same monitor as a small **SDL window** (bars for load/VRAM/temp/power). On error it stops and shows a **Reconnect** button (no auto-retry). Build: Linux `tools/build_gpumon.sh`; Windows via CMake or `build_all_win.bat` (below). |
 | `aidoom_config` / `aidoom_config.exe` | Linux / Windows | SDL3 settings editor; reads/writes `aidoom.cfg` here. Build: Linux `tools/build_config.sh`; Windows via CMake or `build_all_win.bat`. |
 | `aidoom.cfg` | all | The single config file (game keys/video + Ollama), read by the game and all tools from this folder. |
 | `aidoom.ico` | Windows | Source icon. The game **and** both tools embed it as their exe + live window/taskbar icon, so this file isn't needed at runtime. |
@@ -41,8 +41,8 @@ director client that drives the monsters' tactics.
     there's no library to copy alongside it.)
   - Windows (MSVC + the SDL3 SDK): run **`..\build_all_win.bat`** — it builds
     `aidoom.exe` **and** both tools and copies them + `SDL3.dll` into `run/`.
-    Equivalently with CMake (also stages everything into `run/`):
-    `cmake -B build -DCMAKE_PREFIX_PATH=C:/path/to/SDL3 && cmake --build build`.
+    Equivalently with CMake (finds a sibling `../SDL3` SDK automatically, also
+    stages everything into `run/`): `cmake -B build && cmake --build build`.
     (The legacy `tools/build_*_win.sh` are MinGW cross-builds needing a MinGW SDL3
     package; the MSVC path above is preferred on Windows.)
 - A DOOM **IWAD**. The engine finds one via `-iwad <file>` → the `iwad` key in
@@ -130,7 +130,7 @@ On startup it self-tests the SSH read; if that fails it automatically falls back
 to the Ollama mode. Override with `--host` / `--user` / `--interval`. (The remote
 SSH details are in the project memory; SSH is Windows-OpenSSH as user `lubee`.)
 
-There's also a **graphical version**, `gpumon_sdl` (SDL3 window with live bars for
+There's also a **graphical version**, `gpumon` (SDL3 window with live bars for
 GPU load / VRAM / temperature / power). It reads the same `aidoom.cfg`
 (`gpu_host` / `gpu_user` / `gpu_ssh_port`) and accepts `--host` / `--user` /
 `--port`; build it with `tools/build_gpumon.sh` (Linux) or

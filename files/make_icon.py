@@ -63,5 +63,5 @@ for i, x in enumerate(range(110, 150, 13)):
 
 # --- save multi-resolution .ico ---
 sizes = [(256, 256), (128, 128), (64, 64), (48, 48), (32, 32), (16, 16)]
-img.save("aidoom.ico", sizes=sizes)
-print("wrote aidoom.ico", sizes)
+img.save("../aidoom.ico", sizes=sizes)
+print("wrote ../aidoom.ico", sizes)
