@@ -353,15 +353,17 @@ enum
 
 menuitem_t OptionsMenu[]=
 {
-    {1,"M_ENDGAM",	M_EndGame,'e'},
-    {1,"M_MESSG",	M_ChangeMessages,'m'},
-    {1,"M_DETAIL",	M_ChangeDetail,'g'},
-    {2,"M_SCRNSZ",	M_SizeDisplay,'s'},
+    // All text-drawn at the small (hu_font) size by M_DrawOptions -- empty names
+    // so M_Drawer doesn't blit the big graphic lumps.
+    {1,"",	M_EndGame,'e'},
+    {1,"",	M_ChangeMessages,'m'},
+    {1,"",	M_ChangeDetail,'g'},
+    {2,"",	M_SizeDisplay,'s'},
     {-1,"",0},
-    {2,"M_MSENS",	M_ChangeSensitivity,'m'},
+    {2,"",	M_ChangeSensitivity,'m'},
     {-1,"",0},
-    {1,"M_SVOL",	M_Sound,'s'},
-    {1,"",		M_Video,'v'}	// text-drawn (see M_DrawOptions/M_DrawVideo)
+    {1,"",	M_Sound,'s'},
+    {1,"",	M_Video,'v'}
 };
 
 menu_t  OptionsDef =
@@ -976,23 +978,29 @@ char	msgNames[2][9]		= {"M_MSGOFF","M_MSGON"};
 
 void M_DrawOptions(void)
 {
+    int	x = OptionsDef.x;
+    int	y = OptionsDef.y;
+
     V_DrawPatchDirect (108,15,0,W_CacheLumpName("M_OPTTTL",PU_CACHE));
-	
-    V_DrawPatchDirect (OptionsDef.x + 175,OptionsDef.y+LINEHEIGHT*detail,0,
-		       W_CacheLumpName(detailNames[detailLevel],PU_CACHE));
 
-    V_DrawPatchDirect (OptionsDef.x + 120,OptionsDef.y+LINEHEIGHT*messages,0,
-		       W_CacheLumpName(msgNames[showMessages],PU_CACHE));
+    // All items drawn at the small hu_font size (same as the Video submenu).
+    M_WriteText (x, y+LINEHEIGHT*endgame,  "End Game");
 
-    M_DrawThermo(OptionsDef.x,OptionsDef.y+LINEHEIGHT*(mousesens+1),
-		 10,mouseSensitivity);
-	
-    M_DrawThermo(OptionsDef.x,OptionsDef.y+LINEHEIGHT*(scrnsize+1),
-		 9,screenSize);
+    M_WriteText (x, y+LINEHEIGHT*messages, "Messages");
+    M_WriteText (x+130, y+LINEHEIGHT*messages, showMessages ? "On" : "Off");
 
-    // "Video" submenu entry (text-drawn -- no graphic lump -- at 2x so it
-    // matches the size of the graphic menu items).
-    M_WriteTextBig(OptionsDef.x,OptionsDef.y+LINEHEIGHT*vidoption,"Video",2);
+    M_WriteText (x, y+LINEHEIGHT*detail,   "Graphic Detail");
+    M_WriteText (x+130, y+LINEHEIGHT*detail, detailLevel ? "Low" : "High");
+
+    M_WriteText (x, y+LINEHEIGHT*scrnsize, "Screen Size");
+    M_DrawThermo (x, y+LINEHEIGHT*(scrnsize+1), 9, screenSize);
+
+    M_WriteText (x, y+LINEHEIGHT*mousesens, "Mouse Sensitivity");
+    M_DrawThermo (x, y+LINEHEIGHT*(mousesens+1), 10, mouseSensitivity);
+
+    M_WriteText (x, y+LINEHEIGHT*soundvol, "Sound Volume");
+
+    M_WriteText (x, y+LINEHEIGHT*vidoption, "Video");
 }
 
 

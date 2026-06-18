@@ -23,6 +23,7 @@
 //
 //-----------------------------------------------------------------------------
 
+#include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 
@@ -44,6 +45,10 @@ extern void	P_NewChaseDir (mobj_t* actor);
 extern boolean	P_Move (mobj_t* actor);
 
 static int	aicoop;			// -aicoop given
+static int	coop_state;		// what we're doing (for the console "where")
+static int	summon;			// >0: "come" was ordered -- run to the player
+// coop_state codes (index into the report text): 0 hold 1 follow 2 fight 3 flee
+//                                                4 items 5 yield
 
 #define COOP_SPEED	17		// move speed (u/tic) for P_Move; matches the
 					// player's run terminal speed (~16.7 u/tic)
@@ -195,14 +200,18 @@ void P_AICoop_BuildCmd (void)
     if (bot->health < coop_heal_hp)            fleeing = 1;
     else if (bot->health >= coop_defend_hp)    fleeing = 0;
 
+    coop_state = 0;
+
     // (2,5) yield: the human is right on top of us -> step aside (top priority)
     if (pl && P_AproxDistance (pl->x - mo->x, pl->y - mo->y) < YIELD_DIST)
     {
 	AICoop_MoveAway (mo, pl->x, pl->y);
+	coop_state = 5;
     }
     // (7) flee & hide: run from monsters, regroup on the player when clear
     else if (fleeing)
     {
+	coop_state = 3;
 	if (mon)
 	{
 	    AICoop_MoveAway (mo, mon->x, mon->y);
@@ -214,9 +223,18 @@ void P_AICoop_BuildCmd (void)
 	    mo->angle = R_PointToAngle2 (mo->x, mo->y, pl->x, pl->y);
 	}
     }
+    // "come" ordered from the console: run to the player, ignoring fights/items
+    else if (summon > 0 && pl)
+    {
+	summon--;
+	AICoop_Chase (mo, pl);
+	mo->angle = R_PointToAngle2 (mo->x, mo->y, pl->x, pl->y);
+	coop_state = 1;
+    }
     // fight: aim and fire; charge when healthy, kite when low
     else if (mon)
     {
+	coop_state = 2;
 	int defensive = (bot->health < coop_defend_hp);
 	dist = P_AproxDistance (mon->x - mo->x, mon->y - mo->y);
 	mo->angle = R_PointToAngle2 (mo->x, mo->y, mon->x, mon->y);
@@ -234,9 +252,11 @@ void P_AICoop_BuildCmd (void)
     {
 	AICoop_Chase (mo, item);
 	mo->angle = R_PointToAngle2 (mo->x, mo->y, item->x, item->y);
+	coop_state = 4;
     }
     else if (pl)
     {
+	coop_state = 1;
 	if (P_AproxDistance (pl->x - mo->x, pl->y - mo->y) > COOP_NEAR)
 	{
 	    AICoop_Chase (mo, pl);
@@ -256,4 +276,47 @@ void P_AICoop_BuildCmd (void)
 	}
 	lastx = mo->x; lasty = mo->y;
     }
+}
+
+
+// Console "where": a one-line spoken-style status answer.
+const char* P_AICoop_Report (void)
+{
+    static char		buf[160];
+    static const char*	dirs[8]  = { "east","north-east","north","north-west",
+					"west","south-west","south","south-east" };
+    static const char*	doing[6] = { "holding position","right behind you","fighting",
+					"falling back (low HP)","grabbing supplies",
+					"stepping out of your way" };
+    player_t*	bot = &players[1];
+    mobj_t*	me;
+    mobj_t*	pl;
+    int		dist = 0, di = 0, st;
+
+    if (!aicoop || !playeringame[1] || bot->playerstate == PST_DEAD || !bot->mo)
+    {
+	snprintf (buf, sizeof(buf), "[Buddy] (no companion -- launch with -aicoop)");
+	return buf;
+    }
+    me = bot->mo;
+    pl = playeringame[0] ? players[0].mo : NULL;
+    if (pl)
+    {
+	dist = P_AproxDistance (me->x - pl->x, me->y - pl->y) >> FRACBITS;
+	di   = (int)((R_PointToAngle2 (pl->x, pl->y, me->x, me->y) + (1u<<28)) >> 29) & 7;
+    }
+    st = (coop_state >= 0 && coop_state <= 5) ? coop_state : 0;
+    snprintf (buf, sizeof(buf), "[Buddy] %d units to your %s, %d HP -- %s.",
+	      dist, dirs[di], bot->health, doing[st]);
+    return buf;
+}
+
+
+// Console "come": order the companion to run to the player.  0 if none.
+int P_AICoop_Summon (void)
+{
+    if (!aicoop || !playeringame[1] || players[1].playerstate == PST_DEAD || !players[1].mo)
+	return 0;
+    summon = 245;		// ~7 s of coming to the player
+    return 1;
 }

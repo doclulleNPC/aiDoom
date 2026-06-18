@@ -19,4 +19,8 @@ void P_AICoop_Init (void);
 // P_PlayerThink loop.  No-op unless -aicoop is active.
 void P_AICoop_BuildCmd (void);
 
+// Console helpers (c_console.c "where" / "come").
+const char* P_AICoop_Report (void);	// one-line status answer
+int	    P_AICoop_Summon (void);	// order it to come; 0 if no companion
+
 #endif

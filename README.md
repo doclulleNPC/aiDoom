@@ -177,6 +177,9 @@ Tunable with the `aicoop_config` tool (or the `coop_*` keys in `aidoom.cfg`):
 
 In the launchers it's on by default; disable with `--no-coop` (`-NoCoop` on Windows).
 
+From the **console** (toggle key, default `^`): `where` — the companion answers with
+its distance, direction, HP and what it's doing; `come` — it runs to you.
+
 ## Configuration
 
 Everything lives in **one file, `aidoom.cfg`, in the working folder** (next to the
