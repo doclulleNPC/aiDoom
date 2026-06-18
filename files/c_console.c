@@ -159,7 +159,6 @@ static void C_Execute (char* line)
     {
 	C_Printf ("cheats: god  noclip  give  kill  health <n>  armor <n>  ammo");
 	C_Printf ("world:  spawn <thing>  skill <1-5>  map <e> <m> / warp <m>");
-	C_Printf ("buddy:  where  come  wait/stay  attack  report");
 	C_Printf ("monsterAI: director on|off|demo  (LLM<->Doom)");
 	C_Printf ("misc:   clear  echo <text>  quit");
     }
@@ -256,17 +255,6 @@ static void C_Execute (char* line)
 	    C_Printf ("spawned %s", args);
 	}
     }
-    else if (!strcmp(cmd, "where") || !strcmp(cmd, "buddy") || !strcmp(cmd, "comp"))
-	C_Printf ("%s", P_AICoop_Report ());
-    else if (!strcmp(cmd, "come") || !strcmp(cmd, "follow"))
-	C_Printf ("%s", P_AICoop_Summon () ? "[Buddy] On my way!"
-					   : "[Buddy] (no companion -- launch with -aicoop)");
-    else if (!strcmp(cmd, "wait") || !strcmp(cmd, "stay"))
-	C_Printf ("%s", P_AICoop_Wait ());
-    else if (!strcmp(cmd, "attack"))
-	C_Printf ("%s", P_AICoop_Attack ());
-    else if (!strcmp(cmd, "report") || !strcmp(cmd, "status"))
-	C_Printf ("%s", P_AICoop_StatusReport ());
     else if (!strcmp(cmd, "director") || !strcmp(cmd, "ai") || !strcmp(cmd, "llm"))
 	C_Printf ("%s", P_AI_Console (args));
     else

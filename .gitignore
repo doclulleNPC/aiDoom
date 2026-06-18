@@ -58,6 +58,13 @@ run/aidoom_config
 # runtime config (written by the game / config app; user-specific)
 aidoom.cfg
 run/aidoom.cfg
+aidoom2.cfg
+run/aidoom2.cfg
+
+# local debug screenshots (not part of the repo; hero.png is the only tracked image)
+Bildschirmfoto_*.png
+stuck.png
+hand.png
 tools/aidoom_config.exe
 run/aidoom_config.exe
 tools/gpumon_sdl
@@ -72,7 +79,5 @@ build_cmake_build.log
 CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake
-tools/aicoop_config
-run/aicoop_config
 tools/gpumon
 run/gpumon

@@ -26,15 +26,13 @@ a language model drive monster tactics in real time.
   (default **Space**, with a grunt), toggle **autorun**, and an optional
   **`-friendlyfire`** flag that enables same-species monster infighting.
 - **AI co-op companion** (`files/p_ai_coop.c`, `-aicoop`) — a second marine (player 2)
-  driven by a built-in bot that **navigates with the engine's monster path-finding**
-  (walks around walls, opens doors), fights, fetches items, auto-heals and retreats
-  when hurt. A real co-op player (weapons, damage, pickups, reborn all work). Off by
-  default; tunable in `aicoop_config`. See [AI co-op companion](#ai-co-op-companion--aicoop) below.
-- **Pack-hunt monster AI** (`files/p_ai_coop.c`… `p_enemy.c`, `monster_pack`) — an
-  optional aggressive mode (on by default): monsters acquire the player the instant
-  they spawn (searching even with no line of sight) and steer toward nearby allies en
-  route, so they gather and assault in groups. Tunable in `aicoop_config`; set
-  `monster_pack 0` for vanilla wake-on-sight behaviour.
+  driven by a small built-in bot: it acquires the nearest visible monster and fires,
+  seeks health when hurt, otherwise follows you. A real co-op player (weapons, damage,
+  pickups, reborn all work). Off by default. See [AI co-op companion](#ai-co-op-companion--aicoop) below.
+- **Pack-hunt monster AI** (`p_enemy.c`, `monster_pack`) — an optional aggressive mode
+  (on by default): monsters acquire the player the instant they spawn (searching even
+  with no line of sight) and steer toward nearby allies en route, so they gather and
+  assault in groups. Set `monster_pack 0` in `aidoom.cfg` for vanilla wake-on-sight.
 - **LLM AI Director** (`files/p_ai_llm.c`) — an external director drives monster
   *tactics* (flank, fall back, ambush, focus-fire, …) over a small TCP line protocol,
   or via a built-in scripted `-aidemo` director. A ready-to-run **Ollama** client is
@@ -149,48 +147,17 @@ so weapons, damage, item pickups and respawning all work.
 ./aidoom -warp 1 1 -skill 3 -aicoop      # or run/start_aidoom.sh (on by default)
 ```
 
-Behaviour:
+Behaviour (intentionally simple):
 
-- **Navigation** uses **grid A\* path-finding** (no LLM): a walkability grid is
-  built per level (where the marine fits), A\* routes global waypoints, and the
-  engine mover (`P_Move`) walks them — so it routes around walls/obstacles and
-  opens doors instead of getting stuck. Falls back to the local pather if no route.
-- **Speed** matches the player's run speed (~16.7 units/tic) — it keeps up without
-  outrunning you.
-- **Combat** — with a monster in sight it aims and fires: charges to close range when
-  healthy, kites (keeps its distance) when hurt.
-- **Items** — with no monster in sight it fetches nearby health, health/armor bonuses
-  and armor; otherwise it follows you.
-- **Auto-heal** — regenerates +1 HP/s up to 100.
-- **Self-preservation** — below `coop_heal_hp` it flees and hides from monsters until
-  auto-heal brings it back to `coop_defend_hp`.
-- **Stays out of the way** — steps aside when you bump into it, and never stands still
-  for more than ~3 s.
-
-Tunable with the `aicoop_config` tool (or the `coop_*` keys in `aidoom.cfg`):
-
-| key | default | meaning |
-|-----|---------|---------|
-| `coop_defend_hp` | 35 | below this HP: stop charging, kite |
-| `coop_heal_hp` | 20 | below this HP: flee & hide until back to `coop_defend_hp` |
-| `coop_sight` | 1280 | monster acquisition range (map units) |
-| `coop_follow` | 256 | follow distance to the player |
-| `coop_heal_range` | 1024 | item search range |
+- **Combat** — acquires the nearest visible monster, turns to face it and fires.
+- **Health** — when hurt it heads for the nearest health pickup.
+- **Follow** — with nothing to fight it follows you.
 
 In the launchers it's on by default; disable with `--no-coop` (`-NoCoop` on Windows).
 
-From the **console** (open with **F12** or `` ` ``) you can talk to it:
-
-| command | effect |
-|---|---|
-| `where` | answers with distance, direction, HP and what it's doing |
-| `come` | runs to you (ignores fights/items for ~7 s) |
-| `wait` / `stay` | holds position (still faces & fires); repeat to release |
-| `attack` | charges the monster nearest you for ~10 s |
-| `report` | HP, armor, current weapon and ammo |
-
-The **monster** LLM director (separate system — it drives the *monsters*, not the
-companion) can be toggled live: `director on` / `director off` / `director demo`.
+The **monster** LLM director (a separate system — it drives the *monsters*, not the
+companion) can be toggled live from the console: `director on` / `director off` /
+`director demo`.
 
 ## Configuration
 

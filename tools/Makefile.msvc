@@ -17,7 +17,7 @@ CFLAGS = /nologo /O2 /MD /W3 /I. /I"$(SDL)\include" /DSDL_MAIN_HANDLED \
 LIBS = "$(SDL)\lib\x86\SDL3.lib"
 LDFLAGS = /link /SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup
 
-all: aidoom_config.exe gpumon.exe aicoop_config.exe
+all: aidoom_config.exe gpumon.exe
 
 aidoom_config.res: aidoom_config.rc ..\aidoom.ico
 	rc /nologo /fo aidoom_config.res aidoom_config.rc
@@ -36,13 +36,5 @@ gpumon.exe: gpumon_sdl.c gpumon.res font_atlas.h ..\files\aidoom_icon.h
 	@if not exist ..\run mkdir ..\run
 	@copy /Y gpumon.exe ..\run\gpumon.exe >nul
 
-aicoop_config.res: aicoop_config.rc ..\aidoom.ico
-	rc /nologo /fo aicoop_config.res aicoop_config.rc
-
-aicoop_config.exe: aicoop_config.c aicoop_config.res font_atlas.h ..\files\aidoom_icon.h
-	$(CC) $(CFLAGS) /Fe:aicoop_config.exe aicoop_config.c aicoop_config.res $(LDFLAGS) $(LIBS)
-	@if not exist ..\run mkdir ..\run
-	@copy /Y aicoop_config.exe ..\run\aicoop_config.exe >nul
-
 clean:
-	-del *.obj *.res aidoom_config.exe gpumon.exe gpumon_sdl.exe aicoop_config.exe 2>nul
+	-del *.obj *.res aidoom_config.exe gpumon.exe gpumon_sdl.exe 2>nul

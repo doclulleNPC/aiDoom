@@ -183,14 +183,6 @@ extern int	key_jump;
 extern int	autorun;
 extern int	key_console;
 
-// AI co-op companion behaviour (p_ai_coop.c)
-extern int	coop_defend_hp;
-extern int	coop_heal_hp;
-extern int	coop_sight;
-extern int	coop_follow;
-extern int	coop_heal_range;
-extern int	coop_speed;
-
 // Monster pack-hunt AI (p_enemy.c)
 extern int	monster_pack;
 extern int	monster_pack_range;
@@ -261,13 +253,6 @@ default_t	defaults[] =
     {"key_jump",&key_jump, ' '},
     {"autorun",&autorun, 1},
     {"key_console",&key_console, KEY_F12},
-
-    {"coop_defend_hp",&coop_defend_hp, 35},
-    {"coop_heal_hp",&coop_heal_hp, 20},
-    {"coop_sight",&coop_sight, 1280},
-    {"coop_follow",&coop_follow, 256},
-    {"coop_heal_range",&coop_heal_range, 1024},
-    {"coop_speed",&coop_speed, 13},
 
     {"monster_pack",&monster_pack, 1},
     {"monster_pack_range",&monster_pack_range, 2048},
