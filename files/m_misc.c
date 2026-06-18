@@ -183,6 +183,13 @@ extern int	key_jump;
 extern int	autorun;
 extern int	key_console;
 
+// AI co-op companion behaviour (p_ai_coop.c)
+extern int	coop_defend_hp;
+extern int	coop_heal_hp;
+extern int	coop_sight;
+extern int	coop_follow;
+extern int	coop_heal_range;
+
 extern int	mousebfire;
 extern int	mousebstrafe;
 extern int	mousebforward;
@@ -249,6 +256,12 @@ default_t	defaults[] =
     {"key_jump",&key_jump, ' '},
     {"autorun",&autorun, 1},
     {"key_console",&key_console, '^'},
+
+    {"coop_defend_hp",&coop_defend_hp, 50},
+    {"coop_heal_hp",&coop_heal_hp, 30},
+    {"coop_sight",&coop_sight, 1280},
+    {"coop_follow",&coop_follow, 256},
+    {"coop_heal_range",&coop_heal_range, 1024},
 
     {"use_mouse",&usemouse, 1},
     {"mouseb_fire",&mousebfire,0},

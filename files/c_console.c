@@ -26,6 +26,10 @@
 #include "g_game.h"
 #include "p_mobj.h"
 
+#include "tables.h"		// finecosine, ANGLETOFINESHIFT
+#include "info.h"		// mobjtype_t, MT_*
+#include "m_fixed.h"		// FixedMul
+
 #include "c_console.h"
 
 extern patch_t*		hu_font[HU_FONTSIZE];
@@ -33,12 +37,19 @@ extern const char*	shiftxform;
 extern lighttable_t*	colormaps;
 extern void		I_Quit (void);
 
+// Play-sim hooks, declared by hand to avoid p_local.h (its p_spec.h enums
+// 'open'/'close' collide with code elsewhere).
+extern thinker_t	thinkercap;
+extern mobj_t*		P_SpawnMobj (fixed_t x, fixed_t y, fixed_t z, mobjtype_t type);
+extern void		P_DamageMobj (mobj_t* target, mobj_t* inflictor, mobj_t* source, int dmg);
+extern void		P_MobjThinker (mobj_t* mobj);
+
 #define CON_H		120		// console height in BASE (320x200) rows
 #define CON_DARK	22		// colormap level used to dim the view behind it
 #define CON_LINES	256		// scrollback ring size
 #define CON_LINEW	128
 #define CON_INPUTW	128
-#define LINE_STEP	9		// BASE pixels per text row
+#define LINE_STEP	5		// BASE pixels per text row (half-size font)
 
 static char	con_text[CON_LINES][CON_LINEW];
 static int	con_head;		// next slot to write
@@ -91,7 +102,7 @@ void C_Init (void)
 {
     con_head = con_count = con_inlen = con_open = con_shift = con_scroll = 0;
     con_input[0] = '\0';
-    C_Printf ("aiDoom console.  Type 'help'.  Toggle with ` (backquote).");
+    C_Printf ("aiDoom console.  Type 'help'.  Toggle with the console key (default ^).");
 }
 
 
@@ -106,6 +117,20 @@ static void C_GiveAll (player_t* p)
     p->armortype   = 2;
     p->health = 100;
     if (p->mo) p->mo->health = 100;
+}
+
+// Map a short name to a thing type for the "spawn" command.
+static int C_MobjByName (const char* s)
+{
+    if (!strcmp(s,"imp"))				 return MT_TROOP;
+    if (!strcmp(s,"demon") || !strcmp(s,"pinky"))	 return MT_SERGEANT;
+    if (!strcmp(s,"spectre"))				 return MT_SHADOWS;
+    if (!strcmp(s,"baron"))				 return MT_BRUISER;
+    if (!strcmp(s,"zombie") || !strcmp(s,"zombieman"))	 return MT_POSSESSED;
+    if (!strcmp(s,"shotgunner") || !strcmp(s,"sergeant")) return MT_SHOTGUY;
+    if (!strcmp(s,"lostsoul") || !strcmp(s,"soul"))	 return MT_SKULL;
+    if (!strcmp(s,"barrel"))				 return MT_BARREL;
+    return -1;
 }
 
 static void C_Execute (char* line)
@@ -129,7 +154,11 @@ static void C_Execute (char* line)
     while (*args == ' ') args++;
 
     if (!strcmp(cmd, "help"))
-	C_Printf ("commands: help clear echo quit god noclip give map<e m>/warp");
+    {
+	C_Printf ("cheats: god  noclip  give  kill  health <n>  armor <n>  ammo");
+	C_Printf ("world:  spawn <thing>  skill <1-5>  map <e> <m> / warp <m>");
+	C_Printf ("misc:   clear  echo <text>  quit");
+    }
     else if (!strcmp(cmd, "clear"))
 	{ con_head = con_count = 0; con_scroll = 0; }
     else if (!strcmp(cmd, "echo"))
@@ -164,6 +193,64 @@ static void C_Execute (char* line)
 	else if (got == 1)   G_DeferedInitNew (gameskill, 1, e);	// single arg = map number
 	else { C_Printf ("usage: map <episode> <map>   (or  map <map>)"); return; }
 	con_open = 0;		// close so you can see the new level load
+    }
+    else if (!strcmp(cmd, "kill"))
+    {
+	thinker_t*	th;
+	int		killed = 0;
+	for (th = thinkercap.next ; th != &thinkercap ; th = th->next)
+	{
+	    mobj_t* mo;
+	    if (th->function.acp1 != (actionf_p1)P_MobjThinker) continue;
+	    mo = (mobj_t*)th;
+	    if ((mo->flags & MF_COUNTKILL) && mo->health > 0)
+	    {
+		P_DamageMobj (mo, pl->mo, pl->mo, mo->health + 1000);	// gib it
+		killed++;
+	    }
+	}
+	C_Printf ("killed %d monsters", killed);
+    }
+    else if (!strcmp(cmd, "health") || !strcmp(cmd, "hp"))
+    {
+	int h = 100; sscanf (args, "%d", &h);
+	if (h < 1) h = 1; if (h > 999) h = 999;
+	pl->health = h; if (pl->mo) pl->mo->health = h;
+	C_Printf ("health = %d", h);
+    }
+    else if (!strcmp(cmd, "armor") || !strcmp(cmd, "armour"))
+    {
+	int a = 200; sscanf (args, "%d", &a);
+	if (a < 0) a = 0; if (a > 999) a = 999;
+	pl->armorpoints = a;
+	pl->armortype = (a > 100) ? 2 : (a ? 1 : 0);
+	C_Printf ("armor = %d", a);
+    }
+    else if (!strcmp(cmd, "ammo"))
+    {
+	int i; for (i = 0 ; i < NUMAMMO ; i++) pl->ammo[i] = pl->maxammo[i];
+	C_Printf ("ammo refilled.");
+    }
+    else if (!strcmp(cmd, "skill"))
+    {
+	int sk;
+	if (sscanf (args, "%d", &sk) == 1 && sk >= 1 && sk <= 5)
+	    { gameskill = sk-1; C_Printf ("skill = %d (applies to new maps)", sk); }
+	else C_Printf ("usage: skill <1-5>");
+    }
+    else if (!strcmp(cmd, "spawn"))
+    {
+	int t = C_MobjByName (args);
+	if (t < 0)
+	    C_Printf ("usage: spawn <imp|demon|spectre|baron|zombie|shotgunner|lostsoul|barrel>");
+	else if (pl->mo)
+	{
+	    unsigned	an = pl->mo->angle >> ANGLETOFINESHIFT;
+	    fixed_t	x  = pl->mo->x + FixedMul (96*FRACUNIT, finecosine[an]);
+	    fixed_t	y  = pl->mo->y + FixedMul (96*FRACUNIT, finesine[an]);
+	    P_SpawnMobj (x, y, pl->mo->z, (mobjtype_t)t);
+	    C_Printf ("spawned %s", args);
+	}
     }
     else
 	C_Printf ("unknown command: %s", cmd);
@@ -235,16 +322,64 @@ boolean C_Responder (event_t* ev)
 
 
 // ---------------------------------------------------------------- drawing
+
+// Draw an hu_font patch at HALF its base size: take every other source
+// pixel (column/row) so the glyph occupies (w/2 x h/2) BASE pixels, then the
+// usual hires scaling applies.  Keeps the console text small but in BASE coords.
+static void C_DrawPatchHalf (int x, int y, patch_t* patch)
+{
+    int		s = hires;
+    int		w = SHORT(patch->width);
+    int		col;
+
+    x -= SHORT(patch->leftoffset) / 2;
+    y -= SHORT(patch->topoffset)  / 2;
+
+    for (col = 0 ; col < w ; col += 2)
+    {
+	int		ocol = col >> 1;
+	column_t*	column = (column_t *)((byte *)patch + LONG(patch->columnofs[col]));
+
+	while (column->topdelta != 0xff)
+	{
+	    byte*	src = (byte *)column + 3;
+	    int		len = column->length;
+	    int		k;
+	    for (k = 0 ; k < len ; k++)
+	    {
+		int	srow = column->topdelta + k;
+		int	orow, sx, sy, i, j;
+		byte	px;
+		if (srow & 1) continue;			// keep even rows only
+		orow = srow >> 1;
+		sx = (x + ocol) * s;
+		sy = (y + orow) * s;
+		if (sx < 0 || sy < 0 || sx + s > SCREENWIDTH || sy + s > SCREENHEIGHT)
+		    continue;
+		px = src[k];
+		for (i = 0 ; i < s ; i++)
+		{
+		    byte* d = screens[0] + (sy + i)*SCREENWIDTH + sx;
+		    for (j = 0 ; j < s ; j++) d[j] = px;
+		}
+	    }
+	    column = (column_t *)((byte *)column + len + 4);
+	}
+    }
+}
+
 static void C_DrawString (int x, int y, const char* s)
 {
     for (; *s; s++)
     {
 	int ch = toupper((unsigned char)*s);
-	if (ch == ' ' || ch < HU_FONTSTART || ch > HU_FONTEND) { x += 4; continue; }
+	int cw;
+	if (ch == ' ' || ch < HU_FONTSTART || ch > HU_FONTEND) { x += 2; continue; }
 	patch_t* p = hu_font[ch - HU_FONTSTART];
-	if (x + SHORT(p->width) > BASE_WIDTH) break;
-	V_DrawPatch (x, y, 0, p);
-	x += SHORT(p->width);
+	cw = SHORT(p->width) / 2; if (cw < 1) cw = 1;
+	if (x + cw > BASE_WIDTH) break;
+	C_DrawPatchHalf (x, y, p);
+	x += cw;
     }
 }
 

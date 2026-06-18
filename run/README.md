@@ -17,6 +17,7 @@ director client that drives the monsters' tactics.
 | `ollama_director.py` | all | The director client (talks to Ollama + the game). Mirror of the repo-root copy. |
 | `gpumon` / `gpumon.exe` | Linux / Windows | GPU monitor as a small **SDL window** (bars for load/VRAM/temp/power). On error it stops and shows a **Reconnect** button (no auto-retry). Build: Linux `tools/build_gpumon.sh`; Windows via CMake or `build_all_win.bat`. See **`../GPUMON.md`**. |
 | `aidoom_config` / `aidoom_config.exe` | Linux / Windows | SDL3 settings editor; reads/writes `aidoom.cfg` here. Build: Linux `tools/build_config.sh`; Windows via CMake or `build_all_win.bat`. |
+| `aicoop_config` / `aicoop_config.exe` | Linux / Windows | SDL3 editor for the **AI co-op companion** (`-aicoop`) behaviour: defend/heal HP thresholds, sight/follow/heal ranges. Writes `coop_*` to `aidoom.cfg`. |
 | `aidoom.cfg` | all | The single config file (game keys/video + Ollama), read by the game and all tools from this folder. |
 
 (The terminal monitor `gpumon.py` and the source `aidoom.ico` now live one level up, in the repo root.)

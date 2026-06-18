@@ -1,8 +1,9 @@
 // aidoom_config -- tiny SDL3 settings editor for aiDoom.
 //
-// Edits the game config (~/.doomrc: action keys, mouse, video) and the AI
-// Director config (~/.aidoom.cfg: Ollama host/port/model). No deps beyond SDL3;
-// text is drawn from a baked DejaVuSansMono atlas (tools/font_atlas.h).
+// Edits the single game/tools config file aidoom.cfg (in the run/ folder): action
+// keys, mouse, video, IWAD, the Ollama AI-Director host/port/model and the GPU
+// monitor's SSH settings. No deps beyond SDL3; text is drawn from a baked
+// DejaVuSansMono atlas (tools/font_atlas.h).
 //
 // Build: see tools/build_config.sh  (gcc + pkg-config sdl3)
 

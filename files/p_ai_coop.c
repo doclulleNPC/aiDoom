@@ -33,17 +33,27 @@
 
 static int	aicoop;			// -aicoop given
 
-#define COOP_SIGHT	(1280*FRACUNIT)	// monster acquisition range
 #define COOP_TURN	1300		// max angleturn per tic (~7 deg)
 #define COOP_FACING	1500		// |remaining turn| under which we open fire
-#define COOP_NEAR	(256*FRACUNIT)	// follow distance to the human (healthy)
 #define COOP_KEEP	(192*FRACUNIT)	// advance toward a monster until this close
 #define COOP_RUN	0x32		// forwardmove "run" magnitude
-#define COOP_DEFEND_HP	50		// below this: defensive -- don't charge, hang back
-#define COOP_HEAL_HP	30		// below this: break off and grab a med-pack
-#define COOP_HEAL_RANGE	(1024*FRACUNIT)	// how far to look for one
 #define COOP_BEHIND	(110*FRACUNIT)	// defensive: hold this far behind the player
 #define COOP_NEAR_DEF	(64*FRACUNIT)	// defensive: stay tight to that spot
+
+// --- Behaviour knobs ---------------------------------------------------------
+// Defaults match the original constants; loaded from aidoom.cfg (m_misc.c) and
+// editable with the aicoop_config tool.  HP values are absolute (max 100, so 50
+// = 50%); ranges are in map units (scaled by FRACUNIT at the use sites).
+int	coop_defend_hp  = 50;		// below this HP: defensive -- don't charge
+int	coop_heal_hp    = 30;		// below this HP: break off and grab a med-pack
+int	coop_sight      = 1280;		// monster acquisition range (map units)
+int	coop_follow     = 256;		// follow distance to the human (map units)
+int	coop_heal_range = 1024;		// med-pack search range (map units)
+#define COOP_SIGHT	((fixed_t)coop_sight      * FRACUNIT)
+#define COOP_NEAR	((fixed_t)coop_follow     * FRACUNIT)
+#define COOP_HEAL_RANGE	((fixed_t)coop_heal_range * FRACUNIT)
+#define COOP_DEFEND_HP	coop_defend_hp
+#define COOP_HEAL_HP	coop_heal_hp
 
 
 void P_AICoop_Init (void)
