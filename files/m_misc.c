@@ -261,8 +261,8 @@ default_t	defaults[] =
     {"autorun",&autorun, 1},
     {"key_console",&key_console, '^'},
 
-    {"coop_defend_hp",&coop_defend_hp, 50},
-    {"coop_heal_hp",&coop_heal_hp, 30},
+    {"coop_defend_hp",&coop_defend_hp, 35},
+    {"coop_heal_hp",&coop_heal_hp, 20},
     {"coop_sight",&coop_sight, 1280},
     {"coop_follow",&coop_follow, 256},
     {"coop_heal_range",&coop_heal_range, 1024},

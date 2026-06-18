@@ -33,8 +33,8 @@ typedef struct {
 } setting_t;
 
 static setting_t settings[] = {
-    {"AI co-op companion (-aicoop)","Defend below HP",  "coop_defend_hp",   50,  0,  100,   5, "HP"},
-    {"AI co-op companion (-aicoop)","Seek health below","coop_heal_hp",     30,  0,  100,   5, "HP"},
+    {"AI co-op companion (-aicoop)","Defend below HP",  "coop_defend_hp",   35,  0,  100,   5, "HP"},
+    {"AI co-op companion (-aicoop)","Flee/hide below",  "coop_heal_hp",     20,  0,  100,   5, "HP"},
     {"AI co-op companion (-aicoop)","Sight range",      "coop_sight",     1280,256, 4096, 128, "mu"},
     {"AI co-op companion (-aicoop)","Follow distance",  "coop_follow",     256, 64, 1024,  32, "mu"},
     {"AI co-op companion (-aicoop)","Heal search range","coop_heal_range",1024,256, 4096, 128, "mu"},
