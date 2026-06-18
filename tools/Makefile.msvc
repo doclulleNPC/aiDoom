@@ -1,0 +1,40 @@
+# Makefile.msvc -- build aiDoom's SDL3 tools with Visual Studio 2019 (MSVC).
+#   aidoom_config.exe  (settings editor)   gpumon_sdl.exe (GPU monitor)
+#
+# Usage (x86 Native Tools Command Prompt for VS 2019), in tools\:
+#     nmake /f Makefile.msvc
+#     nmake /f Makefile.msvc SDL=C:\path\to\SDL3
+#
+# Both are SDL3 GUI apps that own main() (SDL_MAIN_HANDLED), so we link the
+# WINDOWS subsystem (no console window) with the CRT's mainCRTStartup entry.
+# Binaries are copied into ..\run\ next to aidoom.exe.
+
+SDL = C:\Source\SDL3
+
+CC = cl
+CFLAGS = /nologo /O2 /MD /W3 /I. /I"$(SDL)\include" /DSDL_MAIN_HANDLED \
+	/D_CRT_SECURE_NO_WARNINGS /D_CRT_NONSTDC_NO_DEPRECATE
+LIBS = "$(SDL)\lib\x86\SDL3.lib"
+LDFLAGS = /link /SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup
+
+all: aidoom_config.exe gpumon_sdl.exe
+
+aidoom_config.res: aidoom_config.rc ..\files\aidoom.ico
+	rc /nologo /fo aidoom_config.res aidoom_config.rc
+
+aidoom_config.exe: aidoom_config.c aidoom_config.res font_atlas.h ..\files\aidoom_icon.h
+	$(CC) $(CFLAGS) /Fe:aidoom_config.exe aidoom_config.c aidoom_config.res $(LDFLAGS) $(LIBS)
+	@if not exist ..\run mkdir ..\run
+	@copy /Y aidoom_config.exe ..\run\aidoom_config.exe >nul
+	@if exist "$(SDL)\lib\x86\SDL3.dll" copy /Y "$(SDL)\lib\x86\SDL3.dll" ..\run\SDL3.dll >nul
+
+gpumon.res: gpumon.rc ..\files\aidoom.ico
+	rc /nologo /fo gpumon.res gpumon.rc
+
+gpumon_sdl.exe: gpumon_sdl.c gpumon.res font_atlas.h ..\files\aidoom_icon.h
+	$(CC) $(CFLAGS) /Fe:gpumon_sdl.exe gpumon_sdl.c gpumon.res $(LDFLAGS) $(LIBS)
+	@if not exist ..\run mkdir ..\run
+	@copy /Y gpumon_sdl.exe ..\run\gpumon_sdl.exe >nul
+
+clean:
+	-del *.obj *.res aidoom_config.exe gpumon_sdl.exe 2>nul

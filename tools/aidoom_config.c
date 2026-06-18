@@ -12,9 +12,18 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#ifdef _MSC_VER
+#include <io.h>			// MSVC: access() lives here
+#ifndef F_OK
+#define F_OK 0
+#endif
+#define access _access
+#else
 #include <unistd.h>
+#endif
 
 #include "font_atlas.h"
+#include "../files/aidoom_icon.h"	// shared 64x64 RGBA window icon (from aidoom.ico)
 
 #define WINW 680
 #define WINH 860
@@ -405,6 +414,13 @@ int main(int argc, char** argv)
 
     if (!SDL_Init(SDL_INIT_VIDEO)) { fprintf(stderr,"SDL_Init: %s\n",SDL_GetError()); return 1; }
     win = SDL_CreateWindow("aiDoom Config", WINW, WINH, 0);
+    {
+        // Window/taskbar icon from the shared aidoom.ico (same as the game).
+        SDL_Surface* icon = SDL_CreateSurfaceFrom(
+            AIDOOM_ICON_W, AIDOOM_ICON_H, SDL_PIXELFORMAT_RGBA32,
+            (void *)aidoom_icon_rgba, AIDOOM_ICON_W*4);
+        if (icon) { SDL_SetWindowIcon(win, icon); SDL_DestroySurface(icon); }
+    }
     ren = SDL_CreateRenderer(win, NULL);
     font_init();
 

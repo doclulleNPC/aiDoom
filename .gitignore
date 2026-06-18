@@ -64,3 +64,11 @@ tools/gpumon_sdl
 run/gpumon_sdl
 tools/gpumon_sdl.exe
 run/gpumon_sdl.exe
+
+# CMake build output
+/build/
+/build_cmake/
+build_cmake_build.log
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake

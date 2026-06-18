@@ -16,10 +16,10 @@ director client that drives the monsters' tactics.
 | `start_aidoom.ps1` | Windows | Main launcher (PowerShell). |
 | `ollama_director.py` | all | The director client (talks to Ollama + the game). Mirror of the repo-root copy. |
 | `gpumon.py` | all | Live GPU monitor for the remote Ollama machine, terminal (see below). |
-| `gpumon_sdl` / `gpumon_sdl.exe` | Linux / Windows | Same monitor as a small **SDL window** (bars for load/VRAM/temp/power); built by `tools/build_gpumon.sh` / `tools/build_gpumon_win.sh`. |
-| `aidoom_config` / `aidoom_config.exe` | Linux / Windows | SDL3 settings editor (built by `tools/build_config.sh` / `tools/build_config_win.sh`); reads/writes `aidoom.cfg` here. |
+| `gpumon_sdl` / `gpumon_sdl.exe` | Linux / Windows | Same monitor as a small **SDL window** (bars for load/VRAM/temp/power). Build: Linux `tools/build_gpumon.sh`; Windows via CMake or `build_all_win.bat` (below). |
+| `aidoom_config` / `aidoom_config.exe` | Linux / Windows | SDL3 settings editor; reads/writes `aidoom.cfg` here. Build: Linux `tools/build_config.sh`; Windows via CMake or `build_all_win.bat`. |
 | `aidoom.cfg` | all | The single config file (game keys/video + Ollama), read by the game and all tools from this folder. |
-| `aidoom.ico` | Windows | Icon for the launcher/shortcut. |
+| `aidoom.ico` | Windows | Source icon. The game **and** both tools embed it as their exe + live window/taskbar icon, so this file isn't needed at runtime. |
 
 ## What the launcher does
 
@@ -39,7 +39,12 @@ director client that drives the monsters' tactics.
   - Linux/macOS: run **`../build.sh`** — it compiles against system SDL3 and
     copies the `aidoom` binary into `run/`. (SDL3 is linked from the system, so
     there's no library to copy alongside it.)
-  - Windows: build `files/Makefile.msvc`, then put `aidoom.exe` + `SDL3.dll` in `run/`.
+  - Windows (MSVC + the SDL3 SDK): run **`..\build_all_win.bat`** — it builds
+    `aidoom.exe` **and** both tools and copies them + `SDL3.dll` into `run/`.
+    Equivalently with CMake (also stages everything into `run/`):
+    `cmake -B build -DCMAKE_PREFIX_PATH=C:/path/to/SDL3 && cmake --build build`.
+    (The legacy `tools/build_*_win.sh` are MinGW cross-builds needing a MinGW SDL3
+    package; the MSVC path above is preferred on Windows.)
 - A DOOM **IWAD**. The engine finds one via `-iwad <file>` → the `iwad` key in
   `aidoom.cfg` → an `iwads/` subfolder → `run/` (the binary's folder) → a Steam
   install. Pick which to use in the config app, or drop a `.wad` in `run/iwads/`.
