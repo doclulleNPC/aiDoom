@@ -36,7 +36,8 @@
 // ---- Doom key codes (mirror doomdef.h) ----
 enum { K_RIGHT=0xae,K_LEFT=0xac,K_UP=0xad,K_DOWN=0xaf,
        K_RCTRL=0x9d,K_RSHIFT=0xb6,K_RALT=0xb8,
-       K_MWHEELUP=0xb0,K_MWHEELDOWN=0xb1,K_ESC=27,K_ENTER=13,K_TAB=9,K_BKSP=127 };
+       K_MWHEELUP=0xb0,K_MWHEELDOWN=0xb1,K_ESC=27,K_ENTER=13,K_TAB=9,K_BKSP=127,
+       K_F11=0xd7,K_F12=0xd8 };
 
 enum { T_KEY, T_INT, T_TOGGLE, T_TEXT, T_CHOICE };
 enum { F_DOOMRC, F_AIDOOM };
@@ -138,7 +139,10 @@ static void keyname(int k, char* out, int n)
       case K_ENTER:snprintf(out,n,"Enter");return;
       case K_TAB:  snprintf(out,n,"Tab");  return;
       case K_BKSP: snprintf(out,n,"Bksp"); return;
+      case K_F11:  snprintf(out,n,"F11");  return;
+      case K_F12:  snprintf(out,n,"F12");  return;
     }
+    if (k>=0xbb && k<=0xc4) { snprintf(out,n,"F%d", k-0xbb+1); return; }	// F1..F10
     if (k>32 && k<127) snprintf(out,n,"%c", toupper(k));
     else snprintf(out,n,"key %d", k);
 }
@@ -153,7 +157,9 @@ static int sdl_to_doomkey(SDL_Keycode s)
       case SDLK_LALT:case SDLK_RALT:case SDLK_LGUI:case SDLK_RGUI: return K_RALT;
       case SDLK_RETURN: return K_ENTER; case SDLK_TAB: return K_TAB;
       case SDLK_BACKSPACE: return K_BKSP; case SDLK_SPACE: return ' ';
+      case SDLK_F11: return K_F11; case SDLK_F12: return K_F12;
     }
+    if (s >= SDLK_F1 && s <= SDLK_F10) return 0xbb + (int)(s - SDLK_F1);	// F1..F10
     if (s>32 && s<127) return (int)s;	// ASCII (already lower-case in SDL3)
     return 0;
 }
@@ -187,7 +193,7 @@ static void set_default_int(setting_t* s)
     else if (!strcmp(n,"key_nextweapon"))   v = K_MWHEELUP;
     else if (!strcmp(n,"key_prevweapon"))   v = K_MWHEELDOWN;
     else if (!strcmp(n,"key_jump"))         v = ' ';
-    else if (!strcmp(n,"key_console"))      v = '^';
+    else if (!strcmp(n,"key_console"))      v = K_F12;
     else if (!strcmp(n,"mouse_sensitivity"))v = 5;
     else if (!strcmp(n,"screen_resolution"))v = 1;
     else if (!strcmp(n,"screenblocks"))     v = 9;

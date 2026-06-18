@@ -19,7 +19,7 @@ a language model drive monster tactics in real time.
 - **Variable internal resolution** — the software renderer draws natively at
   320×200 … 1920×1200 (`hires` 1–6), switchable at runtime from an **Options → Video**
   menu (no upscaling of a fixed 320×200 image).
-- **Quake-style console** (`files/c_console.c`) — toggle with **`` ` ``** (backquote);
+- **Quake-style console** (`files/c_console.c`) — open with **F12** or **`` ` ``** (backquote);
   scrollback + input line over a dimmed view, commands: `help clear echo quit god
   noclip give map`/`warp`.
 - **Free-look** (mouse aims the view up/down and your shots follow), **jump**
@@ -177,7 +177,7 @@ Tunable with the `aicoop_config` tool (or the `coop_*` keys in `aidoom.cfg`):
 
 In the launchers it's on by default; disable with `--no-coop` (`-NoCoop` on Windows).
 
-From the **console** (toggle key, default `^`) you can talk to it:
+From the **console** (open with **F12** or `` ` ``) you can talk to it:
 
 | command | effect |
 |---|---|

@@ -47,11 +47,11 @@ extern void		P_DamageMobj (mobj_t* target, mobj_t* inflictor, mobj_t* source, in
 extern void		P_MobjThinker (mobj_t* mobj);
 
 #define CON_H		120		// console height in BASE (320x200) rows
-#define CON_DARK	22		// colormap level used to dim the view behind it
+#define CON_DARK	26		// colormap level used to dim the view behind it
 #define CON_LINES	256		// scrollback ring size
 #define CON_LINEW	128
 #define CON_INPUTW	128
-#define LINE_STEP	5		// BASE pixels per text row (half-size font)
+#define LINE_STEP	9		// BASE pixels per text row (full-size font)
 
 static char	con_text[CON_LINES][CON_LINEW];
 static int	con_head;		// next slot to write
@@ -104,7 +104,7 @@ void C_Init (void)
 {
     con_head = con_count = con_inlen = con_open = con_shift = con_scroll = 0;
     con_input[0] = '\0';
-    C_Printf ("aiDoom console.  Type 'help'.  Toggle with ` (backquote) or the console key.");
+    C_Printf ("aiDoom console.  Type 'help'.  Open with F12 or ` (backquote).");
 }
 
 
@@ -276,20 +276,37 @@ static void C_Execute (char* line)
 
 // ---------------------------------------------------------------- input
 
-// Key that toggles the console.  Configurable via "key_console" (m_misc.c).
-// Backquote/tilde (`) is always accepted as well: on Linux/SDL the top-left
-// key (labelled ^ on many layouts) reports as KEY_BACKQUOTE, not '^'.
-int	key_console = '^';
+// Key that opens the console.  Configurable via "key_console" (m_misc.c);
+// default F12 (the only otherwise-free function key -- it was netgame spy-mode).
+// Backquote (`) is always accepted too.
+int	key_console = KEY_F12;
 
 boolean C_Responder (event_t* ev)
 {
     int c;
 
-    // toggle (consume the key press; ignore its key-up)
-    if (ev->data1 == key_console || ev->data1 == KEY_BACKQUOTE)
+    // Backquote: universal toggle (open and close).
+    if (ev->data1 == KEY_BACKQUOTE)
     {
 	if (ev->type == ev_keydown) { con_open = !con_open; con_shift = 0; }
 	return true;
+    }
+
+    // Configured key: opens when closed.  Also closes when open -- except if it
+    // is Backspace, which must stay free to delete the input line (fall through).
+    if (ev->data1 == key_console)
+    {
+	if (!con_open)
+	{
+	    if (ev->type == ev_keydown) { con_open = 1; con_shift = 0; }
+	    return true;
+	}
+	if (key_console != KEY_BACKSPACE)
+	{
+	    if (ev->type == ev_keydown) con_open = 0;
+	    return true;
+	}
+	/* console open and key is Backspace -> fall through to edit the line */
     }
 
     if (!con_open)
@@ -341,63 +358,18 @@ boolean C_Responder (event_t* ev)
 
 // ---------------------------------------------------------------- drawing
 
-// Draw an hu_font patch at HALF its base size: take every other source
-// pixel (column/row) so the glyph occupies (w/2 x h/2) BASE pixels, then the
-// usual hires scaling applies.  Keeps the console text small but in BASE coords.
-static void C_DrawPatchHalf (int x, int y, patch_t* patch)
-{
-    int		s = hires;
-    int		w = SHORT(patch->width);
-    int		col;
-
-    x -= SHORT(patch->leftoffset) / 2;
-    y -= SHORT(patch->topoffset)  / 2;
-
-    for (col = 0 ; col < w ; col += 2)
-    {
-	int		ocol = col >> 1;
-	column_t*	column = (column_t *)((byte *)patch + LONG(patch->columnofs[col]));
-
-	while (column->topdelta != 0xff)
-	{
-	    byte*	src = (byte *)column + 3;
-	    int		len = column->length;
-	    int		k;
-	    for (k = 0 ; k < len ; k++)
-	    {
-		int	srow = column->topdelta + k;
-		int	orow, sx, sy, i, j;
-		byte	px;
-		if (srow & 1) continue;			// keep even rows only
-		orow = srow >> 1;
-		sx = (x + ocol) * s;
-		sy = (y + orow) * s;
-		if (sx < 0 || sy < 0 || sx + s > SCREENWIDTH || sy + s > SCREENHEIGHT)
-		    continue;
-		px = src[k];
-		for (i = 0 ; i < s ; i++)
-		{
-		    byte* d = screens[0] + (sy + i)*SCREENWIDTH + sx;
-		    for (j = 0 ; j < s ; j++) d[j] = px;
-		}
-	    }
-	    column = (column_t *)((byte *)column + len + 4);
-	}
-    }
-}
-
+// Draw a string in the full-size hu_font (crisp, readable).  BASE coords --
+// V_DrawPatch scales to the current resolution.
 static void C_DrawString (int x, int y, const char* s)
 {
     for (; *s; s++)
     {
 	int ch = toupper((unsigned char)*s);
-	int cw;
-	if (ch == ' ' || ch < HU_FONTSTART || ch > HU_FONTEND) { x += 2; continue; }
+	if (ch == ' ' || ch < HU_FONTSTART || ch > HU_FONTEND) { x += 4; continue; }
 	patch_t* p = hu_font[ch - HU_FONTSTART];
-	cw = SHORT(p->width) / 2; if (cw < 1) cw = 1;
-	if (x + cw > BASE_WIDTH) break;
-	C_DrawPatchHalf (x, y, p);
-	x += cw;
+	if (x + SHORT(p->width) > BASE_WIDTH) break;
+	V_DrawPatch (x, y, 0, p);
+	x += SHORT(p->width);
     }
 }
 

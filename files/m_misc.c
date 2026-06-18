@@ -260,7 +260,7 @@ default_t	defaults[] =
     {"key_prevweapon",&key_prevweapon, KEY_MWHEELDOWN},
     {"key_jump",&key_jump, ' '},
     {"autorun",&autorun, 1},
-    {"key_console",&key_console, '^'},
+    {"key_console",&key_console, KEY_F12},
 
     {"coop_defend_hp",&coop_defend_hp, 35},
     {"coop_heal_hp",&coop_heal_hp, 20},
