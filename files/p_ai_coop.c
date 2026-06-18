@@ -52,6 +52,7 @@ static int	wantmove;		// set when we actually tried to move this tic
 static int	hold;			// "wait/stay" -- hold position
 static int	forceaggro;		// >0: "attack" ordered -- charge forcetarget
 static mobj_t*	forcetarget;		// the forced attack target
+static int	doorwait;		// >0: waiting for a door we opened to finish
 
 // ---- grid A* pathfinding (no LLM) -----------------------------------------
 #define PF_CELL		64		// nav-cell size in map units
@@ -59,6 +60,7 @@ static mobj_t*	forcetarget;		// the forced attack target
 #define PF_LOOKAHEAD	4		// waypoint this many cells ahead
 static byte*	pf_walk;		// 1 = the companion fits in this cell
 static byte*	pf_edge;		// per cell: 8-bit "edge open" mask (traversable)
+static fixed_t*	pf_floor;		// per cell: sector floor height (for step checks)
 static byte*	pf_state;		// A* per-node: 0 none, 1 open, 2 closed
 static int*	pf_g;			// A* cost-so-far
 static int*	pf_came;		// A* predecessor cell
@@ -176,15 +178,6 @@ static mobj_t* AICoop_NearestMonsterTo (fixed_t x, fixed_t y)
     return best;
 }
 
-// Move toward a goal mobj using the monster pathing (walls + doors handled).
-static void AICoop_Chase (mobj_t* mo, mobj_t* goal)
-{
-    wantmove = 1;
-    mo->target = goal;
-    if (--mo->movecount < 0 || !P_Move (mo))
-	P_NewChaseDir (mo);
-}
-
 // Step away from (fx,fy): pick the 8-dir leading away, try it then turned dirs.
 static void AICoop_MoveAway (mobj_t* mo, fixed_t fx, fixed_t fy)
 {
@@ -205,15 +198,29 @@ static void AICoop_MoveAway (mobj_t* mo, fixed_t fx, fixed_t fy)
 // Step toward a point with the engine mover (handles fine collision + doors).
 static void AICoop_MoveToPoint (mobj_t* mo, fixed_t tx, fixed_t ty)
 {
-    angle_t	a = R_PointToAngle2 (mo->x, mo->y, tx, ty);
-    int		base = (int)((a + (1u<<28)) >> 29) & 7;
-    static const int off[5] = { 0, 1, 7, 2, 6 };
-    int		i;
+    static const int	off[5] = { 0, 1, 7, 2, 6 };	// straight, +-45, +-90
+    angle_t		a;
+    int			base, i;
+
+    // While a door we opened is still moving, hold -- re-triggering it would
+    // reverse it (the companion is a real player), which is the "use-loop stuck".
+    if (doorwait > 0) { doorwait--; return; }
+
+    a = R_PointToAngle2 (mo->x, mo->y, tx, ty);
+    base = (int)((a + (1u<<28)) >> 29) & 7;
     wantmove = 1;
     for (i = 0; i < 5; i++)
     {
+	fixed_t ox = mo->x, oy = mo->y;
 	mo->movedir = (base + off[i]) & 7;
-	if (P_Move (mo)) return;
+	if (P_Move (mo))
+	{
+	    // P_Move returns true but the mobj didn't move => it opened a door (or
+	    // used a line).  Wait for it to finish instead of pressing use again.
+	    if (mo->x == ox && mo->y == oy)
+		doorwait = 35;
+	    return;
+	}
     }
     mo->movedir = 8;
 }
@@ -231,21 +238,25 @@ static void PF_Build (mobj_t* probe)
     if (pf_h < 1) pf_h = 1;
     n = pf_w * pf_h;
 
-    free (pf_walk); free (pf_edge); free (pf_state); free (pf_g); free (pf_came); free (pf_olist);
+    free (pf_walk); free (pf_edge); free (pf_floor);
+    free (pf_state); free (pf_g); free (pf_came); free (pf_olist);
     pf_walk  = malloc (n);
     pf_edge  = malloc (n);
+    pf_floor = malloc (n * sizeof(fixed_t));
     pf_state = malloc (n);
     pf_g     = malloc (n * sizeof(int));
     pf_came  = malloc (n * sizeof(int));
     pf_olist = malloc (n * sizeof(int));
 
-    // 1) which cells the marine fits in (centre probe + head-room)
+    // 1) which cells the marine fits in (centre probe + head-room), and the
+    //    floor height there (for step-up checks below).
     for (j = 0; j < pf_h; j++)
 	for (i = 0; i < pf_w; i++)
 	{
 	    fixed_t cx = pf_orgx + (i*PF_CELL + PF_CELL/2)*FRACUNIT;
 	    fixed_t cy = pf_orgy + (j*PF_CELL + PF_CELL/2)*FRACUNIT;
 	    byte    w  = 0;
+	    pf_floor[j*pf_w + i] = R_PointInSubsector (cx, cy)->sector->floorheight;
 	    if (P_CheckPosition (probe, cx, cy) && (tmceilingz - tmfloorz >= 56*FRACUNIT))
 		w = 1;
 	    pf_walk[j*pf_w + i] = w;
@@ -274,7 +285,12 @@ static void PF_Build (mobj_t* probe)
 		{
 		    fixed_t mx = pf_orgx + (i*PF_CELL + PF_CELL/2 + dx[d]*PF_CELL/2)*FRACUNIT;
 		    fixed_t my = pf_orgy + (j*PF_CELL + PF_CELL/2 + dy[d]*PF_CELL/2)*FRACUNIT;
-		    if (P_CheckPosition (probe, mx, my) && (tmceilingz - tmfloorz >= 56*FRACUNIT))
+		    // edge open only if the marine fits at the boundary, has head-room,
+		    // and the step up from this cell is climbable (<=24) -- so it won't
+		    // try to scale a too-high ledge or hop a window sill.
+		    if (P_CheckPosition (probe, mx, my)
+			&& (tmceilingz - tmfloorz >= 56*FRACUNIT)
+			&& (tmfloorz - pf_floor[c] <= 24*FRACUNIT))
 			e |= (1 << d);
 		}
 	      }
@@ -401,7 +417,7 @@ static void AICoop_PathChase (mobj_t* mo, mobj_t* goal)
 	if (!PF_Next (mo, goal->x, goal->y, &pf_wpx, &pf_wpy))
 	{
 	    pf_goal = NULL;			// no route -> retry next tic
-	    AICoop_Chase (mo, goal);		// fall back to the engine local pather
+	    AICoop_MoveToPoint (mo, goal->x, goal->y);	// head straight (also opens doors)
 	    return;
 	}
     }
