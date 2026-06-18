@@ -171,12 +171,17 @@ static void C_Execute (char* line)
 
 
 // ---------------------------------------------------------------- input
+
+// Key that toggles the console.  Default '^' (the key left of 1 on many
+// non-US layouts); configurable via "key_console" in the config (m_misc.c).
+int	key_console = '^';
+
 boolean C_Responder (event_t* ev)
 {
     int c;
 
     // toggle (consume the key press; ignore its key-up)
-    if (ev->data1 == KEY_BACKQUOTE)
+    if (ev->data1 == key_console)
     {
 	if (ev->type == ev_keydown) { con_open = !con_open; con_shift = 0; }
 	return true;

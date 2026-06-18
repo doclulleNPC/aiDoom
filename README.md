@@ -153,15 +153,15 @@ On Windows the config editor (and the GPU monitor) are built by the CMake build 
 - **IWAD** — pick which WAD to play from the ones it finds (`iwads/`, the folder,
   Steam) or leave it on *auto*; the choice is saved as `iwad` and the game uses it.
 - **Ollama host / port / model** — read by the AI-Director tools
-  (`ollama_director.py`, `run/gpumon.py`, `run/start_aidoom.{sh,ps1}`).
+  (`ollama_director.py`, `gpumon.py`, `run/start_aidoom.{sh,ps1}`).
 - **GPU monitor (SSH)** — host / user / port of the (remote) Ollama machine, plus a
   **Copy SSH key** button that installs your public key there (so the GPU monitor's
   `nvidia-smi`-over-SSH works without a password).
 
-A small **GPU monitor** (`gpumon`, an SDL3 window) shows live load / VRAM / temperature
-/ power of the Ollama machine via `nvidia-smi` — over SSH, or directly when the host is
-`localhost` (no SSH/key needed). On a connection error it stops and offers a
-**Reconnect** button. See `run/README.md`.
+A small **GPU monitor** shows live load / VRAM / temperature / power of the Ollama
+machine via `nvidia-smi` — over SSH, or directly when the host is `localhost` (no
+SSH/key needed). Two flavours: `gpumon.py` (terminal) and `gpumon` (SDL3 window with a
+**Reconnect** button). See **GPUMON.md**.
 
 The **game** reads/writes the same `aidoom.cfg` from its working directory, and the
 config app preserves any keys it doesn't manage (so neither side clobbers the
@@ -172,6 +172,8 @@ writes one on exit; the editor shows those defaults too.
 
 - `AGENT_CONTROL.md` — full player- and monster-control API & TCP protocol
 - `MONSTER_AGENT_GUIDE.md` — guide to directing monsters with an LLM
+- `GPUMON.md` — the GPU monitor (`gpumon.py` / `gpumon`)
+- `run/README.md` — the launchers in `run/`
 - `CLAUDE.md` — architecture notes & build/porting gotchas
 
 ## License

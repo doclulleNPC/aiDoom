@@ -26,7 +26,7 @@
 #include "../files/aidoom_icon.h"	// shared 64x64 RGBA window icon (from aidoom.ico)
 
 #define WINW 680
-#define WINH 960
+#define WINH 990
 #define ROWH 26
 #define HEADH 30
 #define LABELX 28
@@ -64,6 +64,7 @@ static setting_t settings[] = {
     {"Action keys","Next weapon",   "key_nextweapon", T_KEY,0,0,F_DOOMRC},
     {"Action keys","Prev weapon",   "key_prevweapon", T_KEY,0,0,F_DOOMRC},
     {"Action keys","Jump",          "key_jump",       T_KEY,0,0,F_DOOMRC},
+    {"Action keys","Console",       "key_console",    T_KEY,0,0,F_DOOMRC},
 
     {"Video / mouse","Mouse sensitivity","mouse_sensitivity",T_INT,0,9,F_DOOMRC},
     {"Video / mouse","Resolution (1-6)", "screen_resolution",T_INT,1,6,F_DOOMRC},
@@ -185,6 +186,7 @@ static void set_default_int(setting_t* s)
     else if (!strcmp(n,"key_nextweapon"))   v = K_MWHEELUP;
     else if (!strcmp(n,"key_prevweapon"))   v = K_MWHEELDOWN;
     else if (!strcmp(n,"key_jump"))         v = ' ';
+    else if (!strcmp(n,"key_console"))      v = '^';
     else if (!strcmp(n,"mouse_sensitivity"))v = 5;
     else if (!strcmp(n,"screen_resolution"))v = 1;
     else if (!strcmp(n,"screenblocks"))     v = 9;

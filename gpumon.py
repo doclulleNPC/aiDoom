@@ -21,14 +21,19 @@ def _aidoom_cfg():
     import os
     cfg = {}
     here = os.path.dirname(os.path.abspath(__file__))
-    try:
-        with open(os.path.join(here, "aidoom.cfg")) as f:
-            for line in f:
-                p = line.split()
-                if len(p) >= 2:
-                    cfg[p[0]] = p[1].strip('"')
-    except OSError:
-        pass
+    # aidoom.cfg lives next to the game (run/).  Look beside this script and in a
+    # run/ subdir, so gpumon.py works both from run/ and from the repo root.
+    for cand in (os.path.join(here, "aidoom.cfg"),
+                 os.path.join(here, "run", "aidoom.cfg")):
+        try:
+            with open(cand) as f:
+                for line in f:
+                    p = line.split()
+                    if len(p) >= 2:
+                        cfg[p[0]] = p[1].strip('"')
+            break
+        except OSError:
+            pass
     return cfg
 _CFG = _aidoom_cfg()
 # gpu_host / gpu_user fall back to the Ollama host (same machine) and "lubee".
