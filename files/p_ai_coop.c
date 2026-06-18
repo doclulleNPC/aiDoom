@@ -26,6 +26,8 @@
 #include "p_mobj.h"
 #include "info.h"
 #include "r_main.h"
+#include "tables.h"
+#include "m_fixed.h"
 
 #include "p_ai_coop.h"
 
@@ -34,11 +36,14 @@ static int	aicoop;			// -aicoop given
 #define COOP_SIGHT	(1280*FRACUNIT)	// monster acquisition range
 #define COOP_TURN	1300		// max angleturn per tic (~7 deg)
 #define COOP_FACING	1500		// |remaining turn| under which we open fire
-#define COOP_NEAR	(256*FRACUNIT)	// follow distance to the human
+#define COOP_NEAR	(256*FRACUNIT)	// follow distance to the human (healthy)
 #define COOP_KEEP	(192*FRACUNIT)	// advance toward a monster until this close
 #define COOP_RUN	0x32		// forwardmove "run" magnitude
-#define COOP_HEAL_HP	50		// seek a med-pack below this health
+#define COOP_DEFEND_HP	50		// below this: defensive -- don't charge, hang back
+#define COOP_HEAL_HP	30		// below this: break off and grab a med-pack
 #define COOP_HEAL_RANGE	(1024*FRACUNIT)	// how far to look for one
+#define COOP_BEHIND	(110*FRACUNIT)	// defensive: hold this far behind the player
+#define COOP_NEAR_DEF	(64*FRACUNIT)	// defensive: stay tight to that spot
 
 
 void P_AICoop_Init (void)
@@ -156,16 +161,41 @@ void P_AICoop_BuildCmd (void)
     mo = bot->mo;
     memset (cmd, 0, sizeof(*cmd));
 
-    // Priority: when hurt, break off and grab the nearest med-pack.  Otherwise
-    // fight the nearest monster, else follow the human.
+    // Health-tiered behaviour:
+    //   < 30 HP : break off and grab the nearest med-pack.
+    //   < 50 HP : defensive -- still shoots, but doesn't charge; hangs back
+    //             behind the player.
+    //   healthy : chase the nearest monster, else follow the player.
+    int defensive = (bot->health < COOP_DEFEND_HP);
+
     heal   = (bot->health < COOP_HEAL_HP) ? AICoop_FindHealth (mo) : NULL;
     tgt    = heal ? NULL : AICoop_FindTarget (mo);
     follow = playeringame[0] ? players[0].mo : NULL;
 
-    if (heal)		{ tx = heal->x;   ty = heal->y; }
-    else if (tgt)	{ tx = tgt->x;    ty = tgt->y; }
-    else if (follow)	{ tx = follow->x; ty = follow->y; }
-    else		return;
+    if (heal)
+    {
+	tx = heal->x; ty = heal->y;
+    }
+    else if (tgt)
+    {
+	tx = tgt->x; ty = tgt->y;	// face the monster (to shoot)
+    }
+    else if (follow)
+    {
+	if (defensive)
+	{
+	    // hold a spot behind the player and stick close to it
+	    angle_t pa = follow->angle;
+	    tx = follow->x - FixedMul (finecosine[pa>>ANGLETOFINESHIFT], COOP_BEHIND);
+	    ty = follow->y - FixedMul (finesine[pa>>ANGLETOFINESHIFT],   COOP_BEHIND);
+	}
+	else
+	{
+	    tx = follow->x; ty = follow->y;
+	}
+    }
+    else
+	return;
 
     // turn toward the target, clamped to a sane rate
     want  = R_PointToAngle2 (mo->x, mo->y, tx, ty);
@@ -187,12 +217,14 @@ void P_AICoop_BuildCmd (void)
     {
 	if (abs(rem) < COOP_FACING && P_CheckSight (mo, tgt))
 	    cmd->buttons |= BT_ATTACK;
-	if (dist > COOP_KEEP)
-	    cmd->forwardmove = COOP_RUN;	// close in
+	// Healthy: close the distance.  Defensive: hold position and just shoot.
+	if (!defensive && dist > COOP_KEEP)
+	    cmd->forwardmove = COOP_RUN;
     }
     else
     {
-	if (dist > COOP_NEAR)
-	    cmd->forwardmove = COOP_RUN;	// follow the human
+	// follow the player -- tighter and behind when defensive
+	if (dist > (defensive ? COOP_NEAR_DEF : COOP_NEAR))
+	    cmd->forwardmove = COOP_RUN;
     }
 }
