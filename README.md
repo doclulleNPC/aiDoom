@@ -29,6 +29,11 @@ a language model drive monster tactics in real time.
   (player 2) driven by a built-in bot: it acquires the nearest visible monster and
   fires, otherwise follows you. Drives a real co-op player through the normal ticcmd
   path (weapons, damage, pickups, reborn all work). Single-machine, off by default.
+- **Pack-hunt monster AI** (`files/p_ai_coop.c`… `p_enemy.c`, `monster_pack`) — an
+  optional aggressive mode (on by default): monsters acquire the player the instant
+  they spawn (searching even with no line of sight) and steer toward nearby allies en
+  route, so they gather and assault in groups. Tunable in `aicoop_config`; set
+  `monster_pack 0` for vanilla wake-on-sight behaviour.
 - **LLM AI Director** (`files/p_ai_llm.c`) — an external director drives monster
   *tactics* (flank, fall back, ambush, focus-fire, …) over a small TCP line protocol,
   or via a built-in scripted `-aidemo` director. A ready-to-run **Ollama** client is

@@ -1,8 +1,9 @@
-// aicoop_config -- tiny SDL3 editor for the AI co-op companion's behaviour.
+// aicoop_config -- tiny SDL3 editor for aiDoom's AI behaviour.
 //
-// Edits the same aidoom.cfg (in the run/ folder) the game reads, but only the
-// companion knobs (coop_*).  HP values are absolute (max 100, so 50 = 50%);
-// ranges are in map units.  Other config keys are preserved untouched.
+// Edits the same aidoom.cfg (in the run/ folder) the game reads: the AI co-op
+// companion knobs (coop_*) and the monster pack-hunt AI (monster_*).  HP values
+// are absolute (max 100, so 50 = 50%); ranges are in map units.  Other config
+// keys are preserved untouched.
 //
 // Build: CMake / build_all_win.bat (Windows) or tools/build_config.sh-style gcc.
 
@@ -16,13 +17,14 @@
 #include "../files/aidoom_icon.h"	// shared 64x64 RGBA window icon (from aidoom.ico)
 
 #define WINW 560
-#define WINH 320
+#define WINH 410
 #define ROWH 30
 #define HEADH 30
 #define LABELX 26
 #define VALX 330
 
 typedef struct {
+    const char* section;
     const char* label;
     const char* name;	// key in aidoom.cfg
     int		val, vmin, vmax, step;
@@ -31,13 +33,16 @@ typedef struct {
 } setting_t;
 
 static setting_t settings[] = {
-    {"Defend below HP",    "coop_defend_hp",   50,  0,  100,   5, "HP"},
-    {"Seek health below",  "coop_heal_hp",     30,  0,  100,   5, "HP"},
-    {"Sight range",        "coop_sight",     1280,256, 4096, 128, "mu"},
-    {"Follow distance",    "coop_follow",     256, 64, 1024,  32, "mu"},
-    {"Heal search range",  "coop_heal_range",1024,256, 4096, 128, "mu"},
+    {"AI co-op companion (-aicoop)","Defend below HP",  "coop_defend_hp",   50,  0,  100,   5, "HP"},
+    {"AI co-op companion (-aicoop)","Seek health below","coop_heal_hp",     30,  0,  100,   5, "HP"},
+    {"AI co-op companion (-aicoop)","Sight range",      "coop_sight",     1280,256, 4096, 128, "mu"},
+    {"AI co-op companion (-aicoop)","Follow distance",  "coop_follow",     256, 64, 1024,  32, "mu"},
+    {"AI co-op companion (-aicoop)","Heal search range","coop_heal_range",1024,256, 4096, 128, "mu"},
+    {"Monsters (pack hunt)","Pack hunt  0=off 1=on","monster_pack",          1,  0,    1,   1, ""},
+    {"Monsters (pack hunt)","Search / group range", "monster_pack_range", 2048,256, 8192, 256, "mu"},
 };
 #define NSET ((int)(sizeof(settings)/sizeof(settings[0])))
+static const int DEFVAL[NSET] = { 50, 30, 1280, 256, 1024, 1, 2048 };
 
 static SDL_Window*   win;
 static SDL_Renderer* ren;
@@ -126,8 +131,12 @@ static SDL_FRect btn_save, btn_quit, btn_reset;
 
 static float layout(void)
 {
-    float y = 16 + HEADH;
-    for (int i=0;i<NSET;i++) { settings[i].y = y; y += ROWH; }
+    float y = 16;
+    const char* sec = NULL;
+    for (int i=0;i<NSET;i++) {
+        if (sec != settings[i].section) { sec = settings[i].section; y += (i?10:0) + HEADH; }
+        settings[i].y = y; y += ROWH;
+    }
     return y;
 }
 
@@ -136,12 +145,15 @@ static int hit(float mx,float my, SDL_FRect r){ return mx>=r.x&&mx<r.x+r.w&&my>=
 static void draw(void)
 {
     rect(0,0,WINW,WINH, 24,24,28);
-    text(LABELX, 16, "AI co-op companion (-aicoop)", 120,200,255);
-    rect(LABELX, 40, WINW-2*LABELX, 1, 60,60,70);
-
+    const char* sec = NULL;
     for (int i=0;i<NSET;i++) {
         setting_t* s=&settings[i];
         char buf[96];
+        if (sec != s->section) {
+            sec = s->section;
+            text(LABELX, s->y - HEADH + 8, sec, 120,200,255);
+            rect(LABELX, s->y - 6, WINW-2*LABELX, 1, 60,60,70);
+        }
         text(LABELX, s->y+6, s->label, 220,220,220);
         snprintf(buf,sizeof(buf),"< %d %s >", s->val, s->unit);
         text(VALX, s->y+6, buf, 255,235,150);
@@ -159,10 +171,7 @@ static void click(float mx,float my)
     if (hit(mx,my,btn_save)) { save_cfg(); return; }
     if (hit(mx,my,btn_quit)) { SDL_Event q={.type=SDL_EVENT_QUIT}; SDL_PushEvent(&q); return; }
     if (hit(mx,my,btn_reset)) {
-        for (int i=0;i<NSET;i++) {
-            static const int def[NSET] = {50,30,1280,256,1024};
-            settings[i].val = def[i];
-        }
+        for (int i=0;i<NSET;i++) settings[i].val = DEFVAL[i];
         snprintf(status,sizeof(status),"reset to defaults (not yet saved)");
         return;
     }
@@ -186,7 +195,7 @@ int main(int argc, char** argv)
     load_cfg();
 
     if (!SDL_Init(SDL_INIT_VIDEO)) { fprintf(stderr,"SDL_Init: %s\n",SDL_GetError()); return 1; }
-    win = SDL_CreateWindow("aiDoom AI Companion", WINW, WINH, 0);
+    win = SDL_CreateWindow("aiDoom AI behaviour", WINW, WINH, 0);
     {
         SDL_Surface* icon = SDL_CreateSurfaceFrom(
             AIDOOM_ICON_W, AIDOOM_ICON_H, SDL_PIXELFORMAT_RGBA32,

@@ -603,11 +603,103 @@ void A_KeenDie (mobj_t* mo)
 // A_Look
 // Stay in state until a player is sighted.
 //
+//
+// Pack hunt -- optional aggressive group AI (config: monster_pack).
+//  * monsters acquire the player the moment they spawn -- searching even with
+//    no line of sight -- so they hunt immediately, and
+//  * while still far away they steer partly toward the centre of nearby allies
+//    so they bunch up and hit the player in groups.
+// Turning it off restores vanilla wake-on-sight/sound behaviour.
+//
+int	monster_pack       = 1;		// 1 = pack hunt on
+int	monster_pack_range = 2048;	// search / cohesion radius (map units)
+
+static mobj_t* P_PackNearestPlayer (mobj_t* actor)
+{
+    int		i, best = -1;
+    fixed_t	bd = 0;
+    for (i = 0 ; i < MAXPLAYERS ; i++)
+    {
+	fixed_t	d;
+	if (!playeringame[i] || !players[i].mo || players[i].health <= 0)
+	    continue;
+	d = P_AproxDistance (players[i].mo->x - actor->x,
+			     players[i].mo->y - actor->y);
+	if (best < 0 || d < bd) { best = i; bd = d; }
+    }
+    return (best >= 0) ? players[best].mo : NULL;
+}
+
+// Average position of nearby live monsters (excluding `actor`).  Needs at least
+// a couple of allies for a meaningful "group".
+static boolean P_PackCentre (mobj_t* actor, fixed_t* cx, fixed_t* cy)
+{
+    thinker_t*	th;
+    long long	sdx = 0, sdy = 0;	// sum of *relative* positions (small)
+    int		n = 0;
+    fixed_t	r = (fixed_t)monster_pack_range * FRACUNIT;
+
+    for (th = thinkercap.next ; th != &thinkercap ; th = th->next)
+    {
+	mobj_t* m;
+	if (th->function.acp1 != (actionf_p1)P_MobjThinker) continue;
+	m = (mobj_t *)th;
+	if (m == actor || m->health <= 0 || !(m->flags & MF_COUNTKILL)) continue;
+	if (P_AproxDistance (m->x - actor->x, m->y - actor->y) > r) continue;
+	sdx += (m->x - actor->x);
+	sdy += (m->y - actor->y);
+	n++;
+    }
+    if (n < 2) return false;
+    *cx = actor->x + (fixed_t)(sdx / n);
+    *cy = actor->y + (fixed_t)(sdy / n);
+    return true;
+}
+
+// Chase the target, but while far away bias toward the local pack centre so
+// monsters converge into groups en route.  Mirrors vanilla's movecount/P_Move
+// flow (only re-steers when committing to a new direction).
+void P_PackChase (mobj_t* actor)
+{
+    if (--actor->movecount < 0 || !P_Move (actor))
+    {
+	fixed_t	tx = actor->target->x;
+	fixed_t	ty = actor->target->y;
+	angle_t	ang;
+
+	if (P_AproxDistance (tx - actor->x, ty - actor->y)
+		> (fixed_t)monster_pack_range * FRACUNIT)
+	{
+	    fixed_t cx, cy;
+	    if (P_PackCentre (actor, &cx, &cy))
+	    {
+		tx += (cx - tx) / 5 * 2;	// ~40% toward the group centre
+		ty += (cy - ty) / 5 * 2;
+	    }
+	}
+
+	ang = R_PointToAngle2 (actor->x, actor->y, tx, ty);
+	actor->movedir = ((ang + (ANG45/2)) >> 29) & 7;
+	actor->movecount = 4 + (P_Random () & 7);	// commit for a few tics
+	if (!P_Move (actor))
+	    P_NewChaseDir (actor);
+    }
+}
+
+
 void A_Look (mobj_t* actor)
 {
     mobj_t*	targ;
-	
+
     actor->threshold = 0;	// any shot will wake up
+
+    // Pack hunt: lock onto the player at once (even with no line of sight) so a
+    // freshly-spawned monster starts searching/closing in immediately.
+    if (monster_pack)
+    {
+	mobj_t* pl = P_PackNearestPlayer (actor);
+	if (pl) { actor->target = pl; goto seeyou; }
+    }
     targ = actor->subsector->sector->soundtarget;
 
     if (targ
@@ -771,12 +863,16 @@ void A_Chase (mobj_t*	actor)
     }
     
     // chase towards player
-    if (--actor->movecount<0
+    if (monster_pack)
+    {
+	P_PackChase (actor);		// group up + path to the player
+    }
+    else if (--actor->movecount<0
 	|| !P_Move (actor))
     {
 	P_NewChaseDir (actor);
     }
-    
+
     // make active sound
     if (actor->info->activesound
 	&& P_Random () < 3)

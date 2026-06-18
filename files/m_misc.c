@@ -190,6 +190,10 @@ extern int	coop_sight;
 extern int	coop_follow;
 extern int	coop_heal_range;
 
+// Monster pack-hunt AI (p_enemy.c)
+extern int	monster_pack;
+extern int	monster_pack_range;
+
 extern int	mousebfire;
 extern int	mousebstrafe;
 extern int	mousebforward;
@@ -262,6 +266,9 @@ default_t	defaults[] =
     {"coop_sight",&coop_sight, 1280},
     {"coop_follow",&coop_follow, 256},
     {"coop_heal_range",&coop_heal_range, 1024},
+
+    {"monster_pack",&monster_pack, 1},
+    {"monster_pack_range",&monster_pack_range, 2048},
 
     {"use_mouse",&usemouse, 1},
     {"mouseb_fire",&mousebfire,0},
