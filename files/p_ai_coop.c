@@ -48,6 +48,7 @@ static mobj_t*	forcetarget;		// the forced attack target
 #define COOP_TURN	1300		// max angleturn per tic (~7 deg)
 #define COOP_FACING	1500		// |remaining turn| under which we open fire
 #define COOP_NEAR	(256*FRACUNIT)	// follow distance to the human
+#define YIELD_DIST	(48*FRACUNIT)	// human this close -> step out of the way
 #define COOP_KEEP	(192*FRACUNIT)	// advance toward a monster until this close
 #define COOP_RUN	0x32		// forwardmove "run" magnitude
 #define COOP_HEAL_HP	50		// seek a med-pack below this health
@@ -413,7 +414,22 @@ void P_AICoop_BuildCmd (void)
     lastx = mo->x; lasty = mo->y;
     if (doorwait > 0) doorwait--;
 
-    pl   = playeringame[0] ? players[0].mo : NULL;
+    pl = playeringame[0] ? players[0].mo : NULL;
+
+    // Yield (top priority): the human is bumping into us -> get out of the way by
+    // stepping straight away from them.  Use forward+side move so we slide aside
+    // immediately instead of slowly turning around (which keeps blocking).
+    if (pl && P_AproxDistance (pl->x - mo->x, pl->y - mo->y) < YIELD_DIST)
+    {
+	unsigned fa = (R_PointToAngle2 (pl->x, pl->y, mo->x, mo->y) - mo->angle)
+		      >> ANGLETOFINESHIFT;
+	cmd->forwardmove =  (signed char)(FixedMul (COOP_RUN*FRACUNIT, finecosine[fa]) >> FRACBITS);
+	cmd->sidemove    = -(signed char)(FixedMul (COOP_RUN*FRACUNIT, finesine[fa])   >> FRACBITS);
+	triedmove  = 1;
+	coop_state = 0;
+	return;
+    }
+
     tgt  = AICoop_FindTarget (mo);
     heal = (bot->health < COOP_HEAL_HP) ? AICoop_FindHealth (mo) : NULL;
 
