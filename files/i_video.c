@@ -522,6 +522,11 @@ void I_InitGraphics(void)
     if ( renderer == NULL )
 	I_Error("Could not create renderer: %s", SDL_GetError());
 
+    // VSync on: SDL3 defaults it OFF, which tears badly on fast strafes -- the
+    // high-contrast textures (e.g. the blue computer wall) showed as a horizontal
+    // "smear". Sync presentation to the refresh to kill the tearing.
+    SDL_SetRenderVSync(renderer, 1);
+
     I_CreateTexture();
 
     SDL_HideCursor();
