@@ -24,6 +24,11 @@ config.status
 # IWADs are copyrighted id Software data -- bring your own, never commit them.
 *.wad
 *.WAD
+# Exception: run/buddy.wad is OUR voice asset (pre-rendered OGG phrases in a
+# Doom PWAD), not a game IWAD.  It must be in the repo so the engine can
+# play the buddy voice offline without anyone re-running the ElevenLabs
+# baker.  Listed AFTER the general *.wad rule so it takes precedence.
+!run/buddy.wad
 doom.cfg
 .doomrc
 doomsav*.dsg
