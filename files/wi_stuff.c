@@ -1652,12 +1652,15 @@ void WI_loadData(void)
      // "secret"
     sp_secret = W_CacheLumpName("WISCRT2", PU_STATIC);
 
-    // Yuck. 
-    if (french)
+    // Yuck.  (Was 'if (french)' -- but `french` is the language_t enum constant,
+    // i.e. always non-zero/true, so co-op netgames wrongly loaded the French-only
+    // "WIOBJ" lump, which isn't in the IWAD -> W_GetNumForName crash.  Must test
+    // the current language.)
+    if (language == french)
     {
 	// "items"
 	if (netgame && !deathmatch)
-	    items = W_CacheLumpName("WIOBJ", PU_STATIC);    
+	    items = W_CacheLumpName("WIOBJ", PU_STATIC);
   	else
 	    items = W_CacheLumpName("WIOSTI", PU_STATIC);
     } else

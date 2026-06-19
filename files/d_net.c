@@ -476,6 +476,11 @@ static void TryRunTics_Choc (void)
 	    for (p = 0 ; p < MAXPLAYERS ; p++)
 		netcmds[p][g%BACKUPTICS] = cmds[p];
 
+	    // The server's echo of our OWN command can arrive empty/late (the local
+	    // player froze in netgames).  Trust our locally-built command for
+	    // ourselves; the server still relays it to the other players.
+	    netcmds[consoleplayer][g%BACKUPTICS] = localcmds[g%BACKUPTICS];
+
 	    if (advancedemo)
 		D_DoAdvanceDemo ();
 	    M_Ticker ();
