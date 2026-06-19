@@ -109,6 +109,7 @@ hi-res.
 | `Z_Malloc: failed on allocation of 1024040 bytes` → crash at map-end stats screen | the screen wipe transposes a `SCREENWIDTH*SCREENHEIGHT` buffer (~1 MB at 1280×800, ~2.3 MB at 1920×1200) on top of level data, overflowing the **6 MB** zone heap | bump the zone to **32 MB** (`mb_used`) | `i_system.c` |
 | status-bar background buffer | `screens[4]` sized for 320×32 | `SCREENWIDTH*ST_HEIGHT*hires`, reallocated in `ST_SetRes` | `st_stuff.c` |
 | AI-buddy **voice crash a few minutes into a game** | `lumpcache[]` is `malloc`'d **once** in `W_InitMultipleFiles`, sized to `numlumps` at that moment — the 1996 engine only ever `W_AddFile`s *before* that point. Adding `buddy.wad` at **runtime** (`I_Voice_Init`) grows `numlumps` but **not** `lumpcache`, so `W_CacheLumpNum` on a buddy lump writes past the array → heap corruption (latent → crash later) | grow `lumpcache` (`realloc` + zero the new slots) right after the runtime `W_AddFile` | `i_voice.c` |
+| **HOM / non-continuous edges** on busy hi-res views | `MAXSEGS` (solid-seg clip list) was **32** — far below the worst case (≈viewwidth/2); a complex/hi-res view overruns `solidsegs[]` and corrupts memory. Plus `drawsegs[]` was a fixed `MAXDRAWSEGS` array that **silently dropped** wall segments once full → missing-wall HOM | `MAXSEGS = MAXWIDTH/2 + 8`; make `drawsegs` grow on demand (`realloc`; `MAXDRAWSEGS` = initial cap) | `r_bsp.c`, `r_bsp.h`, `r_segs.c`, `r_plane.c` |
 
 ---
 

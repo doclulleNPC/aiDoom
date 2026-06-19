@@ -373,7 +373,7 @@ void R_DrawPlanes (void)
     int			angle;
 				
 #ifdef RANGECHECK
-    if (ds_p - drawsegs > MAXDRAWSEGS)
+    if ((unsigned)(ds_p - drawsegs) > maxdrawsegs)
 	I_Error ("R_DrawPlanes: drawsegs overflow (%i)",
 		 ds_p - drawsegs);
     

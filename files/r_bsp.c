@@ -50,7 +50,12 @@ line_t*		linedef;
 sector_t*	frontsector;
 sector_t*	backsector;
 
-drawseg_t	drawsegs[MAXDRAWSEGS];
+// drawsegs grows on demand (see R_StoreWallRange in r_segs.c); MAXDRAWSEGS is
+// just the initial capacity now, not a hard cap.  The old fixed array silently
+// dropped wall segments (-> HOM / non-continuous edges) on busy / hi-res scenes
+// once it filled.
+drawseg_t*	drawsegs;
+unsigned	maxdrawsegs;
 drawseg_t*	ds_p;
 
 
@@ -85,7 +90,12 @@ typedef	struct
 } cliprange_t;
 
 
-#define MAXSEGS		32
+// The solid-seg clip list partitions the viewwidth columns into disjoint solid
+// intervals (each separated by >=1 visible column) plus two sentinels, so it can
+// never need more than viewwidth/2 + 2 entries.  Vanilla's MAXSEGS=32 was far
+// below that and could overrun the array on complex hi-res views (corruption ->
+// HOM/gaps); size it for the max internal resolution.
+#define MAXSEGS		(MAXWIDTH/2 + 8)
 
 // newend is one past the last valid seg
 cliprange_t*	newend;
