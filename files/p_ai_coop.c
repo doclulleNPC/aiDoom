@@ -532,16 +532,18 @@ const char* P_AICoop_StatusReport (void)
 
 #define PF_DOOR_PEN	200		// extra cost (units) to route through a door
 #define PF_HAZARD_PEN	1000		// extra cost to route over a damaging floor
-#define PF_MAXPOP	3000		// cap on Dijkstra node expansions
-#define PF_PATHMAX	256		// max sub-sectors in a reconstructed path
+#define PF_MAXPOP	8000		// cap on Dijkstra node expansions
+#define PF_PATHMAX	512		// max sub-sectors in a reconstructed path
 #define PF_INF		0x7fffffff
+#define PF_MAXADJ	32		// max graph edges per sub-sector
 
 static int	pf_level = -1;		// episode*100+map the graph was built for
 static int	pf_n;			// sub-sector count
 static fixed_t*	pf_cx;			// centroid x / y per sub-sector
 static fixed_t*	pf_cy;
-static int*	pf_segss;		// sub-sector each seg belongs to
-static int*	pf_segnb;		// neighbour sub-sector across each seg (-1 none)
+static int*	pf_nadj;		// edge count per sub-sector
+static int*	pf_adj;			// flat [pf_n*PF_MAXADJ] neighbour sub-sectors
+static int*	pf_adjw;		// flat [pf_n*PF_MAXADJ] edge weights
 static int*	pf_dist;		// Dijkstra cost-so-far
 static int*	pf_prev;		// Dijkstra predecessor
 static byte*	pf_done;		// Dijkstra closed flag
@@ -557,65 +559,138 @@ static boolean PF_IsDoorSpecial (int sp)	// push (DR) doors with no key
     return (sp == 1 || sp == 31 || sp == 117 || sp == 118);
 }
 
-static void PF_Build (void)
-{
-    int	i, j;
+static int PF_EdgeWeight (seg_t* sg, int u, int v);	// defined below
 
-    free (pf_cx); free (pf_cy); free (pf_segss); free (pf_segnb);
+// Straight feet-trace between two world points (the "item reachability" trick used
+// for graph building): every ~24 units require a player-sized box (ref's radius/
+// height) to fit (P_CheckPosition) and the floor to step <=24.  `fz` seeds the
+// starting floor height.  Independent of ref's own position (P_CheckPosition tests
+// the passed x,y), so it's safe to call while building the graph.
+static boolean PF_LineWalkable (fixed_t ax, fixed_t ay, fixed_t bx, fixed_t by,
+				mobj_t* ref, fixed_t fz)
+{
+    fixed_t	dx = bx - ax, dy = by - ay;
+    fixed_t	dist = P_AproxDistance (dx, dy);
+    int		steps, i;
+
+    if (dist < 24*FRACUNIT) return true;
+    steps = dist / (24*FRACUNIT);
+    if (steps > 48) return false;
+    for (i = 1; i <= steps; i++)
+    {
+	fixed_t	frac = (i << 16) / steps;
+	fixed_t	px = ax + FixedMul (dx, frac);
+	fixed_t	py = ay + FixedMul (dy, frac);
+	if (!P_CheckPosition (ref, px, py))		return false;
+	if (tmceilingz - tmfloorz < 56*FRACUNIT)	return false;
+	if (tmfloorz - fz > 24*FRACUNIT)		return false;
+	fz = tmfloorz;
+    }
+    return true;
+}
+
+static void PF_AddEdge (int u, int v, int w)
+{
+    int	k;
+    if (u < 0 || v < 0 || u == v || w < 0) return;
+    for (k = 0; k < pf_nadj[u]; k++)			// dedup, keep cheapest
+	if (pf_adj[u*PF_MAXADJ + k] == v)
+	{ if (w < pf_adjw[u*PF_MAXADJ + k]) pf_adjw[u*PF_MAXADJ + k] = w; return; }
+    if (pf_nadj[u] >= PF_MAXADJ) return;
+    pf_adj [u*PF_MAXADJ + pf_nadj[u]] = v;
+    pf_adjw[u*PF_MAXADJ + pf_nadj[u]] = w;
+    pf_nadj[u]++;
+}
+
+static void PF_Build (mobj_t* ref)
+{
+    int		i, j, s;
+    int*	segss;
+
+    free (pf_cx); free (pf_cy); free (pf_nadj); free (pf_adj); free (pf_adjw);
     free (pf_dist); free (pf_prev); free (pf_done);
 
-    pf_n     = numsubsectors;
-    pf_cx    = malloc (pf_n * sizeof(fixed_t));
-    pf_cy    = malloc (pf_n * sizeof(fixed_t));
-    pf_dist  = malloc (pf_n * sizeof(int));
-    pf_prev  = malloc (pf_n * sizeof(int));
-    pf_done  = malloc (pf_n);
-    pf_segss = malloc (numsegs * sizeof(int));
-    pf_segnb = malloc (numsegs * sizeof(int));
+    pf_n    = numsubsectors;
+    pf_cx   = malloc (pf_n * sizeof(fixed_t));
+    pf_cy   = malloc (pf_n * sizeof(fixed_t));
+    pf_dist = malloc (pf_n * sizeof(int));
+    pf_prev = malloc (pf_n * sizeof(int));
+    pf_done = malloc (pf_n);
+    pf_nadj = calloc (pf_n, sizeof(int));
+    pf_adj  = malloc (pf_n * PF_MAXADJ * sizeof(int));
+    pf_adjw = malloc (pf_n * PF_MAXADJ * sizeof(int));
+    segss   = malloc (numsegs * sizeof(int));
 
     // centroid of each sub-sector (mean of its segs' endpoints) + seg->ss map
     for (i = 0; i < pf_n; i++)
     {
 	subsector_t*	ss = &subsectors[i];
 	int64_t		sx = 0, sy = 0;
-	int		cnt = 0, s;
+	int		cnt = 0;
 	for (s = 0; s < ss->numlines; s++)
 	{
 	    seg_t* sg = &segs[ss->firstline + s];
 	    sx += sg->v1->x; sy += sg->v1->y;
 	    sx += sg->v2->x; sy += sg->v2->y;
 	    cnt += 2;
-	    pf_segss[ss->firstline + s] = i;
+	    segss[ss->firstline + s] = i;
 	}
 	pf_cx[i] = cnt ? (fixed_t)(sx / cnt) : 0;
 	pf_cy[i] = cnt ? (fixed_t)(sy / cnt) : 0;
     }
 
-    // neighbour sub-sector across each two-sided seg: probe a point ~4 units off
-    // the seg midpoint on each side; the side that isn't our own sub-sector is it
+    // (1) Cross-sector edges: each two-sided seg connects to the sub-sector on its
+    // far side (probe ~4u off the midpoint).  PF_EdgeWeight handles doors/steps.
     for (j = 0; j < numsegs; j++)
     {
 	seg_t*	sg = &segs[j];
 	fixed_t	mx, my, nx, ny, len, ox, oy;
-	int	a, b, self;
+	int	a, b, self, v, w;
 
-	pf_segnb[j] = -1;
 	if (!sg->backsector) continue;			// one-sided wall
-
 	mx = (sg->v1->x + sg->v2->x) >> 1;
 	my = (sg->v1->y + sg->v2->y) >> 1;
-	nx = -(sg->v2->y - sg->v1->y);			// perpendicular to the seg
+	nx = -(sg->v2->y - sg->v1->y);
 	ny =  (sg->v2->x - sg->v1->x);
 	len = P_AproxDistance (nx, ny);
 	if (len < FRACUNIT) continue;
-	ox = (fixed_t)(((int64_t)nx * (4*FRACUNIT)) / len);	// ~4-unit offset
+	ox = (fixed_t)(((int64_t)nx * (4*FRACUNIT)) / len);
 	oy = (fixed_t)(((int64_t)ny * (4*FRACUNIT)) / len);
 
-	self = pf_segss[j];
+	self = segss[j];
 	a = PF_SS (mx + ox, my + oy);
 	b = PF_SS (mx - ox, my - oy);
-	pf_segnb[j] = (a != self) ? a : (b != self ? b : -1);
+	v = (a != self) ? a : (b != self ? b : -1);
+	if (v < 0) continue;
+	w = PF_EdgeWeight (sg, self, v);
+	if (w >= 0) PF_AddEdge (self, v, w);
     }
+
+    // (2) Same-sector edges -- THE fix for the "graph fragments per room" bug.
+    // In vanilla Doom the BSP splits a sector into several sub-sectors with NO
+    // connecting seg, so step (1) alone leaves each room a pile of disconnected
+    // islands.  Sub-sectors of one sector share a floor, so connect any two whose
+    // centroids are joined by a clear feet-trace (handles convex splits; an L/U
+    // shaped sector won't get a through-the-wall shortcut because the trace fails).
+    for (i = 0; i < pf_n; i++)
+    {
+	sector_t* si = subsectors[i].sector;
+	for (j = i + 1; j < pf_n; j++)
+	{
+	    fixed_t	d;
+	    int		w;
+	    if (subsectors[j].sector != si) continue;
+	    d = P_AproxDistance (pf_cx[i]-pf_cx[j], pf_cy[i]-pf_cy[j]);
+	    if (d > 1024*FRACUNIT) continue;		// too far to be neighbours
+	    if (!PF_LineWalkable (pf_cx[i], pf_cy[i], pf_cx[j], pf_cy[j],
+				  ref, si->floorheight)) continue;
+	    w = (int)(d >> FRACBITS); if (w < 1) w = 1;
+	    PF_AddEdge (i, j, w + (AICoop_DamagingFloor (pf_cx[j], pf_cy[j]) ? PF_HAZARD_PEN : 0));
+	    PF_AddEdge (j, i, w + (AICoop_DamagingFloor (pf_cx[i], pf_cy[i]) ? PF_HAZARD_PEN : 0));
+	}
+    }
+
+    free (segss);
 }
 
 // Cost of crossing seg `sg` from sub-sector u to its neighbour v; -1 = blocked.
@@ -659,7 +734,6 @@ static boolean PF_Dijkstra (int start, int goal)
     while (pop < PF_MAXPOP)
     {
 	int		u = -1, best = PF_INF, s;
-	subsector_t*	ss;
 
 	for (i = 0; i < pf_n; i++)			// pop nearest unvisited
 	    if (!pf_done[i] && pf_dist[i] < best) { best = pf_dist[i]; u = i; }
@@ -667,15 +741,11 @@ static boolean PF_Dijkstra (int start, int goal)
 	if (u == goal) return true;
 	pf_done[u] = 1; pop++;
 
-	ss = &subsectors[u];
-	for (s = 0; s < ss->numlines; s++)
+	for (s = 0; s < pf_nadj[u]; s++)
 	{
-	    int	segi = ss->firstline + s;
-	    int	v = pf_segnb[segi];
-	    int	w;
-	    if (v < 0 || pf_done[v]) continue;
-	    w = PF_EdgeWeight (&segs[segi], u, v);
-	    if (w < 0) continue;
+	    int	v = pf_adj[u*PF_MAXADJ + s];
+	    int	w = pf_adjw[u*PF_MAXADJ + s];
+	    if (pf_done[v]) continue;
 	    if (pf_dist[u] + w < pf_dist[v]) { pf_dist[v] = pf_dist[u] + w; pf_prev[v] = u; }
 	}
     }
@@ -688,7 +758,7 @@ static boolean PF_NextWaypoint (mobj_t* mo, fixed_t dx, fixed_t dy, fixed_t* wx,
     int	start, goal, len, i, pick, c;
 
     if (pf_level != gameepisode*100 + gamemap || !pf_cx)
-    { PF_Build (); pf_level = gameepisode*100 + gamemap; }
+    { PF_Build (mo); pf_level = gameepisode*100 + gamemap; }
 
     start = PF_SS (mo->x, mo->y);
     goal  = PF_SS (dx, dy);
