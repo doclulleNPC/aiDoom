@@ -42,8 +42,17 @@ typedef bool boolean;
 // original `typedef enum {false, true} boolean;`.  Use stdbool instead while
 // keeping the historic int-sized boolean ABI (load-bearing for the on-disk WAD
 // and savegame struct layouts -- see CLAUDE.md).
+//
+// On Windows, <rpcndr.h> (transitively pulled in by <windows.h>) hard-codes
+// `typedef unsigned char boolean;` with no #ifdef guard.  We can't redefine
+// `boolean` to int after the SDK does, but we CAN pre-empt the SDK by
+// aliasing the engine's `boolean` to a private tag name via #define, BEFORE
+// <windows.h> is included anywhere.  All engine source continues to spell
+// the type as `boolean`; the preprocessor turns it into `doom_boolean_t`
+// consistently across all translation units.
+#define boolean doom_boolean_t
+typedef int doom_boolean_t;
 #include <stdbool.h>
-typedef int boolean;
 #ifndef false
 #define false 0
 #endif

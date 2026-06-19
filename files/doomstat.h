@@ -32,6 +32,10 @@
 //  for defining the global state variables.
 #include "doomdata.h"
 #include "d_net.h"
+// doomstat.h uses `boolean` in its extern declarations; ensure the typedef
+// is in scope regardless of the order in which callers include other
+// headers (some .c files include doomstat.h before doomdef.h).
+#include "doomtype.h"
 
 // We need the playr data structure as well.
 #include "d_player.h"
