@@ -254,7 +254,7 @@ default_t	defaults[] =
     {"autorun",&autorun, 1},
     {"key_console",&key_console, KEY_F12},
 
-    {"monster_pack",&monster_pack, 1},
+    {"monster_pack",&monster_pack, 0},		// default OFF -> vanilla 1993 monster AI
     {"monster_pack_range",&monster_pack_range, 2048},
 
     {"use_mouse",&usemouse, 1},

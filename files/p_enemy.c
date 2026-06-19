@@ -611,7 +611,7 @@ void A_KeenDie (mobj_t* mo)
 //    so they bunch up and hit the player in groups.
 // Turning it off restores vanilla wake-on-sight/sound behaviour.
 //
-int	monster_pack       = 1;		// 1 = pack hunt on
+int	monster_pack       = 0;		// 1 = pack hunt on; default OFF = vanilla 1993 AI
 int	monster_pack_range = 2048;	// search / cohesion radius (map units)
 
 static mobj_t* P_PackNearestPlayer (mobj_t* actor)

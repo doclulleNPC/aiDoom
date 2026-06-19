@@ -29,10 +29,11 @@ a language model drive monster tactics in real time.
   driven by a small built-in bot: it acquires the nearest visible monster and fires,
   seeks health when hurt, otherwise follows you. A real co-op player (weapons, damage,
   pickups, reborn all work). Off by default. See [AI co-op companion](#ai-co-op-companion--aicoop) below.
-- **Pack-hunt monster AI** (`p_enemy.c`, `monster_pack`) — an optional aggressive mode
-  (on by default): monsters acquire the player the instant they spawn (searching even
-  with no line of sight) and steer toward nearby allies en route, so they gather and
-  assault in groups. Set `monster_pack 0` in `aidoom.cfg` for vanilla wake-on-sight.
+- **Pack-hunt monster AI** (`p_enemy.c`, `monster_pack`) — an optional aggressive mode,
+  **off by default** (a no-argument launch is plain **vanilla 1993 DOOM** AI): set
+  `monster_pack 1` in `aidoom.cfg` to enable it — then monsters acquire the player the
+  instant they spawn (searching even with no line of sight) and steer toward nearby
+  allies en route, so they gather and assault in groups.
 - **LLM AI Director** (`files/p_ai_llm.c`) — an external director drives monster
   *tactics* (flank, fall back, ambush, focus-fire, …) over a small TCP line protocol,
   or via a built-in scripted `-aidemo` director. A ready-to-run **Ollama** client is
