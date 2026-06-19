@@ -722,29 +722,32 @@ static void AICoop_ThrustToward (ticcmd_t* cmd, mobj_t* mo, fixed_t tx, fixed_t 
 }
 
 // Feet-trace steering -- the "item reachability" trick (AICoop_CanReach) applied
-// to movement.  Aim at the goal; if the straight floor-trace to it is blocked,
-// sweep the heading outward (±22°, ±45°, ±67°, ±90°) and steer toward the first
-// direction whose trace is clear, so the buddy feels its way around walls/corners
-// instead of grinding into them.  Writes the steer point into *sx,*sy.
+// to movement.  Aim at the goal; if the straight floor-trace is blocked, sweep
+// the heading outward in 22.5° steps -- the *full* circle (±180°), so it can also
+// turn toward a door beside or behind it -- and steer toward the first clear
+// direction.  If nothing toward the goal is clear, head to the centre of the
+// current room (subsector centroid) to get off the wall, then re-evaluate next
+// tic (this is the "go to the middle of the room first, then path" behaviour).
 static void AICoop_TraceSteer (mobj_t* mo, fixed_t gx, fixed_t gy, fixed_t* sx, fixed_t* sy)
 {
-    static const angle_t off[9] =
-	{ 0, ANG45/2, (angle_t)-(ANG45/2), ANG45, (angle_t)-ANG45,
-	  ANG45+ANG45/2, (angle_t)-(ANG45+ANG45/2), ANG90, (angle_t)-ANG90 };
+    static const int seq[16] = { 0,1,-1,2,-2,3,-3,4,-4,5,-5,6,-6,7,-7,8 };  // *22.5°
     angle_t	base  = R_PointToAngle2 (mo->x, mo->y, gx, gy);
     fixed_t	gdist = P_AproxDistance (gx - mo->x, gy - mo->y);
     fixed_t	probe = (gdist < 192*FRACUNIT) ? gdist : 192*FRACUNIT;
-    int		i;
+    int		i, ss;
 
     if (AICoop_CanReach (mo, gx, gy, true)) { *sx = gx; *sy = gy; return; }
-    for (i = 0 ; i < 9 ; i++)
+    for (i = 0 ; i < 16 ; i++)
     {
-	angle_t a  = (base + off[i]) >> ANGLETOFINESHIFT;
+	angle_t a  = (base + (angle_t)seq[i] * (ANG45/2)) >> ANGLETOFINESHIFT;
 	fixed_t px = mo->x + FixedMul (probe, finecosine[a]);
 	fixed_t py = mo->y + FixedMul (probe, finesine[a]);
 	if (AICoop_CanReach (mo, px, py, true)) { *sx = px; *sy = py; return; }
     }
-    *sx = gx; *sy = gy;		// nothing clear -- head straight (wiggle/door handles it)
+    // Nothing clear toward the goal -> aim for the centre of our own room.
+    ss = PF_SS (mo->x, mo->y);
+    if (pf_cx && ss >= 0 && ss < pf_n) { *sx = pf_cx[ss]; *sy = pf_cy[ss]; return; }
+    *sx = gx; *sy = gy;
 }
 
 void P_AICoop_BuildCmd (void)
