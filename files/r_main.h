@@ -43,6 +43,9 @@ extern int		viewheight;
 extern int		viewwindowx;
 extern int		viewwindowy;
 
+extern int		crosshair;		// 0 off, 1 cross, 2 dot, 3 big cross
+void			R_DrawCrosshair (void);	// draw it at the 3D-view centre
+
 
 
 extern int		centerx;

@@ -182,6 +182,7 @@ extern int	key_prevweapon;
 extern int	key_jump;
 extern int	autorun;
 extern int	key_console;
+extern int	crosshair;
 
 // Monster pack-hunt AI (p_enemy.c)
 extern int	monster_pack;
@@ -253,6 +254,7 @@ default_t	defaults[] =
     {"key_jump",&key_jump, ' '},
     {"autorun",&autorun, 1},
     {"key_console",&key_console, KEY_F12},
+    {"crosshair",&crosshair, 0},
 
     {"monster_pack",&monster_pack, 0},		// default OFF -> vanilla 1993 monster AI
     {"monster_pack_range",&monster_pack_range, 2048},

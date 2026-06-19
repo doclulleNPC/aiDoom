@@ -40,6 +40,7 @@ static const char rcsid[] = "$Id: am_map.c,v 1.4 1997/02/03 21:24:33 b1 Exp $";
 
 // State.
 #include "doomstat.h"
+#include "p_ai_coop.h"	// P_AICoop_Slot -- draw the buddy on the automap
 #include "r_state.h"
 
 // Data.
@@ -1259,6 +1260,16 @@ void AM_drawPlayers(void)
 	    AM_drawLineCharacter
 		(player_arrow, NUMPLYRLINES, 0, plr->mo->angle,
 		 WHITE, plr->mo->x, plr->mo->y);
+
+	// AI co-op buddy: mark its position with a yellow arrow.
+	{
+	    int bs = P_AICoop_Slot ();
+	    if (bs >= 0 && playeringame[bs] && players[bs].mo
+		&& players[bs].playerstate == PST_LIVE)
+		AM_drawLineCharacter
+		    (player_arrow, NUMPLYRLINES, 0, players[bs].mo->angle,
+		     YELLOWS, players[bs].mo->x, players[bs].mo->y);
+	}
 	return;
     }
 

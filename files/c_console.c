@@ -32,6 +32,7 @@
 
 #include "tables.h"		// finecosine, ANGLETOFINESHIFT
 #include "info.h"		// mobjtype_t, MT_*
+#include "d_items.h"		// weaponinfo (give <weapon> -> its ammo)
 #include "m_fixed.h"		// FixedMul
 
 #include "c_console.h"
@@ -41,6 +42,7 @@
 extern patch_t*		hu_font[HU_FONTSIZE];
 extern const char*	shiftxform;
 extern lighttable_t*	colormaps;
+extern int		crosshair;	// r_draw.c -- gameplay crosshair style
 extern void		I_Quit (void);
 
 // Play-sim hooks, declared by hand to avoid p_local.h (its p_spec.h enums
@@ -125,6 +127,33 @@ static void C_GiveAll (player_t* p)
     if (p->mo) p->mo->health = 100;
 }
 
+// weapon index by name for "give <weapon>"; -1 if unknown.
+static int C_WeaponByName (const char* s)
+{
+    if (!strcmp(s,"fist"))			return wp_fist;
+    if (!strcmp(s,"chainsaw") || !strcmp(s,"saw")) return wp_chainsaw;
+    if (!strcmp(s,"pistol"))			return wp_pistol;
+    if (!strcmp(s,"shotgun"))			return wp_shotgun;
+    if (!strcmp(s,"ssg") || !strcmp(s,"supershotgun")) return wp_supershotgun;
+    if (!strcmp(s,"chaingun"))			return wp_chaingun;
+    if (!strcmp(s,"rocket") || !strcmp(s,"rocketlauncher") || !strcmp(s,"launcher")) return wp_missile;
+    if (!strcmp(s,"plasma"))			return wp_plasma;
+    if (!strcmp(s,"bfg") || !strcmp(s,"bfg9000"))	return wp_bfg;
+    return -1;
+}
+
+// keycard/skull index by name for "give <key>"; -1 if unknown.
+static int C_CardByName (const char* s)
+{
+    if (!strcmp(s,"bluecard")   || !strcmp(s,"blue"))	return it_bluecard;
+    if (!strcmp(s,"yellowcard") || !strcmp(s,"yellow"))	return it_yellowcard;
+    if (!strcmp(s,"redcard")    || !strcmp(s,"red"))	return it_redcard;
+    if (!strcmp(s,"blueskull"))				return it_blueskull;
+    if (!strcmp(s,"yellowskull"))			return it_yellowskull;
+    if (!strcmp(s,"redskull"))				return it_redskull;
+    return -1;
+}
+
 // Map a short name to a thing type for the "spawn" command.
 static int C_MobjByName (const char* s)
 {
@@ -161,8 +190,10 @@ static void C_Execute (char* line)
 
     if (!strcmp(cmd, "help"))
     {
-	C_Printf ("cheats: god  noclip  give  kill  health <n>  armor <n>  ammo");
+	C_Printf ("cheats: god  noclip  kill  health <n>  armor <n>");
+	C_Printf ("give:   all|weapons|ammo|keys|armor|health|<weapon>|<key>");
 	C_Printf ("world:  spawn <thing>  skill <1-5>  map <e> <m> / warp <m>");
+	C_Printf ("view:   crosshair 0..3");
 	C_Printf ("buddy:  where  come  wait/stay  attack  report");
 	C_Printf ("monsterAI: director on|off|demo  (LLM<->Doom)");
 	C_Printf ("misc:   clear  echo <text>  quit");
@@ -192,7 +223,24 @@ static void C_Execute (char* line)
 	C_Printf ("noclip %s", (pl->cheats & CF_NOCLIP) ? "ON" : "off");
     }
     else if (!strcmp(cmd, "give"))
-	{ C_GiveAll (pl); C_Printf ("gave all weapons, ammo, keys, armor."); }
+    {
+	int w, k, i;
+	for (i = 0 ; args[i] ; i++) args[i] = tolower(args[i]);	// case-insensitive
+	if (!*args)
+	    C_Printf ("usage: give all|weapons|ammo|keys|armor|health|<weapon>|<key>");
+	else if (!strcmp(args,"all"))     { C_GiveAll (pl); C_Printf ("gave everything."); }
+	else if (!strcmp(args,"weapons")) { for(i=0;i<NUMWEAPONS;i++) pl->weaponowned[i]=true; C_Printf("gave all weapons."); }
+	else if (!strcmp(args,"ammo"))    { for(i=0;i<NUMAMMO;i++) pl->ammo[i]=pl->maxammo[i]; C_Printf("gave max ammo."); }
+	else if (!strcmp(args,"keys") || !strcmp(args,"cards")) { for(i=0;i<NUMCARDS;i++) pl->cards[i]=true; C_Printf("gave all keys."); }
+	else if (!strcmp(args,"armor") || !strcmp(args,"armour")) { pl->armorpoints=200; pl->armortype=2; C_Printf("gave armor."); }
+	else if (!strcmp(args,"health") || !strcmp(args,"hp")) { pl->health=100; if(pl->mo)pl->mo->health=100; C_Printf("gave health."); }
+	else if ((w = C_WeaponByName(args)) >= 0)
+	    { pl->weaponowned[w]=true;
+	      if (weaponinfo[w].ammo < NUMAMMO) pl->ammo[weaponinfo[w].ammo]=pl->maxammo[weaponinfo[w].ammo];
+	      C_Printf ("gave %s.", args); }
+	else if ((k = C_CardByName(args)) >= 0) { pl->cards[k]=true; C_Printf("gave %s.", args); }
+	else C_Printf ("give: unknown '%s'", args);
+    }
     else if (!strcmp(cmd, "map") || !strcmp(cmd, "warp"))
     {
 	int e = 1, m = 0;
@@ -329,6 +377,11 @@ static void C_Execute (char* line)
     }
     else if (!strcmp(cmd, "director") || !strcmp(cmd, "ai") || !strcmp(cmd, "llm"))
 	C_Printf ("%s", P_AI_Console (args));
+    else if (!strcmp(cmd, "crosshair") || !strcmp(cmd, "xhair"))
+    {
+	if (*args) { crosshair = atoi(args); if (crosshair<0) crosshair=0; if (crosshair>3) crosshair=3; }
+	C_Printf ("crosshair %d  (0 off, 1 cross, 2 dot, 3 big)", crosshair);
+    }
     else
 	C_Printf ("unknown command: %s", cmd);
 }

@@ -798,6 +798,33 @@ void P_AICoop_BuildCmd (void)
     	lasttgt = tgt; lasthp = bot->health;
         }
 
+    // Announce a newly picked-up weapon ("Buddy: got the shotgun!") -- text to the
+    // human + a voice line (reusing the status:<weapon> phrase that names it).
+    {
+	static const char* wname[NUMWEAPONS] =
+	    { "fists","pistol","shotgun","chaingun","rocket launcher",
+	      "plasma rifle","BFG9000","chainsaw","super shotgun" };
+	static const char* wtag[NUMWEAPONS] =
+	    { "status:fists","status:pistol","status:shotgun","status:chaingun",
+	      "status:rocketlauncher","status:plasma","status:bfg","status:chainsaw",
+	      "status:supershotgun" };
+	static int  ownedmask;
+	static char gotmsg[64];
+	int newmask = 0, wi;
+	for (wi = 0 ; wi < NUMWEAPONS ; wi++)
+	    if (bot->weaponowned[wi]) newmask |= (1 << wi);
+	if (ownedmask && (newmask & ~ownedmask))		// skip the spawn loadout
+	    for (wi = 0 ; wi < NUMWEAPONS ; wi++)
+		if ((newmask & ~ownedmask) & (1 << wi))
+		{
+		    AICoop_SayTag (wtag[wi]);
+		    snprintf (gotmsg, sizeof(gotmsg), "Buddy: got the %s!", wname[wi]);
+		    if (playeringame[displayplayer]) players[displayplayer].message = gotmsg;
+		    break;
+		}
+	ownedmask = newmask;
+    }
+
     if (summon > 0)     summon--;
     if (forceaggro > 0) forceaggro--;
 
@@ -930,18 +957,19 @@ void P_AICoop_BuildCmd (void)
 	    AICoop_ThrustToward (cmd, mo, stx, sty);	// straight to the waypoint
     }
 
-    // Navigating but wedged (no progress) on something that isn't a door -> force
-    // a fresh path next tic so we don't keep ramming the same corner/waypoint.
-    if (navigate && triedmove && stuck && doorwait == 0)
-	navtimer = 0;
-
-    // Doors: if we're trying to move but stuck (e.g. pushing a closed door), tap
-    // Use *once*, then leave it alone for a bit -- spamming Use re-triggers a DR
-    // door every tic and it just bounces open/shut.  Monsters open doors the same
-    // way (in P_Move); here we do it through the player's Use line.
-    if (triedmove && stuck && doorwait == 0)
+    // Wedged while trying to move -- a closed door, a corner, or a blocking thing
+    // that isn't in the nav grid (e.g. a barrel; we don't shoot those, it'd blow
+    // the buddy up).  Three responses:
+    if (triedmove && stuck)
     {
-	cmd->buttons |= BT_USE;
-	doorwait = 40;				// ~ door open time; no Use until then
+	static int wig;
+	// (1) tap Use once for a possible door (gated -- spamming reverses DR doors).
+	if (doorwait == 0) { cmd->buttons |= BT_USE; doorwait = 40; }
+	// (2) strafe sideways to slip past a barrel / convex corner (forward stays,
+	//     so it slides around diagonally); flip the side every ~16 tics so if
+	//     one way is blocked it tries the other.
+	cmd->sidemove = ((wig++ >> 4) & 1) ? COOP_RUN : -COOP_RUN;
+	// (3) re-path so we stop aiming at the same blocked waypoint.
+	if (navigate) navtimer = 0;
     }
 }

@@ -656,8 +656,8 @@ boolean HU_Responder(event_t *ev)
 
     if (!chat_on)
     {
-	if (ev->data1 == HU_MSGREFRESH)
-	{
+	if (0)	// was HU_MSGREFRESH (= Enter): re-showing the last message on every
+	{	// Enter press was unwanted noise -- disabled.
 	    message_on = true;
 	    message_counter = HU_MSGTIMEOUT;
 	    eatkey = true;

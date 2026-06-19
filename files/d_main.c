@@ -285,7 +285,10 @@ void D_Display (void)
     
     // draw the view directly
     if (gamestate == GS_LEVEL && !automapactive && gametic)
+    {
 	R_RenderPlayerView (&players[displayplayer]);
+	R_DrawCrosshair ();		// over the 3D view, under the HUD/menu/console
+    }
 
     if (gamestate == GS_LEVEL && gametic)
 	HU_Drawer ();

@@ -67,9 +67,47 @@ int		viewwidth;
 int		scaledviewwidth;
 int		viewheight;
 int		viewwindowx;
-int		viewwindowy; 
-byte*		ylookup[MAXHEIGHT]; 
-int		columnofs[MAXWIDTH]; 
+int		viewwindowy;
+byte*		ylookup[MAXHEIGHT];
+int		columnofs[MAXWIDTH];
+
+// Gameplay crosshair: 0 off, 1 cross, 2 dot, 3 big cross.  Drawn into the 8-bit
+// frame at the 3D-view centre (see R_DrawCrosshair, called from D_Display).
+int		crosshair = 0;
+
+static void XHairPix (int x, int y, int col)
+{
+    if (x >= 0 && y >= 0 && x < SCREENWIDTH && y < SCREENHEIGHT)
+	screens[0][y*SCREENWIDTH + x] = (byte)col;
+}
+
+void R_DrawCrosshair (void)
+{
+    int	cx, cy, i, len, gap, col;
+
+    if (!crosshair)
+	return;
+    cx  = viewwindowx + scaledviewwidth/2;
+    cy  = viewwindowy + viewheight/2;
+    col = 0x70;					// Doom palette: bright green
+
+    if (crosshair == 2)				// filled dot
+    {
+	int r = hires, dx, dy;
+	for (dy = -r ; dy <= r ; dy++)
+	    for (dx = -r ; dx <= r ; dx++)
+		XHairPix (cx+dx, cy+dy, col);
+	return;
+    }
+
+    gap = 2*hires;				// centre gap so the target stays visible
+    len = (crosshair == 3 ? 7 : 4) * hires;
+    for (i = gap ; i <= len ; i++)
+    {
+	XHairPix (cx+i, cy, col);  XHairPix (cx-i, cy, col);
+	XHairPix (cx, cy+i, col);  XHairPix (cx, cy-i, col);
+    }
+}
 
 // Color tables for different players,
 //  translate a limited part to another
