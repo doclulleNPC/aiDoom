@@ -43,6 +43,7 @@ extern patch_t*		hu_font[HU_FONTSIZE];
 extern const char*	shiftxform;
 extern lighttable_t*	colormaps;
 extern int		crosshair;	// r_draw.c -- gameplay crosshair style
+extern boolean		menuactive;	// m_menu.c -- don't fire key binds in a menu
 extern void		I_Quit (void);
 
 // Play-sim hooks, declared by hand to avoid p_local.h (its p_spec.h enums
@@ -70,6 +71,10 @@ static int	con_inlen;
 static int	con_open;
 static int	con_shift;
 static int	con_blink;		// cursor blink counter (per draw)
+
+// Key bindings: bindings[doomkeycode] = a console command run when that key is
+// pressed in-game (console closed, not in a menu).  In-memory for the session.
+static char	bindings[256][CON_INPUTW];
 
 
 int C_Active (void) { return con_open; }
@@ -154,6 +159,51 @@ static int C_CardByName (const char* s)
     return -1;
 }
 
+// Doom keycode for a "bind <key>" name: a single printable char, or a named key.
+static int C_KeyByName (const char* s)
+{
+    if (!s || !s[0]) return -1;
+    if (!s[1]) return (unsigned char)s[0];		// single char -> its code
+    if (!strcmp(s,"space"))  return ' ';
+    if (!strcmp(s,"tab"))    return KEY_TAB;
+    if (!strcmp(s,"enter") || !strcmp(s,"return")) return KEY_ENTER;
+    if (!strcmp(s,"esc") || !strcmp(s,"escape"))   return KEY_ESCAPE;
+    if (!strcmp(s,"up"))     return KEY_UPARROW;
+    if (!strcmp(s,"down"))   return KEY_DOWNARROW;
+    if (!strcmp(s,"left"))   return KEY_LEFTARROW;
+    if (!strcmp(s,"right"))  return KEY_RIGHTARROW;
+    if (s[0]=='f' && (s[1]>='1' && s[1]<='9'))
+    {
+	int n = atoi (s+1);
+	if (n >= 1 && n <= 10) return KEY_F1 + (n-1);
+	if (n == 11) return KEY_F11;
+	if (n == 12) return KEY_F12;
+    }
+    return -1;
+}
+
+// Reverse: a printable name for a keycode (static buffer), for "bind" listing.
+static const char* C_KeyName (int k)
+{
+    static char b[8];
+    switch (k) {
+      case ' ':            return "space";
+      case KEY_TAB:        return "tab";
+      case KEY_ENTER:      return "enter";
+      case KEY_ESCAPE:     return "esc";
+      case KEY_UPARROW:    return "up";
+      case KEY_DOWNARROW:  return "down";
+      case KEY_LEFTARROW:  return "left";
+      case KEY_RIGHTARROW: return "right";
+      case KEY_F11:        return "f11";
+      case KEY_F12:        return "f12";
+    }
+    if (k >= KEY_F1 && k <= KEY_F10) { snprintf(b,sizeof(b),"f%d", k-KEY_F1+1); return b; }
+    if (k > 32 && k < 127) { b[0]=(char)k; b[1]=0; return b; }
+    snprintf (b, sizeof(b), "0x%02x", k & 0xff);
+    return b;
+}
+
 // Map a short name to a thing type for the "spawn" command.
 static int C_MobjByName (const char* s)
 {
@@ -194,6 +244,7 @@ static void C_Execute (char* line)
 	C_Printf ("give:   all|weapons|ammo|keys|armor|health|<weapon>|<key>");
 	C_Printf ("world:  spawn <thing>  skill <1-5>  map <e> <m> / warp <m>");
 	C_Printf ("view:   crosshair 0..3");
+	C_Printf ("keys:   bind <key> <command> | unbind <key> | bind (list)");
 	C_Printf ("buddy:  where  come  wait/stay  attack  report");
 	C_Printf ("monsterAI: director on|off|demo  (LLM<->Doom)");
 	C_Printf ("misc:   clear  echo <text>  quit");
@@ -382,6 +433,36 @@ static void C_Execute (char* line)
 	if (*args) { crosshair = atoi(args); if (crosshair<0) crosshair=0; if (crosshair>3) crosshair=3; }
 	C_Printf ("crosshair %d  (0 off, 1 cross, 2 dot, 3 big)", crosshair);
     }
+    else if (!strcmp(cmd, "bind"))
+    {
+	if (!*args)					// list current bindings
+	{
+	    int j, any = 0;
+	    for (j = 0 ; j < 256 ; j++)
+		if (bindings[j][0]) { C_Printf ("  %s = %s", C_KeyName(j), bindings[j]); any = 1; }
+	    if (!any) C_Printf ("no binds.  usage: bind <key> <command>   e.g. bind k \"give all\"");
+	}
+	else
+	{
+	    char keyw[32]; int kn = 0, key; char* rest;
+	    while (args[kn] && args[kn] != ' ' && kn < 31) { keyw[kn] = tolower(args[kn]); kn++; }
+	    keyw[kn] = '\0';
+	    rest = args + kn; while (*rest == ' ') rest++;
+	    key = C_KeyByName (keyw);
+	    if (key < 0)        C_Printf ("bind: unknown key '%s'", keyw);
+	    else if (!*rest)    C_Printf ("%s = %s", keyw, bindings[key][0] ? bindings[key] : "(unbound)");
+	    else { strncpy (bindings[key], rest, CON_INPUTW-1); bindings[key][CON_INPUTW-1] = '\0';
+		   C_Printf ("bound %s -> %s", keyw, rest); }
+	}
+    }
+    else if (!strcmp(cmd, "unbind"))
+    {
+	int j, key;
+	for (j = 0 ; args[j] ; j++) args[j] = tolower(args[j]);
+	key = C_KeyByName (args);
+	if (key < 0) C_Printf ("unbind: unknown key '%s'", args);
+	else { bindings[key][0] = '\0'; C_Printf ("unbound %s", args); }
+    }
     else
 	C_Printf ("unknown command: %s", cmd);
 }
@@ -423,7 +504,19 @@ boolean C_Responder (event_t* ev)
     }
 
     if (!con_open)
+    {
+	// Key bindings: console closed and not in a menu -> run the bound command
+	// and swallow the key (the bind overrides its normal game function).
+	if (ev->type == ev_keydown && !menuactive && bindings[ev->data1 & 0xff][0])
+	{
+	    char tmp[CON_INPUTW];
+	    strncpy (tmp, bindings[ev->data1 & 0xff], sizeof(tmp)-1);
+	    tmp[sizeof(tmp)-1] = '\0';
+	    C_Execute (tmp);
+	    return true;
+	}
 	return false;
+    }
 
     // track shift
     if (ev->data1 == KEY_RSHIFT)
