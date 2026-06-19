@@ -721,6 +721,32 @@ static void AICoop_ThrustToward (ticcmd_t* cmd, mobj_t* mo, fixed_t tx, fixed_t 
     cmd->sidemove    = -(signed char)(FixedMul (COOP_RUN*FRACUNIT, finesine[rel])   >> FRACBITS);
 }
 
+// Feet-trace steering -- the "item reachability" trick (AICoop_CanReach) applied
+// to movement.  Aim at the goal; if the straight floor-trace to it is blocked,
+// sweep the heading outward (±22°, ±45°, ±67°, ±90°) and steer toward the first
+// direction whose trace is clear, so the buddy feels its way around walls/corners
+// instead of grinding into them.  Writes the steer point into *sx,*sy.
+static void AICoop_TraceSteer (mobj_t* mo, fixed_t gx, fixed_t gy, fixed_t* sx, fixed_t* sy)
+{
+    static const angle_t off[9] =
+	{ 0, ANG45/2, (angle_t)-(ANG45/2), ANG45, (angle_t)-ANG45,
+	  ANG45+ANG45/2, (angle_t)-(ANG45+ANG45/2), ANG90, (angle_t)-ANG90 };
+    angle_t	base  = R_PointToAngle2 (mo->x, mo->y, gx, gy);
+    fixed_t	gdist = P_AproxDistance (gx - mo->x, gy - mo->y);
+    fixed_t	probe = (gdist < 192*FRACUNIT) ? gdist : 192*FRACUNIT;
+    int		i;
+
+    if (AICoop_CanReach (mo, gx, gy, true)) { *sx = gx; *sy = gy; return; }
+    for (i = 0 ; i < 9 ; i++)
+    {
+	angle_t a  = (base + off[i]) >> ANGLETOFINESHIFT;
+	fixed_t px = mo->x + FixedMul (probe, finecosine[a]);
+	fixed_t py = mo->y + FixedMul (probe, finesine[a]);
+	if (AICoop_CanReach (mo, px, py, true)) { *sx = px; *sy = py; return; }
+    }
+    *sx = gx; *sy = gy;		// nothing clear -- head straight (wiggle/door handles it)
+}
+
 void P_AICoop_BuildCmd (void)
 {
     player_t*	bot;
@@ -901,13 +927,17 @@ void P_AICoop_BuildCmd (void)
     stx = tx; sty = ty;
     if (navigate)
     {
+	// Coarse route: BSP waypoint toward the player (cached, re-pathed ~3x/s).
+	fixed_t goalx = tx, goaly = ty;
 	int gss = PF_SS (tx, ty);
 	if (--navtimer <= 0 || gss != navgoal)
 	{
 	    navtimer = 10; navgoal = gss;
 	    navok = PF_NextWaypoint (mo, tx, ty, &navwx, &navwy);
 	}
-	if (navok) { stx = navwx; sty = navwy; }
+	if (navok) { goalx = navwx; goaly = navwy; }
+	// Local: feet-trace steering toward that waypoint (avoids walls/corners).
+	AICoop_TraceSteer (mo, goalx, goaly, &stx, &sty);
     }
 
     // turn toward the steer point (waypoint when navigating), clamped
