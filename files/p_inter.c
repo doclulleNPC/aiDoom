@@ -39,6 +39,7 @@ rcsid[] = "$Id: p_inter.c,v 1.4 1997/02/03 22:45:11 b1 Exp $";
 #include "am_map.h"
 
 #include "p_local.h"
+#include "p_ai_coop.h"	// P_AICoop_IsBuddy -- buddy must not pocket keys
 
 #include "s_sound.h"
 
@@ -362,6 +363,20 @@ P_TouchSpecialThing
     // Can happen with a sliding player corpse.
     if (toucher->health <= 0)
 	return;
+
+    // The AI co-op buddy must never pocket keys -- the human needs them to open
+    // locked doors.  Leave keycards/skulls on the ground (walk over, don't grab).
+    if (player && P_AICoop_IsBuddy (player))
+    {
+	switch (special->sprite)
+	{
+	  case SPR_BKEY: case SPR_YKEY: case SPR_RKEY:
+	  case SPR_BSKU: case SPR_YSKU: case SPR_RSKU:
+	    return;
+	  default:
+	    break;
+	}
+    }
 
     // Identify by sprite.
     switch (special->sprite)

@@ -55,7 +55,7 @@ static mobj_t*	forcetarget;		// the forced attack target
 #define COOP_RUN	0x32		// forwardmove "run" magnitude
 #define COOP_HEAL_HP	50		// seek a med-pack below this health
 #define COOP_HEAL_RANGE	(1024*FRACUNIT)	// how far to look for one
-#define COOP_ITEM_RANGE	(256*FRACUNIT)	// idle pickups only when right nearby (not "miles away")
+#define COOP_ITEM_RANGE	(128*FRACUNIT)	// idle pickups only when right nearby (not "miles away")
 #define COOP_SUMMON_TICS (7*TICRATE)	// "come" runs to you for this long
 #define COOP_ATTACK_TICS (10*TICRATE)	// "attack" charges the target for this long
 
@@ -88,6 +88,11 @@ int P_AICoop_Slot (void)
 {
     if (!aicoop) return -1;
     return coop_slot;
+}
+
+boolean P_AICoop_IsBuddy (player_t* p)
+{
+    return aicoop && p == &players[coop_slot];
 }
 
 // Public read-only accessor for coop_state (used by c_console.c for the voice
