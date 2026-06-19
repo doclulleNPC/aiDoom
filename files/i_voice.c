@@ -30,9 +30,11 @@
 
 #include <SDL3/SDL.h>
 
-// Single-header Vorbis decoder.  Define the implementation flag exactly
-// once, here, so the rest of the engine only sees the API.
-#define STB_VORBIS_IMPLEMENTATION
+// Single-header Vorbis decoder.  build.sh compiles stb_vorbis.c on its own (the
+// *.c glob), so that object IS the implementation -- here we pull in only the
+// API declarations (STB_VORBIS_HEADER_ONLY), otherwise the symbols are defined
+// twice and the link fails with "multiple definition of stb_vorbis_*".
+#define STB_VORBIS_HEADER_ONLY
 #include "stb_vorbis.c"
 // stb_vorbis.c #define's `L` to `(PLAYBACK_LEFT | PLAYBACK_MONO)` near the end
 // of its implementation section.  That clobbers every identifier named `L`
@@ -51,7 +53,13 @@
 
 // W_AddFile lives in w_wad.c but isn't in w_wad.h (it's only called from
 // D_DoomMain at startup).  Forward-declare so we can add buddy.wad.
-extern void W_AddFile (char *filename);
+extern void   W_AddFile (char *filename);
+// w_wad.c internals: lumpcache is malloc'd ONCE in W_InitMultipleFiles, sized to
+// numlumps at that moment.  Adding buddy.wad later grows numlumps but NOT
+// lumpcache, so we must grow it ourselves (see I_Voice_Init) -- otherwise
+// W_CacheLumpNum on a buddy lump writes past the array and corrupts the heap.
+extern void** lumpcache;
+extern int    numlumps;
 
 
 // ----- lump-name -> "tag" mapping (must match tools/bake_buddy_voice.py) ---
@@ -293,7 +301,15 @@ void I_Voice_Init (void)
         strncpy (wadpath, "buddy.wad", sizeof(wadpath));
 
     // Try to add it; detect success via "is any DS* lump now known?".
+    int oldnumlumps = numlumps;
     W_AddFile (wadpath);
+    // Grow lumpcache to cover the lumps buddy.wad just added (W_AddFile doesn't),
+    // and zero the new slots so W_CacheLumpNum sees them as not-yet-cached.
+    if (numlumps > oldnumlumps && lumpcache)
+    {
+        lumpcache = (void**)realloc (lumpcache, numlumps * sizeof(*lumpcache));
+        memset (lumpcache + oldnumlumps, 0, (numlumps - oldnumlumps) * sizeof(*lumpcache));
+    }
     int probe = W_CheckNumForName ("DSCT001");
     if (probe < 0)
     {

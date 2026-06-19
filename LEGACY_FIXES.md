@@ -108,6 +108,7 @@ hi-res.
 |---|---|---|---|
 | `Z_Malloc: failed on allocation of 1024040 bytes` → crash at map-end stats screen | the screen wipe transposes a `SCREENWIDTH*SCREENHEIGHT` buffer (~1 MB at 1280×800, ~2.3 MB at 1920×1200) on top of level data, overflowing the **6 MB** zone heap | bump the zone to **32 MB** (`mb_used`) | `i_system.c` |
 | status-bar background buffer | `screens[4]` sized for 320×32 | `SCREENWIDTH*ST_HEIGHT*hires`, reallocated in `ST_SetRes` | `st_stuff.c` |
+| AI-buddy **voice crash a few minutes into a game** | `lumpcache[]` is `malloc`'d **once** in `W_InitMultipleFiles`, sized to `numlumps` at that moment — the 1996 engine only ever `W_AddFile`s *before* that point. Adding `buddy.wad` at **runtime** (`I_Voice_Init`) grows `numlumps` but **not** `lumpcache`, so `W_CacheLumpNum` on a buddy lump writes past the array → heap corruption (latent → crash later) | grow `lumpcache` (`realloc` + zero the new slots) right after the runtime `W_AddFile` | `i_voice.c` |
 
 ---
 
@@ -120,6 +121,12 @@ hi-res.
   *not* recompile the `.c` files that include it. After a header change do
   `make clean && make` (or just use `build.sh`, which recompiles everything).
   This masked a `visplane_t` (`r_defs.h`) change during the hi-res work.
+- `build.sh` compiles **every** `files/*.c`. A single-header library that is both
+  compiled standalone (its own `.c` in the glob) *and* `#include`d with its
+  implementation in another TU defines its symbols twice → `multiple definition`
+  link error. Pull in only the API in the consumer (`#define STB_VORBIS_HEADER_ONLY`
+  before `#include "stb_vorbis.c"`); let the standalone `stb_vorbis.c` be the single
+  implementation. (`i_voice.c`, for the buddy-voice OGG decoder.)
 
 ---
 
