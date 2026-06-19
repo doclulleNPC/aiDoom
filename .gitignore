@@ -34,6 +34,9 @@ doomsav*.dsg
 icon_preview.png
 exe_icon_check.png
 
+# Throwaway scratch directory (test artifacts, downloaded zips, etc.)
+tmp/
+
 # --- Python (ollama_director.py / gpumon.py) ---
 __pycache__/
 *.pyc
