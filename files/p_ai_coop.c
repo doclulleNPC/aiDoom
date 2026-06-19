@@ -383,6 +383,7 @@ static mobj_t* AICoop_FindItem (mobj_t* self)
     thinker_t*	th;
     mobj_t*	best = NULL;
     fixed_t	bestd = 0;
+    mobj_t*	pl = AICoop_NearestHuman (self->x, self->y);	// don't steal the human's items
 
     for (th = thinkercap.next; th != &thinkercap; th = th->next)
     {
@@ -411,6 +412,9 @@ static mobj_t* AICoop_FindItem (mobj_t* self)
 
 	d = P_AproxDistance (m->x - self->x, m->y - self->y);
 	if (d > COOP_ITEM_RANGE)	continue;
+	// Leave items the human is closer to -- otherwise the buddy snatches the
+	// pickup right as the player walks up to it (looks like it "vanishes").
+	if (pl && P_AproxDistance (m->x - pl->x, m->y - pl->y) < d) continue;
 	if (best && d >= bestd)		continue;	// not closer -> skip the trace
 	if (!AICoop_CanReach (self, m->x, m->y, true)) continue;	// can't walk there
 
@@ -881,20 +885,37 @@ void P_AICoop_BuildCmd (void)
     if (fire && aimmon && abs(rem) < COOP_FACING && P_CheckSight (mo, aimmon))
 	cmd->buttons |= BT_ATTACK;
 
-    triedmove = (movethresh >= 0 && dist > movethresh);
-
-    // For low-priority moves (following), don't step onto a damaging floor.
-    if (triedmove && avoiddamage)
+    if (AICoop_DamagingFloor (mo->x, mo->y) && pl)
     {
-	unsigned fa = mo->angle >> ANGLETOFINESHIFT;
-	fixed_t  ax = mo->x + FixedMul (32*FRACUNIT, finecosine[fa]);
-	fixed_t  ay = mo->y + FixedMul (32*FRACUNIT, finesine[fa]);
-	if (AICoop_DamagingFloor (ax, ay))
-	    triedmove = 0;
-    }
-
-    if (triedmove)
+	// Standing in nukage/lava -- get OUT.  Bolt to the nearest human (on safe
+	// ground) and never freeze here (the avoidance below would set triedmove=0
+	// and the buddy would just stand in the hazard and die).
+	want = R_PointToAngle2 (mo->x, mo->y, pl->x, pl->y);
+	rem  = (short)((want - mo->angle) >> 16);
+	turn = rem;
+	if (turn >  COOP_TURN) turn =  COOP_TURN;
+	if (turn < -COOP_TURN) turn = -COOP_TURN;
+	cmd->angleturn   = (short)turn;
 	cmd->forwardmove = COOP_RUN;
+	triedmove = 1;
+    }
+    else
+    {
+	triedmove = (movethresh >= 0 && dist > movethresh);
+
+	// For low-priority moves (following), don't step onto a damaging floor.
+	if (triedmove && avoiddamage)
+	{
+	    unsigned fa = mo->angle >> ANGLETOFINESHIFT;
+	    fixed_t  ax = mo->x + FixedMul (32*FRACUNIT, finecosine[fa]);
+	    fixed_t  ay = mo->y + FixedMul (32*FRACUNIT, finesine[fa]);
+	    if (AICoop_DamagingFloor (ax, ay))
+		triedmove = 0;
+	}
+
+	if (triedmove)
+	    cmd->forwardmove = COOP_RUN;
+    }
 
     // Doors: if we're trying to move but stuck (e.g. pushing a closed door), tap
     // Use *once*, then leave it alone for a bit -- spamming Use re-triggers a DR
