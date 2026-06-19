@@ -45,6 +45,61 @@ static SDL_Texture*	texture = NULL;
 // Expanded 32-bit (ARGB8888) palette, rebuilt by I_SetPalette.
 static Uint32		palette[256];
 
+// Video filters (Options -> Video; default off, persisted in config).
+//  antialiasing: bilinear texture scaling (crispy-doom-style smoothing when the
+//                frame is scaled up to the window/fullscreen).
+//  blur:         a 1-2-1 separable soft blur applied to the frame each present.
+int			antialiasing = 0;
+int			blur = 0;
+
+// Separable 1-2-1 ("gaussian-ish") soft blur over a 32-bit ARGB frame, in place.
+static void I_BlurFrame (Uint32* buf, int w, int h)
+{
+    static Uint32*	tmp;
+    static int		cap;
+    int			x, y;
+
+    if (cap < w*h) { free (tmp); tmp = malloc (w*h*sizeof(Uint32)); cap = w*h; }
+    if (!tmp) return;
+
+    for (y = 0; y < h; y++)			// horizontal pass: buf -> tmp
+    {
+	Uint32*	s = buf + y*w;
+	Uint32*	d = tmp + y*w;
+	for (x = 0; x < w; x++)
+	{
+	    Uint32 a = s[x>0?x-1:x], b = s[x], c = s[x<w-1?x+1:x];
+	    int r = ((a>>16&0xff) + (b>>16&0xff)*2 + (c>>16&0xff)) >> 2;
+	    int g = ((a>>8 &0xff) + (b>>8 &0xff)*2 + (c>>8 &0xff)) >> 2;
+	    int bl= ((a    &0xff) + (b    &0xff)*2 + (c    &0xff)) >> 2;
+	    d[x] = 0xff000000u | (r<<16) | (g<<8) | bl;
+	}
+    }
+    for (y = 0; y < h; y++)			// vertical pass: tmp -> buf
+    {
+	Uint32*	s0 = tmp + (y>0?y-1:y)*w;
+	Uint32*	s1 = tmp + y*w;
+	Uint32*	s2 = tmp + (y<h-1?y+1:y)*w;
+	Uint32*	d  = buf + y*w;
+	for (x = 0; x < w; x++)
+	{
+	    Uint32 a = s0[x], b = s1[x], c = s2[x];
+	    int r = ((a>>16&0xff) + (b>>16&0xff)*2 + (c>>16&0xff)) >> 2;
+	    int g = ((a>>8 &0xff) + (b>>8 &0xff)*2 + (c>>8 &0xff)) >> 2;
+	    int bl= ((a    &0xff) + (b    &0xff)*2 + (c    &0xff)) >> 2;
+	    d[x] = 0xff000000u | (r<<16) | (g<<8) | bl;
+	}
+    }
+}
+
+// Re-apply the texture scale mode when the antialiasing option changes (menu).
+void I_ApplyVideoFilter (void)
+{
+    if (texture)
+	SDL_SetTextureScaleMode (texture,
+	    antialiasing ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST);
+}
+
 // Non-zero when displaying fullscreen.  Saved/restored via the config file.
 int			fullscreen_mode = 0;
 
@@ -336,12 +391,39 @@ void I_FinishUpdate (void)
     if ( !SDL_LockTexture(texture, NULL, &pixels, &pitch) )
 	return;
 
-    for (y=0 ; y<SCREENHEIGHT ; y++)
+    if (!blur)
     {
-	Uint32*		dst = (Uint32 *)((Uint8 *)pixels + y*pitch);
-	unsigned char*	src = screens[0] + y*SCREENWIDTH;
-	for (x=0 ; x<SCREENWIDTH ; x++)
-	    dst[x] = palette[src[x]];
+	for (y=0 ; y<SCREENHEIGHT ; y++)		// fast path: expand straight to texture
+	{
+	    Uint32*		dst = (Uint32 *)((Uint8 *)pixels + y*pitch);
+	    unsigned char*	src = screens[0] + y*SCREENWIDTH;
+	    for (x=0 ; x<SCREENWIDTH ; x++)
+		dst[x] = palette[src[x]];
+	}
+    }
+    else
+    {
+	// expand into a contiguous buffer, soft-blur it, then copy to the texture
+	static Uint32*	fb;
+	static int	fbcap;
+	if (fbcap < SCREENWIDTH*SCREENHEIGHT)
+	{ free (fb); fb = malloc (SCREENWIDTH*SCREENHEIGHT*sizeof(Uint32)); fbcap = SCREENWIDTH*SCREENHEIGHT; }
+	if (fb)
+	{
+	    for (y=0 ; y<SCREENHEIGHT ; y++)
+	    {
+		Uint32*		d = fb + y*SCREENWIDTH;
+		unsigned char*	src = screens[0] + y*SCREENWIDTH;
+		for (x=0 ; x<SCREENWIDTH ; x++) d[x] = palette[src[x]];
+	    }
+	    I_BlurFrame (fb, SCREENWIDTH, SCREENHEIGHT);
+	    for (y=0 ; y<SCREENHEIGHT ; y++)
+	    {
+		Uint32*	dst = (Uint32 *)((Uint8 *)pixels + y*pitch);
+		Uint32*	s   = fb + y*SCREENWIDTH;
+		for (x=0 ; x<SCREENWIDTH ; x++) dst[x] = s[x];
+	    }
+	}
     }
 
     SDL_UnlockTexture(texture);
@@ -397,7 +479,8 @@ static void I_CreateTexture(void)
 				SCREENWIDTH, SCREENHEIGHT);
     if ( texture == NULL )
 	I_Error("Could not create texture: %s", SDL_GetError());
-    SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_NEAREST);	// crisp pixels
+    SDL_SetTextureScaleMode(texture,				// crisp, or smooth if AA on
+	antialiasing ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST);
 }
 
 

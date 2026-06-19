@@ -198,6 +198,8 @@ void M_Sound(int choice);
 void M_Video(int choice);
 void M_VideoRes(int choice);
 void M_VideoFullscreen(int choice);
+void M_VideoAntialias(int choice);
+void M_VideoBlur(int choice);
 void M_DrawVideo(void);
 void M_WriteTextBig(int x, int y, char *string, int sc);
 
@@ -383,13 +385,17 @@ enum
 {
     vid_res,
     vid_fullscreen,
+    vid_aa,
+    vid_blur,
     vid_end
 } video_e;
 
 menuitem_t VideoMenu[]=
 {
     {2,"",	M_VideoRes,'r'},	// left/right changes resolution
-    {1,"",	M_VideoFullscreen,'f'}
+    {1,"",	M_VideoFullscreen,'f'},
+    {1,"",	M_VideoAntialias,'a'},
+    {1,"",	M_VideoBlur,'b'}
 };
 
 menu_t  VideoDef =
@@ -1011,6 +1017,9 @@ extern int	hires;			// doomdef.c
 void		V_SetRes (int scale);	// i_video.c
 void		I_SetFullscreen (int on);// i_video.c
 int		I_GetFullscreen (void);	// i_video.c
+extern int	antialiasing;		// i_video.c
+extern int	blur;			// i_video.c
+void		I_ApplyVideoFilter (void);// i_video.c
 
 static char* M_ResNames[6] = { "320x200", "640x400", "960x600",
 			       "1280x800", "1600x1000", "1920x1200" };
@@ -1030,6 +1039,14 @@ void M_DrawVideo(void)
     M_WriteText(VideoDef.x, VideoDef.y + LINEHEIGHT*vid_fullscreen, "Fullscreen");
     M_WriteText(VideoDef.x + 130, VideoDef.y + LINEHEIGHT*vid_fullscreen,
 		I_GetFullscreen() ? "On" : "Off");
+
+    M_WriteText(VideoDef.x, VideoDef.y + LINEHEIGHT*vid_aa, "Antialiasing");
+    M_WriteText(VideoDef.x + 130, VideoDef.y + LINEHEIGHT*vid_aa,
+		antialiasing ? "On" : "Off");
+
+    M_WriteText(VideoDef.x, VideoDef.y + LINEHEIGHT*vid_blur, "Blur");
+    M_WriteText(VideoDef.x + 130, VideoDef.y + LINEHEIGHT*vid_blur,
+		blur ? "On" : "Off");
 }
 
 void M_VideoRes(int choice)
@@ -1050,6 +1067,19 @@ void M_VideoFullscreen(int choice)
 {
     I_SetFullscreen(!I_GetFullscreen());
     M_SaveDefaults();		// persist now, not just at quit
+}
+
+void M_VideoAntialias(int choice)
+{
+    antialiasing = !antialiasing;
+    I_ApplyVideoFilter();	// re-apply texture scale mode live
+    M_SaveDefaults();
+}
+
+void M_VideoBlur(int choice)
+{
+    blur = !blur;
+    M_SaveDefaults();
 }
 
 void M_Video(int choice)

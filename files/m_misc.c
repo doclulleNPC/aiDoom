@@ -183,6 +183,8 @@ extern int	key_jump;
 extern int	autorun;
 extern int	key_console;
 extern int	crosshair;
+extern int	antialiasing;	// i_video.c -- smooth (bilinear) scaling
+extern int	blur;		// i_video.c -- soft blur post-process
 
 // Monster pack-hunt AI (p_enemy.c)
 extern int	monster_pack;
@@ -277,6 +279,8 @@ default_t	defaults[] =
     // fullscreen flag.  Applied by i_video.c at startup.
     {"screen_resolution",&hires, 3},
     {"fullscreen",&fullscreen_mode, 0},
+    {"antialiasing",&antialiasing, 0},		// default OFF
+    {"blur",&blur, 0},				// default OFF
 
     {"snd_channels",&numChannels, 3},
 
