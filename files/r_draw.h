@@ -44,6 +44,7 @@ extern byte*		dc_source;
 // Hook in assembler or system specific BLT
 //  here.
 void 	R_DrawColumn (void);
+void 	R_DrawSkyColumn (void);		// clamping column for the sky (no vertical tiling)
 void 	R_DrawColumnLow (void);
 
 // The Spectre/Invisibility effect.

@@ -413,7 +413,10 @@ void R_DrawPlanes (void)
 		    angle = (viewangle + xtoviewangle[x])>>ANGLETOSKYSHIFT;
 		    dc_x = x;
 		    dc_source = R_GetColumn(skytexture, angle);
-		    colfunc ();
+		    // Sky-specific column: CLAMP the texture row instead of the &127
+		    // wrap R_DrawColumn does -- at hi-res a tall sky span (big open
+		    // area) exceeds the 128-row sky and would tile vertically.
+		    R_DrawSkyColumn ();
 		}
 	    }
 	    continue;

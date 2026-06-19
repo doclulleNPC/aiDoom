@@ -180,12 +180,49 @@ void R_DrawColumn (void)
 	// Re-map color indices from wall texture column
 	//  using a lighting/special effects LUT.
 	*dest = dc_colormap[dc_source[(frac>>FRACBITS)&127]];
-	
-	dest += SCREENWIDTH; 
+
+	dest += SCREENWIDTH;
 	frac += fracstep;
-	
-    } while (count--); 
-} 
+
+    } while (count--);
+}
+
+
+//
+// R_DrawSkyColumn
+// Like R_DrawColumn but CLAMPS the texture row to [0,127] instead of wrapping
+// (&127).  The sky texture is 128 rows; at hi-res a tall sky span (a large open
+// area where the sky fills much of the screen) maps past row 127 and the wrap
+// would tile the sky vertically.  Clamping extends the bottom row (horizon)
+// downward and the top row upward instead -- no visible repeat.  Identical to
+// R_DrawColumn for normal (<=128-row) spans, so no regression for small skies.
+//
+void R_DrawSkyColumn (void)
+{
+    int		count;
+    byte*	dest;
+    fixed_t	frac;
+    fixed_t	fracstep;
+    int		row;
+
+    count = dc_yh - dc_yl;
+    if (count < 0)
+	return;
+
+    dest = ylookup[dc_yl] + columnofs[dc_x];
+    fracstep = dc_iscale;
+    frac = dc_texturemid + (dc_yl-centery)*fracstep;
+
+    do
+    {
+	row = frac>>FRACBITS;
+	if (row < 0)        row = 0;
+	else if (row > 127) row = 127;
+	*dest = dc_colormap[dc_source[row]];
+	dest += SCREENWIDTH;
+	frac += fracstep;
+    } while (count--);
+}
 
 
 
