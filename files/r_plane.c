@@ -395,8 +395,14 @@ void R_DrawPlanes (void)
 	// sky flat
 	if (pl->picnum == skyflatnum)
 	{
-	    dc_iscale = pspriteiscale>>detailshift;
-	    
+	    // Map sky texture rows 0..100 over screen-top..horizon from the ACTUAL
+	    // view height (centery), not pspriteiscale (which is tied to the width /
+	    // hires and mismatches when the view height isn't 200*hires).  This keeps
+	    // frac >= 0 at the top (no row-0 clamp -> no vertical streaks) and the
+	    // visible range within the 128-row sky above the horizon (no tiling); the
+	    // clamp in R_DrawSkyColumn only catches the rare below-horizon rows.
+	    dc_iscale = (centery > 0 ? (100*FRACUNIT / centery) : pspriteiscale) >> detailshift;
+
 	    // Sky is allways drawn full bright,
 	    //  i.e. colormaps[0] is used.
 	    // Because of this hack, sky is not affected
