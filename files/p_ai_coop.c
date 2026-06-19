@@ -145,9 +145,46 @@ static const char* AICOOP_STATE_TAGS[] =
     "state:grabbing",    // COOP_STATE_GRAB
 };
 
+// Doom positional-sound constants (mirror s_sound.c) for spatialising the voice.
+#define VOICE_CLIPDIST  (1200*0x10000)
+#define VOICE_CLOSEDIST (160*0x10000)
+#define VOICE_ATTEN     ((VOICE_CLIPDIST-VOICE_CLOSEDIST)>>FRACBITS)
+#define VOICE_SWING     (96*0x10000)
+
+// Per-channel 0..127 gains so the buddy's voice comes from *its* world position
+// (distance attenuation + stereo pan) -- exactly like Doom SFX
+// (S_AdjustSoundParams + i_sound.c's x^2 separation).  lis = the listening human,
+// src = the buddy.
+static void AICoop_VoicePan (mobj_t* lis, mobj_t* src, int* lvol, int* rvol)
+{
+    fixed_t adx = abs (lis->x - src->x);
+    fixed_t ady = abs (lis->y - src->y);
+    fixed_t dist = adx + ady - ((adx < ady ? adx : ady) >> 1);
+    angle_t ang;
+    int     vol, sep, s;
+
+    if (lis == src) { *lvol = *rvol = 127; return; }		// shouldn't happen
+    if (dist > VOICE_CLIPDIST) { *lvol = *rvol = 0; return; }	// too far -> silent
+
+    ang = R_PointToAngle2 (lis->x, lis->y, src->x, src->y) - lis->angle;
+    sep = 128 - (FixedMul (VOICE_SWING, finesine[ang >> ANGLETOFINESHIFT]) >> FRACBITS);
+
+    if (dist < VOICE_CLOSEDIST) vol = 127;
+    else vol = 127 * ((VOICE_CLIPDIST - dist) >> FRACBITS) / VOICE_ATTEN;
+
+    s = sep + 1;   *lvol = vol - ((vol*s*s) >> 16);		// Doom's x^2 pan
+    s = s - 257;   *rvol = vol - ((vol*s*s) >> 16);
+    if (*lvol < 0) *lvol = 0; if (*lvol > 127) *lvol = 127;
+    if (*rvol < 0) *rvol = 0; if (*rvol > 127) *rvol = 127;
+}
+
 static void AICoop_SayTag (const char* tag)
 {
-    I_Voice_Say (tag);
+    mobj_t*	src = AICoop_Mo ();				// the buddy = sound source
+    mobj_t*	lis = playeringame[displayplayer] ? players[displayplayer].mo : NULL;
+    int		lvol = 127, rvol = 127;
+    if (src && lis && src != lis) AICoop_VoicePan (lis, src, &lvol, &rvol);
+    I_Voice_Say (tag, lvol, rvol);
 }
 
 // Rate-limited automatic line (combat/ambient): at most one every few seconds,

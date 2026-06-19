@@ -28,13 +28,16 @@
 // loaded from the buddy.wad PWAD added by D_DoomMain.  Returns silently if the
 // lump is unknown, the WAD isn't loaded, or voice init failed.  Voice init
 // failures are non-fatal -- the buddy stays silent rather than crashing.
-void I_Voice_SayByName (const char* lumpname);
+// lvol/rvol are 0..127 per-channel gains (Doom positional volume): the caller
+// computes them from the buddy's position vs the listener, so the voice is
+// spatialised (distance + stereo pan) instead of flat at the player.
+void I_Voice_SayByName (const char* lumpname, int lvol, int rvol);
 
 // Speak the buddy's canonical phrase by tag: "contact", "hurt", "clear",
 // "state:<what>", "summon_ok", "wait_hold", "wait_move", "attack_ok",
 // "attack_none", "status:<weapon>[:ammo]".  Resolves to the right lump and
 // forwards to I_Voice_SayByName.  Unknown tags are no-ops.
-void I_Voice_Say (const char* tag);
+void I_Voice_Say (const char* tag, int lvol, int rvol);
 
 // Init / shutdown -- called from D_DoomMain around the I_Init*/I_Shutdown*
 // pair.  Loads the buddy WAD (cwd-relative "buddy.wad" by default, or from

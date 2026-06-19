@@ -253,23 +253,30 @@ static SDL_AudioSpec make_spec (int rate, int channels)
 
 // ----- public API ----------------------------------------------------------
 
-void I_Voice_SayByName (const char* lumpname)
+static short clamp16 (int v)
 {
-    if (!voice_stream) return;             // init failed or skipped
-    if (!lumpname) return;
+    if (v >  32767) return  32767;
+    if (v < -32768) return -32768;
+    return (short)v;
+}
+
+// lvol/rvol are 0..127 per-channel gains (Doom's positional volume) so the
+// buddy's voice comes from *its* spot in the world -- distance attenuation +
+// stereo pan computed by the caller (p_ai_coop) relative to the listener.
+void I_Voice_SayByName (const char* lumpname, int lvol, int rvol)
+{
+    if (!voice_stream || !lumpname) return; // init failed/skipped or no name
+    if (lvol <= 0 && rvol <= 0)    return;  // inaudible (buddy too far) -> skip
 
     voicecache_t* v = find_cache (lumpname);
     if (!v) v = load_lump (lumpname);
-    if (!v || !v->pcm) return;             // lump missing or decode failed
+    if (!v || !v->pcm) return;              // lump missing or decode failed
 
-    // Open the stream with the *first* OGG's spec; subsequent plays reuse it.
-    // (All lumps in buddy.wad come from the same ElevenLabs model so rate and
-    // channels are identical; if they ever differ we'd need a stream per
-    // rate/channels combo.  Not worth the complexity for a 37-lump set.)
+    // Bind the stream as STEREO once (so we can pan); SDL resamples to the device.
     static int bound = 0;
     if (!bound)
     {
-        SDL_AudioSpec spec = make_spec (v->samplerate, v->channels);
+        SDL_AudioSpec spec = make_spec (v->samplerate, 2);
         if (!SDL_SetAudioStreamFormat (voice_stream, &spec, NULL))
         {
             fprintf (stderr, "I_Voice: SDL_SetAudioStreamFormat: %s\n", SDL_GetError());
@@ -278,16 +285,27 @@ void I_Voice_SayByName (const char* lumpname)
         bound = 1;
     }
 
-    // Push all PCM bytes at once -- lumps are short (< 5 sec each).  SDL will
-    // resample / queue them.
-    SDL_PutAudioStreamData (voice_stream, v->pcm, v->pcmsamples * (int)sizeof(short));
+    // Render to a temporary interleaved-stereo buffer with the per-channel gains
+    // (the cached PCM is shared across plays, so we must not scale it in place).
+    int     frames = v->pcmsamples;         // samples per channel from stb decode
+    short*  out    = (short*)malloc ((size_t)frames * 2 * sizeof(short));
+    if (!out) return;
+    for (int i = 0; i < frames; i++)
+    {
+        int sl = (v->channels == 1) ? v->pcm[i] : v->pcm[2*i];
+        int sr = (v->channels == 1) ? v->pcm[i] : v->pcm[2*i+1];
+        out[2*i]   = clamp16 (sl * lvol / 127);
+        out[2*i+1] = clamp16 (sr * rvol / 127);
+    }
+    SDL_PutAudioStreamData (voice_stream, out, frames * 2 * (int)sizeof(short));
+    free (out);
 }
 
-void I_Voice_Say (const char* tag)
+void I_Voice_Say (const char* tag, int lvol, int rvol)
 {
     const char* lumpname = tag_to_lumpname (tag);
     if (!lumpname) return;                 // unknown tag -> silent
-    I_Voice_SayByName (lumpname);
+    I_Voice_SayByName (lumpname, lvol, rvol);
 }
 
 
