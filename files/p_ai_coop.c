@@ -56,6 +56,7 @@ static mobj_t*	forcetarget;		// the forced attack target
 #define COOP_HEAL_HP	50		// seek a med-pack below this health
 #define COOP_HEAL_RANGE	(1024*FRACUNIT)	// how far to look for one
 #define COOP_ITEM_RANGE	(128*FRACUNIT)	// idle pickups only when right nearby (not "miles away")
+#define COOP_GRAB_NEAR	(512*FRACUNIT)	// only grab items while still near the human (else follow)
 #define COOP_SUMMON_TICS (7*TICRATE)	// "come" runs to you for this long
 #define COOP_ATTACK_TICS (10*TICRATE)	// "attack" charges the target for this long
 
@@ -538,6 +539,7 @@ const char* P_AICoop_StatusReport (void)
 #define PF_MAXADJ	32		// max graph edges per sub-sector
 
 static int	pf_level = -1;		// episode*100+map the graph was built for
+static int	pf_lastbuild;		// gametic of the last graph (re)build
 static int	pf_n;			// sub-sector count
 static fixed_t*	pf_cx;			// centroid x / y per sub-sector
 static fixed_t*	pf_cy;
@@ -666,27 +668,40 @@ static void PF_Build (mobj_t* ref)
 	if (w >= 0) PF_AddEdge (self, v, w);
     }
 
-    // (2) Same-sector edges -- THE fix for the "graph fragments per room" bug.
-    // In vanilla Doom the BSP splits a sector into several sub-sectors with NO
-    // connecting seg, so step (1) alone leaves each room a pile of disconnected
-    // islands.  Sub-sectors of one sector share a floor, so connect any two whose
-    // centroids are joined by a clear feet-trace (handles convex splits; an L/U
-    // shaped sector won't get a through-the-wall shortcut because the trace fails).
-    for (i = 0; i < pf_n; i++)
+    // (2) Grid adjacency -- THE fix for isolated sub-sectors.  In vanilla Doom a
+    // sector is split into sub-sectors with NO connecting seg, and an L/concave
+    // sector defeats a centroid-to-centroid trace, so some walkable sub-sectors
+    // ended up with zero edges (bot standing in one => stuck).  Sample a grid over
+    // the map; wherever two adjacent sample points fall in different sub-sectors
+    // and a feet-trace between them is clear, connect those sub-sectors.  Catches
+    // every walkable adjacency regardless of segs / sector shape.
     {
-	sector_t* si = subsectors[i].sector;
-	for (j = i + 1; j < pf_n; j++)
+	const fixed_t	step = 32*FRACUNIT;
+	fixed_t		gx, gy;
+	fixed_t		xmax = bmaporgx + (fixed_t)bmapwidth *128*FRACUNIT;
+	fixed_t		ymax = bmaporgy + (fixed_t)bmapheight*128*FRACUNIT;
+
+	for (gy = bmaporgy; gy < ymax; gy += step)
+	for (gx = bmaporgx; gx < xmax; gx += step)
 	{
-	    fixed_t	d;
-	    int		w;
-	    if (subsectors[j].sector != si) continue;
-	    d = P_AproxDistance (pf_cx[i]-pf_cx[j], pf_cy[i]-pf_cy[j]);
-	    if (d > 1024*FRACUNIT) continue;		// too far to be neighbours
-	    if (!PF_LineWalkable (pf_cx[i], pf_cy[i], pf_cx[j], pf_cy[j],
-				  ref, si->floorheight)) continue;
-	    w = (int)(d >> FRACBITS); if (w < 1) w = 1;
-	    PF_AddEdge (i, j, w + (AICoop_DamagingFloor (pf_cx[j], pf_cy[j]) ? PF_HAZARD_PEN : 0));
-	    PF_AddEdge (j, i, w + (AICoop_DamagingFloor (pf_cx[i], pf_cy[i]) ? PF_HAZARD_PEN : 0));
+	    int		a = PF_SS (gx, gy);
+	    fixed_t	af = subsectors[a].sector->floorheight;
+	    int		nb[2], k;
+
+	    nb[0] = PF_SS (gx+step, gy);		// right + down neighbours
+	    nb[1] = PF_SS (gx, gy+step);
+	    for (k = 0; k < 2; k++)
+	    {
+		fixed_t	tx = k ? gx : gx+step;
+		fixed_t	ty = k ? gy+step : gy;
+		int	b = nb[k], w;
+		if (b == a) continue;
+		if (!PF_LineWalkable (gx, gy, tx, ty, ref, af)) continue;
+		w = (int)(P_AproxDistance (pf_cx[a]-pf_cx[b], pf_cy[a]-pf_cy[b]) >> FRACBITS);
+		if (w < 1) w = 1;
+		PF_AddEdge (a, b, w + (AICoop_DamagingFloor (pf_cx[b], pf_cy[b]) ? PF_HAZARD_PEN : 0));
+		PF_AddEdge (b, a, w + (AICoop_DamagingFloor (pf_cx[a], pf_cy[a]) ? PF_HAZARD_PEN : 0));
+	    }
 	}
     }
 
@@ -758,12 +773,25 @@ static boolean PF_NextWaypoint (mobj_t* mo, fixed_t dx, fixed_t dy, fixed_t* wx,
     int	start, goal, len, i, pick, c;
 
     if (pf_level != gameepisode*100 + gamemap || !pf_cx)
-    { PF_Build (mo); pf_level = gameepisode*100 + gamemap; }
+    { PF_Build (mo); pf_level = gameepisode*100 + gamemap; pf_lastbuild = gametic; }
 
     start = PF_SS (mo->x, mo->y);
     goal  = PF_SS (dx, dy);
     if (start == goal) { *wx = dx; *wy = dy; return true; }
-    if (!PF_Dijkstra (start, goal)) return false;
+    if (!PF_Dijkstra (start, goal))
+    {
+	// No route -- the graph is built once at level start, so a door/lift/secret
+	// wall that has since OPENED isn't in it yet (it had no passable edge when
+	// built).  Rebuild from the current map state and retry (rate-limited to
+	// ~1.5s so a genuinely unreachable target doesn't thrash).
+	if (gametic - pf_lastbuild > 50)
+	{
+	    PF_Build (mo); pf_lastbuild = gametic;
+	    if (!PF_Dijkstra (start, goal)) return false;
+	}
+	else
+	    return false;
+    }
 
     // reconstruct goal -> ... -> first step (pf_path[len-1] is adjacent to start)
     len = 0; c = goal;
@@ -823,6 +851,25 @@ static void AICoop_TraceSteer (mobj_t* mo, fixed_t gx, fixed_t gy, fixed_t* sx, 
     ss = PF_SS (mo->x, mo->y);
     if (pf_cx && ss >= 0 && ss < pf_n) { *sx = pf_cx[ss]; *sy = pf_cy[ss]; return; }
     *sx = gx; *sy = gy;
+}
+
+// Guard against fixating on a pickup the buddy can reach horizontally but never
+// actually collect (e.g. it sits a little above on a ledge/pedestal -> the buddy
+// oscillates on it forever, as seen stuck in an E1M2 secret).  If we've targeted
+// the same item for >2s without grabbing it, blacklist it for a few seconds so the
+// buddy gives up and resumes following.
+static boolean AICoop_GrabStuck (mobj_t* item)
+{
+    static mobj_t*	cur;
+    static int		started;
+    static mobj_t*	skip;
+    static int		skipuntil;
+
+    if (item == skip && gametic < skipuntil)	return true;
+    if (item != cur) { cur = item; started = gametic; }
+    if (gametic - started > 2*TICRATE)
+    { skip = item; skipuntil = gametic + 5*TICRATE; return true; }
+    return false;
 }
 
 void P_AICoop_BuildCmd (void)
@@ -983,8 +1030,13 @@ void P_AICoop_BuildCmd (void)
 	    movethresh = COOP_KEEP;
 	    tx = tgt->x; ty = tgt->y;
 	}
-	// idle: collect a nearby item, else follow the human
-	else if ((item = AICoop_FindItem (mo)) != NULL)
+	// idle: collect a nearby item, but ONLY while still near the human (don't
+	// wander off / linger for an item while the player walks away), and not one
+	// we've been failing to grab (AICoop_GrabStuck) -- else follow the human.
+	else if (pl
+		 && P_AproxDistance (pl->x - mo->x, pl->y - mo->y) < COOP_GRAB_NEAR
+		 && (item = AICoop_FindItem (mo)) != NULL
+		 && !AICoop_GrabStuck (item))
 	{
 	    coop_state = 5; haveaim = 1; movethresh = 16*FRACUNIT;
 	    tx = item->x; ty = item->y;
