@@ -33,6 +33,7 @@ rcsid[] = "$Id: m_bbox.c,v 1.1 1997/02/03 22:45:10 b1 Exp $";
 #include "m_misc.h"
 #include "i_video.h"
 #include "i_sound.h"
+#include "i_voice.h"
 
 #include "d_net.h"
 #include "g_game.h"
@@ -100,7 +101,10 @@ byte* I_ZoneBase (int*	size)
 //
 int  I_GetTime (void)
 {
-    return (SDL_GetTicks()*TICRATE)/1000;
+    // SDL_GetTicks() returns Uint32; multiplying by TICRATE (35) can wrap a
+    // 32-bit int, so use Uint64 for the intermediate, then cast back.
+    Uint64 ms = (Uint64)SDL_GetTicks ();
+    return (int)((ms * TICRATE) / 1000);
 }
 
 
@@ -115,6 +119,7 @@ void I_Init (void)
 
     I_InitSound();
     //  I_InitGraphics();
+    I_Voice_Init ();
 }
 
 //
@@ -125,6 +130,7 @@ void I_Quit (void)
     D_QuitNetGame ();
     I_ShutdownSound();
     I_ShutdownMusic();
+    I_Voice_Shutdown ();
     M_SaveDefaults ();
     I_ShutdownGraphics();
     exit(0);

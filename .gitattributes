@@ -1,0 +1,58 @@
+# --- Line endings ---
+# Force consistent line endings per file type.  Without this, Git emits
+# "LF will be replaced by CRLF" warnings on Windows checkouts (the
+# `core.autocrlf=true` default) and the silent rewrite can race with
+# open file handles -- manifesting as "Permission denied" / "Zugriff
+# verweigert" when a process is mid-write.  Setting it explicitly here
+# silences the warnings and removes the rewrite race.
+
+# Source code: LF, always.  DOS-era engines + SDL3 both handle LF fine on
+# Windows; cl.exe and gcc don't care.  Easier diffs across platforms.
+*.c       text eol=lf
+*.h       text eol=lf
+*.cpp     text eol=lf
+*.cc      text eol=lf
+*.py      text eol=lf
+*.sh      text eol=lf
+*.js      text eol=lf
+*.json    text eol=lf
+*.yml     text eol=lf
+*.yaml    text eol=lf
+*.md      text eol=lf
+*.txt     text eol=lf
+*.cfg     text eol=lf
+*.cmake   text eol=lf
+*.in      text eol=lf
+Makefile* text eol=lf
+
+# Windows-native scripts need CRLF or cmd.exe / PowerShell misbehaves
+# (cmd parses LF as part of the line and the next line bleeds in).
+*.bat     text eol=crlf
+*.cmd     text eol=crlf
+*.ps1     text eol=crlf
+
+# Resource files: Windows toolchain expects CRLF.
+*.rc      text eol=crlf
+
+# --- Binary (do not touch) ---
+# WADs, OGG samples, exe/dll/obj/pdb, icon data, font atlas -- these have
+# exact byte layouts and must never be subject to autocrlf translation.
+*.wad     binary
+*.WAD     binary
+*.ogg     binary
+*.mp3     binary
+*.wav     binary
+*.exe     binary
+*.dll     binary
+*.obj     binary
+*.o       binary
+*.pdb     binary
+*.ico     binary
+*.png     binary
+*.jpg     binary
+*.jpeg    binary
+*.gif     binary
+*.zip     binary
+*.7z      binary
+*.tar     binary
+*.gz      binary

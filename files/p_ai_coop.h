@@ -24,9 +24,14 @@ void P_AICoop_BuildCmd (void);
 // consistency check for it (the buddy is local-but-deterministic, never sent).
 int  P_AICoop_Slot (void);
 
-// Speak a line via the voice helper (writes buddy_say.txt -> tools/buddy_voice.py).
-// Pass a "[Buddy] ..." reply; the tag is stripped.  No-op unless the buddy is active.
-void P_AICoop_Voice (const char* line);
+// Current buddy state as a small enum (0=follow, 1=fight, 2=heal, 3=hold,
+// 4=come, 5=grab).  Exposed for the console / voice system.
+int  P_AICoop_State (void);
+
+// Speak a tagged phrase through i_voice.c (offline OGG via buddy.wad).
+// Callers pick the exact tag (e.g. "summon_ok", "state:fighting"); the
+// tag -> lump-name mapping lives in i_voice.c.
+void P_AICoop_VoiceTag (const char* tag);
 
 // Console commands (used by c_console.c).  The const char* ones return a short
 // "[Buddy] ..." reply to print; P_AICoop_Summon returns 1 if a companion exists.

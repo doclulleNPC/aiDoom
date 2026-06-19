@@ -15,6 +15,10 @@
 #include <stdarg.h>
 #include <string.h>
 #include <ctype.h>
+// strcasecmp is POSIX-only; MSVC names it _stricmp.  Map once for portability.
+#ifdef _WIN32
+#define strcasecmp _stricmp
+#endif
 
 #include "doomdef.h"
 #include "doomstat.h"
@@ -257,17 +261,72 @@ static void C_Execute (char* line)
 	}
     }
     else if (!strcmp(cmd, "where") || !strcmp(cmd, "buddy") || !strcmp(cmd, "comp"))
-	{ const char* r = P_AICoop_Report ();        C_Printf ("%s", r); P_AICoop_Voice (r); }
+    {
+	const char* r = P_AICoop_Report ();
+	C_Printf ("%s", r);
+	// Voice tag derived from coop_state -- see AICOOP_STATE_TAGS in p_ai_coop.c
+	// (kept in sync with the enum there).  Use the public accessor since
+	// coop_state is static in p_ai_coop.c.
+	extern int P_AICoop_State (void);
+	static const char* state_tags[] = {
+	    "state:following","state:fighting","state:healing",
+	    "state:holding", "state:coming",  "state:grabbing"
+	};
+	int s = P_AICoop_State ();
+	if (s >= 0 && s < (int)(sizeof(state_tags)/sizeof(state_tags[0])))
+	    P_AICoop_VoiceTag (state_tags[s]);
+    }
     else if (!strcmp(cmd, "come") || !strcmp(cmd, "follow"))
-	{ const char* r = P_AICoop_Summon () ? "[Buddy] On my way!"
-					     : "[Buddy] (no companion -- launch with -aicoop)";
-	  C_Printf ("%s", r); P_AICoop_Voice (r); }
+    {
+	const char* r = P_AICoop_Summon () ? "[Buddy] On my way!"
+					   : "[Buddy] (no companion -- launch with -aicoop)";
+	C_Printf ("%s", r);
+	if (P_AICoop_Slot () >= 0 && !strncmp (r, "[Buddy] On", 10))
+	    P_AICoop_VoiceTag ("summon_ok");
+    }
     else if (!strcmp(cmd, "wait") || !strcmp(cmd, "stay"))
-	{ const char* r = P_AICoop_Wait ();          C_Printf ("%s", r); P_AICoop_Voice (r); }
+    {
+	const char* r = P_AICoop_Wait ();
+	C_Printf ("%s", r);
+	if      (!strcmp (r, "[Buddy] Holding position.")) P_AICoop_VoiceTag ("wait_hold");
+	else if (!strcmp (r, "[Buddy] Moving out."))       P_AICoop_VoiceTag ("wait_move");
+    }
     else if (!strcmp(cmd, "attack"))
-	{ const char* r = P_AICoop_Attack ();        C_Printf ("%s", r); P_AICoop_Voice (r); }
+    {
+	const char* r = P_AICoop_Attack ();
+	C_Printf ("%s", r);
+	if      (!strcmp (r, "[Buddy] Attacking!"))         P_AICoop_VoiceTag ("attack_ok");
+	else if (!strcmp (r, "[Buddy] No targets around.")) P_AICoop_VoiceTag ("attack_none");
+    }
     else if (!strcmp(cmd, "report") || !strcmp(cmd, "status"))
-	{ const char* r = P_AICoop_StatusReport ();  C_Printf ("%s", r); P_AICoop_Voice (r); }
+    {
+	const char* r = P_AICoop_StatusReport ();
+	C_Printf ("%s", r);
+	// The status reply's weapon name is what we want the buddy to speak.
+	// It follows "[Buddy] <hp> HP, <armor>% armor, <weapon>" or with ", <ammo> rounds."
+	// at the end.  Pull the last comma-separated token.
+	const char* comma = strrchr (r, ',');
+	const char* weapon = comma ? comma + 1 : r + 8;  // skip "[Buddy] "
+	char  wbuf[32]; int i = 0;
+	while (*weapon && *weapon != '.' && i < 30) wbuf[i++] = *weapon++;
+	wbuf[i] = 0;
+	while (i > 0 && wbuf[i-1] == ' ') wbuf[--i] = 0;
+	// Lowercase + map to tag.  Plain variant by default; the "loaded" variant
+	// is only used when the ammo line was present (i.e. comma != NULL after weapon).
+	int has_ammo = comma && strstr (comma, "rounds") != NULL;
+	char tag[64];
+	if      (!strcasecmp (wbuf, "fists"))          strcpy (tag, "status:fists");
+	else if (!strcasecmp (wbuf, "pistol"))         strcpy (tag, has_ammo ? "status:pistol:ammo"        : "status:pistol");
+	else if (!strcasecmp (wbuf, "shotgun"))        strcpy (tag, has_ammo ? "status:shotgun:ammo"       : "status:shotgun");
+	else if (!strcasecmp (wbuf, "chaingun"))       strcpy (tag, has_ammo ? "status:chaingun:ammo"      : "status:chaingun");
+	else if (!strcasecmp (wbuf, "rocket launcher"))strcpy (tag, has_ammo ? "status:rocketlauncher:ammo": "status:rocketlauncher");
+	else if (!strcasecmp (wbuf, "plasma rifle"))   strcpy (tag, has_ammo ? "status:plasma:ammo"        : "status:plasma");
+	else if (!strcasecmp (wbuf, "B. F. G."))       strcpy (tag, has_ammo ? "status:bfg:ammo"           : "status:bfg");
+	else if (!strcasecmp (wbuf, "chainsaw"))       strcpy (tag, "status:chainsaw");
+	else if (!strcasecmp (wbuf, "super shotgun"))  strcpy (tag, has_ammo ? "status:supershotgun:ammo"  : "status:supershotgun");
+	else tag[0] = 0;
+	if (tag[0]) P_AICoop_VoiceTag (tag);
+    }
     else if (!strcmp(cmd, "director") || !strcmp(cmd, "ai") || !strcmp(cmd, "llm"))
 	C_Printf ("%s", P_AI_Console (args));
     else

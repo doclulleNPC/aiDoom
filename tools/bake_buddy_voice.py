@@ -1,0 +1,406 @@
+#!/usr/bin/env python3
+"""
+bake_buddy_voice.py -- pre-render the aiDoom AI co-op buddy's spoken lines
+from ElevenLabs TTS, and pack them into a Doom PWAD (`buddy.wad`) so the
+engine can play them offline with no network at runtime.
+
+Why a WAD: the engine already has a single-file lump archive loader
+(`files/w_wad.c`); shipping the voice lines as lumps is consistent with
+every other asset the engine loads, and a single file is much nicer
+to distribute than 37 loose .ogg files.  See CLAUDE.md / LEGACY_FIXES.md
+("offline buddy voice via stb_vorbis + dedicated SDL audio stream").
+
+Output:
+    run/buddy.wad              (~2-5 MB; PWAD with 37 DS* lumps, OGG/Vorbis data)
+    run/buddy_voice_manifest.txt  (lump name <-> phrase, for reproducibility)
+
+Phrases (37 total): combat callouts (10), state-where (6), wait/hold/move (2),
+attack/no-target (2), summon (1), status per weapon x 2 variants (18).
+
+ElevenLabs:
+    - voice id        configurable; default Joker-HL (matches in-game default)
+    - model           eleven_turbo_v2_5  (fast, callout-grade latency)
+    - output_format   ogg_vorbis         (engine decodes with stb_vorbis)
+    - voice_settings  stability 0.4 / similarity 0.85 / style 0.5 (per phrase)
+
+Usage:
+    export ELEVENLABS_API_KEY=sk_...
+    python3 tools/bake_buddy_voice.py                       # full bake
+    python3 tools/bake_buddy_voice.py --voice zmclHrhV...   # different voice
+    python3 tools/bake_buddy_voice.py --out run/buddy.wad   # custom path
+    python3 tools/bake_buddy_voice.py --dry-run             # print phrases, no API
+
+Idempotent: skips phrases whose OGG already exists in a cache directory,
+so re-runs only fetch what changed.  Use --force to redownload all.
+"""
+
+import argparse
+import hashlib
+import json
+import os
+import struct
+import sys
+import time
+import urllib.request
+import urllib.error
+from pathlib import Path
+
+
+# ---------- phrase table (37 entries, must match engine's runtime mapping) ----------
+
+# Lump names are exactly 8 ASCII chars (Doom WAD limit); we use the same `DS` prefix
+# as the engine's existing SFX lumps so the i_voice.c loader can range over `ds*`
+# lumps in the buddy.wad namespace without colliding with game-SFX lumps (which
+# live in the IWAD, not in buddy.wad).
+def _lump(name: str) -> str:
+    """Truncate/pad to exactly 8 chars (uppercase ASCII) per Doom WAD spec.
+    Truncation silently merges lumps -- this raises instead so the bake
+    script fails loudly on a typo rather than producing a WAD with collisions."""
+    n = name.upper().replace("-", "").replace("'", "").replace(".", "")
+    if len(n) > 8:
+        raise ValueError(f"lump name '{name}' is {len(n)} chars (>8); "
+                         f"shorten the prefix or the discriminator")
+    return (n + "        ")[:8]
+
+
+# Each entry: (lump_name_8char, phrase_to_speak)
+# Auto-callouts (10, from p_ai_coop.c:714-716, rotated by rate limiter).
+# Lump names are exactly 8 chars (Doom WAD spec): "DSCT" + "001".."004" for
+# contact, "DSHR" + "01".."03" for hurt, "DSCL" + "01".."03" for clear.
+CALLOUTS = [
+    ("DSCT001", "Contact!"),
+    ("DSCT002", "Tango, engaging!"),
+    ("DSCT003", "I see one!"),
+    ("DSCT004", "Got movement!"),
+    ("DSHR01",  "I'm hit!"),
+    ("DSHR02",  "Taking fire!"),
+    ("DSHR03",  "I need health!"),
+    ("DSCL01",  "Area clear."),
+    ("DSCL02",  "All quiet."),
+    ("DSCL03",  "Watch our six."),
+]
+
+# Where-state report (6, from p_ai_coop.c:368-369 `what[]`); HP/distance spoken
+# by the screen HUD already, so the voice only carries the semantic state.
+STATES = [
+    ("DSWFOLLOW", "Following you."),
+    ("DSWFIGHT",  "Fighting."),
+    ("DSWHEAL",   "Getting health."),
+    ("DSWHOLD",   "Holding position."),
+    ("DSWCOME",   "Coming to you."),
+    ("DSWGRAB",   "Grabbing an item."),
+]
+
+# Console replies (5, from c_console.c:262-264, p_ai_coop.c:412/428/432)
+REPLIES = [
+    ("DSSUMONOK", "On my way!"),
+    ("DSWAITHD",  "Holding position."),
+    ("DSWAITMV",  "Moving out."),
+    ("DSATACK",   "Attacking!"),
+    ("DSATNONE",  "No targets around."),
+]
+
+# Status report (16 = 9 weapons x {plain, with-ammo}); weapon names from
+# p_ai_coop.c:438-439 `wn[NUMWEAPONS]`.  Numbers (HP/armor/ammo) appear on
+# the HUD; the voice just announces the weapon.
+#
+# 4-letter weapon codes that are unique within the 8-char budget and don't
+# collide with each other.  Plain = name only, Ammo = name + " loaded".
+# Lump name = "DSST" + code + ("P"|"A")  ->  must be <= 8 chars.
+# "DSST" (4) + code (3) + P/A (1) = 8 chars max -> use 3-char codes.
+WEAPON_CODES = [
+    ("FIS",  "fists",          "Fists."),
+    ("PIS",  "pistol",         "Pistol."),
+    ("SHT",  "shotgun",        "Shotgun."),
+    ("CHG",  "chaingun",       "Chaingun."),
+    ("RCK",  "rocketlauncher", "Rocket launcher."),
+    ("PLS",  "plasma",         "Plasma rifle."),
+    ("BFG",  "bfg",            "B. F. G."),
+    ("CSW",  "chainsaw",       "Chainsaw."),
+    ("SSH",  "supershotgun",   "Super shotgun."),
+]
+WEAPONS_WITH_AMMO = {"PIS", "SHT", "CHG", "RCK", "PLS", "BFG", "SSH"}
+
+STATUS_LUMPS = []
+for code, _wkey, wname in WEAPON_CODES:
+    STATUS_LUMPS.append((_lump("DSST" + code + "P"), wname))
+    if code in WEAPONS_WITH_AMMO:
+        STATUS_LUMPS.append((_lump("DSST" + code + "A"), wname + " Loaded."))
+
+PHRASES = CALLOUTS + STATES + REPLIES + STATUS_LUMPS
+assert len(PHRASES) == 37, f"phrase count drifted: {len(PHRASES)} != 37"
+
+
+# ---------- ElevenLabs API ----------
+
+DEFAULT_VOICE = "wJmFT75XSkFKaBF1R0rX"      # "Joker-HL"; matches engine default
+DEFAULT_MODEL = "eleven_turbo_v2_5"
+# ElevenLabs does NOT support ogg_vorbis (their docs say so; we tried).
+# We fetch MP3 (mp3_44100_128) and transcode to OGG/Vorbis with ffmpeg below.
+API_URL = "https://api.elevenlabs.io/v1/text-to-speech/{voice}" \
+          "?output_format=mp3_44100_128&optimize_streaming_latency=0"
+
+
+def cfg_value(cfg_path, key):
+    """Read a 'key value' / 'key \"value\"' line from aidoom.cfg."""
+    try:
+        with open(cfg_path) as f:
+            for line in f:
+                parts = line.strip().split(None, 1)
+                if len(parts) == 2 and parts[0] == key:
+                    return parts[1].strip().strip('"')
+    except OSError:
+        pass
+    return None
+
+
+def fetch_mp3(phrase, voice, model, key, retries=3):
+    """POST to ElevenLabs TTS, return raw MP3 bytes (mp3_44100_128)."""
+    body = json.dumps({
+        "text": phrase,
+        "model_id": model,
+        "voice_settings": {
+            "stability": 0.4, "similarity_boost": 0.85, "style": 0.5,
+        },
+    }).encode()
+    req = urllib.request.Request(
+        API_URL.format(voice=voice),
+        data=body,
+        headers={"xi-api-key": key, "Content-Type": "application/json",
+                 "Accept": "audio/mpeg"},
+    )
+    last = None
+    for attempt in range(retries):
+        try:
+            with urllib.request.urlopen(req, timeout=30) as r:
+                return r.read()
+        except urllib.error.HTTPError as e:
+            last = e
+            if e.code in (429, 500, 502, 503, 504):
+                time.sleep(2 ** attempt)
+                continue
+            raise
+    raise last
+
+
+def _find_ffmpeg():
+    """Locate ffmpeg on PATH (we need it for MP3->OGG transcoding)."""
+    from shutil import which
+    for f in ("ffmpeg", "ffmpeg.exe"):
+        if which(f):
+            return f
+    return None
+
+
+def transcode_mp3_to_ogg(mp3_bytes, ffmpeg, trim_silence=True):
+    """Transcode MP3 bytes to OGG/Vorbis bytes using ffmpeg (in-memory).
+    With trim_silence=True (default), leading and trailing silence are
+    stripped via the silenceremove filter -- ElevenLabs TTS often pads
+    short phrases to ~30-42 seconds; without trim, "Contact!" would play
+    for almost a minute."""
+    import subprocess, tempfile
+    with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmpi:
+        tmpi.write(mp3_bytes); tmp_in = tmpi.name
+    tmp_out = tmp_in[:-4] + ".ogg"
+    try:
+        # silenceremove: strip silence >0.05s below -35dB at start/end.
+        # start_periods=1 means we keep audio up to the first non-silent
+        # stretch and drop everything before; same for end.
+        af = ("silenceremove=start_periods=1:start_duration=0.05:"
+              "start_threshold=-35dB:stop_periods=-1:stop_duration=0.05:"
+              "stop_threshold=-35dB") if trim_silence else "anull"
+        cmd = [ffmpeg, "-y", "-loglevel", "error",
+               "-i", tmp_in,
+               "-af", af,
+               "-c:a", "libvorbis", "-q:a", "5",  # ~96 kbps, good for speech
+               tmp_out]
+        subprocess.run(cmd, check=True, capture_output=True)
+        with open(tmp_out, "rb") as f:
+            return f.read()
+    finally:
+        for p in (tmp_in, tmp_out):
+            try: os.unlink(p)
+            except OSError: pass
+
+
+def fetch_ogg(phrase, voice, model, key, ffmpeg, trim_silence=True):
+    """End-to-end: fetch MP3 from ElevenLabs, return trimmed OGG/Vorbis bytes."""
+    mp3 = fetch_mp3(phrase, voice, model, key)
+    return transcode_mp3_to_ogg(mp3, ffmpeg, trim_silence=trim_silence)
+
+
+# ---------- Doom PWAD writer ----------
+
+# PWAD on-disk layout (little-endian), per Doom spec:
+#   header:      "PWAD" (4) + numlumps (4) + diroffset (4)              = 12 bytes
+#   lump data:   all lump bytes concatenated in directory order
+#   directory:   per-lump entry = filepos (4) + size (4) + name (8)    = 16 bytes
+# Directory is at the END of the file, not after the header.  Many loaders
+# accept both, but the Doom spec is unambiguous and `W_CheckNumForName` in
+# aiDoom's w_wad.c reads the directory from the file end (it was written
+# that way originally because files were streamed in order).
+def write_wad(out_path, lumps):
+    """`lumps` is a list of (8-char-name, bytes); writes a Doom PWAD."""
+    header_size = 12
+    data_off = header_size
+    # Lump data offsets are absolute within the file; compute them sequentially.
+    entries = []
+    cur = data_off
+    for name, data in lumps:
+        entries.append((cur, len(data), name))
+        cur += len(data)
+    dir_off = cur  # directory sits right after the lump data
+    # Header
+    with open(out_path, "wb") as f:
+        f.write(b"PWAD")
+        f.write(struct.pack("<II", len(lumps), dir_off))
+        # Lump data (no directory in between)
+        for _name, data in lumps:
+            f.write(data)
+        # Directory at end
+        for filepos, size, name in entries:
+            f.write(struct.pack("<II", filepos, size))
+            f.write(name.encode("ascii", "replace")[:8].ljust(8, b"\x00"))
+
+
+# ---------- main ----------
+
+def main():
+    ap = argparse.ArgumentParser(description="Bake aiDoom buddy voice into buddy.wad")
+    ap.add_argument("--voice", default=DEFAULT_VOICE)
+    ap.add_argument("--model", default=DEFAULT_MODEL)
+    ap.add_argument("--key",   default=None)
+    ap.add_argument("--cfg",   default="aidoom.cfg")
+    ap.add_argument("--out",   default="run/buddy.wad",
+                    help="output PWAD path (default: run/buddy.wad)")
+    ap.add_argument("--cache", default=".buddy_voice_cache",
+                    help="dir for raw OGGs (skips re-download on rerun)")
+    ap.add_argument("--force", action="store_true",
+                    help="redownload even if cached")
+    ap.add_argument("--dry-run", action="store_true",
+                    help="print the phrase table, do not call ElevenLabs")
+    ap.add_argument("--offline-test", action="store_true",
+                    help="skip ElevenLabs; emit 0.3s sine-tone OGGs via ffmpeg "
+                         "for smoke-testing the engine pipeline without API quota")
+    ap.add_argument("--no-trim", action="store_true",
+                    help="keep leading/trailing silence in OGGs "
+                         "(default: trim via ffmpeg silenceremove)")
+    args = ap.parse_args()
+
+    out_path = Path(args.out).resolve()
+    cache_dir = Path(args.cache).resolve()
+
+    if args.dry_run:
+        print(f"voice={args.voice} model={args.model}")
+        print(f"phrases ({len(PHRASES)}):")
+        for name, phrase in PHRASES:
+            print(f"  {name}  <-  {phrase!r}")
+        print(f"would write -> {out_path}")
+        return 0
+
+    # Offline-test mode: synthesise sine-tone OGGs with ffmpeg.  Useful for
+    # smoke-testing the engine's OGG-decode + audio-stream pipeline without
+    # burning ElevenLabs quota.  No key required.
+    if args.offline_test:
+        import subprocess
+        for f in ("ffmpeg", "ffmpeg.exe"):
+            from shutil import which as _which
+            if _which(f):
+                FFMPEG = f
+                break
+        else:
+            print("ERROR: --offline-test needs ffmpeg on PATH.", file=sys.stderr)
+            return 2
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        lumps = []
+        manifest_lines = []
+        print(f"bake_buddy_voice: OFFLINE-TEST mode (sine-tone OGGs) -> {out_path}")
+        for i, (name, phrase) in enumerate(PHRASES, 1):
+            cached = cache_dir / f"{name}_offline.ogg"
+            # 220 Hz base + 11 Hz per index so each phrase is a distinct tone
+            freq = 220 + i * 11
+            # No trim in offline-test (sine has no silence to remove).
+            af = "anull"
+            cmd = [FFMPEG, "-y", "-loglevel", "error",
+                   "-f", "lavfi",
+                   "-i", f"sine=frequency={freq}:duration=0.3",
+                   "-af", af,
+                   "-c:a", "libvorbis", "-q:a", "0",
+                   str(Path(cached).resolve())]
+            subprocess.run (cmd, check=True, capture_output=True)
+            data = cached.read_bytes()
+            lumps.append((name, data))
+            manifest_lines.append(f"{name}\t{phrase}\toffline-sine({freq}Hz)\t{len(data)}\n")
+            print(f"  [{i:2d}/{len(PHRASES)}] {name}  '{phrase}' -> {freq} Hz")
+        write_wad(out_path, lumps)
+        (out_path.parent / "buddy_voice_manifest.txt").write_text(
+            f"OFFLINE-TEST MODE (sine tones)\n"
+            f"generated={time.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+            + "".join(manifest_lines)
+        )
+        total = sum(len(d) for _n, d in lumps)
+        print(f"\nbake_buddy_voice: wrote {out_path}  ({len(lumps)} lumps, {total} bytes)")
+        return 0
+
+    key = args.key or os.environ.get("ELEVENLABS_API_KEY") \
+          or cfg_value(args.cfg, "elevenlabs_api_key")
+    if not key:
+        print("ERROR: no ElevenLabs API key (set ELEVENLABS_API_KEY or "
+              "pass --key / put 'elevenlabs_api_key ...' in aidoom.cfg).",
+              file=sys.stderr)
+        return 2
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    cache_dir.mkdir(parents=True, exist_ok=True)
+
+    print(f"bake_buddy_voice: voice={args.voice} model={args.model}")
+    print(f"  cache={cache_dir}\n  out={out_path}")
+    print(f"  {len(PHRASES)} phrases\n")
+
+    lumps = []
+    manifest_lines = []
+    ffmpeg = _find_ffmpeg()
+    if not ffmpeg:
+        print("ERROR: ffmpeg not found on PATH (needed for MP3->OGG transcode).",
+              file=sys.stderr)
+        return 2
+    for i, (name, phrase) in enumerate(PHRASES, 1):
+        # Cache key is content-addressed on phrase+voice+model so different
+        # voices land in separate files.
+        h = hashlib.sha1(f"{args.voice}|{args.model}|{phrase}".encode()).hexdigest()[:16]
+        cached = cache_dir / f"{name}_{h}.ogg"
+        if cached.exists() and not args.force:
+            data = cached.read_bytes()
+            src = "cached"
+        else:
+            print(f"  [{i:2d}/{len(PHRASES)}] {name}  '{phrase}' ...", end="", flush=True)
+            try:
+                data = fetch_ogg(phrase, args.voice, args.model, key, ffmpeg,
+                                  trim_silence=not args.no_trim)
+            except Exception as e:
+                print(f" FAILED: {e}", file=sys.stderr)
+                return 3
+            cached.write_bytes(data)
+            print(f" {len(data)} bytes")
+            src = "fetched"
+            # Be polite to the API
+            time.sleep(0.3)
+        lumps.append((name, data))
+        manifest_lines.append(f"{name}\t{phrase}\t{src}\t{len(data)}\n")
+
+    write_wad(out_path, lumps)
+
+    # Manifest next to the WAD for reproducibility.
+    (out_path.parent / "buddy_voice_manifest.txt").write_text(
+        f"voice={args.voice}\nmodel={args.model}\n"
+        f"generated={time.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+        + "".join(manifest_lines)
+    )
+
+    total = sum(len(d) for _n, d in lumps)
+    print(f"\nbake_buddy_voice: wrote {out_path}  ({len(lumps)} lumps, {total} bytes)")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

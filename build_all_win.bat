@@ -24,6 +24,13 @@ echo [build] === tools (config + gpumon) ===
 cd /d "%ROOT%tools"
 nmake /nologo /f Makefile.msvc %* || exit /b 1
 
+REM --- copy the aiDoom engine + tool binaries (+SDL3.dll) into run\ ---
+echo [build] === copy outputs to run\ ===
+copy /Y "%ROOT%files\aidoom.exe"      "%ROOT%run\aidoom.exe"      >nul || exit /b 1
+copy /Y "%ROOT%tools\aidoom_config.exe" "%ROOT%run\aidoom_config.exe" >nul || exit /b 1
+copy /Y "%ROOT%tools\gpumon_sdl.exe"  "%ROOT%run\gpumon.exe"      >nul || exit /b 1
+if exist "%ROOT%files\SDL3.dll" copy /Y "%ROOT%files\SDL3.dll" "%ROOT%run\SDL3.dll" >nul
+
 echo.
 echo [build] OK -- aidoom.exe + aidoom_config.exe + gpumon.exe built and copied to run\.
 endlocal

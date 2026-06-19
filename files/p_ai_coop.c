@@ -78,8 +78,7 @@ void P_AICoop_Init (void)
     coop_slot = 1;
     aicoop = 1;
     playeringame[1] = true;		// spawn the buddy at the co-op start
-    { FILE* f = fopen ("buddy_say.txt", "w"); if (f) fclose (f); }	// fresh voice log
-    printf ("P_AICoop: AI co-op companion enabled (player 2)\n");
+        printf ("P_AICoop: AI co-op companion enabled (player 2)\n");
 }
 
 // The slot the buddy occupies (-1 if disabled).  Used by g_game.c to skip the
@@ -87,9 +86,17 @@ void P_AICoop_Init (void)
 // networked, so there is no remote command to validate against.
 int P_AICoop_Slot (void)
 {
-    return aicoop ? coop_slot : -1;
+    if (!aicoop) return -1;
+    return coop_slot;
 }
 
+// Public read-only accessor for coop_state (used by c_console.c for the voice
+// tag mapping).  Returns -1 if the buddy is inactive.
+int P_AICoop_State (void)
+{
+    if (!aicoop) return -1;
+    return coop_state;
+}
 
 // The live companion mobj, or NULL if there isn't one right now.
 static mobj_t* AICoop_Mo (void)
@@ -121,34 +128,51 @@ static mobj_t* AICoop_NearestHuman (fixed_t x, fixed_t y)
 
 
 // ----------------------------------------------------------------- voice
-// The buddy "speaks" by appending a line to buddy_say.txt; the external helper
-// tools/buddy_voice.py tails it, runs ElevenLabs TTS (voice Joker-HL) and plays
-// the audio.  Writing a file is a harmless side effect -- it never touches game
-// state, so the deterministic playsim is unaffected and the tic never blocks on
-// the network.  No-op'd off the playsim path otherwise.
-static void AICoop_Say (const char* s)
+// The buddy speaks through i_voice.c, which plays an offline-baked OGG from
+// buddy.wad via a dedicated SDL3 audio stream.  We pass a "tag" (e.g.
+// "contact:0", "state:fighting") and i_voice maps it to the right lump.
+// All best-effort: if buddy.wad isn't present or the lump is missing, the
+// call is a silent no-op and the deterministic playsim is unaffected.
+#include "i_voice.h"
+
+static const char* AICOOP_STATE_TAGS[] =
 {
-    FILE* f = fopen ("buddy_say.txt", "a");
-    if (f) { fprintf (f, "%s\n", s); fclose (f); }
+    "state:following",   // COOP_STATE_FOLLOW
+    "state:fighting",    // COOP_STATE_FIGHT
+    "state:healing",     // COOP_STATE_HEAL
+    "state:holding",     // COOP_STATE_HOLD
+    "state:coming",      // COOP_STATE_COME
+    "state:grabbing",    // COOP_STATE_GRAB
+};
+
+static void AICoop_SayTag (const char* tag)
+{
+    I_Voice_Say (tag);
 }
 
-// Rate-limited automatic line (combat/ambient): at most one every few seconds, and
-// rotate through the given pool so it doesn't repeat the same phrase back-to-back.
-static void AICoop_Callout (const char* const* pool, int n)
+// Rate-limited automatic line (combat/ambient): at most one every few seconds,
+// rotating through the tag suffixes "0","1","2","3" so the buddy doesn't
+// repeat the same phrase back-to-back.  tagprefix is e.g. "contact:" or
+// "hurt:"; the index is appended (e.g. "contact:2").
+static void AICoop_Callout (const char* tagprefix, int n)
 {
-    static int	last, idx;
+    static int last, idx;
     if (gametic - last < 4*TICRATE) return;
     last = gametic;
-    AICoop_Say (pool[idx % n]);
+    static char buf[32];
+    snprintf (buf, sizeof(buf), "%s%d", tagprefix, idx % n);
+    AICoop_SayTag (buf);
     idx++;
 }
 
-// Speak a console reply (the "[Buddy] ..." text), used for where/come/wait/etc.
-void P_AICoop_Voice (const char* line)
+// Speak a tagged phrase through i_voice.c (offline OGG via buddy.wad).
+// The "[Buddy] ..." console text is unaffected -- this is just the audio.
+// Callers pick the exact tag (e.g. "summon_ok", "state:fighting"); the
+// tag -> lump-name mapping lives in i_voice.c.
+void P_AICoop_VoiceTag (const char* tag)
 {
-    if (!aicoop || !line) return;
-    if (!strncmp (line, "[Buddy] ", 8)) line += 8;	// drop the chat tag for speech
-    AICoop_Say (line);
+    if (!aicoop || !tag) return;
+    AICoop_SayTag (tag);
 }
 
 
@@ -710,17 +734,16 @@ void P_AICoop_BuildCmd (void)
     heal = (bot->health < COOP_HEAL_HP) ? AICoop_FindHealth (mo) : NULL;
 
     // Voice: automatic combat / hurt / all-clear callouts (rate-limited).
-    {
-	static const char* contact[] = { "Contact!", "Tango -- engaging!", "I see one!", "Got movement!" };
-	static const char* hurt[]    = { "I'm hit!", "Taking fire!", "I need health!" };
-	static const char* clear[]   = { "Area clear.", "All quiet.", "Watch our six." };
-	static mobj_t*	lasttgt;
-	static int	lasthp = 100;
-	if (tgt && !lasttgt)				AICoop_Callout (contact, 4);
-	else if (!tgt && lasttgt)			AICoop_Callout (clear, 3);
-	if (bot->health < COOP_HEAL_HP && lasthp >= COOP_HEAL_HP) AICoop_Callout (hurt, 3);
-	lasttgt = tgt; lasthp = bot->health;
-    }
+        // The phrases themselves live as OGG lumps in buddy.wad; we just hand
+        // the tag prefix to AICoop_Callout, which appends the rotated index.
+        {
+    	static mobj_t*	lasttgt;
+    	static int	lasthp = 100;
+    	if (tgt && !lasttgt)				AICoop_Callout ("contact:", 4);
+    	else if (!tgt && lasttgt)			AICoop_Callout ("clear:",   3);
+    	if (bot->health < COOP_HEAL_HP && lasthp >= COOP_HEAL_HP) AICoop_Callout ("hurt:", 3);
+    	lasttgt = tgt; lasthp = bot->health;
+        }
 
     if (summon > 0)     summon--;
     if (forceaggro > 0) forceaggro--;
