@@ -78,6 +78,7 @@ void P_AICoop_Init (void)
     coop_slot = 1;
     aicoop = 1;
     playeringame[1] = true;		// spawn the buddy at the co-op start
+    { FILE* f = fopen ("buddy_say.txt", "w"); if (f) fclose (f); }	// fresh voice log
     printf ("P_AICoop: AI co-op companion enabled (player 2)\n");
 }
 
@@ -116,6 +117,38 @@ static mobj_t* AICoop_NearestHuman (fixed_t x, fixed_t y)
 	if (!best || d < bestd) { best = m; bestd = d; }
     }
     return best;
+}
+
+
+// ----------------------------------------------------------------- voice
+// The buddy "speaks" by appending a line to buddy_say.txt; the external helper
+// tools/buddy_voice.py tails it, runs ElevenLabs TTS (voice Joker-HL) and plays
+// the audio.  Writing a file is a harmless side effect -- it never touches game
+// state, so the deterministic playsim is unaffected and the tic never blocks on
+// the network.  No-op'd off the playsim path otherwise.
+static void AICoop_Say (const char* s)
+{
+    FILE* f = fopen ("buddy_say.txt", "a");
+    if (f) { fprintf (f, "%s\n", s); fclose (f); }
+}
+
+// Rate-limited automatic line (combat/ambient): at most one every few seconds, and
+// rotate through the given pool so it doesn't repeat the same phrase back-to-back.
+static void AICoop_Callout (const char* const* pool, int n)
+{
+    static int	last, idx;
+    if (gametic - last < 4*TICRATE) return;
+    last = gametic;
+    AICoop_Say (pool[idx % n]);
+    idx++;
+}
+
+// Speak a console reply (the "[Buddy] ..." text), used for where/come/wait/etc.
+void P_AICoop_Voice (const char* line)
+{
+    if (!aicoop || !line) return;
+    if (!strncmp (line, "[Buddy] ", 8)) line += 8;	// drop the chat tag for speech
+    AICoop_Say (line);
 }
 
 
@@ -675,6 +708,19 @@ void P_AICoop_BuildCmd (void)
 
     tgt  = AICoop_FindTarget (mo);
     heal = (bot->health < COOP_HEAL_HP) ? AICoop_FindHealth (mo) : NULL;
+
+    // Voice: automatic combat / hurt / all-clear callouts (rate-limited).
+    {
+	static const char* contact[] = { "Contact!", "Tango -- engaging!", "I see one!", "Got movement!" };
+	static const char* hurt[]    = { "I'm hit!", "Taking fire!", "I need health!" };
+	static const char* clear[]   = { "Area clear.", "All quiet.", "Watch our six." };
+	static mobj_t*	lasttgt;
+	static int	lasthp = 100;
+	if (tgt && !lasttgt)				AICoop_Callout (contact, 4);
+	else if (!tgt && lasttgt)			AICoop_Callout (clear, 3);
+	if (bot->health < COOP_HEAL_HP && lasthp >= COOP_HEAL_HP) AICoop_Callout (hurt, 3);
+	lasttgt = tgt; lasthp = bot->health;
+    }
 
     if (summon > 0)     summon--;
     if (forceaggro > 0) forceaggro--;

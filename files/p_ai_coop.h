@@ -24,6 +24,10 @@ void P_AICoop_BuildCmd (void);
 // consistency check for it (the buddy is local-but-deterministic, never sent).
 int  P_AICoop_Slot (void);
 
+// Speak a line via the voice helper (writes buddy_say.txt -> tools/buddy_voice.py).
+// Pass a "[Buddy] ..." reply; the tag is stripped.  No-op unless the buddy is active.
+void P_AICoop_Voice (const char* line);
+
 // Console commands (used by c_console.c).  The const char* ones return a short
 // "[Buddy] ..." reply to print; P_AICoop_Summon returns 1 if a companion exists.
 const char*	P_AICoop_Report (void);		// "where"  -- distance/dir/HP/doing

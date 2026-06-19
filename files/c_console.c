@@ -257,16 +257,17 @@ static void C_Execute (char* line)
 	}
     }
     else if (!strcmp(cmd, "where") || !strcmp(cmd, "buddy") || !strcmp(cmd, "comp"))
-	C_Printf ("%s", P_AICoop_Report ());
+	{ const char* r = P_AICoop_Report ();        C_Printf ("%s", r); P_AICoop_Voice (r); }
     else if (!strcmp(cmd, "come") || !strcmp(cmd, "follow"))
-	C_Printf ("%s", P_AICoop_Summon () ? "[Buddy] On my way!"
-					   : "[Buddy] (no companion -- launch with -aicoop)");
+	{ const char* r = P_AICoop_Summon () ? "[Buddy] On my way!"
+					     : "[Buddy] (no companion -- launch with -aicoop)";
+	  C_Printf ("%s", r); P_AICoop_Voice (r); }
     else if (!strcmp(cmd, "wait") || !strcmp(cmd, "stay"))
-	C_Printf ("%s", P_AICoop_Wait ());
+	{ const char* r = P_AICoop_Wait ();          C_Printf ("%s", r); P_AICoop_Voice (r); }
     else if (!strcmp(cmd, "attack"))
-	C_Printf ("%s", P_AICoop_Attack ());
+	{ const char* r = P_AICoop_Attack ();        C_Printf ("%s", r); P_AICoop_Voice (r); }
     else if (!strcmp(cmd, "report") || !strcmp(cmd, "status"))
-	C_Printf ("%s", P_AICoop_StatusReport ());
+	{ const char* r = P_AICoop_StatusReport ();  C_Printf ("%s", r); P_AICoop_Voice (r); }
     else if (!strcmp(cmd, "director") || !strcmp(cmd, "ai") || !strcmp(cmd, "llm"))
 	C_Printf ("%s", P_AI_Console (args));
     else

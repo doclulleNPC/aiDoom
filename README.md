@@ -215,6 +215,21 @@ The **monster** LLM director (a separate system — it drives the *monsters*, no
 companion) can be toggled live from the console: `director on` / `director off` /
 `director demo`.
 
+### Buddy voice (ElevenLabs TTS)
+
+The buddy can **speak** — combat callouts ("Contact!", "I'm hit!"), all-clear, and
+its console replies (`where`/`report`/`come`/…) — in the **"Joker-HL"** voice. The
+engine never calls the network itself (that would stall the tic): it appends each
+line to `buddy_say.txt`, and a small helper does the text-to-speech and playback:
+
+```sh
+export ELEVENLABS_API_KEY=sk_...          # your key (or put 'elevenlabs_api_key sk_...' in aidoom.cfg)
+cd run && python3 ../tools/buddy_voice.py # run alongside the game; needs ffplay/mpg123 for audio
+```
+
+Stdlib-only, no pip install. Without a key it just prints the lines. **Never commit
+the API key** — keep it in the (gitignored) `aidoom.cfg` or an env var.
+
 ## Configuration
 
 Everything lives in **one file, `aidoom.cfg`, in the working folder** (next to the

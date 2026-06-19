@@ -65,6 +65,10 @@ run/aidoom2.cfg
 Bildschirmfoto_*.png
 stuck.png
 hand.png
+
+# runtime artifacts
+buddy_say.txt
+run/buddy_say.txt
 tools/aidoom_config.exe
 run/aidoom_config.exe
 tools/gpumon_sdl
