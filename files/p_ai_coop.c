@@ -55,7 +55,7 @@ static mobj_t*	forcetarget;		// the forced attack target
 #define COOP_RUN	0x32		// forwardmove "run" magnitude
 #define COOP_HEAL_HP	50		// seek a med-pack below this health
 #define COOP_HEAL_RANGE	(1024*FRACUNIT)	// how far to look for one
-#define COOP_ITEM_RANGE	(1024*FRACUNIT)	// how far to look for an idle pickup
+#define COOP_ITEM_RANGE	(256*FRACUNIT)	// idle pickups only when right nearby (not "miles away")
 #define COOP_SUMMON_TICS (7*TICRATE)	// "come" runs to you for this long
 #define COOP_ATTACK_TICS (10*TICRATE)	// "attack" charges the target for this long
 
@@ -709,6 +709,18 @@ static boolean PF_NextWaypoint (mobj_t* mo, fixed_t dx, fixed_t dy, fixed_t* wx,
 }
 
 
+// Move toward a world point using forward+side thrust, so the buddy heads
+// straight there *regardless of which way it's facing*.  Pure forwardmove only
+// goes where the marine looks, and the slow turn (COOP_TURN) lags -- so while
+// turning it walks the wrong way, drifts into walls and snags on corners.
+// angleturn still faces the target separately (for aiming/firing).
+static void AICoop_ThrustToward (ticcmd_t* cmd, mobj_t* mo, fixed_t tx, fixed_t ty)
+{
+    angle_t rel = (R_PointToAngle2 (mo->x, mo->y, tx, ty) - mo->angle) >> ANGLETOFINESHIFT;
+    cmd->forwardmove =  (signed char)(FixedMul (COOP_RUN*FRACUNIT, finecosine[rel]) >> FRACBITS);
+    cmd->sidemove    = -(signed char)(FixedMul (COOP_RUN*FRACUNIT, finesine[rel])   >> FRACBITS);
+}
+
 void P_AICoop_BuildCmd (void)
 {
     player_t*	bot;
@@ -896,17 +908,18 @@ void P_AICoop_BuildCmd (void)
 	if (turn >  COOP_TURN) turn =  COOP_TURN;
 	if (turn < -COOP_TURN) turn = -COOP_TURN;
 	cmd->angleturn   = (short)turn;
-	cmd->forwardmove = COOP_RUN;
+	AICoop_ThrustToward (cmd, mo, pl->x, pl->y);
 	triedmove = 1;
     }
     else
     {
 	triedmove = (movethresh >= 0 && dist > movethresh);
 
-	// For low-priority moves (following), don't step onto a damaging floor.
+	// For low-priority moves (following), don't step onto a damaging floor --
+	// check the actual move direction (toward the waypoint), not just facing.
 	if (triedmove && avoiddamage)
 	{
-	    unsigned fa = mo->angle >> ANGLETOFINESHIFT;
+	    unsigned fa = R_PointToAngle2 (mo->x, mo->y, stx, sty) >> ANGLETOFINESHIFT;
 	    fixed_t  ax = mo->x + FixedMul (32*FRACUNIT, finecosine[fa]);
 	    fixed_t  ay = mo->y + FixedMul (32*FRACUNIT, finesine[fa]);
 	    if (AICoop_DamagingFloor (ax, ay))
@@ -914,8 +927,13 @@ void P_AICoop_BuildCmd (void)
 	}
 
 	if (triedmove)
-	    cmd->forwardmove = COOP_RUN;
+	    AICoop_ThrustToward (cmd, mo, stx, sty);	// straight to the waypoint
     }
+
+    // Navigating but wedged (no progress) on something that isn't a door -> force
+    // a fresh path next tic so we don't keep ramming the same corner/waypoint.
+    if (navigate && triedmove && stuck && doorwait == 0)
+	navtimer = 0;
 
     // Doors: if we're trying to move but stuck (e.g. pushing a closed door), tap
     // Use *once*, then leave it alone for a bit -- spamming Use re-triggers a DR
