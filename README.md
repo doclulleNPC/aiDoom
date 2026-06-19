@@ -218,7 +218,7 @@ companion) can be toggled live from the console: `director on` / `director off` 
 ### Buddy voice (ElevenLabs TTS)
 
 The buddy can **speak** — combat callouts ("Contact!", "I'm hit!"), all-clear, and
-its console replies (`where`/`report`/`come`/…) — in the **"DoomSlayer"** voice. The
+its console replies (`where`/`report`/`come`/…) — in the **"Joker-HL"** voice. The
 engine never calls the network itself (that would stall the tic): it appends each
 line to `buddy_say.txt`, and a small helper does the text-to-speech and playback:
 

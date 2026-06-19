@@ -122,7 +122,7 @@ static mobj_t* AICoop_NearestHuman (fixed_t x, fixed_t y)
 
 // ----------------------------------------------------------------- voice
 // The buddy "speaks" by appending a line to buddy_say.txt; the external helper
-// tools/buddy_voice.py tails it, runs ElevenLabs TTS (voice DoomSlayer) and plays
+// tools/buddy_voice.py tails it, runs ElevenLabs TTS (voice Joker-HL) and plays
 // the audio.  Writing a file is a harmless side effect -- it never touches game
 // state, so the deterministic playsim is unaffected and the tic never blocks on
 // the network.  No-op'd off the playsim path otherwise.

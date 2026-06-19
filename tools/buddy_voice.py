@@ -3,7 +3,7 @@
 #
 # The game (files/p_ai_coop.c) appends each spoken line to buddy_say.txt in its
 # working dir (run/).  This helper tails that file and, for every new line, calls
-# the ElevenLabs text-to-speech API with the "DoomSlayer" voice and plays the audio.
+# the ElevenLabs text-to-speech API with the "Joker-HL" voice and plays the audio.
 # It never touches the game -- the engine stays deterministic and never blocks on
 # the network.  Run it alongside the game:
 #
@@ -17,7 +17,7 @@
 
 import os, sys, time, json, tempfile, subprocess, urllib.request, urllib.error, argparse
 
-DEFAULT_VOICE = "zmclHrhV7VYdPfzybfK6"      # ElevenLabs "DoomSlayer"
+DEFAULT_VOICE = "wJmFT75XSkFKaBF1R0rX"      # ElevenLabs "Joker-HL"
 DEFAULT_MODEL = "eleven_turbo_v2_5"         # fast, low latency for callouts
 API = "https://api.elevenlabs.io/v1/text-to-speech/{vid}"
 
