@@ -130,6 +130,11 @@ upscale of 320x200. Key design (ported from `../sdldoom-1.10`, adapted to SDL 1.
   `M_DrawVideo`/`M_VideoRes`/`M_VideoFullscreen`, drawn as text — no graphic lumps),
   or `-1`/`-2`/`-3`/`-4` / `-render N` at startup. Persisted in the config as
   `screen_resolution` and `fullscreen` (`m_misc.c` `defaults[]`).
+- **Video filters** (Options → Video, default off, persisted as `antialiasing`/`blur`):
+  `antialiasing` toggles the texture scale mode (`SDL_SCALEMODE_LINEAR` vs `NEAREST`,
+  smooths the upscale to the window), `blur` runs a 1-2-1 separable soft blur
+  (`I_BlurFrame`) over the 32-bit frame each present (`i_video.c`). VSync is forced on
+  (`SDL_SetRenderVSync`) — SDL3 defaults it off, which tore the frame on fast strafes.
 - **`visplane_t.top/bottom` (`r_defs.h`) are `unsigned short`, not `byte`** — they
   hold screen row numbers, which exceed 255 above hires=1; the "unset" sentinel is
   `0xffff` (in `r_plane.c`). A `byte` here silently truncated rows >255 and broke
