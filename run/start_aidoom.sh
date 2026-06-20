@@ -1,23 +1,36 @@
 #!/usr/bin/env bash
 #
-# start_aidoom.sh -- wait for Ollama, then launch aiDoom (+ the LLM director).
-# Linux/macOS counterpart of start_aidoom.bat / start_aidoom.ps1.
+# start_aidoom.sh -- launch aiDoom (optionally with the LLM director and/or
+# the AI co-op companion).  Linux/macOS counterpart of start_aidoom.bat /
+# start_aidoom.ps1.
 #
-# Checks the Ollama server is up and the model is available, optionally warms it
-# into memory, starts aidoom with the -aidirector TCP server, then runs the
-# Python director client that drives the monsters.
+# Modes (defaults: OFF for everything; plain `aidoom` with no extras):
+#   default       : plain aiDoom -- no LLM director, no buddy, no Ollama check.
+#                   Fastest startup; works fully offline.
+#   --buddy       : enable the rule-based co-op companion ("buddy", player 2).
+#                   Passes -coop to aidoom.  Local + deterministic, no LLM needed.
+#                   (For buddy-only with NO director, use start_buddy.sh.)
+#   --aicoop      : enable the AI/LLM-backed companion.  Passes -aicoop, which is a
+#                   DISTINCT flag from -coop (the two are mutually exclusive); today
+#                   it falls back to the rule-based behaviour until the AI companion
+#                   layer ships (see AI_IMPROVEMENTS.md #1).
+#   --director    : enable the LLM monster director.  Waits for Ollama, warms
+#                   the model, launches the game + director client.  Implies
+#                   Ollama host/port/model from aidoom.cfg or flags.
+#   --director --buddy : both -- buddy + LLM-driven monsters.
 #
 # Usage:
-#   ./start_aidoom.sh
-#   ./start_aidoom.sh --model qwen3:8b --skill 4 --friendlyfire
-#   ./start_aidoom.sh --no-director            # just the game, no LLM
-#   ./start_aidoom.sh --no-coop                # disable the AI co-op companion
+#   ./start_aidoom.sh                          # plain aidoom (offline, fast)
+#   ./start_aidoom.sh --buddy                  # + rule-based co-op buddy
+#   ./start_aidoom.sh --aicoop                  # + AI/LLM co-op buddy (-aicoop)
+#   ./start_aidoom.sh --director               # + LLM monster director
+#   ./start_aidoom.sh --director --buddy       # + buddy + LLM director
+#   ./start_aidoom.sh --director --model qwen3:8b --skill 4 --friendlyfire
 #   ./start_aidoom.sh --ollama http://localhost:11434
-# The AI co-op companion (player 2) is ON by default; disable it with --no-coop.
-# Unrecognized args are passed straight through to aidoom.
 #
 # Requires: SDL3 installed (to run the binary) and the aidoom binary built
-# (see README; e.g. in files/). Python 3 (stdlib only) for the director.
+# (see README; e.g. in files/).  Python 3 (stdlib only) only needed for the
+# director client (skipped unless --director).
 
 set -u
 
@@ -29,9 +42,11 @@ MAP=1
 SKILL=4
 OLLAMA="http://192.168.2.114:11434"
 FRIENDLYFIRE=0
-NODIRECTOR=0
+NODIRECTOR=1		# default OFF -- plain aidoom, no LLM, no Ollama check
 NOWARM=0
-COOP=1			# AI co-op companion (player 2) on by default; --no-coop to disable
+BUDDY=0			# default OFF -- plain aidoom, no co-op companion
+AIBUDDY=0			# default OFF -- --aicoop enables the AI/LLM buddy (-aicoop)
+DIRECTOR=0		# default OFF -- explicit --director enables the LLM monster director
 GAME_EXTRA=()
 
 # aidoom.cfg (next to this script, written by the SDL3 config app) overrides the
@@ -45,6 +60,11 @@ if [ -f "$_here_pre/aidoom.cfg" ]; then
     [ -n "$_m" ] && MODEL="$_m"
 fi
 
+# --- helper output functions (defined early so the arg parser can use them) ---
+info(){ printf '\033[36m[start] %s\033[0m\n' "$*"; }
+warn(){ printf '\033[33m[start] %s\033[0m\n' "$*"; }
+die(){  printf '\033[31m[start] %s\033[0m\n' "$*" >&2; exit 1; }
+
 while [ $# -gt 0 ]; do
     case "$1" in
         --model)        MODEL="$2"; shift 2;;
@@ -54,20 +74,21 @@ while [ $# -gt 0 ]; do
         --skill)        SKILL="$2"; shift 2;;
         --ollama)       OLLAMA="$2"; shift 2;;
         --friendlyfire) FRIENDLYFIRE=1; shift;;
-        --no-director)  NODIRECTOR=1; shift;;
+        --director)     DIRECTOR=1; NODIRECTOR=0; shift;;
+        --no-director)  NODIRECTOR=1; shift;;    # legacy alias
+        --buddy)        BUDDY=1; shift;;
+        --no-buddy)     BUDDY=0; shift;;
+        --aicoop)       AIBUDDY=1; shift;;   # AI/LLM-backed buddy (-aicoop); falls back to rule-based until the AI layer ships
+        --no-coop)      warn "--no-coop is deprecated, use --no-buddy"; BUDDY=0; shift;;
+        --coop)         warn "--coop is deprecated, use --buddy"; BUDDY=1; shift;;
         --no-warm)      NOWARM=1; shift;;
-        --no-coop)      COOP=0; shift;;
-        --coop)         COOP=1; shift;;
         -h|--help)
-            sed -n '3,20p' "$0"; exit 0;;
+            sed -n '3,30p' "$0"; exit 0;;
         *)              GAME_EXTRA+=("$1"); shift;;
     esac
 done
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-info(){ printf '\033[36m[start] %s\033[0m\n' "$*"; }
-warn(){ printf '\033[33m[start] %s\033[0m\n' "$*"; }
-die(){  printf '\033[31m[start] %s\033[0m\n' "$*" >&2; exit 1; }
 
 command -v curl >/dev/null 2>&1 || die "curl is required."
 
@@ -89,19 +110,24 @@ for c in "$HOME/.doom-agent/bin/python" python3 python; do
 done
 
 # --- 1. wait for the Ollama server ---
-info "waiting for Ollama at $OLLAMA ..."
-ready=0
-for i in $(seq 1 30); do
-    if curl -s -m 3 "$OLLAMA/api/version" >/dev/null 2>&1; then
-        info "Ollama is up ($(curl -s -m 3 "$OLLAMA/api/version"))."
-        ready=1; break
-    fi
-    sleep 1
-done
-[ "$ready" = 1 ] || die "Ollama not reachable at $OLLAMA. Start it: 'ollama serve' (set OLLAMA_HOST=0.0.0.0 for remote access)."
+# Only when the director is enabled.  Default (--director not given) skips
+# Ollama entirely so the game launches immediately, even if Ollama is offline
+# / slow / not running.  Pass --director to opt in.
+if [ "$NODIRECTOR" = 1 ]; then
+    info "no director -- skipping Ollama check and model warmup."
+else
+    info "waiting for Ollama at $OLLAMA ..."
+    ready=0
+    for i in $(seq 1 30); do
+        if curl -s -m 3 "$OLLAMA/api/version" >/dev/null 2>&1; then
+            info "Ollama is up ($(curl -s -m 3 "$OLLAMA/api/version"))."
+            ready=1; break
+        fi
+        sleep 1
+    done
+    [ "$ready" = 1 ] || die "Ollama not reachable at $OLLAMA. Start it: 'ollama serve' (set OLLAMA_HOST=0.0.0.0 for remote access)."
 
-# --- 2/3. check the model is present, then warm it into memory ---
-if [ "$NODIRECTOR" = 0 ]; then
+    # --- 2/3. check the model is present, then warm it into memory ---
     if curl -s -m 5 "$OLLAMA/api/tags" 2>/dev/null | grep -q "\"$MODEL\""; then
         info "model '$MODEL' is available."
         if [ "$NOWARM" = 0 ]; then
@@ -119,9 +145,14 @@ if [ "$NODIRECTOR" = 0 ]; then
     fi
 fi
 
-# --- 4. start aiDoom with the AI director TCP server ---
-gameargs=( -warp "$EPISODE" "$MAP" -skill "$SKILL" -aidirector "$PORT" )
-[ "$COOP" = 1 ]        && gameargs+=( -aicoop )
+# --- 4. start aiDoom ---
+# Default: nothing extra -- vanilla aiDoom, no -aidirector (no TCP server), no
+# buddy.  Pass --director to add -aidirector + the Python client; pass --buddy to
+# add -coop (rule-based companion) or --aicoop to add -aicoop (AI/LLM companion).
+gameargs=( -warp "$EPISODE" "$MAP" -skill "$SKILL" )
+[ "$NODIRECTOR" = 0 ] && gameargs+=( -aidirector "$PORT" )
+[ "$BUDDY" = 1 ] && [ "$AIBUDDY" = 0 ] && gameargs+=( -coop )    # rule-based buddy
+[ "$AIBUDDY" = 1 ]   && gameargs+=( -aicoop )   # AI/LLM buddy; -coop and -aicoop are mutually exclusive (aicoop wins)
 [ "$FRIENDLYFIRE" = 1 ] && gameargs+=( -friendlyfire )
 [ ${#GAME_EXTRA[@]} -gt 0 ] && gameargs+=( "${GAME_EXTRA[@]}" )
 
@@ -132,7 +163,7 @@ GAME_PID=$!
 trap 'kill "$GAME_PID" 2>/dev/null' EXIT INT TERM
 
 if [ "$NODIRECTOR" = 1 ]; then
-    info "no director (just the game)."
+    info "no director -- buddy: $([ "$BUDDY" = 1 ] && echo ON || echo OFF), AI layer: $([ "$AIBUDDY" = 1 ] && echo stub || echo off). waiting for game to exit ..."
     trap - EXIT INT TERM
     wait "$GAME_PID"
     exit 0
