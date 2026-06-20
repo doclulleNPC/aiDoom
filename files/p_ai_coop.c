@@ -220,6 +220,37 @@ void P_AICoop_VoiceTag (const char* tag)
 }
 
 
+// ---- "hopeless target" blacklist ------------------------------------------
+// If the buddy fires at a monster and its health just won't drop (shots blocked /
+// can't reach / can't elevate), it blacklists that monster for a few seconds so
+// target acquisition skips it and picks another foe (or falls back to following)
+// instead of freezing on one it can't hurt.  Keyed by mobj_t* like the rest of the
+// buddy's side state; entries simply expire, so a freed/reused pointer self-heals.
+#define COOP_BL_MAX	8
+#define COOP_BL_TICS	(5*TICRATE)	// how long a hopeless target stays ignored
+static struct { mobj_t* mon; int until; } coop_bl[COOP_BL_MAX];
+
+static void AICoop_Blacklist (mobj_t* m)
+{
+    int	i, slot = 0, oldest = 0x7fffffff;
+    for (i = 0; i < COOP_BL_MAX; i++)
+    {
+	if (coop_bl[i].mon == m)       { slot = i; break; }		// refresh existing
+	if (coop_bl[i].until < oldest) { oldest = coop_bl[i].until; slot = i; }
+    }
+    coop_bl[slot].mon   = m;
+    coop_bl[slot].until = gametic + COOP_BL_TICS;
+}
+
+static boolean AICoop_IsBlacklisted (mobj_t* m)
+{
+    int	i;
+    for (i = 0; i < COOP_BL_MAX; i++)
+	if (coop_bl[i].mon == m && gametic < coop_bl[i].until)
+	    return true;
+    return false;
+}
+
 //
 // AICoop_FindTarget
 // Nearest live, shootable, visible monster within range (never the human).
@@ -245,6 +276,7 @@ static mobj_t* AICoop_FindTarget (mobj_t* self)
 	if (!(m->flags & MF_SHOOTABLE))	continue;
 	if (m->flags & MF_CORPSE)	continue;
 	if (m->health <= 0)		continue;
+	if (AICoop_IsBlacklisted (m))	continue;	// shots weren't connecting -> skip it
 
 	d = P_AproxDistance (m->x - self->x, m->y - self->y);
 	if (d > COOP_SIGHT)		continue;
@@ -1015,6 +1047,8 @@ void P_AICoop_BuildCmd (void)
     static int	navtimer, navgoal = -1;	// pathfinder re-path cooldown / cached goal ss
     static fixed_t navwx, navwy;	// cached waypoint
     static boolean navok;
+    static mobj_t* dmg_mon;		// monster the damage-watchdog is tracking
+    static int	dmg_hp0, dmg_firetics;	// its health at baseline / tics fired with no drop
 
     if (!aicoop || !playeringame[coop_slot])
 	return;
@@ -1275,6 +1309,28 @@ void P_AICoop_BuildCmd (void)
 		cmd->buttons |= BT_ATTACK;
 	    else if (!linetarget && dist < 768*FRACUNIT)
 		backoff = true;
+	}
+
+	// Damage-progress watchdog: remember the target's health, and while we're
+	// actually firing at it count the tics; if its health hasn't dropped after a
+	// few attacks' worth (~2s of fire) the shots aren't connecting -- blacklist it
+	// so we switch to another target (or fall back to following) instead of
+	// freezing here.  Any damage at all resets the window.
+	if (aimmon != dmg_mon)
+	{
+	    dmg_mon = aimmon; dmg_hp0 = aimmon->health; dmg_firetics = 0;
+	}
+	else if (cmd->buttons & BT_ATTACK)
+	{
+	    if (aimmon->health < dmg_hp0)		// hurting it -> keep at it
+	    {
+		dmg_hp0 = aimmon->health; dmg_firetics = 0;
+	    }
+	    else if (++dmg_firetics >= 2*TICRATE)	// fired ~2s, no damage -> give up on it
+	    {
+		AICoop_Blacklist (aimmon);
+		dmg_mon = NULL;
+	    }
 	}
     }
     else
