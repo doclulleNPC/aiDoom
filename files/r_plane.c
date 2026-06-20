@@ -203,9 +203,11 @@ void R_ClearPlanes (void)
     // left to right mapping
     angle = (viewangle-ANG90)>>ANGLETOFINESHIFT;
 	
-    // scale will be unit scale at SCREENWIDTH/2 distance
-    basexscale = FixedDiv (finecosine[angle],centerxfrac);
-    baseyscale = -FixedDiv (finesine[angle],centerxfrac);
+    // scale will be unit scale at the NON-wide half-width (the projection focal),
+    // so floor/ceiling texture scale matches the walls in Hor+ widescreen (using
+    // the wide centerxfrac stretched the flats).  Equal to centerxfrac in 16:10.
+    basexscale = FixedDiv (finecosine[angle],centerxfrac_nonwide);
+    baseyscale = -FixedDiv (finesine[angle],centerxfrac_nonwide);
 }
 
 
