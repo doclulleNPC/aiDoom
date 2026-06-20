@@ -669,11 +669,31 @@ int P_AICoop_AIMode (void)
 // buddy reverts to autonomous behaviour.
 void P_AICoop_SetDirective (int tactic, struct mobj_s* focus, fixed_t x, fixed_t y, int tics)
 {
+    static int	ai_last_tactic = -1;
     mobj_t*	mo = AICoop_Mo ();
     if (!mo || netgame)
 	return;
     if (tics <= 0)
 	tics = 70;				// ~2 s
+
+    // Voice: announce a CHANGED non-combat order once.  Combat orders (engage/
+    // defend) stay silent here -- the automatic contact/hurt/clear callouts in
+    // BuildCmd already cover the fighting, so we'd only double up.
+    if (tactic != ai_last_tactic)
+    {
+	const char* vtag = NULL;
+	switch (tactic)
+	{
+	  case BUD_HOLD:    vtag = "wait_hold";      break;	// "Holding position"
+	  case BUD_REGROUP:
+	  case BUD_RETREAT: vtag = "summon_ok";      break;	// "On my way!"
+	  case BUD_GOTO:    vtag = "wait_move";       break;	// "Moving out"
+	  case BUD_GRAB:    vtag = "state:grabbing";  break;
+	  default:          break;				// engage/defend/auto -> silent
+	}
+	if (vtag) P_AICoop_VoiceTag (vtag);
+	ai_last_tactic = tactic;
+    }
 
     // clear all overrides first; the chosen tactic re-arms the ones it needs
     forceaggro = 0; forcetarget = NULL; hold = 0; summon = 0; ai_goto = 0;
