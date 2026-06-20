@@ -608,6 +608,63 @@ static boolean AICoop_FindDoorAhead (mobj_t* mo, fixed_t gx, fixed_t gy,
     return found;
 }
 
+// --- Monster-style chase (Doom P_NewChaseDir) -------------------------------
+// Steering straight at a waypoint can't round a tight corner: the buddy grinds the
+// wall next to the opening.  Doom monsters solve this by trial-walking the 8 compass
+// directions (diagonal toward the target first, then the two axes, then a scan),
+// keeping a direction for a while so they escape concave nooks.  We do the same, but
+// the trial is a no-move reachability probe (AICoop_CanReach mirrors P_TryMove) and
+// the chosen heading drives the ticcmd instead of moving the mobj directly.
+
+// Can the buddy walk ~24u along compass heading `d8` (0=E,1=NE,2=N,..,7=SE)?
+static boolean AICoop_ChaseTry (mobj_t* mo, int d8)
+{
+    angle_t	a    = ((angle_t)d8 * ANG45) >> ANGLETOFINESHIFT;
+    fixed_t	step = mo->radius + 24*FRACUNIT;
+    return AICoop_CanReach (mo, mo->x + FixedMul (step, finecosine[a]),
+				mo->y + FixedMul (step, finesine[a]), true);
+}
+
+// Pick (and commit to) a compass heading toward (gx,gy), Doom-monster style.
+// Returns the heading as a BAM angle.  Keeps the last heading while it stays
+// walkable so the buddy commits to a leg instead of dithering at a corner.
+static angle_t AICoop_ChaseDir (mobj_t* mo, fixed_t gx, fixed_t gy)
+{
+    static int		dir = -1, count;
+    static int		flip;
+    fixed_t		dx = gx - mo->x, dy = gy - mo->y;
+    int			wx = (dx > 10*FRACUNIT) ? 0 : (dx < -10*FRACUNIT) ? 4 : -1;	// E / W
+    int			wy = (dy > 10*FRACUNIT) ? 2 : (dy < -10*FRACUNIT) ? 6 : -1;	// N / S
+    int			turn = (dir >= 0) ? ((dir + 4) & 7) : -1;			// reverse of current
+    int			cand[4], nc = 0, i, s;
+
+    // keep the committed heading while it's still walkable
+    if (dir >= 0 && count > 0 && AICoop_ChaseTry (mo, dir)) { count--; return (angle_t)dir * ANG45; }
+
+    if (wx >= 0 && wy >= 0)					// diagonal toward goal
+	cand[nc++] = (wy == 2) ? (wx == 0 ? 1 : 3) : (wx == 0 ? 7 : 5);
+    if (abs (dx) >= abs (dy)) { if (wx >= 0) cand[nc++] = wx; if (wy >= 0) cand[nc++] = wy; }
+    else                      { if (wy >= 0) cand[nc++] = wy; if (wx >= 0) cand[nc++] = wx; }
+    if (dir >= 0) cand[nc++] = dir;				// then continue current
+
+    for (i = 0; i < nc; i++)
+	if (cand[i] != turn && AICoop_ChaseTry (mo, cand[i]))
+	    { dir = cand[i]; count = 8; return (angle_t)dir * ANG45; }
+
+    flip ^= 1;							// scan all 8, alternating sweep side
+    for (s = 0; s < 8; s++)
+    {
+	int d = flip ? s : (7 - s);
+	if (d != turn && AICoop_ChaseTry (mo, d))
+	    { dir = d; count = 8; return (angle_t)dir * ANG45; }
+    }
+    if (turn >= 0 && AICoop_ChaseTry (mo, turn))			// last resort: turn around
+	{ dir = turn; count = 4; return (angle_t)dir * ANG45; }
+
+    dir = -1;							// boxed in -- head straight at goal
+    return R_PointToAngle2 (mo->x, mo->y, gx, gy);
+}
+
 static int PF_EdgeWeight (seg_t* sg, int u, int v);	// defined below
 
 // Straight feet-trace between two world points (the "item reachability" trick used
@@ -939,8 +996,6 @@ void P_AICoop_BuildCmd (void)
     static int	navtimer, navgoal = -1;	// pathfinder re-path cooldown / cached goal ss
     static fixed_t navwx, navwy;	// cached waypoint
     static boolean navok;
-    static fixed_t navsx, navsy;	// committed steer point (anti junction-oscillation)
-    static int	navsteer;		// tics left committed to navsx/navsy
 
     if (!aicoop || !playeringame[coop_slot])
 	return;
@@ -1133,25 +1188,26 @@ void P_AICoop_BuildCmd (void)
 	// door (it reads as a wall) and the buddy would oscillate beside it forever.
 	{
 	    fixed_t	ddx, ddy;
-	    if (AICoop_FindDoorAhead (mo, tx, ty, &ddx, &ddy))
+	    if (AICoop_FindDoorAhead (mo, tx, ty, &ddx, &ddy)
+		&& AICoop_CanReach (mo, ddx, ddy, true))
 	    {
-		stx = ddx; sty = ddy;		// straight at the doorway
-		navsteer = 0;			// re-pick a fresh steer once through
+		stx = ddx; sty = ddy;		// doorway in reach -> head right at it + Use
+	    }
+	    else if (AICoop_CanReach (mo, goalx, goaly, true))
+	    {
+		stx = goalx; sty = goaly;	// clear straight shot -> head right at it
 	    }
 	    else
 	    {
-		// Local: feet-trace steering toward that waypoint, but COMMIT to the
-		// chosen steer point for ~0.4s (or until reached).  At a junction the
-		// string-pull picks a different reachable node each re-path as the buddy
-		// jitters, which flip-flopped the steer and made it oscillate in place;
-		// committing lets it actually travel one leg before re-deciding.
-		if (--navsteer <= 0
-		    || P_AproxDistance (mo->x - navsx, mo->y - navsy) < 32*FRACUNIT)
-		{
-		    AICoop_TraceSteer (mo, goalx, goaly, &navsx, &navsy);
-		    navsteer = 14;
-		}
-		stx = navsx; sty = navsy;
+		// Waypoint (or an out-of-reach doorway) is behind a wall/corner: steering
+		// straight at it just grinds the wall, so navigate the corner Doom-monster
+		// style -- trial-walk the 8 compass headings toward the waypoint and commit
+		// to the best one.  This walks us up to the doorway, where the branch above
+		// then takes over and Use opens it.
+		angle_t	cd = AICoop_ChaseDir (mo, goalx, goaly);
+		angle_t	a  = cd >> ANGLETOFINESHIFT;
+		stx = mo->x + FixedMul (96*FRACUNIT, finecosine[a]);
+		sty = mo->y + FixedMul (96*FRACUNIT, finesine[a]);
 	    }
 	}
     }
