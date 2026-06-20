@@ -13,6 +13,7 @@ director client that drives the monsters' tactics.
 |------|----------|---------|
 | `start_aidoom.sh`  | Linux / macOS | Main launcher (bash). |
 | `start_buddy.sh`   | Linux / macOS | Offline launcher: **no LLM/AI director**, just the rule-based co-op buddy (`-coop`). Extra args pass through (`./start_buddy.sh -warp 1 1 -skill 4`). |
+| `start_buddy.bat`  | Windows | Offline buddy launcher (double-click). Same as `start_buddy.sh`: `aidoom.exe -coop` — no Ollama, no PowerShell. Args pass through. |
 | `start_aidoom.bat` | Windows | Double-click shim → calls the PowerShell script. |
 | `start_aidoom.ps1` | Windows | Main launcher (PowerShell). |
 | `ollama_director.py` | all | The director client (talks to Ollama + the game). Mirror of the repo-root copy. |
