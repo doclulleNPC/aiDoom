@@ -91,6 +91,35 @@ static patch_t* p_stkeys[6];
 static patch_t* p_sttminus;
 
 //
+// Resolution scaling.  The strip is authored in BASE (320x200) pixels but the
+// 3D framebuffer screens[0] is the NATIVE SCREENWIDTHxSCREENHEIGHT (hi-res), so a
+// 1:1 BASE write would leave the bar a tiny 160x16 patch in the corner.  We scale
+// every BASE pixel to an `bs_scale` x `bs_scale` screen block (bs_scale = hires) and
+// centre the bar horizontally in SCREENWIDTH (so it also centres in widescreen).
+// Set once per frame in HU_Buddy_DrawStrip.
+static int bs_scale = 1;
+static int bs_xoff  = 0;
+
+// Write one BASE-pixel as a bs_scale x bs_scale block at (bx,by) BASE coords.
+static void HU_Buddy_PutBlock (int bx, int by, byte pix)
+{
+    int sx0 = bx * bs_scale + bs_xoff;
+    int sy0 = by * bs_scale;
+    int i, j;
+    for (j = 0; j < bs_scale; j++)
+    {
+	int sy = sy0 + j;
+	if (sy < 0 || sy >= SCREENHEIGHT) continue;
+	for (i = 0; i < bs_scale; i++)
+	{
+	    int sx = sx0 + i;
+	    if (sx < 0 || sx >= SCREENWIDTH) continue;
+	    screens[0][sy * SCREENWIDTH + sx] = pix;
+	}
+    }
+}
+
+//
 // TTF (DejaVuSansMono baked atlas, sub-sampled to match patch height)
 //
 #define BUDDY_TTF_SCALE_X   2   // take every 2nd atlas x pixel (10 -> 5)
@@ -203,8 +232,7 @@ static void HU_Buddy_DrawPatchHalf (int x, int y, patch_t* p)
 		     src_y += 2, dy++)
 		{
 		    byte  pix    = src[src_y];
-		    byte* dest   = screens[0] + dy * SCREENWIDTH + col_x;
-		    *dest = pix;
+		    HU_Buddy_PutBlock (col_x, dy, pix);
 		}
 
 		// Next post in this column
@@ -238,7 +266,7 @@ static void HU_Buddy_DrawTtfChar (int x, int y, char ch, byte col)
 	    if (dx < 0 || dx >= SCREENWIDTH) continue;
 	    byte a = font_alpha[gy * FONT_AW + idx * FONT_CW + gx];
 	    if (a < 64) continue;            // threshold for visible pixel
-	    screens[0][dy * SCREENWIDTH + dx] = col;
+	    HU_Buddy_PutBlock (dx, dy, col);
 	}
     }
 }
@@ -332,6 +360,12 @@ static void HU_Buddy_DrawStrip (player_t* bot, mobj_t* bot_mo)
     fixed_t dx, dy;
     char    cell[16];
 
+    // Scale to the current resolution and centre the bar horizontally (so it grows
+    // with hires and also centres in widescreen).  Everything below is authored in
+    // BASE pixels and routed through HU_Buddy_PutBlock, which applies these.
+    bs_scale = hires;
+    bs_xoff  = (SCREENWIDTH - BUDDY_BAR_W * bs_scale) / 2 - BUDDY_BAR_X * bs_scale;
+
     if (w >= 0 && w < NUMWEAPONS && weaponinfo[w].ammo < NUMAMMO)
 	ammo = bot->ammo[weaponinfo[w].ammo];
 
@@ -361,9 +395,8 @@ static void HU_Buddy_DrawStrip (player_t* bot, mobj_t* bot_mo)
 	int x;
 	for (x = BUDDY_BAR_X; x < BUDDY_BAR_X + BUDDY_BAR_W; x++)
 	{
-	    screens[0][BUDDY_BAR_Y * SCREENWIDTH + x] = BUDDY_BAR_COL;
-	    screens[0][(BUDDY_BAR_Y + BUDDY_BAR_H - 1) * SCREENWIDTH + x]
-		= BUDDY_BAR_COL;
+	    HU_Buddy_PutBlock (x, BUDDY_BAR_Y,                  BUDDY_BAR_COL);
+	    HU_Buddy_PutBlock (x, BUDDY_BAR_Y + BUDDY_BAR_H - 1, BUDDY_BAR_COL);
 	}
     }
 
