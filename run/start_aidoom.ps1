@@ -9,8 +9,8 @@
     .\start_aidoom.ps1
     .\start_aidoom.ps1 -Model qwen2.5-coder:1.5b -Skill 4 -FriendlyFire
     .\start_aidoom.ps1 -NoDirector        # just the game, no LLM
-    .\start_aidoom.ps1 -NoCoop            # disable the AI co-op companion
-  The AI co-op companion (player 2) is ON by default; -NoCoop turns it off.
+    .\start_aidoom.ps1 -NoCoop            # disable the rule-based co-op companion
+  The rule-based co-op companion (player 2) is ON by default; -NoCoop turns it off.
 #>
 param(
     [string]$Model     = "mistral:7b-instruct",
@@ -22,7 +22,7 @@ param(
     [switch]$FriendlyFire,
     [switch]$NoDirector,
     [switch]$NoWarm,
-    [switch]$NoCoop          # AI co-op companion (player 2) is on by default
+    [switch]$NoCoop          # rule-based co-op companion (player 2) is on by default
 )
 
 $ErrorActionPreference = "Stop"
@@ -97,7 +97,7 @@ if (-not (Test-Path (Join-Path $here "SDL3.dll"))) { Die "SDL3.dll missing next 
 # IWAD selection is handled by the engine itself, in this order:
 #   -iwad <file>  >  aidoom.cfg "iwad"  >  iwads\  >  this folder  >  Steam.
 $gameArgs = @("-warp","$Episode","$Map","-skill","$Skill","-aidirector","$Port")
-if (-not $NoCoop)  { $gameArgs += "-aicoop" }
+if (-not $NoCoop)  { $gameArgs += "-coop" }
 if ($FriendlyFire) { $gameArgs += "-friendlyfire" }
 Info "launching aidoom.exe $($gameArgs -join ' ')"
 Start-Process -FilePath (Join-Path $here "aidoom.exe") -ArgumentList $gameArgs -WorkingDirectory $here
@@ -107,18 +107,27 @@ if ($NoDirector) {
     exit 0
 }
 
-# --- 5. start the Python LLM director client ---
+# --- 5. start the LLM director client ---
+# Prefer the native director.exe (no Python needed; build: tools/build_director_win.sh).
+# Fall back to the Python client only if the binary isn't present.
+Start-Sleep -Seconds 2   # give the game a moment to open the listening socket
+$dirbin = Join-Path $here "director.exe"
+if (Test-Path $dirbin) {
+    Info "starting native director: $Model -> 127.0.0.1:$Port"
+    & $dirbin --port $Port --model $Model --ollama "$Ollama/api/chat"
+    exit 0
+}
+
 $py = $null
 foreach ($cand in @("python","py")) {
     $c = Get-Command $cand -ErrorAction SilentlyContinue
     if ($c) { $py = $c.Source; break }
 }
 if (-not $py -and (Test-Path "C:\Python313\python.exe")) { $py = "C:\Python313\python.exe" }
-if (-not $py) { Warn "Python not found -- game runs without the LLM director."; exit 0 }
+if (-not $py) { Warn "no director.exe and no Python -- game runs without the LLM director."; exit 0 }
 
 $client = Join-Path $here "ollama_director.py"
-if (-not (Test-Path $client)) { Warn "ollama_director.py not found in $here -- game runs without director."; exit 0 }
+if (-not (Test-Path $client)) { Warn "no director.exe and no ollama_director.py -- game runs without director."; exit 0 }
 
-Start-Sleep -Seconds 2   # give the game a moment to open the listening socket
-Info "starting LLM director: $Model -> 127.0.0.1:$Port"
+Info "native director.exe not built; using Python fallback: $Model -> 127.0.0.1:$Port"
 & $py $client --port $Port --model $Model --ollama "$Ollama/api/chat"

@@ -16,7 +16,8 @@ director client that drives the monsters' tactics.
 | `start_buddy.bat`  | Windows | Offline buddy launcher (double-click). Same as `start_buddy.sh`: `aidoom.exe -coop` — no Ollama, no PowerShell. Args pass through. |
 | `start_aidoom.bat` | Windows | Double-click shim → calls the PowerShell script. |
 | `start_aidoom.ps1` | Windows | Main launcher (PowerShell). |
-| `ollama_director.py` | all | The director client (talks to Ollama + the game). Mirror of the repo-root copy. |
+| `director` / `director.exe` | Linux / Windows | **Native SDL3 AI director** (C) — the no-Python LLM monster director: a small window showing live status + a scrolling log, talks to Ollama + the game. The launchers use this when present. Build: `tools/build_director.sh` (Linux) / `tools/build_director_win.sh` (Windows). |
+| `ollama_director.py` | all | Python director client — **fallback** only, used when the native `director` binary isn't built. Same protocol. Mirror of the repo-root copy. |
 | (`../tools/buddy_voice.py`) | all | AI co-op **buddy voice**: tails `buddy_say.txt` (written here by `-aicoop`) and speaks lines via ElevenLabs (Joker-HL). Run from here: `python3 ../tools/buddy_voice.py`. Needs `ELEVENLABS_API_KEY` (env or `elevenlabs_api_key` in `aidoom.cfg`) + ffplay/mpg123. |
 | `gpumon` / `gpumon.exe` | Linux / Windows | GPU monitor as a small **SDL window** (bars for load/VRAM/temp/power). On error it stops and shows a **Reconnect** button (no auto-retry). Build: Linux `tools/build_gpumon.sh`; Windows via CMake or `build_all_win.bat`. See **`../GPUMON.md`**. |
 | `aidoom_config` / `aidoom_config.exe` | Linux / Windows | SDL3 settings editor; reads/writes `aidoom.cfg` here. Build: Linux `tools/build_config.sh`; Windows via CMake or `build_all_win.bat`. |

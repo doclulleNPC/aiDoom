@@ -169,18 +169,22 @@ if [ "$NODIRECTOR" = 1 ]; then
     exit 0
 fi
 
-# --- 5. start the Python LLM director client ---
-CLIENT="$here/ollama_director.py"
-[ -f "$CLIENT" ] || CLIENT="$here/../ollama_director.py"
-if [ ! -f "$CLIENT" ]; then
-    warn "ollama_director.py not found -- game runs without the director."
-    trap - EXIT INT TERM; wait "$GAME_PID"; exit 0
-fi
-if [ -z "$PY" ]; then
-    warn "python not found -- game runs without the director."
-    trap - EXIT INT TERM; wait "$GAME_PID"; exit 0
-fi
-
+# --- 5. start the LLM director client ---
+# Prefer the native SDL3 director (no Python needed; build: tools/build_director.sh).
+# Fall back to the Python client (ollama_director.py) only if the binary is missing.
 sleep 2   # give the game a moment to open the listening socket
-info "starting LLM director: $MODEL -> 127.0.0.1:$PORT (ollama $OLLAMA)"
-"$PY" "$CLIENT" --port "$PORT" --model "$MODEL" --ollama "$OLLAMA/api/chat"
+DIRBIN="$here/director"
+[ -x "$DIRBIN" ] || DIRBIN="$here/../tools/director"
+if [ -x "$DIRBIN" ]; then
+    info "starting native director: $MODEL -> 127.0.0.1:$PORT (ollama $OLLAMA)"
+    "$DIRBIN" --port "$PORT" --model "$MODEL" --ollama "$OLLAMA/api/chat"
+else
+    CLIENT="$here/ollama_director.py"
+    [ -f "$CLIENT" ] || CLIENT="$here/../ollama_director.py"
+    if [ ! -f "$CLIENT" ] || [ -z "$PY" ]; then
+        warn "no director binary and no Python+ollama_director.py -- game runs without the director."
+        trap - EXIT INT TERM; wait "$GAME_PID"; exit 0
+    fi
+    info "native director not built; using Python fallback: $MODEL -> 127.0.0.1:$PORT (ollama $OLLAMA)"
+    "$PY" "$CLIENT" --port "$PORT" --model "$MODEL" --ollama "$OLLAMA/api/chat"
+fi
