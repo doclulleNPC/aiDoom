@@ -49,6 +49,7 @@ static mobj_t*	forcetarget;		// the forced attack target
 #define COOP_SIGHT	(1280*FRACUNIT)	// monster acquisition range
 #define COOP_TURN	1300		// max angleturn per tic (~7 deg)
 #define COOP_FACING	1500		// |remaining turn| under which we open fire
+#define COOP_LOOKMAX	56		// vertical aim clamp (mirrors g_game.c LOOKDIRMAX)
 #define COOP_NEAR	(256*FRACUNIT)	// follow distance to the human
 #define YIELD_DIST	(48*FRACUNIT)	// human this close -> step out of the way
 #define COOP_KEEP	(192*FRACUNIT)	// advance toward a monster until this close
@@ -990,7 +991,7 @@ void P_AICoop_BuildCmd (void)
     fixed_t	tx = 0, ty = 0, stx, sty, dist;
     fixed_t	movethresh = -1;	// move when dist > this; -1 = stand still
     int		rem, turn, haveaim = 0, fire = 0, avoiddamage = 0, navigate = 0;
-    boolean	stuck;
+    boolean	stuck, backoff = false;	// backoff: can't hit the target, retreat to open the angle
     static fixed_t lastx, lasty;	// where we were last tic (progress check)
     static int	doorwait, triedmove;	// door pulse cooldown / did we try to move
     static int	navtimer, navgoal = -1;	// pathfinder re-path cooldown / cached goal ss
@@ -1223,8 +1224,31 @@ void P_AICoop_BuildCmd (void)
 
     dist = P_AproxDistance (tx - mo->x, ty - mo->y);
 
-    if (fire && aimmon && abs(rem) < COOP_FACING && P_CheckSight (mo, aimmon))
-	cmd->buttons |= BT_ATTACK;
+    if (fire && aimmon)
+    {
+	// Aim vertically at the target's centre: if autoaim misses (target above or
+	// below) the weapon falls back to lookdir ("shoot where you look"), so the
+	// shot elevates instead of plugging the wall/crate in front.
+	fixed_t	dz = (aimmon->z + (aimmon->height>>1)) - (mo->z + (mo->height>>1));
+	fixed_t	hd = P_AproxDistance (aimmon->x - mo->x, aimmon->y - mo->y);
+	int	ld = hd ? (int)((FixedDiv (dz, hd) * 160) >> FRACBITS) : 0;
+	bot->lookdir = ld > COOP_LOOKMAX ? COOP_LOOKMAX : (ld < -COOP_LOOKMAX ? -COOP_LOOKMAX : ld);
+
+	// Clear shot?  Autoaim-probe along the bearing: linetarget==NULL means the line
+	// is blocked (e.g. the crate the monster stands on) or too steep to reach.  Then
+	// don't waste ammo -- retreat to open the angle (it stays facing, so it fires the
+	// moment the shot clears).  Capped so it doesn't back off into the next county.
+	{
+	    angle_t	aang = R_PointToAngle2 (mo->x, mo->y, aimmon->x, aimmon->y);
+	    P_AimLineAttack (mo, aang, COOP_SIGHT);
+	    if (linetarget && abs(rem) < COOP_FACING)
+		cmd->buttons |= BT_ATTACK;
+	    else if (!linetarget && dist < 768*FRACUNIT)
+		backoff = true;
+	}
+    }
+    else
+	bot->lookdir = 0;
 
     if (AICoop_DamagingFloor (mo->x, mo->y) && pl)
     {
@@ -1257,6 +1281,22 @@ void P_AICoop_BuildCmd (void)
 
 	if (triedmove)
 	    AICoop_ThrustToward (cmd, mo, stx, sty);	// straight to the waypoint
+    }
+
+    // Can't hit the target (it's above/behind a crate): back straight away from it
+    // -- facing stays on it, so the buddy keeps aiming up and fires the instant the
+    // angle opens.  Only onto safe, reachable ground (don't reverse into nukage/a
+    // wall).  Overrides the combat advance above.
+    if (backoff && aimmon)
+    {
+	angle_t	ra = R_PointToAngle2 (aimmon->x, aimmon->y, mo->x, mo->y) >> ANGLETOFINESHIFT;
+	fixed_t	rx = mo->x + FixedMul (64*FRACUNIT, finecosine[ra]);
+	fixed_t	ry = mo->y + FixedMul (64*FRACUNIT, finesine[ra]);
+	if (!AICoop_DamagingFloor (rx, ry) && AICoop_CanReach (mo, rx, ry, true))
+	{
+	    AICoop_ThrustToward (cmd, mo, rx, ry);
+	    triedmove = 1;
+	}
     }
 
     // Wedged while trying to move -- most often a closed door on the path, else a
