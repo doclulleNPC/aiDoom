@@ -26,12 +26,15 @@
 #include "font_atlas.h"
 #include "../files/aidoom_icon.h"	// shared 64x64 RGBA window icon (from aidoom.ico)
 
-#define WINW 680
-#define WINH 990
+// Two-column layout: each column is COLW wide (label at LABELX, value at VALX,
+// both column-relative).  Wider + shorter so it fits a normal-height screen.
+#define COLW 580
+#define WINW (2*COLW)
+#define WINH 600
 #define ROWH 26
 #define HEADH 30
 #define LABELX 28
-#define VALX 300
+#define VALX 250
 
 // ---- Doom key codes (mirror doomdef.h) ----
 enum { K_RIGHT=0xae,K_LEFT=0xac,K_UP=0xad,K_DOWN=0xaf,
@@ -49,6 +52,7 @@ typedef struct {
     int type, vmin, vmax, file;
     int ival;
     char sval[128];
+    int col;		// filled at layout time: which column (0=left, 1=right)
     float y;		// filled at layout time
 } setting_t;
 
@@ -67,6 +71,10 @@ static setting_t settings[] = {
     {"Action keys","Prev weapon",   "key_prevweapon", T_KEY,0,0,F_DOOMRC},
     {"Action keys","Jump",          "key_jump",       T_KEY,0,0,F_DOOMRC},
     {"Action keys","Console",       "key_console",    T_KEY,0,0,F_DOOMRC},
+
+    {"Buddy keys","Buddy: come",    "key_buddy_come",   T_KEY,0,0,F_DOOMRC},
+    {"Buddy keys","Buddy: attack",  "key_buddy_attack", T_KEY,0,0,F_DOOMRC},
+    {"Buddy keys","Buddy: stay",    "key_buddy_stay",   T_KEY,0,0,F_DOOMRC},
 
     {"Video / mouse","Mouse sensitivity","mouse_sensitivity",T_INT,0,9,F_DOOMRC},
     {"Video / mouse","Resolution (1-6)", "screen_resolution",T_INT,1,6,F_DOOMRC},
@@ -194,6 +202,9 @@ static void set_default_int(setting_t* s)
     else if (!strcmp(n,"key_prevweapon"))   v = K_MWHEELDOWN;
     else if (!strcmp(n,"key_jump"))         v = ' ';
     else if (!strcmp(n,"key_console"))      v = K_F12;
+    else if (!strcmp(n,"key_buddy_come"))   v = ',';
+    else if (!strcmp(n,"key_buddy_attack")) v = '.';
+    else if (!strcmp(n,"key_buddy_stay"))   v = '-';
     else if (!strcmp(n,"mouse_sensitivity"))v = 5;
     else if (!strcmp(n,"screen_resolution"))v = 1;
     else if (!strcmp(n,"screenblocks"))     v = 9;
@@ -371,47 +382,58 @@ static void copy_ssh_key(const char* host, const char* user, const char* port)
 #endif
 }
 
-static float layout(void)	// returns y of bottom; fills setting.y
+// Which column a section lives in: the two key-binding sections fill the left
+// column, everything else the right.  (Keeps the two columns roughly equal height.)
+static int section_col(const char* sec)
 {
-    float y = 16;
-    const char* sec = NULL;
+    if (!strcmp(sec,"Action keys") || !strcmp(sec,"Buddy keys")) return 0;
+    return 1;
+}
+
+static float layout(void)	// returns y of the taller column's bottom; fills setting.col/.y
+{
+    float cy[2] = { 16, 16 };
+    const char* csec[2] = { NULL, NULL };
     for (int i=0;i<NSET;i++) {
-        if (sec != settings[i].section) {
-            sec = settings[i].section;
-            y += (i? 10:0);
-            settings[i].y = -1;	// header marker drawn separately
-            y += HEADH;
+        int c = section_col(settings[i].section);
+        if (csec[c] != settings[i].section) {
+            csec[c] = settings[i].section;
+            cy[c] += (cy[c] > 16 ? 10 : 0);
+            cy[c] += HEADH;
         }
-        settings[i].y = y;
-        y += ROWH;
+        settings[i].col = c;
+        settings[i].y   = cy[c];
+        cy[c] += ROWH;
     }
-    return y;
+    return cy[0] > cy[1] ? cy[0] : cy[1];
 }
 
 static void draw(void)
 {
     rect(0,0,WINW,WINH, 24,24,28);
-    const char* sec=NULL;
+    rect(COLW, 12, 1, WINH-60, 50,50,60);	// divider between the two columns
+    const char* sec[2]={NULL,NULL};
     for (int i=0;i<NSET;i++) {
         setting_t* s=&settings[i];
-        if (sec!=s->section) {
-            sec=s->section;
-            text(LABELX, s->y-HEADH+8, sec, 120,200,255);
-            rect(LABELX, s->y-6, WINW-2*LABELX, 1, 60,60,70);
+        float cx = s->col * COLW;
+        if (sec[s->col]!=s->section) {
+            sec[s->col]=s->section;
+            text(cx+LABELX, s->y-HEADH+8, s->section, 120,200,255);
+            rect(cx+LABELX, s->y-6, COLW-2*LABELX, 1, 60,60,70);
         }
         int hot = (mode==1&&active==i)||(mode==2&&active==i);
-        text(LABELX, s->y+4, s->label, 220,220,220);
+        text(cx+LABELX, s->y+4, s->label, 220,220,220);
         char buf[160];
         if (s->type==T_KEY)      keyname(s->ival,buf,sizeof(buf));
         else if (s->type==T_TOGGLE) snprintf(buf,sizeof(buf), s->ival?"On":"Off");
         else if (s->type==T_INT) snprintf(buf,sizeof(buf),"< %d >", s->ival);
         else if (s->type==T_CHOICE) snprintf(buf,sizeof(buf),"< %s >", s->sval[0]?base_name(s->sval):"auto (detect)");
         else                     snprintf(buf,sizeof(buf),"%s", (mode==2&&active==i)?editbuf:s->sval);
-        if (hot) rect(VALX-4, s->y+1, WINW-VALX-LABELX+4, ROWH-4, 50,50,70);
+        if (hot) rect(cx+VALX-4, s->y+1, COLW-VALX-LABELX+4, ROWH-4, 50,50,70);
         if (mode==2&&active==i) { // text cursor
-            text(VALX, s->y+4, buf, 255,255,160);
-            text(VALX + (float)strlen(buf)*FONT_CW, s->y+4, "_", 255,255,160);
-        } else text(VALX, s->y+4, buf, 255,235,150);
+            text(cx+VALX, s->y+4, buf, 255,255,160);
+            text(cx+VALX + (float)strlen(buf)*FONT_CW, s->y+4, "_", 255,255,160);
+        } else text(cx+VALX, s->y+4, buf, 255,235,150);
     }
     // buttons
     rect(btn_save.x,btn_save.y,btn_save.w,btn_save.h, 40,110,40); text(btn_save.x+18,btn_save.y+8,"Save",230,255,230);
@@ -430,7 +452,8 @@ static void click(float mx,float my)
     if (hit(mx,my,btn_sshkey)) { copy_ssh_key(find_sval("gpu_host"), find_sval("gpu_user"), find_sval("gpu_ssh_port")); return; }
     for (int i=0;i<NSET;i++) {
         setting_t* s=&settings[i];
-        SDL_FRect vr={VALX-4,s->y,WINW-VALX,ROWH};
+        float cx = s->col * COLW;
+        SDL_FRect vr={cx+VALX-4,s->y,COLW-VALX,ROWH};
         if (!hit(mx,my,vr)) continue;
         if (s->type==T_KEY) { mode=1; active=i; snprintf(status,sizeof(status),"Press a key (or mouse wheel) for \"%s\"  -  Esc cancels", s->label); }
         else if (s->type==T_TOGGLE) s->ival = !s->ival;
@@ -438,8 +461,8 @@ static void click(float mx,float my)
             // hit-test against the actual "< N >" text: left half = '<', right = '>'
             char tmp[32]; snprintf(tmp,sizeof(tmp),"< %d >", s->ival);
             float w = (float)strlen(tmp)*FONT_CW;
-            if (mx <= VALX + w) {
-                s->ival += (mx < VALX + w/2.0f) ? -1 : 1;
+            if (mx <= cx+VALX + w) {
+                s->ival += (mx < cx+VALX + w/2.0f) ? -1 : 1;
                 if (s->ival<s->vmin) s->ival=s->vmin;
                 if (s->ival>s->vmax) s->ival=s->vmax;
             }
@@ -447,8 +470,8 @@ static void click(float mx,float my)
         else if (s->type==T_CHOICE) {
             char t[160]; snprintf(t,sizeof(t),"< %s >", s->sval[0]?base_name(s->sval):"auto (detect)");
             float w = (float)strlen(t)*FONT_CW;
-            if (mx <= VALX + w && niwad>0) {
-                iwadsel += (mx < VALX + w/2.0f) ? -1 : 1;
+            if (mx <= cx+VALX + w && niwad>0) {
+                iwadsel += (mx < cx+VALX + w/2.0f) ? -1 : 1;
                 if (iwadsel<0) iwadsel = niwad-1;
                 if (iwadsel>=niwad) iwadsel = 0;
                 strncpy(s->sval, iwadlist[iwadsel], sizeof(s->sval)-1); s->sval[sizeof(s->sval)-1]=0;
