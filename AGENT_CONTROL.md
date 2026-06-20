@@ -516,3 +516,30 @@ loop never waits on the director.
 - Implementation note: `p_ai_llm.c` does **not** include `p_local.h` — that pulls
   in `p_spec.h`, whose enum constants `open`/`close` collide with `<unistd.h>`;
   the two engine functions it needs are declared by hand instead.
+
+## 14. Letting the LLM control the *buddy* (-aicoop)
+
+The same director transport also commands the co-op companion. `-aicoop` (instead
+of `-coop`) starts the buddy in AI mode: it opens the AI socket (on the
+`-aidirector` port or the default 31666), adds the buddy to the `observe` stream,
+and accepts `buddy` orders.  `start_aidoom.sh --aicoop` launches game + director.
+
+### Protocol additions
+- **Observation** gains a `"buddy"` object when `-aicoop` is active:
+  `"buddy":{"pos":[x,y],"health":h,"armor":a,"weapon":w,"ammo":n,"state":"follow|fight|heal|hold|come|grab"}`
+- **Command:** `buddy order=<tactic> [focus=<monster id>] [x=<n> y=<n>] [for=<tics>]\n`
+  → `ok\n`.  Tactics: `engage` (focus a specific monster, else nearest), `defend`,
+  `hold`, `regroup`, `retreat`, `goto` (x,y), `grab`.
+
+### How it executes
+Unlike the monsters (which divert `A_Chase`), the buddy LLM order maps onto the
+buddy's existing **rule-based overrides** in `p_ai_coop.c`
+(`P_AICoop_SetDirective`): `engage`→forced target, `hold`/`regroup`/`retreat`→the
+stay/come timers, `goto`→a move-to-point timer.  The proven rule-based BuildCmd
+then executes it per tic.  Orders **expire** after `for` tics, so the buddy
+reverts to autonomous behaviour the moment the director stops talking.
+
+The director (`tools/director.c`) drives **monsters and/or buddy** from one LLM
+call: it asks for `{"commands":[...monsters...],"buddy":{"order","focus"}}` and
+issues whatever the live state contains (monsters from `-aidirector`, buddy from
+`-aicoop`).  Same single-player/determinism caveats as §12–13.

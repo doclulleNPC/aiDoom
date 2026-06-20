@@ -11,9 +11,24 @@
 #ifndef __P_AI_COOP__
 #define __P_AI_COOP__
 
+#include "m_fixed.h"		// fixed_t
+struct mobj_s;
+
 // Parse -aicoop and, if present, enable player 2.  Call once after
 // D_CheckNetGame (so it isn't clobbered) and before the first level loads.
 void P_AICoop_Init (void);
+
+// Called from P_SetupLevel after P_LoadThings.  If -coop/-aicoop was given
+// but the map has no Player_2_Start, prints a one-shot warning and disables
+// the buddy for this level.
+void P_AICoop_VerifySpawn (void);
+
+// Called from P_SetupLevel just before P_LoadThings.  Clears the buddy slot's
+// stale mobj pointer so P_AICoop_VerifySpawn can reliably tell whether THIS
+// map's THINGS contain a Player_2_Start (which would have re-spawned the
+// buddy mobj).  See p_setup.c for why this is necessary even though it looks
+// redundant.
+void P_AICoop_ResetSlot (void);
 
 // Build the buddy's ticcmd for this tic.  Call from P_Ticker *before* the
 // P_PlayerThink loop.  No-op unless -aicoop is active.  Deterministic, so in a
@@ -44,5 +59,30 @@ int		P_AICoop_Summon (void);		// "come"   -- run to the player
 const char*	P_AICoop_Wait (void);		// "wait"/"stay" -- toggle hold
 const char*	P_AICoop_Attack (void);		// "attack" -- charge nearest monster
 const char*	P_AICoop_StatusReport (void);	// "report" -- HP/armor/weapon/ammo
+
+// ---------------------------------------------------------------------------
+//  AI (LLM) director layer for the buddy (-aicoop).  The director sets a
+//  high-level *tactic* (and an optional focus monster / point); the rule-based
+//  BuildCmd executes it per tic.  Directives expire after `tics`, so the buddy
+//  reverts to autonomous behaviour if the director stops talking.
+// ---------------------------------------------------------------------------
+enum {
+    BUD_AUTO = 0,	// no override -- pure rule-based
+    BUD_ENGAGE,		// fight (focus a specific monster if given, else nearest)
+    BUD_DEFEND,		// stay near the player, fight only close threats (rule-based)
+    BUD_HOLD,		// hold position
+    BUD_REGROUP,	// run to the player
+    BUD_RETREAT,	// fall back to the player
+    BUD_GOTO,		// move to a point (x,y)
+    BUD_GRAB		// collect nearby items (rule-based)
+};
+
+// True if -aicoop (AI-driven) mode is active -- the AI transport then exposes the
+// buddy in `observe` and accepts `buddy` orders.
+int  P_AICoop_AIMode (void);
+
+// Apply a director tactic to the buddy for `tics` (<=0 -> ~2 s default).  `focus`
+// is the monster to engage (NULL = nearest); x,y the BUD_GOTO point.
+void P_AICoop_SetDirective (int tactic, struct mobj_s* focus, fixed_t x, fixed_t y, int tics);
 
 #endif

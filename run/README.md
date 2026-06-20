@@ -74,15 +74,19 @@ Flags (unrecognized args are passed straight through to `aidoom`):
 
 | Flag | Default | Meaning |
 |------|---------|---------|
+| `--director` | off | LLM **monster** director (`-aidirector` + run the director) |
+| `--buddy` | off | rule-based co-op buddy, player 2 (`-coop`, no LLM) |
+| `--aicoop` | off | **AI buddy**: `-aicoop` + turns the director on, so the LLM directs the buddy's tactics (engage/defend/regroup/…) in the same loop as the monsters |
 | `--model <name>` | `mistral:7b-instruct` | Ollama model for tactics |
 | `--port <n>` | `31666` | director TCP port (`-aidirector`) |
 | `--episode <n>` / `--map <n>` | `1` / `1` | `-warp` target |
 | `--skill <n>` | `4` | difficulty (1–5) |
 | `--ollama <url>` | `http://192.168.2.114:11434` | Ollama base URL |
 | `--friendlyfire` | off | enable monster infighting (`-friendlyfire`) |
-| `--no-coop` | off | disable the AI co-op companion (player 2, on by default) |
-| `--no-director` | off | launch only the game |
 | `--no-warm` | off | skip model warm-up |
+
+`--director` (monsters) and `--aicoop` (buddy) compose: pass both and one LLM loop
+directs the enemy squad *and* the ally buddy from the same observation.
 
 ## Usage — Windows
 

@@ -10,10 +10,10 @@
 #   --buddy       : enable the rule-based co-op companion ("buddy", player 2).
 #                   Passes -coop to aidoom.  Local + deterministic, no LLM needed.
 #                   (For buddy-only with NO director, use start_buddy.sh.)
-#   --aicoop      : enable the AI/LLM-backed companion.  Passes -aicoop, which is a
-#                   DISTINCT flag from -coop (the two are mutually exclusive); today
-#                   it falls back to the rule-based behaviour until the AI companion
-#                   layer ships (see AI_IMPROVEMENTS.md #1).
+#   --aicoop      : enable the AI/LLM-backed companion.  Passes -aicoop (DISTINCT from
+#                   -coop; the two are mutually exclusive) and turns the director ON --
+#                   the LLM then directs the buddy's tactics (engage/defend/regroup/...)
+#                   in the same loop it directs the monsters.
 #   --director    : enable the LLM monster director.  Waits for Ollama, warms
 #                   the model, launches the game + director client.  Implies
 #                   Ollama host/port/model from aidoom.cfg or flags.
@@ -78,7 +78,7 @@ while [ $# -gt 0 ]; do
         --no-director)  NODIRECTOR=1; shift;;    # legacy alias
         --buddy)        BUDDY=1; shift;;
         --no-buddy)     BUDDY=0; shift;;
-        --aicoop)       AIBUDDY=1; shift;;   # AI/LLM-backed buddy (-aicoop); falls back to rule-based until the AI layer ships
+        --aicoop)       AIBUDDY=1; NODIRECTOR=0; shift;;   # AI/LLM buddy (-aicoop): needs the director, so enable it too
         --no-coop)      warn "--no-coop is deprecated, use --no-buddy"; BUDDY=0; shift;;
         --coop)         warn "--coop is deprecated, use --buddy"; BUDDY=1; shift;;
         --no-warm)      NOWARM=1; shift;;

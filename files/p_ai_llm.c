@@ -56,10 +56,12 @@
 // enum constants named `open`/`close` that collide with <unistd.h>. We declare
 // the few engine functions we need by hand instead.
 #include "info.h"
+#include "d_items.h"		// weaponinfo (buddy ammo in the observation)
 #include "s_sound.h"
 #include "r_main.h"
 
 #include "p_ai_llm.h"
+#include "p_ai_coop.h"		// buddy observation + director directives (-aicoop)
 
 extern boolean	P_SetMobjState (mobj_t* mobj, statenum_t state);
 extern boolean	P_CheckSight (mobj_t* t1, mobj_t* t2);
@@ -365,6 +367,15 @@ static const char* AI_TypeName (mobjtype_t t)
     }
 }
 
+// Resolve a registry id (as exposed in `observe`) to its monster, or NULL.
+// Used to let the buddy `focus` a specific monster the director names.
+static mobj_t* P_AI_MobjForId (int id)
+{
+    if (id >= 1 && id <= aient_count)
+	return aient[id-1].mo;
+    return NULL;
+}
+
 #define OBSBUF	32768
 static char obsbuf[OBSBUF];
 
@@ -386,6 +397,25 @@ static int AI_Serialize (void)
 		pl->health, pl->armorpoints, pl->readyweapon);
     else
 	n += snprintf (obsbuf+n, OBSBUF-n, "\"dead\":true}");
+
+    // Buddy (-aicoop only): the director also commands the player's AI companion.
+    {
+	int bs = P_AICoop_Slot ();
+	if (P_AICoop_AIMode () && bs >= 0 && playeringame[bs] && players[bs].mo)
+	{
+	    player_t*	b = &players[bs];
+	    int		w = b->readyweapon;
+	    int		ammo = (w >= 0 && w < NUMWEAPONS && weaponinfo[w].ammo < NUMAMMO)
+			       ? b->ammo[weaponinfo[w].ammo] : -1;
+	    static const char* sname[] = {"follow","fight","heal","hold","come","grab"};
+	    int		st = P_AICoop_State ();
+	    n += snprintf (obsbuf+n, OBSBUF-n,
+		",\"buddy\":{\"pos\":[%d,%d],\"health\":%d,\"armor\":%d,"
+		"\"weapon\":%d,\"ammo\":%d,\"state\":\"%s\"}",
+		b->mo->x/fx, b->mo->y/fx, b->health, b->armorpoints,
+		w, ammo, (st>=0 && st<6) ? sname[st] : "follow");
+	}
+    }
 
     n += snprintf (obsbuf+n, OBSBUF-n, ",\"monsters\":[");
     for (i = 0; i < aient_count; i++)
@@ -420,6 +450,18 @@ static int AI_OrderByName (const char* s)
     if (!strcmp(s,"focus_fire"))	return AIO_FOCUS;
     if (!strcmp(s,"use_door"))		return AIO_USEDOOR;
     return AIO_NONE;
+}
+
+static int AI_BuddyTactic (const char* s)
+{
+    if (!strcmp(s,"engage"))	return BUD_ENGAGE;
+    if (!strcmp(s,"defend"))	return BUD_DEFEND;
+    if (!strcmp(s,"hold"))	return BUD_HOLD;
+    if (!strcmp(s,"regroup"))	return BUD_REGROUP;
+    if (!strcmp(s,"retreat"))	return BUD_RETREAT;
+    if (!strcmp(s,"goto"))	return BUD_GOTO;
+    if (!strcmp(s,"grab"))	return BUD_GRAB;
+    return BUD_AUTO;
 }
 
 static void AI_Apply (int order, const char* ids,
@@ -508,6 +550,31 @@ static void AI_HandleLine (char* line, int client)
 	    else if (!strcmp(kv,"after")) after = atoi(eq);
 	}
 	AI_Apply (AI_OrderByName(order_s), ids, tx, ty, focus, fortics, after);
+	if (client >= 0) (void)!write (client, "ok\n", 3);
+	return;
+    }
+    if (!strncmp(line, "buddy", 5))
+    {
+	char	order_s[32] = "auto";
+	int	focus = 0, fortics = 0;
+	fixed_t	bx = 0, by = 0;
+	char*	kv;
+	char	work[256];
+
+	strncpy (work, line+5, sizeof(work)-1);
+	work[sizeof(work)-1] = 0;
+	for (kv = strtok(work, " \t\r\n"); kv; kv = strtok(NULL, " \t\r\n"))
+	{
+	    char* eq = strchr(kv, '=');
+	    if (!eq) continue;
+	    *eq++ = 0;
+	    if      (!strcmp(kv,"order")) { strncpy(order_s,eq,sizeof(order_s)-1); order_s[sizeof(order_s)-1]=0; }
+	    else if (!strcmp(kv,"focus")) focus   = atoi(eq);
+	    else if (!strcmp(kv,"x"))     bx      = atoi(eq)*FRACUNIT;
+	    else if (!strcmp(kv,"y"))     by      = atoi(eq)*FRACUNIT;
+	    else if (!strcmp(kv,"for"))   fortics = atoi(eq);
+	}
+	P_AICoop_SetDirective (AI_BuddyTactic(order_s), P_AI_MobjForId(focus), bx, by, fortics);
 	if (client >= 0) (void)!write (client, "ok\n", 3);
 	return;
     }
@@ -642,6 +709,14 @@ void P_AI_Init (void)
 	ai_on = 1;
 	ai_demo = 1;
 	printf ("P_AI: built-in demo director enabled\n");
+    }
+    // -aicoop drives the buddy through the same director transport, so open the
+    // socket for it too (on the -aidirector port if given, else the default).
+    if (M_CheckParm ("-aicoop"))
+    {
+	ai_on = 1;
+	if (listen_fd < 0)
+	    AI_OpenSocket ();
     }
 }
 

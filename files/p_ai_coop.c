@@ -46,6 +46,8 @@ static int	summon;			// "come": tics left running to the player
 static int	hold;			// "wait/stay": hold position
 static int	forceaggro;		// "attack": tics left charging forcetarget
 static mobj_t*	forcetarget;		// the forced attack target
+static int	ai_goto;		// LLM "goto": tics left moving to (ai_gx,ai_gy)
+static fixed_t	ai_gx, ai_gy;		// LLM goto destination
 
 #define COOP_SIGHT	(1280*FRACUNIT)	// monster acquisition range
 #define COOP_TURN	1300		// max angleturn per tic (~7 deg)
@@ -69,9 +71,13 @@ static int	coop_slot = 1;		// player index the buddy occupies (single-player: 1)
 // disabled, so real network games run without it (clean lockstep, no extra slot).
 void P_AICoop_Init (void)
 {
-    // -coop starts the rule-based bot (current behaviour).
-    // -aicoop is a forward-compatible stub for the AI-driven companion layer
-    // (see AI_IMPROVEMENTS.md #1); until that ships it falls back to -coop.
+    // -coop  : autonomous rule-based bot.
+    // -aicoop: the rule-based bot PLUS the LLM director layer -- an external
+    //          director (run/director) sets the buddy's high-level tactic each
+    //          cycle (engage/defend/hold/regroup/retreat/grab) over the same TCP
+    //          transport it uses for the monsters; the rule-based primitives
+    //          execute it, and the buddy reverts to autonomous when the director
+    //          goes quiet.  See AGENT_CONTROL.md / p_ai_llm.c.
     int coop    = M_CheckParm ("-coop")    > 0;
     int aicoop  = M_CheckParm ("-aicoop")  > 0;
 
@@ -95,15 +101,14 @@ void P_AICoop_Init (void)
 
     coop_slot = 1;
     companion_active = 1;
-    aicoop_layer = aicoop;		// remember whether -aicoop was given; the
-				// build-cmd hook can prefer an AI source over
-				// the rule bot once that ships.  Today this is
-				// read but does nothing extra.
+    aicoop_layer = aicoop;		// -aicoop: accept director tactics for the buddy
+				// (P_AICoop_AIMode / P_AICoop_SetDirective) + expose
+				// it in the AI `observe` stream.
     playeringame[1] = true;	// spawn the buddy at the co-op start
 
-    if (aicoop && !coop)
-	printf ("P_AICoop: -aicoop (AI companion layer) not yet implemented -- "
-		"falling back to rule-based co-op buddy (player 2).\n");
+    if (aicoop)
+	printf ("P_AICoop: AI-directed co-op companion enabled (player 2) -- "
+		"connect the director to drive its tactics.\n");
     else
 	printf ("P_AICoop: rule-based co-op companion enabled (player 2)\n");
 }
@@ -648,6 +653,54 @@ const char* P_AICoop_Attack (void)
     forceaggro  = COOP_ATTACK_TICS;
     hold = 0;
     return "[Buddy] Attacking!";
+}
+
+// ---------------------------------------------------------------------------
+//  AI (LLM) director layer
+// ---------------------------------------------------------------------------
+int P_AICoop_AIMode (void)
+{
+    return aicoop_layer;
+}
+
+// Map a director tactic onto the buddy's existing rule-based overrides (which
+// already age + are executed in P_AICoop_BuildCmd).  The director re-sends the
+// order every cycle to keep it fresh; when it stops, the timers lapse and the
+// buddy reverts to autonomous behaviour.
+void P_AICoop_SetDirective (int tactic, struct mobj_s* focus, fixed_t x, fixed_t y, int tics)
+{
+    mobj_t*	mo = AICoop_Mo ();
+    if (!mo || netgame)
+	return;
+    if (tics <= 0)
+	tics = 70;				// ~2 s
+
+    // clear all overrides first; the chosen tactic re-arms the ones it needs
+    forceaggro = 0; forcetarget = NULL; hold = 0; summon = 0; ai_goto = 0;
+
+    switch (tactic)
+    {
+      case BUD_ENGAGE:
+	forcetarget = (mobj_t*) focus;
+	if (!forcetarget) forcetarget = AICoop_FindTarget (mo);
+	forceaggro  = tics;
+	break;
+      case BUD_HOLD:
+	hold = 1;
+	break;
+      case BUD_REGROUP:
+      case BUD_RETREAT:
+	summon = tics;
+	break;
+      case BUD_GOTO:
+	ai_goto = tics; ai_gx = x; ai_gy = y;
+	break;
+      case BUD_DEFEND:
+      case BUD_GRAB:
+      case BUD_AUTO:
+      default:
+	break;					// overrides cleared -> rule-based
+    }
 }
 
 const char* P_AICoop_StatusReport (void)
@@ -1292,6 +1345,7 @@ void P_AICoop_BuildCmd (void)
 
     if (summon > 0)     summon--;
     if (forceaggro > 0) forceaggro--;
+    if (ai_goto > 0)    ai_goto--;
 
     // "come" ends as soon as the buddy has reached the player (don't run the
     // whole timer once it's already next to you).
@@ -1318,8 +1372,14 @@ void P_AICoop_BuildCmd (void)
 
     if (!haveaim)
     {
+	// (LLM goto) ordered: move to a point, ignoring fights/items
+	if (ai_goto > 0)
+	{
+	    coop_state = 4; haveaim = 1; movethresh = 24*FRACUNIT; navigate = 1;
+	    tx = ai_gx; ty = ai_gy;
+	}
 	// (wait/stay) ordered: hold position; still face & fire at a monster
-	if (hold)
+	else if (hold)
 	{
 	    coop_state = 3;
 	    if (tgt) { coop_state = 1; haveaim = 1; fire = 1; aimmon = tgt; tx = tgt->x; ty = tgt->y; }

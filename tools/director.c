@@ -346,19 +346,30 @@ static int   opt_oport;
 static double opt_period = 1.0;
 
 static const char* SYSTEM_PROMPT =
-    "You are the AI Director commanding the MONSTERS in a game of DOOM against the "
-    "human player. You receive the live game state and assign each monster a tactical "
-    "order. Think like a squad: pincer the player (some flank_left, some flank_right), "
-    "have 1-2 strong monsters focus_fire, keep low-HP monsters back with fallback or "
-    "hold, use ambush for monsters that can't see the player yet. Available orders: "
-    "chase, hold, fallback, flank_left, flank_right, ambush, focus_fire, use_door. "
+    "You are the AI director for a single-player DOOM session and you control TWO things. "
+    "(1) The MONSTERS, as a coordinated squad challenging the human: pincer (some flank_left, "
+    "some flank_right), 1-2 strong monsters focus_fire, keep low-HP monsters back with fallback "
+    "or hold, ambush for monsters that can't see the player yet. Monster orders: chase, hold, "
+    "fallback, flank_left, flank_right, ambush, focus_fire, use_door. "
+    "(2) The human's AI COMPANION 'buddy' (the \\\"buddy\\\" field of the state), which you direct "
+    "to HELP the human: engage dangerous monsters (add \\\"focus\\\":<monster id> to pick one), "
+    "regroup or retreat it when its health is low, defend when the human is safe, grab to collect "
+    "items. Buddy orders: engage, defend, hold, regroup, retreat, grab. "
     "Respond ONLY with JSON of the form {\\\"commands\\\":[{\\\"order\\\":\\\"flank_left\\\","
-    "\\\"ids\\\":[1,3]}]}. Every monster id must appear in exactly one command.";
+    "\\\"ids\\\":[1,3]}],\\\"buddy\\\":{\\\"order\\\":\\\"engage\\\",\\\"focus\\\":2}}. "
+    "Every monster id must appear in exactly one command. Omit \\\"buddy\\\" if the state has no buddy.";
 
 static int is_order (const char* o)
 {
     static const char* k[] = { "chase","hold","fallback","flank_left","flank_right",
                                "ambush","focus_fire","use_door", NULL };
+    for (int i = 0; k[i]; i++) if (!strcmp (o, k[i])) return 1;
+    return 0;
+}
+
+static int is_buddy_order (const char* o)
+{
+    static const char* k[] = { "engage","defend","hold","regroup","retreat","grab","auto", NULL };
     for (int i = 0; k[i]; i++) if (!strcmp (o, k[i])) return 1;
     return 0;
 }
@@ -414,6 +425,7 @@ static int worker (void* unused)
         json* state = json_parse (line);
         json* mons  = json_get (state, "monsters");
         json* plr   = json_get (state, "player");
+        json* bud   = json_get (state, "buddy");	// present only with -aicoop
 
         // collect valid ids
         int  ids[256], nids = 0;
@@ -423,9 +435,9 @@ static int worker (void* unused)
                 json* id = json_get (m, "id");
                 if (id && id->t == JNUM) ids[nids++] = (int) id->num;
             }
-        if (nids == 0)
+        if (nids == 0 && !bud)
         {
-            char s2[160]; snprintf (s2, sizeof s2, "round %d: no live monsters yet", round); setsub (s2);
+            char s2[160]; snprintf (s2, sizeof s2, "round %d: no live monsters / no buddy yet", round); setsub (s2);
             json_free (state);
             SDL_Delay ((int)(opt_period * 1000));
             continue;
@@ -491,6 +503,33 @@ static int worker (void* unused)
                     strncat (summary, piece, sizeof summary - strlen (summary) - 1);
                     issued++;
                 }
+
+            // buddy order (the player's ally) -- {"buddy":{"order":"engage","focus":2}}
+            if (bud)
+            {
+                json* bo = json_get (plan, "buddy");
+                json* bord = bo ? json_get (bo, "order") : NULL;
+                if (bord && bord->t == JSTR)
+                {
+                    char bl[32]; snprintf (bl, sizeof bl, "%s", bord->str);
+                    for (char* p = bl; *p; p++) *p = (char) tolower ((unsigned char)*p);
+                    if (is_buddy_order (bl))
+                    {
+                        json* bf = json_get (bo, "focus");
+                        int fid = (bf && bf->t == JNUM) ? (int) bf->num : 0;
+                        int fok = 0;
+                        for (int i = 0; i < nids; i++) if (ids[i] == fid) { fok = 1; break; }
+                        char bc[128];
+                        int bn = fok ? snprintf (bc, sizeof bc, "buddy order=%s focus=%d for=105\n", bl, fid)
+                                     : snprintf (bc, sizeof bc, "buddy order=%s for=105\n", bl);
+                        send_all (gs, bc, bn);
+                        recv_line (gs, line, sizeof line);   // "ok"
+                        char piece[48]; snprintf (piece, sizeof piece, "buddy:%s%s ", bl, fok ? "*" : "");
+                        strncat (summary, piece, sizeof summary - strlen (summary) - 1);
+                        issued++;
+                    }
+                }
+            }
             json_free (plan);
 
             json* hp = plr ? json_get (plr, "health") : NULL;

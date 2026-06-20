@@ -92,7 +92,7 @@ Vollständige Liste aller CLI-Flags die `aidoom` akzeptiert, extrahiert via
 | Flag | Parameter | Default | Wirkung |
 |------|-----------|---------|---------|
 | `-coop` | — | off | Aktiviert den regelbasierten Co-op-Buddy (Player 2). Verlangt dass die Map ein `Player_2_Start`-Thing hat; sonst WARNING und Buddy disabled. Single-Player only. |
-| `-aicoop` | — | off | Aktiviert den AI-gesteuerten Companion-Layer (siehe `AI_IMPROVEMENTS.md #1`). Aktuell ein Stub der auf `-coop` (regelbasiert) zurückfällt; sobald der AI-Layer gebaut ist, routet der ticcmd-Generator durch den LLM-Director. |
+| `-aicoop` | — | off | Aktiviert den AI-gesteuerten Companion (Player 2): die regelbasierte Basis **plus** den LLM-Director. Öffnet den AI-Transport (TCP, `-aidirector`-Port oder Default 31666), exponiert den Buddy im `observe`-Stream und nimmt `buddy order=…`-Befehle an. Der Director (`run/director`) setzt damit pro Zyklus die Buddy-Taktik (engage/defend/hold/regroup/retreat/grab); ohne Director-Verbindung läuft der Buddy autonom (regelbasiert). Start am einfachsten via `start_aidoom.sh --aicoop`. |
 | `-friendlyfire` | — | off | Erlaubt Friendly-Fire zwischen Spielern (Buddy kann Spieler 1 treffen). |
 
 **`-coop` und `-aicoop` sind mutually exclusive.** Werden beide zusammen
