@@ -205,12 +205,14 @@ extern int	viewheight;
 
 extern int	mouseSensitivity;
 extern int	showMessages;
+extern int	show_buddy_hud;	// hu_buddy.c -- companion top-of-screen HUD
 
 extern int	detailLevel;
 
 extern int	screenblocks;
 
 extern int	showMessages;
+extern int	show_buddy_hud;	// hu_buddy.c -- companion top-of-screen HUD
 
 // machine-independent sound params
 extern	int	numChannels;
@@ -239,6 +241,7 @@ default_t	defaults[] =
     {"sfx_volume",&snd_SfxVolume, 8},
     {"music_volume",&snd_MusicVolume, 8},
     {"show_messages",&showMessages, 1},
+    {"show_buddy_hud",&show_buddy_hud, 1},
     
 
     {"key_right",&key_right, KEY_RIGHTARROW},

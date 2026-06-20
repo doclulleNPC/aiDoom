@@ -491,6 +491,10 @@ void HU_Drawer(void)
     if (automapactive)
 	HUlib_drawTextLine(&w_title, false);
 
+    // Companion stats strip across the top (no-op when -aicoop isn't active
+    // or the user disabled it via `show_buddy_hud`).
+    HU_Buddy_Drawer ();
+
 }
 
 void HU_Erase(void)

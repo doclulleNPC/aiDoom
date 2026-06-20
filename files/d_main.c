@@ -1219,6 +1219,9 @@ printf("added\n");
 
     C_Init ();		// developer console (toggle with `)
 
+    printf ("HU_Buddy_Init: Companion HUD.\n");
+    HU_Buddy_Init ();	// small top-strip HUD for the AI co-op buddy
+
     printf ("ST_Init: Init status bar.\n");
     ST_Init ();
 
