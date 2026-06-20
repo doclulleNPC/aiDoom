@@ -198,7 +198,7 @@ void M_Sound(int choice);
 void M_Video(int choice);
 void M_VideoRes(int choice);
 void M_VideoFullscreen(int choice);
-void M_VideoWidescreen(int choice);
+void M_VideoAspect(int choice);
 void M_VideoAntialias(int choice);
 void M_VideoBlur(int choice);
 void M_DrawVideo(void);
@@ -396,7 +396,7 @@ menuitem_t VideoMenu[]=
 {
     {2,"",	M_VideoRes,'r'},	// left/right changes resolution
     {1,"",	M_VideoFullscreen,'f'},
-    {1,"",	M_VideoWidescreen,'w'},
+    {2,"",	M_VideoAspect,'w'},	// left/right cycles 4:3 / 16:9 / 16:10
     {1,"",	M_VideoAntialias,'a'},
     {1,"",	M_VideoBlur,'b'}
 };
@@ -1022,31 +1022,29 @@ void		I_SetFullscreen (int on);// i_video.c
 int		I_GetFullscreen (void);	// i_video.c
 extern int	antialiasing;		// i_video.c
 extern int	blur;			// i_video.c
-extern int	widescreen;		// doomdef.c
+extern int	aspect;			// doomdef.c (0=4:3, 1=16:9, 2=16:10)
+extern int	SCREENWIDTH, SCREENHEIGHT;
 void		I_ApplyVideoFilter (void);// i_video.c
 
-static char* M_ResNames[6] = { "320x200", "640x400", "960x600",
-			       "1280x800", "1600x1000", "1920x1200" };
+static char* M_AspectNames[3] = { "4:3", "16:9", "16:10" };
 
 void M_DrawVideo(void)
 {
-    int ri = hires-1;
-    if (ri < 0) ri = 0;
-    if (ri > 5) ri = 5;
+    char res[24];
 
     V_DrawPatchDirect (108,15,0,W_CacheLumpName("M_OPTTTL",PU_CACHE));
 
+    sprintf (res, "%dx%d", SCREENWIDTH, SCREENHEIGHT);	// actual render size
     M_WriteText(VideoDef.x, VideoDef.y + LINEHEIGHT*vid_res, "Resolution");
-    M_WriteText(VideoDef.x + 130, VideoDef.y + LINEHEIGHT*vid_res,
-		M_ResNames[ri]);
+    M_WriteText(VideoDef.x + 130, VideoDef.y + LINEHEIGHT*vid_res, res);
 
     M_WriteText(VideoDef.x, VideoDef.y + LINEHEIGHT*vid_fullscreen, "Fullscreen");
     M_WriteText(VideoDef.x + 130, VideoDef.y + LINEHEIGHT*vid_fullscreen,
 		I_GetFullscreen() ? "On" : "Off");
 
-    M_WriteText(VideoDef.x, VideoDef.y + LINEHEIGHT*vid_widescreen, "Widescreen");
+    M_WriteText(VideoDef.x, VideoDef.y + LINEHEIGHT*vid_widescreen, "Aspect");
     M_WriteText(VideoDef.x + 130, VideoDef.y + LINEHEIGHT*vid_widescreen,
-		widescreen ? "On (16:9)" : "Off (16:10)");
+		M_AspectNames[(aspect>=0 && aspect<=2) ? aspect : 2]);
 
     M_WriteText(VideoDef.x, VideoDef.y + LINEHEIGHT*vid_aa, "Antialiasing");
     M_WriteText(VideoDef.x + 130, VideoDef.y + LINEHEIGHT*vid_aa,
@@ -1062,7 +1060,7 @@ void M_VideoRes(int choice)
     // choice 0 = left (smaller), 1 = right/enter (larger)
     if (choice)
     {
-	if (hires < 6) V_SetRes(hires+1);
+	if (hires < 7) V_SetRes(hires+1);
     }
     else
     {
@@ -1077,10 +1075,10 @@ void M_VideoFullscreen(int choice)
     M_SaveDefaults();		// persist now, not just at quit
 }
 
-void M_VideoWidescreen(int choice)
+void M_VideoAspect(int choice)	// left/right cycles 4:3 -> 16:9 -> 16:10
 {
-    widescreen = !widescreen;
-    V_SetRes(hires);		// rebuild at the new aspect (recomputes FOV + buffers)
+    aspect = choice ? (aspect+1)%3 : (aspect+2)%3;
+    V_SetRes(hires);		// rebuild at the new aspect (FOV + buffer + present)
     M_SaveDefaults();
 }
 

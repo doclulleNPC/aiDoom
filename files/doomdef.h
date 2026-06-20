@@ -107,9 +107,9 @@ typedef enum
 #define	BASE_HEIGHT		200
 
 // Maximum internal resolution the static renderer tables are sized for.
-// (Allows up to 6x = 1920x1200 hi-res rendering of the base 320x200 frame.)
-#define	MAXWIDTH		1920
-#define	MAXHEIGHT		1200
+// (Allows up to 7x = 2240x1400 at 16:10, ~2488x1400 at 16:9 -- 1440p class.)
+#define	MAXWIDTH		2560
+#define	MAXHEIGHT		1440
 
 // The internal rendering resolution.  These are now runtime values
 // (BASE_WIDTH*hires x BASE_HEIGHT*hires) so they can be changed from the menu;
@@ -122,7 +122,8 @@ extern int	hires;
 
 // Widescreen (Hor+); see doomdef.c.  In 16:10 modes NONWIDEWIDTH == SCREENWIDTH
 // and WIDESCREENDELTA == 0, so non-widescreen behaviour is unchanged.
-extern int	widescreen;
+extern int	aspect;		// 0=4:3, 1=16:9, 2=16:10
+extern int	widescreen;	// derived: aspect==16:9
 extern int	NONWIDEWIDTH;
 extern int	WIDESCREENDELTA;
 

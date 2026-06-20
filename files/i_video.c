@@ -469,14 +469,23 @@ void I_SetPalette (byte* pal)
 // (Re)create the streaming texture + logical presentation to match the current
 // internal resolution (SCREENWIDTH x SCREENHEIGHT).
 //
+// Output (display) height for the current aspect.  16:9 and 16:10 show the buffer
+// 1:1; 4:3 reuses the 16:10 buffer but presents it into a 4:3 logical area, which
+// stretches it vertically ~1.2x -- the authentic classic-Doom look.
+int I_OutHeight(void)
+{
+    return (aspect == 0) ? SCREENWIDTH*3/4 : SCREENHEIGHT;
+}
+
 static void I_CreateTexture(void)
 {
     if (texture)
 	SDL_DestroyTexture(texture);
 
     // Render at the internal resolution; SDL scales (aspect-preserving) to the
-    // window.  Letterbox keeps square pixels with bars rather than distorting.
-    SDL_SetRenderLogicalPresentation(renderer, SCREENWIDTH, SCREENHEIGHT,
+    // window.  Letterbox keeps the chosen aspect with bars rather than distorting.
+    // For 4:3 the logical height is wider-aspect so the 16:10 buffer is shown 4:3.
+    SDL_SetRenderLogicalPresentation(renderer, SCREENWIDTH, I_OutHeight(),
 				     SDL_LOGICAL_PRESENTATION_LETTERBOX);
 
     texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
@@ -503,10 +512,11 @@ void		ST_SetRes (void);
 void V_SetRes(int scale)
 {
     if (scale < 1) scale = 1;
-    if (scale > 6) scale = 6;
+    if (scale > 7) scale = 7;
     if (BASE_WIDTH*scale > MAXWIDTH || BASE_HEIGHT*scale > MAXHEIGHT)
 	return;
 
+    widescreen   = (aspect == 1);		// only 16:9 widens the buffer (Hor+)
     hires        = scale;
     SCREENHEIGHT = BASE_HEIGHT * scale;
     NONWIDEWIDTH = BASE_WIDTH  * scale;		// the 16:10 reference width
@@ -518,7 +528,8 @@ void V_SetRes(int scale)
 	SCREENWIDTH &= ~3;			// keep a multiple of 4
     }
     else
-	SCREENWIDTH = NONWIDEWIDTH;
+	SCREENWIDTH = NONWIDEWIDTH;		// 4:3 and 16:10 share the 320*hires buffer
+						// (4:3 is the same buffer shown stretched)
 
     // half the extra width, in BASE (320) coords -- HUD edges shift by this
     WIDESCREENDELTA = ((SCREENWIDTH - NONWIDEWIDTH) / scale) / 2;
@@ -532,10 +543,10 @@ void V_SetRes(int scale)
     ST_SetRes();
     R_SetViewSize (screenblocks, detailLevel);
 
-    // Grow/shrink the window to match the new resolution (windowed only).
+    // Grow/shrink the window to match the new resolution + output aspect (windowed).
     if (window && !fullscreen_mode)
     {
-	SDL_SetWindowSize(window, SCREENWIDTH, SCREENHEIGHT);
+	SDL_SetWindowSize(window, SCREENWIDTH, I_OutHeight());
 	SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
     }
 }
@@ -553,7 +564,7 @@ void I_SetFullscreen(int on)
 
     if (!fullscreen_mode)
     {
-	SDL_SetWindowSize(window, SCREENWIDTH, SCREENHEIGHT);
+	SDL_SetWindowSize(window, SCREENWIDTH, I_OutHeight());
 	SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
     }
 }
@@ -590,7 +601,7 @@ void I_InitGraphics(void)
 	    startscale = atoi(myargv[p+1]);
     }
     if (startscale < 1) startscale = 1;
-    if (startscale > 6) startscale = 6;
+    if (startscale > 7) startscale = 7;
 
     if (fullscreen_mode || M_CheckParm("-fullscreen"))
     {

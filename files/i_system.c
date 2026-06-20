@@ -49,7 +49,7 @@ rcsid[] = "$Id: m_bbox.c,v 1.1 1997/02/03 22:45:10 b1 Exp $";
 // Zone heap size (MB). 6 was the 1996 320x200 value; the hi-res screen wipe
 // transposes a SCREENWIDTH*SCREENHEIGHT buffer (~1MB at 1280x800, ~2.3MB at
 // 1920x1200) on top of level data, which overflowed a 6MB zone at map end.
-int	mb_used = 32;
+int	mb_used = 48;	// zone heap; bumped for the larger screen-wipe buffer at 2560x1440
 
 
 int I_strncasecmp(char *str1, char *str2, int len)
