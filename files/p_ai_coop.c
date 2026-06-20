@@ -1246,8 +1246,8 @@ void P_AICoop_BuildCmd (void)
     {
 	// Wrong weapon?  If holding the chainsaw/fist but the target is out of melee
 	// reach, switch to a ranged weapon -- otherwise the buddy revs the saw at a foe
-	// it can never touch (the bug: it picked up the E1M3 chainsaw and got stuck on
-	// it).  The engine performs the switch via pendingweapon.
+	// it can never touch (the bug: after picking up a chainsaw it got stuck on it,
+	// revving at distant monsters).  The engine performs the switch via pendingweapon.
 	if ((bot->readyweapon == wp_fist || bot->readyweapon == wp_chainsaw)
 	    && bot->pendingweapon == wp_nochange
 	    && P_AproxDistance (aimmon->x - mo->x, aimmon->y - mo->y) > 80*FRACUNIT)
