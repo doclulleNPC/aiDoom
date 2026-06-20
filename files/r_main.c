@@ -65,6 +65,13 @@ fixed_t			centerxfrac;
 fixed_t			centeryfrac;
 fixed_t			projection;
 
+// Widescreen (Hor+): the NON-wide (4:3) view width and its half, used for the
+// projection/focal length so the vertical FOV stays the 4:3 value and the extra
+// width just shows more world at the sides.  Equal to the wide values in 16:10.
+int			viewwidth_nonwide;
+int			scaledviewwidth_nonwide;
+fixed_t			centerxfrac_nonwide;
+
 // just for profiling purposes
 int			framecount;	
 
@@ -554,7 +561,10 @@ void R_InitTextureMapping (void)
     //
     // Calc focallength
     //  so FIELDOFVIEW angles covers SCREENWIDTH.
-    focallength = FixedDiv (centerxfrac,
+    // Hor+ widescreen: focal length from the NON-wide centre, so the per-column
+    // angle matches 4:3 and the wider screen shows more world (not a stretched
+    // 4:3).  In 16:10 modes centerxfrac_nonwide == centerxfrac (unchanged).
+    focallength = FixedDiv (centerxfrac_nonwide,
 			    finetangent[FINEANGLES/4+FIELDOFVIEW/2] );
 	
     for (i=0 ; i<FINEANGLES/2 ; i++)
@@ -682,22 +692,28 @@ void R_ExecuteSetViewSize (void)
     if (setblocks == 11)
     {
 	scaledviewwidth = SCREENWIDTH;
+	scaledviewwidth_nonwide = NONWIDEWIDTH;
 	viewheight = SCREENHEIGHT;
     }
     else
     {
-	scaledviewwidth = (setblocks*32) * hires;
+	scaledviewwidth_nonwide = (setblocks*32) * hires;
 	viewheight = ((setblocks*168/10)&~7) * hires;
+	// widescreen: full-width view at the largest windowed size, else 4:3 window
+	scaledviewwidth = (widescreen && setblocks == 10) ? SCREENWIDTH
+							  : scaledviewwidth_nonwide;
     }
-    
+
     detailshift = setdetail;
     viewwidth = scaledviewwidth>>detailshift;
-	
+    viewwidth_nonwide = scaledviewwidth_nonwide>>detailshift;
+
     centery = viewheight/2;
     centerx = viewwidth/2;
     centerxfrac = centerx<<FRACBITS;
+    centerxfrac_nonwide = (viewwidth_nonwide/2)<<FRACBITS;
     centeryfrac = centery<<FRACBITS;
-    projection = centerxfrac;
+    projection = centerxfrac_nonwide;		// Hor+: vertical FOV from the 4:3 ref
 
     if (!detailshift)
     {
@@ -722,8 +738,8 @@ void R_ExecuteSetViewSize (void)
     // Weapon sprites are authored in 320x200 (BASE) space, so they must scale
     // relative to BASE_WIDTH (not the internal SCREENWIDTH) or they would be
     // drawn at 1/hires size.
-    pspritescale = FRACUNIT*viewwidth/BASE_WIDTH;
-    pspriteiscale = FRACUNIT*BASE_WIDTH/viewwidth;
+    pspritescale = FRACUNIT*viewwidth_nonwide/BASE_WIDTH;
+    pspriteiscale = FRACUNIT*BASE_WIDTH/viewwidth_nonwide;
     
     // thing clipping
     for (i=0 ; i<viewwidth ; i++)

@@ -185,6 +185,7 @@ extern int	key_console;
 extern int	crosshair;
 extern int	antialiasing;	// i_video.c -- smooth (bilinear) scaling
 extern int	blur;		// i_video.c -- soft blur post-process
+extern int	widescreen;	// doomdef.c -- Hor+ widescreen (16:9)
 
 // Monster pack-hunt AI (p_enemy.c)
 extern int	monster_pack;
@@ -281,6 +282,7 @@ default_t	defaults[] =
     {"fullscreen",&fullscreen_mode, 0},
     {"antialiasing",&antialiasing, 0},		// default OFF
     {"blur",&blur, 0},				// default OFF
+    {"widescreen",&widescreen, 0},		// default OFF (16:10)
 
     {"snd_channels",&numChannels, 3},
 

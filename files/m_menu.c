@@ -198,6 +198,7 @@ void M_Sound(int choice);
 void M_Video(int choice);
 void M_VideoRes(int choice);
 void M_VideoFullscreen(int choice);
+void M_VideoWidescreen(int choice);
 void M_VideoAntialias(int choice);
 void M_VideoBlur(int choice);
 void M_DrawVideo(void);
@@ -385,6 +386,7 @@ enum
 {
     vid_res,
     vid_fullscreen,
+    vid_widescreen,
     vid_aa,
     vid_blur,
     vid_end
@@ -394,6 +396,7 @@ menuitem_t VideoMenu[]=
 {
     {2,"",	M_VideoRes,'r'},	// left/right changes resolution
     {1,"",	M_VideoFullscreen,'f'},
+    {1,"",	M_VideoWidescreen,'w'},
     {1,"",	M_VideoAntialias,'a'},
     {1,"",	M_VideoBlur,'b'}
 };
@@ -1019,6 +1022,7 @@ void		I_SetFullscreen (int on);// i_video.c
 int		I_GetFullscreen (void);	// i_video.c
 extern int	antialiasing;		// i_video.c
 extern int	blur;			// i_video.c
+extern int	widescreen;		// doomdef.c
 void		I_ApplyVideoFilter (void);// i_video.c
 
 static char* M_ResNames[6] = { "320x200", "640x400", "960x600",
@@ -1039,6 +1043,10 @@ void M_DrawVideo(void)
     M_WriteText(VideoDef.x, VideoDef.y + LINEHEIGHT*vid_fullscreen, "Fullscreen");
     M_WriteText(VideoDef.x + 130, VideoDef.y + LINEHEIGHT*vid_fullscreen,
 		I_GetFullscreen() ? "On" : "Off");
+
+    M_WriteText(VideoDef.x, VideoDef.y + LINEHEIGHT*vid_widescreen, "Widescreen");
+    M_WriteText(VideoDef.x + 130, VideoDef.y + LINEHEIGHT*vid_widescreen,
+		widescreen ? "On (16:9)" : "Off (16:10)");
 
     M_WriteText(VideoDef.x, VideoDef.y + LINEHEIGHT*vid_aa, "Antialiasing");
     M_WriteText(VideoDef.x + 130, VideoDef.y + LINEHEIGHT*vid_aa,
@@ -1067,6 +1075,13 @@ void M_VideoFullscreen(int choice)
 {
     I_SetFullscreen(!I_GetFullscreen());
     M_SaveDefaults();		// persist now, not just at quit
+}
+
+void M_VideoWidescreen(int choice)
+{
+    widescreen = !widescreen;
+    V_SetRes(hires);		// rebuild at the new aspect (recomputes FOV + buffers)
+    M_SaveDefaults();
 }
 
 void M_VideoAntialias(int choice)

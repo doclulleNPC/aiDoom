@@ -508,8 +508,20 @@ void V_SetRes(int scale)
 	return;
 
     hires        = scale;
-    SCREENWIDTH  = BASE_WIDTH  * scale;
     SCREENHEIGHT = BASE_HEIGHT * scale;
+    NONWIDEWIDTH = BASE_WIDTH  * scale;		// the 16:10 reference width
+
+    if (widescreen)
+    {
+	SCREENWIDTH = SCREENHEIGHT * 16 / 9;	// Hor+ 16:9 buffer
+	if (SCREENWIDTH > MAXWIDTH) SCREENWIDTH = MAXWIDTH;
+	SCREENWIDTH &= ~3;			// keep a multiple of 4
+    }
+    else
+	SCREENWIDTH = NONWIDEWIDTH;
+
+    // half the extra width, in BASE (320) coords -- HUD edges shift by this
+    WIDESCREENDELTA = ((SCREENWIDTH - NONWIDEWIDTH) / scale) / 2;
 
     if (renderer)
 	I_CreateTexture();
