@@ -42,6 +42,19 @@ otherwise (symptom: bogus errors like "missing rotations"). `-DSDL_MAIN_HANDLED`
 because `i_main.c` owns `main()`. `build.sh` recompiles every `.c`, so there's no
 header-dependency-tracking pitfall.
 
+**Auto-versioning (in `build.sh`).** Two version numbers bump automatically:
+- **Fork version** (`files/aidoom_version.h`, `AIDOOM_VERSION`, shown in the window
+  title) — the patch field is bumped **+0.0.1 on every build**. Bump major/minor by
+  hand when cutting a release tag. The file is auto-generated; expect it dirty after
+  every build.
+- **Engine version** (`VERSION_NUM` in `doomdef.h`, the `1.xx` stamped in savegame
+  headers) — `build.sh` fingerprints the sizes of every struct the savegame
+  memcpy's (`p_saveg.c`: `player_t`, `mobj_t`, `ceiling_t`, `vldoor_t`,
+  `floormove_t`, `plat_t`, `lightflash_t`, `strobe_t`, `glow_t`) into
+  `files/aidoom_saveg.sig`; when that changes it bumps `VERSION_NUM` **+1 (=+0.01)**
+  so stale saves are cleanly **rejected** ("bad version") instead of crashing on
+  load. So: change any of those structs → engine version auto-bumps.
+
 **App icon:** the live window/taskbar icon is embedded from `files/aidoom.ico`
 into `files/aidoom_icon.h` (a 64×64 RGBA array) and set via `SDL_SetWindowIcon`
 in `i_video.c`; the Windows `.exe` icon comes from `files/aidoom.rc`. Regenerate

@@ -34,6 +34,7 @@
 #include "doomdef.h"
 
 #include "aidoom_icon.h"
+#include "aidoom_version.h"		// AIDOOM_VERSION (auto-bumped by build.sh)
 #include "c_console.h"			// console overlay state (C_Active / C_GetLine)
 #include "../tools/font_atlas.h"		// baked DejaVuSansMono atlas (TTF console font)
 
@@ -503,6 +504,7 @@ extern int	screenblocks;
 extern int	detailLevel;
 void		R_SetViewSize (int blocks, int detail);
 void		ST_SetRes (void);
+void		HU_Buddy_SetRes (void);
 
 //
 // V_SetRes
@@ -541,6 +543,10 @@ void V_SetRes(int scale)
     // the next D_Display rebuilds the view tables and repaints the border;
     // ST_SetRes resizes (and flags a full redraw of) the status-bar buffer.
     ST_SetRes();
+    // Companion HUD is resolution-independent (uses V_DrawBlock + V_DrawPatch
+    // which scale internally), but call its hook so it can reallocate any
+    // per-resolution scratch buffers it may grow in the future.
+    HU_Buddy_SetRes();
     R_SetViewSize (screenblocks, detailLevel);
 
     // Grow/shrink the window to match the new resolution + output aspect (windowed).
@@ -609,7 +615,7 @@ void I_InitGraphics(void)
 	fullscreen_mode = 1;
     }
 
-    window = SDL_CreateWindow("aiDoom",
+    window = SDL_CreateWindow("aiDoom " AIDOOM_VERSION,
 			      BASE_WIDTH*startscale, BASE_HEIGHT*startscale,
 			      window_flags);
     if ( window == NULL )
