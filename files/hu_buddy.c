@@ -25,6 +25,8 @@
 #include "m_swap.h"
 #include "r_defs.h"
 #include "v_video.h"
+#include "w_wad.h"                  // W_CheckNumForName / W_CacheLumpNum (buddy.wad faces)
+#include "z_zone.h"                 // PU_STATIC
 
 #include "hu_stuff.h"               // HU_FONTSTART / HU_FONTSIZE + the small Doom HUD font
 
@@ -48,6 +50,45 @@ static const char* weapon_short[] = {
 // hu_font is loaded by HU_Init; nothing else to cache here.
 void HU_Buddy_Init  (void) {}
 void HU_Buddy_SetRes (void) {}
+
+
+// ---------------------------------------------------------------------------
+//  Buddy mugshot faces (BUF*) -- a distinct set from the player's STF*, packed
+//  into buddy.wad (tools/bake_buddy_face.py).  Loaded lazily on first draw: the
+//  WAD is added at startup (I_Voice_Init), so the lumps exist by the time the HUD
+//  draws; if buddy.wad is absent the faces stay NULL and the HUD shows text only.
+// ---------------------------------------------------------------------------
+static patch_t* buf_face[5];        // BUFST00/10/20/30/40 (healthy .. near-death)
+static patch_t* buf_dead;           // BUFDEAD0
+static int      faces_tried;        // 0 = not yet, 1 = attempted (loaded or absent)
+
+static void HU_Buddy_LoadFaces (void)
+{
+    int i, l;
+    char nm[9];
+    if (faces_tried) return;
+    faces_tried = 1;
+    for (i = 0; i < 5; i++)
+    {
+	sprintf (nm, "BUFST%d0", i);
+	l = W_CheckNumForName (nm);
+	buf_face[i] = (l >= 0) ? (patch_t*) W_CacheLumpNum (l, PU_STATIC) : NULL;
+    }
+    strcpy (nm, "BUFDEAD0");
+    l = W_CheckNumForName (nm);
+    buf_dead = (l >= 0) ? (patch_t*) W_CacheLumpNum (l, PU_STATIC) : NULL;
+}
+
+// Mugshot for the buddy's current health (mirrors the player's pain-offset buckets).
+static patch_t* HU_Buddy_Face (int hp)
+{
+    int pain;
+    if (hp <= 0) return buf_dead;
+    pain = (100 - (hp > 100 ? 100 : hp)) / 20;
+    if (pain < 0) pain = 0;
+    if (pain > 4) pain = 4;
+    return buf_face[pain];
+}
 
 
 // ===========================================================================
@@ -85,27 +126,43 @@ static void HU_Buddy_Text (int x, int y, const char* s)
     }
 }
 
-// Two right-aligned message-font lines at the top-right (HP/armor, weapon/ammo).
+// Top-right readout: the buddy's mugshot (by health) followed by two right-aligned
+// message-font lines (HP/armor, weapon/ammo).  The mugshot replaces the old "BUDDY"
+// label; if the BUF* faces are missing it falls back to that text label.
 static void HU_Buddy_DrawStrip (player_t* bot)
 {
-    int  hp   = bot->health;
-    int  arm  = bot->armorpoints;
-    int  w    = bot->readyweapon;
-    int  ammo = -1;
-    int  wb   = SCREENWIDTH / hires;   // wide base width = the V_ coordinate space
-    char l1[40], l2[40];
+    int      hp   = bot->health;
+    int      arm  = bot->armorpoints;
+    int      w    = bot->readyweapon;
+    int      ammo = -1;
+    int      wb   = SCREENWIDTH / hires;   // wide base width = the V_ coordinate space
+    int      textw, tx;
+    patch_t* face;
+    char     l1[40], l2[40];
+
+    HU_Buddy_LoadFaces ();
+    face = HU_Buddy_Face (hp);
 
     if (w >= 0 && w < NUMWEAPONS && weaponinfo[w].ammo < NUMAMMO)
 	ammo = bot->ammo[weaponinfo[w].ammo];
 
-    snprintf (l1, sizeof l1, "BUDDY  HP %d  AR %d", hp, arm);
+    // With a mugshot the lines are just stats; without one, prefix the "BUDDY" label.
+    snprintf (l1, sizeof l1, face ? "HP %d  AR %d" : "BUDDY  HP %d  AR %d", hp, arm);
     if (ammo >= 0) snprintf (l2, sizeof l2, "%s %d",
 			     (w >= 0 && w < NUMWEAPONS) ? weapon_short[w] : "", ammo);
     else           snprintf (l2, sizeof l2, "%s",
 			     (w >= 0 && w < NUMWEAPONS) ? weapon_short[w] : "");
 
-    HU_Buddy_Text (wb - 4 - HU_Buddy_TextW (l1), 1,  l1);
-    HU_Buddy_Text (wb - 4 - HU_Buddy_TextW (l2), 11, l2);
+    textw = HU_Buddy_TextW (l1);
+    { int w2 = HU_Buddy_TextW (l2); if (w2 > textw) textw = w2; }
+    tx = wb - 4 - textw;
+
+    HU_Buddy_Text (tx, 2,  l1);
+    HU_Buddy_Text (tx, 12, l2);
+
+    // Mugshot just left of the text block (BUF* patches carry a -5/-2 offset, so
+    // V_DrawPatch shifts them right/down a touch -- accounted for in the x below).
+    if (face) V_DrawPatch (tx - SHORT (face->width) - 6, 1, 0, face);
 }
 
 
