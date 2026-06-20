@@ -659,7 +659,7 @@ int main (int argc, char** argv)
         int n = g_log_n;
         SDL_UnlockMutex (g_lock);
 
-        text (10, 8,  "aiDoom AI Director  (Ollama LLM -> monster tactics)", 120, 200, 255);
+        text (10, 8,  "aiDoom AI Director  (Ollama LLM -> monster + buddy tactics)", 120, 200, 255);
         text (10, 26, status, 230, 230, 120);
         text (10, 42, sub,    180, 200, 180);
         SDL_SetRenderDrawColor (ren, 60, 64, 80, 255);
