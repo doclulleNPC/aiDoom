@@ -2,16 +2,16 @@
 //-----------------------------------------------------------------------------
 //
 // DESCRIPTION:
-//	AI-controlled co-op companion (player 2).  Enabled with -aicoop, which
-//	marks playeringame[1] so the engine spawns a second marine at the map's
-//	co-op start.  Each tic this builds that player's ticcmd with a small
-//	built-in brain: acquire the nearest visible monster, turn to it and fire;
-//	when hurt grab health; when idle collect nearby items; otherwise follow
-//	the human.  It drives the player through the normal ticcmd path, so
-//	weapons, damage, pickups and reborn all work like a real co-op peer.
+//	Co-op companion (player 2).  Pick one of:
+//	  -coop    : rule-based bot (current default; runs without any LLM)
+//	  -aicoop  : AI-driven companion layer (see AI_IMPROVEMENTS.md #1)
+//	          -- until that ships, -aicoop is a stub that falls back to
+//	          the rule-based bot.  Once the AI layer is implemented, the
+//	          same flag will instead route ticcmd generation through an LLM
+//	          director (with the rule bot as the timeout/failure fallback).
 //
-//	Console commands (c_console.c) let the human direct it: where / come /
-//	wait / attack / report.
+//	Specifying both flags at once is a user error -- the two are mutually
+//	exclusive.  P_AICoop_Init prints a warning and disables the buddy.
 //
 //	Single-machine only (no real netgame): the cmd is generated locally and
 //	never carried over the wire.
@@ -39,7 +39,8 @@
 
 #include "p_ai_coop.h"
 
-static int	aicoop;			// -aicoop given
+static int	companion_active;	// buddy enabled (-coop OR -aicoop)
+static int	aicoop_layer;		// -aicoop given: AI-driven layer requested
 static int	coop_state;		// 0 follow 1 fight 2 heal 3 hold 4 come 5 items
 static int	summon;			// "come": tics left running to the player
 static int	hold;			// "wait/stay": hold position
@@ -68,47 +69,151 @@ static int	coop_slot = 1;		// player index the buddy occupies (single-player: 1)
 // disabled, so real network games run without it (clean lockstep, no extra slot).
 void P_AICoop_Init (void)
 {
-    if (!M_CheckParm ("-aicoop"))
+    // -coop starts the rule-based bot (current behaviour).
+    // -aicoop is a forward-compatible stub for the AI-driven companion layer
+    // (see AI_IMPROVEMENTS.md #1); until that ships it falls back to -coop.
+    int coop    = M_CheckParm ("-coop")    > 0;
+    int aicoop  = M_CheckParm ("-aicoop")  > 0;
+
+    if (!coop && !aicoop)
 	return;
+
+    if (coop && aicoop)
+    {
+	printf ("P_AICoop: -coop and -aicoop are mutually exclusive.  Pick one:\n"
+		"  -coop    rule-based buddy (no LLM needed)\n"
+		"  -aicoop  AI-driven buddy (LLM-backed; today falls back to -coop)\n"
+		"P_AICoop: co-op companion disabled.  Relaunch with one of the two.\n");
+	return;
+    }
 
     if (netgame)
     {
-	printf ("P_AICoop: AI co-op buddy is single-player only -- disabled in netgames.\n");
+	printf ("P_AICoop: co-op companion is single-player only -- disabled in netgames.\n");
 	return;
     }
 
     coop_slot = 1;
-    aicoop = 1;
-    playeringame[1] = true;		// spawn the buddy at the co-op start
-        printf ("P_AICoop: AI co-op companion enabled (player 2)\n");
+    companion_active = 1;
+    aicoop_layer = aicoop;		// remember whether -aicoop was given; the
+				// build-cmd hook can prefer an AI source over
+				// the rule bot once that ships.  Today this is
+				// read but does nothing extra.
+    playeringame[1] = true;	// spawn the buddy at the co-op start
+
+    if (aicoop && !coop)
+	printf ("P_AICoop: -aicoop (AI companion layer) not yet implemented -- "
+		"falling back to rule-based co-op buddy (player 2).\n");
+    else
+	printf ("P_AICoop: rule-based co-op companion enabled (player 2)\n");
+}
+
+// Called from P_SetupLevel after P_LoadThings.  If -coop/-aicoop was given
+// but the map has no Player_2_Start, the buddy can't spawn this level --
+// disable it (so P_AICoop_Slot() returns -1 and the build-cmd path is a no-op)
+// and emit a one-shot warning telling the user what to fix.
+// Called from P_SetupLevel just before P_LoadThings.  Drops the buddy slot's
+// stale mobj AND its stale playerstarts[] entry so that P_AICoop_VerifySpawn
+// can reliably distinguish "this map's THINGS contain a Player_2_Start" from
+// "this map has no Player_2_Start".
+//
+// Why we have to touch both:
+//   - players[coop_slot].mo is a dangling pointer across map loads (the mobj
+//     is freed by Z_FreeTags but the pointer field in the static players[]
+//     struct is not zeroed).  Nulling it here makes the post-load "mo != NULL"
+//     check reliable.
+//   - playerstarts[coop_slot] is also static across map loads and only updated
+//     by P_LoadThings if the map has a matching Player_X_Start thing.  If we
+//     don't reset it, an E?M? that doesn't override the IWAD's playerstarts[]
+//     (e.g. testmap's E2M1 PWAD overlay on doom2's E2M1, which retains the
+//     IWAD's P2_Start) will falsely look like it had a P2_Start.  Resetting it
+//     to a sentinel (type=0 = "no thing here") forces the post-load check to
+//     see type=2 only when THIS map's THINGS explicitly set it.
+//
+// We deliberately do NOT touch playeringame[coop_slot]: it stays true (set
+// by P_AICoop_Init), so P_SpawnPlayer inside P_LoadThings will spawn Player 2
+// normally when the map has a Player_2_Start thing.
+void P_AICoop_ResetSlot (void)
+{
+    if (!companion_active) return;
+    if (netgame) return;
+
+    players[coop_slot].mo = NULL;
+    playerstarts[coop_slot].type = 0;	// sentinel: "no P2_Start thing on this map"
+    playerstarts[coop_slot].x = 0;
+    playerstarts[coop_slot].y = 0;
+    playerstarts[coop_slot].angle = 0;
+    playerstarts[coop_slot].options = 0;
+}
+
+static boolean P_AICoop_VerifySpawn_warned = false;	// one-shot per process
+
+void P_AICoop_VerifySpawn (void)
+{
+    mobj_t*	buddy_mo;
+
+    if (!companion_active) return;			// buddy not requested
+    if (netgame) return;					// not single-player, off
+
+    // Has the map's Player_2_Start thing produced a real mobj?  P_LoadThings
+    // would have written playerstarts[1] and called P_SpawnPlayer.  The
+    // authoritative check is: does the buddy player have a mobj?
+    // (P_AICoop_ResetSlot nulled players[coop_slot].mo before P_LoadThings,
+    // so any non-NULL mo now is the result of THIS map's THINGS, not a leftover
+    // from the previous map.  playeringame[coop_slot] stays true throughout
+    // because P_AICoop_Init set it; P_SpawnPlayer in P_LoadThings respected
+    // that, so the buddy is in the game if and only if there was a real P2 thing.)
+    buddy_mo = players[coop_slot].mo;
+    // The mobj-pointer check alone is unreliable because players[coop_slot].mo
+    // can hold a dangling heap pointer from the previous map's spawn (Z_FreeTags
+    // frees the mobj but doesn't NULL the field in the static players[] struct).
+    // We cross-check against playerstarts[coop_slot].type, which P_LoadThings
+    // set to 2 only if THIS map's THINGS contained a matching Player_2_Start;
+    // we reset it to a sentinel in P_AICoop_ResetSlot, so type==2 here is
+    // authoritative for "this map had a P2_Start thing".
+    if (buddy_mo != NULL && playerstarts[coop_slot].type == 2)
+	return;				// all good, buddy spawned
+
+    // Map has no Player_2_Start.  Disable for this level (and all subsequent
+    // levels until the user fixes the WAD or removes -coop), and tell them.
+    companion_active = 0;				// local-only; not persisted
+
+    if (!P_AICoop_VerifySpawn_warned)
+    {
+	printf ("\n"
+		"P_AICoop: WARNING -- -coop/-aicoop requested but this map has no\n"
+		"  Player_2_Start thing.  The co-op buddy will not spawn this level.\n"
+		"  Fix: add a Player_2_Start to the map (any editor), or remove -coop.\n");
+	P_AICoop_VerifySpawn_warned = true;
+    }
 }
 
 // The slot the buddy occupies (-1 if disabled).  Used by g_game.c to skip the
 // netgame consistency check for it -- the buddy is local-but-deterministic, never
-// networked, so there is no remote command to validate against.
+// networked, so no remote command to validate against.
 int P_AICoop_Slot (void)
 {
-    if (!aicoop) return -1;
+    if (!companion_active) return -1;
     return coop_slot;
 }
 
 boolean P_AICoop_IsBuddy (player_t* p)
 {
-    return aicoop && p == &players[coop_slot];
+    return companion_active && p == &players[coop_slot];
 }
 
 // Public read-only accessor for coop_state (used by c_console.c for the voice
 // tag mapping).  Returns -1 if the buddy is inactive.
 int P_AICoop_State (void)
 {
-    if (!aicoop) return -1;
+    if (!companion_active) return -1;
     return coop_state;
 }
 
 // The live companion mobj, or NULL if there isn't one right now.
 static mobj_t* AICoop_Mo (void)
 {
-    if (!aicoop || !playeringame[coop_slot])		return NULL;
+    if (!companion_active || !playeringame[coop_slot])		return NULL;
     if (players[coop_slot].playerstate != PST_LIVE)	return NULL;
     return players[coop_slot].mo;
 }
@@ -215,7 +320,7 @@ static void AICoop_Callout (const char* tagprefix, int n)
 // tag -> lump-name mapping lives in i_voice.c.
 void P_AICoop_VoiceTag (const char* tag)
 {
-    if (!aicoop || !tag) return;
+    if (!companion_active || !tag) return;
     AICoop_SayTag (tag);
 }
 
@@ -486,7 +591,7 @@ const char* P_AICoop_Report (void)
     mobj_t*	pl;
 
     if (!mo)
-	return "[Buddy] (no companion -- launch with -aicoop)";
+	return "[Buddy] (no companion -- launch with -coop)";
     pl = AICoop_NearestHuman (mo->x, mo->y);
 
     if (pl)
@@ -517,7 +622,7 @@ int P_AICoop_Summon (void)
 const char* P_AICoop_Wait (void)
 {
     if (!AICoop_Mo ())
-	return "[Buddy] (no companion -- launch with -aicoop)";
+	return "[Buddy] (no companion -- launch with -coop)";
     if (netgame)
 	return "[Buddy] (orders unavailable in netplay)";
     hold = !hold;
@@ -532,7 +637,7 @@ const char* P_AICoop_Attack (void)
     mobj_t*	t;
 
     if (!mo)
-	return "[Buddy] (no companion -- launch with -aicoop)";
+	return "[Buddy] (no companion -- launch with -coop)";
     if (netgame)
 	return "[Buddy] (orders unavailable in netplay)";
     pl = AICoop_NearestHuman (mo->x, mo->y);
@@ -554,7 +659,7 @@ const char* P_AICoop_StatusReport (void)
     int		w, am;
 
     if (!AICoop_Mo ())
-	return "[Buddy] (no companion -- launch with -aicoop)";
+	return "[Buddy] (no companion -- launch with -coop)";
     w  = bot->readyweapon;
     am = (weaponinfo[w].ammo < NUMAMMO) ? bot->ammo[weaponinfo[w].ammo] : -1;
     if (am >= 0)
@@ -1050,7 +1155,7 @@ void P_AICoop_BuildCmd (void)
     static mobj_t* dmg_mon;		// monster the damage-watchdog is tracking
     static int	dmg_hp0, dmg_firetics;	// its health at baseline / tics fired with no drop
 
-    if (!aicoop || !playeringame[coop_slot])
+    if (!companion_active || !playeringame[coop_slot])
 	return;
 
     bot = &players[coop_slot];
@@ -1314,7 +1419,14 @@ void P_AICoop_BuildCmd (void)
 	{
 	    angle_t	aang = R_PointToAngle2 (mo->x, mo->y, aimmon->x, aimmon->y);
 	    P_AimLineAttack (mo, aang, COOP_SIGHT);
-	    if (linetarget && abs(rem) < COOP_FACING)
+	    if (linetarget && linetarget->player)
+	    {
+		// Friendly fire guard: the autoaim trace hits a PLAYER (the human is
+		// between us and the monster) -- DON'T shoot.  Strafe a little to clear
+		// the angle so the next tic has a safe shot.
+		cmd->sidemove += ((gametic / 16) & 1) ? COOP_RUN : -COOP_RUN;
+	    }
+	    else if (linetarget && abs(rem) < COOP_FACING)
 		cmd->buttons |= BT_ATTACK;
 	    else if (!linetarget && dist < 768*FRACUNIT)
 		backoff = true;
