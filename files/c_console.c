@@ -240,7 +240,7 @@ static void C_Execute (char* line)
 
     if (!strcmp(cmd, "help"))
     {
-	C_Printf ("cheats: god  noclip  kill  health <n>  armor <n>");
+	C_Printf ("cheats: god  noclip  allmap  kill  health <n>  armor <n>");
 	C_Printf ("give:   all|weapons|ammo|keys|armor|health|<weapon>|<key>");
 	C_Printf ("world:  spawn <thing>  skill <1-5>  map <e> <m> / warp <m>");
 	C_Printf ("view:   crosshair 0..3");
@@ -272,6 +272,12 @@ static void C_Execute (char* line)
 	    else                        pl->mo->flags &= ~MF_NOCLIP;
 	}
 	C_Printf ("noclip %s", (pl->cheats & CF_NOCLIP) ? "ON" : "off");
+    }
+    else if (!strcmp(cmd, "allmap") || !strcmp(cmd, "fullmap") || !strcmp(cmd, "iddt"))
+    {
+	// Reveal the whole level on the automap (the Computer Area Map effect).
+	pl->powers[pw_allmap] = pl->powers[pw_allmap] ? 0 : 1;
+	C_Printf ("allmap %s", pl->powers[pw_allmap] ? "ON" : "off");
     }
     else if (!strcmp(cmd, "give"))
     {
