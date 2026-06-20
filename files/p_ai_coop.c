@@ -1241,7 +1241,16 @@ void P_AICoop_BuildCmd (void)
 	// door (it reads as a wall) and the buddy would oscillate beside it forever.
 	{
 	    fixed_t	ddx, ddy;
-	    if (AICoop_FindDoorAhead (mo, tx, ty, &ddx, &ddy)
+	    if (AICoop_CanReach (mo, tx, ty, false))
+	    {
+		// The human is directly reachable -- go straight to them and ignore the
+		// BSP waypoint.  Without this, a stale far waypoint (e.g. after the human
+		// takes a teleporter/secret the graph doesn't model) makes the buddy leave
+		// the human it's standing next to and loop back and forth.  avoiddmg=false:
+		// follow the human even across nukage (e.g. MAP01's teleporter lands in it).
+		stx = tx; sty = ty;
+	    }
+	    else if (AICoop_FindDoorAhead (mo, tx, ty, &ddx, &ddy)
 		&& AICoop_CanReach (mo, ddx, ddy, true))
 	    {
 		stx = ddx; sty = ddy;		// doorway in reach -> head right at it + Use
@@ -1353,6 +1362,13 @@ void P_AICoop_BuildCmd (void)
     else
     {
 	triedmove = (movethresh >= 0 && dist > movethresh);
+
+	// "Close enough, hold" uses straight-line distance -- but if the human is right
+	// the other side of a wall / (secret) door, the gap is small yet not walkable.
+	// So if we'd idle but can't actually walk straight to them, keep following the
+	// route instead of parking on the wrong side of the door.
+	if (!triedmove && navigate && navok && !AICoop_CanReach (mo, tx, ty, false))
+	    triedmove = 1;
 
 	// For low-priority moves (following), don't step onto a damaging floor --
 	// check the actual move direction (toward the waypoint), not just facing.
