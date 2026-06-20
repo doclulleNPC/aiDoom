@@ -133,8 +133,20 @@ upscale of 320x200. Key design (ported from `../sdldoom-1.10`, adapted to SDL 1.
 - **Video filters** (Options → Video, default off, persisted as `antialiasing`/`blur`):
   `antialiasing` toggles the texture scale mode (`SDL_SCALEMODE_LINEAR` vs `NEAREST`,
   smooths the upscale to the window), `blur` runs a 1-2-1 separable soft blur
-  (`I_BlurFrame`) over the 32-bit frame each present (`i_video.c`). VSync is forced on
-  (`SDL_SetRenderVSync`) — SDL3 defaults it off, which tore the frame on fast strafes.
+  (`I_SoftenFrame`, SWAR) over the 32-bit frame each present (`i_video.c`). VSync is
+  forced on (`SDL_SetRenderVSync`) — SDL3 defaults it off, which tore the frame on fast
+  strafes.
+- **Widescreen (Hor+)** (Options → Video → Widescreen, default off, config `widescreen`):
+  crispy-doom-style — `SCREENWIDTH` becomes 16:9 (`SCREENHEIGHT*16/9`, capped `MAXWIDTH`)
+  while `NONWIDEWIDTH` stays the 16:10 reference. The 3D projection/focal length use the
+  **non-wide** centre (`centerxfrac_nonwide`, `r_main.c`) so the per-column angle matches
+  4:3 and the extra width shows *more world* at the sides (vertical FOV unchanged). HUD
+  uses `WIDESCREENDELTA` (half the extra width, BASE coords): the status bar renders
+  **centred over a full-height view** (so the game shows on both sides of it, not a stone
+  bezel) — drawn after `R_RenderPlayerView` in `D_Display`, every-frame refresh; all `ST_*X`
+  defines add `WIDESCREENDELTA` (0 in 16:10). `V_DrawPatch`/`V_CopyRect` X bound is
+  `SCREENWIDTH/hires` (the wide base width), not `BASE_WIDTH`. In 16:10 every `*_nonwide`
+  equals its wide value and `WIDESCREENDELTA==0`, so non-widescreen is unchanged.
 - **`visplane_t.top/bottom` (`r_defs.h`) are `unsigned short`, not `byte`** — they
   hold screen row numbers, which exceed 255 above hires=1; the "unset" sentinel is
   `0xffff` (in `r_plane.c`). A `byte` here silently truncated rows >255 and broke
@@ -206,3 +218,13 @@ portable game code that calls into them through the `I_*` interface.
 - `files/FILES`/`files/FILES2` are historical manifests from the original id
   source drop and list many files (asm, DOS/X11 backends) that are **not** part of
   this SDL build — trust the actual `files/*.c` set, not those lists.
+- **WAD lump names are 8 bytes max, with the trailing byte as NUL.** When you
+  bake an asset into `*.wad` (e.g. via `tools/bake_buddy_voice.py` for the buddy
+  voice PWAD in `run/buddy.wad`), every lump name is stored as exactly 8 bytes;
+  if the human-readable name is shorter than 8 chars, the remaining bytes must be
+  `\0`. A 7-char name in the WAD and the same 7-char name as a C string literal
+  in the lookup table are equivalent (both pad with NUL), but an **8-char C
+  literal** for the same WAD entry will not match because `W_CheckNumForName`
+  treats the embedded NUL as the terminator and the WAD entry has its NUL one
+  byte earlier. Always verify a hand-edited lump name against the on-disk PWAD
+  before assuming a "silent asset" is a missing asset.
