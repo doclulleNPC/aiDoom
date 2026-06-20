@@ -570,6 +570,44 @@ static boolean PF_IsDoorSpecial (int sp)	// push (DR) doors with no key
     return (sp == 1 || sp == 31 || sp == 117 || sp == 118);
 }
 
+// If a CLOSED push-door (unlocked DR) lies ahead toward the goal, hand back the
+// midpoint of its line in (*ox,*oy).  The BSP waypoints are sub-sector centroids,
+// which can sit behind the corridor wall beside a doorway -- so the buddy never
+// heads INTO the doorway and just grinds the wall next to it.  Steering at the
+// door's own midpoint walks it down the corridor into the opening, where the Use
+// tap in the stuck handler opens the (unlocked) door.
+static boolean AICoop_FindDoorAhead (mobj_t* mo, fixed_t gx, fixed_t gy,
+				     fixed_t* ox, fixed_t* oy)
+{
+    int		i;
+    fixed_t	bestd = 256*FRACUNIT;		// only doors we're already near
+    boolean	found = false;
+    angle_t	togoal = R_PointToAngle2 (mo->x, mo->y, gx, gy);
+
+    for (i = 0 ; i < numlines ; i++)
+    {
+	line_t*		ld = &lines[i];
+	sector_t*	fs, *bs;
+	fixed_t		mx, my, d, opening;
+	angle_t		todoor;
+
+	if (!ld->backsector || !ld->frontsector)	continue;	// not two-sided
+	if (!PF_IsDoorSpecial (ld->special))		continue;	// not an openable door
+	fs = ld->frontsector; bs = ld->backsector;
+	opening = (fs->ceilingheight < bs->ceilingheight ? fs->ceilingheight : bs->ceilingheight)
+		- (fs->floorheight   > bs->floorheight   ? fs->floorheight   : bs->floorheight);
+	if (opening >= 56*FRACUNIT)			continue;	// already passable
+	mx = (ld->v1->x + ld->v2->x) >> 1;
+	my = (ld->v1->y + ld->v2->y) >> 1;
+	d  = P_AproxDistance (mx - mo->x, my - mo->y);
+	if (d >= bestd)					continue;
+	todoor = R_PointToAngle2 (mo->x, mo->y, mx, my);
+	if ((angle_t)(todoor - togoal + ANG90) > ANG180) continue;	// not ahead (>90 off)
+	bestd = d; *ox = mx; *oy = my; found = true;
+    }
+    return found;
+}
+
 static int PF_EdgeWeight (seg_t* sg, int u, int v);	// defined below
 
 // Straight feet-trace between two world points (the "item reachability" trick used
@@ -901,6 +939,8 @@ void P_AICoop_BuildCmd (void)
     static int	navtimer, navgoal = -1;	// pathfinder re-path cooldown / cached goal ss
     static fixed_t navwx, navwy;	// cached waypoint
     static boolean navok;
+    static fixed_t navsx, navsy;	// committed steer point (anti junction-oscillation)
+    static int	navsteer;		// tics left committed to navsx/navsy
 
     if (!aicoop || !playeringame[coop_slot])
 	return;
@@ -921,9 +961,22 @@ void P_AICoop_BuildCmd (void)
     mo = bot->mo;
     memset (cmd, 0, sizeof(*cmd));
 
-    // Progress check (movement applied last tic): if we asked to move but barely
-    // moved, we're stuck -- maybe against a door.
-    stuck = (triedmove && P_AproxDistance (mo->x - lastx, mo->y - lasty) < 2*FRACUNIT);
+    // Progress check.  "stuck" if we tried to move but either barely moved this tic
+    // (wedged solid) OR made no NET progress over a ~0.4s window -- the latter
+    // catches oscillating in place in front of a closed door (per-tic it's moving
+    // side to side, so the old check never flagged it and the door never got Used).
+    {
+	static fixed_t	winx, winy;
+	static int	wintic;
+	static boolean	oscillating;
+	if (gametic - wintic >= 14)
+	{
+	    if (wintic) oscillating = P_AproxDistance (mo->x-winx, mo->y-winy) < 40*FRACUNIT;
+	    winx = mo->x; winy = mo->y; wintic = gametic;
+	}
+	stuck = triedmove
+	     && (P_AproxDistance (mo->x - lastx, mo->y - lasty) < 2*FRACUNIT || oscillating);
+    }
     lastx = mo->x; lasty = mo->y;
     if (doorwait > 0) doorwait--;
 
@@ -1075,8 +1128,32 @@ void P_AICoop_BuildCmd (void)
 	    navok = PF_NextWaypoint (mo, tx, ty, &navwx, &navwy);
 	}
 	if (navok) { goalx = navwx; goaly = navwy; }
-	// Local: feet-trace steering toward that waypoint (avoids walls/corners).
-	AICoop_TraceSteer (mo, goalx, goaly, &stx, &sty);
+	// A closed door on the way?  Head STRAIGHT at the doorway (no sweep) so we
+	// enter the corridor toward it -- TraceSteer would sweep away from the shut
+	// door (it reads as a wall) and the buddy would oscillate beside it forever.
+	{
+	    fixed_t	ddx, ddy;
+	    if (AICoop_FindDoorAhead (mo, tx, ty, &ddx, &ddy))
+	    {
+		stx = ddx; sty = ddy;		// straight at the doorway
+		navsteer = 0;			// re-pick a fresh steer once through
+	    }
+	    else
+	    {
+		// Local: feet-trace steering toward that waypoint, but COMMIT to the
+		// chosen steer point for ~0.4s (or until reached).  At a junction the
+		// string-pull picks a different reachable node each re-path as the buddy
+		// jitters, which flip-flopped the steer and made it oscillate in place;
+		// committing lets it actually travel one leg before re-deciding.
+		if (--navsteer <= 0
+		    || P_AproxDistance (mo->x - navsx, mo->y - navsy) < 32*FRACUNIT)
+		{
+		    AICoop_TraceSteer (mo, goalx, goaly, &navsx, &navsy);
+		    navsteer = 14;
+		}
+		stx = navsx; sty = navsy;
+	    }
+	}
     }
 
     // turn toward the steer point (waypoint when navigating), clamped
@@ -1126,20 +1203,17 @@ void P_AICoop_BuildCmd (void)
 	    AICoop_ThrustToward (cmd, mo, stx, sty);	// straight to the waypoint
     }
 
-    // Wedged while trying to move -- a closed door, a corner, or a blocking thing
-    // that isn't in the nav grid (e.g. a barrel; we don't shoot those, it'd blow
-    // the buddy up).  Three responses:
+    // Wedged while trying to move -- most often a closed door on the path, else a
+    // corner / a blocking thing (e.g. a barrel; we don't shoot those).
     if (triedmove && stuck)
     {
 	static int wig;
-	// (1) tap Use once for a possible door (gated -- spamming reverses DR doors).
-	if (doorwait == 0) { cmd->buttons |= BT_USE; doorwait = 40; }
-	// (2) strafe sideways to slip past a barrel / convex corner (forward stays,
-	//     so it slides around diagonally); flip the side every ~24 tics so if
-	//     one way is blocked it tries the other.  Do NOT re-path every tic here:
-	//     that made the waypoint flip between two routes at a junction so the
-	//     buddy oscillated in place instead of committing (normal 10-tic re-path
-	//     still recovers from a genuinely bad waypoint).
-	cmd->sidemove = ((wig++ / 24) & 1) ? COOP_RUN : -COOP_RUN;
+	// Tap Use for a door in front (we already face the steer point, which is the
+	// doorway when one is ahead).  Gated so we don't reverse a DR door mid-rise:
+	// 45 tics > the ~32-tic open, so by the next tap the door is passable and we
+	// are walking through (no longer stuck), so no second tap fires.
+	if (doorwait == 0) { cmd->buttons |= BT_USE; doorwait = 45; }
+	// Sideways wiggle to slip past a barrel / convex corner (non-door wedge).
+	cmd->sidemove += ((wig++ / 24) & 1) ? COOP_RUN : -COOP_RUN;
     }
 }
