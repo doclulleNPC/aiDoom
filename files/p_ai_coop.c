@@ -333,9 +333,14 @@ static boolean AICoop_CanReach (mobj_t* self, fixed_t tx, fixed_t ty, boolean av
 	fixed_t	px   = self->x + FixedMul (dx, frac);
 	fixed_t	py   = self->y + FixedMul (dy, frac);
 
+	// Replicate P_TryMove's feasibility so "reachable" means the buddy can
+	// actually WALK there (point-sampling P_CheckPosition alone said yes to spots
+	// behind a step/ledge the move physics reject, so the buddy wedged there).
 	if (!P_CheckPosition (self, px, py))		return false;	// wall/obstacle
-	if (tmceilingz - tmfloorz < 56*FRACUNIT)	return false;	// won't fit
+	if (tmceilingz - tmfloorz < self->height)	return false;	// doesn't fit
+	if (tmceilingz - fz < self->height)		return false;	// no head room
 	if (tmfloorz - fz > 24*FRACUNIT)		return false;	// step up too high
+	if (tmfloorz - tmdropoffz > 24*FRACUNIT)	return false;	// over a drop-off
 	if (avoiddmg && AICoop_DamagingFloor (px, py))	return false;	// nukage/lava
 	fz = tmfloorz;
     }
