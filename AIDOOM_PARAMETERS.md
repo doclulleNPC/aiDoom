@@ -145,6 +145,9 @@ fullscreen          0|1      # Vollbild-Modus
 screen_resolution   1..6     # Resolution Scale
 autorun             0|1      # Always-Run ohne Hold
 mouselook           0|1      # Y-Achsen-Mouselook
+key_buddy_come      <code>   # Co-op-Buddy "komm her"   (Default ',' = 44)
+key_buddy_attack    <code>   # Co-op-Buddy "angreifen"  (Default '.' = 46)
+key_buddy_stay      <code>   # Co-op-Buddy "bleib/halt" (Default '-' = 0x2d; übernimmt die Taste vom Screen-Size-Shortcut)
 # + alle key_* für Tasten-Bindings
 ```
 
