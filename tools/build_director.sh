@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build the native SDL3 AI Director (director) for Linux/macOS -- the C
-# replacement for ollama_director.py (no Python needed).  -> run/director
+# native LLM monster director (no Python needed).  -> run/director
 set -eu
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 [ -f "$here/font_atlas.h" ] || python3 "$here/bake_font.py"

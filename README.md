@@ -36,8 +36,9 @@ a language model drive monster tactics in real time.
   allies en route, so they gather and assault in groups.
 - **LLM AI Director** (`files/p_ai_llm.c`) — an external director drives monster
   *tactics* (flank, fall back, ambush, focus-fire, …) over a small TCP line protocol,
-  or via a built-in scripted `-aidemo` director. A ready-to-run **Ollama** client is
-  included (`ollama_director.py`). Off unless `-aidirector`/`-aidemo` is passed.
+  or via a built-in scripted `-aidemo` director. A ready-to-run native **Ollama**
+  client is included (`tools/director.c`, a small SDL3 app — no Python). Off unless
+  `-aidirector`/`-aidemo` is passed.
 - Native **Windows build** with Visual Studio 2019 (MSVC) + SDL3; the legacy autotools
   Linux build is still present.
 
@@ -249,7 +250,7 @@ On Windows the config editor (and the GPU monitor) are built by the CMake build 
 - **IWAD** — pick which WAD to play from the ones it finds (`iwads/`, the folder,
   Steam) or leave it on *auto*; the choice is saved as `iwad` and the game uses it.
 - **Ollama host / port / model** — read by the AI-Director tools
-  (`ollama_director.py`, `gpumon.py`, `run/start_aidoom.{sh,ps1}`).
+  (`director`, `gpumon`, `run/start_aidoom.{sh,ps1}`).
 - **GPU monitor (SSH)** — host / user / port of the (remote) Ollama machine, plus a
   **Copy SSH key** button that installs your public key there (so the GPU monitor's
   `nvidia-smi`-over-SSH works without a password).

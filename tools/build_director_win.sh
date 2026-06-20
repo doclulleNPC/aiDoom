@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Cross-build the SDL3 AI Director (director.exe) for Windows with MinGW-w64.
-# The C replacement for ollama_director.py (no Python needed).
+# The native LLM monster director (no Python needed).
 #   SDL3=/path/to/SDL3-devel-3.x.y-mingw/x86_64-w64-mingw32 ./tools/build_director_win.sh
 set -eu
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

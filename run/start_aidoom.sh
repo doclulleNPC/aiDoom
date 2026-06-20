@@ -28,13 +28,13 @@
 #   ./start_aidoom.sh --director --model qwen3:8b --skill 4 --friendlyfire
 #   ./start_aidoom.sh --ollama http://localhost:11434
 #
-# Requires: SDL3 installed (to run the binary) and the aidoom binary built
-# (see README; e.g. in files/).  Python 3 (stdlib only) only needed for the
-# director client (skipped unless --director).
+# Requires: SDL3 installed (to run the binaries) and the aidoom binary built
+# (see README).  For --director: the native director binary (tools/build_director.sh)
+# and a reachable Ollama server.  No Python needed.
 
 set -u
 
-# --- defaults (Ollama IP matches ollama_director.py's OLLAMA_HOST) ---
+# --- defaults (Ollama IP; overridden by aidoom.cfg below) ---
 MODEL="mistral:7b-instruct"
 PORT=31666
 EPISODE=1
@@ -103,12 +103,6 @@ GAMEDIR="$(cd "$(dirname "$AIDOOM")" && pwd)"
 # IWAD selection is handled by the engine: -iwad / aidoom.cfg "iwad" / iwads\/ /
 # the game folder / Steam (see IdentifyVersion). The game runs from GAMEDIR below.
 
-# --- locate python (the director uses only the stdlib) ---
-PY=""
-for c in "$HOME/.doom-agent/bin/python" python3 python; do
-    if [ -x "$c" ] || command -v "$c" >/dev/null 2>&1; then PY="$c"; break; fi
-done
-
 # --- 1. wait for the Ollama server ---
 # Only when the director is enabled.  Default (--director not given) skips
 # Ollama entirely so the game launches immediately, even if Ollama is offline
@@ -147,8 +141,8 @@ fi
 
 # --- 4. start aiDoom ---
 # Default: nothing extra -- vanilla aiDoom, no -aidirector (no TCP server), no
-# buddy.  Pass --director to add -aidirector + the Python client; pass --buddy to
-# add -coop (rule-based companion) or --aicoop to add -aicoop (AI/LLM companion).
+# buddy.  Pass --director to add -aidirector + the native director (run/director);
+# pass --buddy to add -coop (rule-based companion) or --aicoop (AI/LLM companion).
 gameargs=( -warp "$EPISODE" "$MAP" -skill "$SKILL" )
 [ "$NODIRECTOR" = 0 ] && gameargs+=( -aidirector "$PORT" )
 [ "$BUDDY" = 1 ] && [ "$AIBUDDY" = 0 ] && gameargs+=( -coop )    # rule-based buddy
@@ -169,22 +163,14 @@ if [ "$NODIRECTOR" = 1 ]; then
     exit 0
 fi
 
-# --- 5. start the LLM director client ---
-# Prefer the native SDL3 director (no Python needed; build: tools/build_director.sh).
-# Fall back to the Python client (ollama_director.py) only if the binary is missing.
+# --- 5. start the native SDL3 LLM director ---
 sleep 2   # give the game a moment to open the listening socket
 DIRBIN="$here/director"
 [ -x "$DIRBIN" ] || DIRBIN="$here/../tools/director"
-if [ -x "$DIRBIN" ]; then
-    info "starting native director: $MODEL -> 127.0.0.1:$PORT (ollama $OLLAMA)"
-    "$DIRBIN" --port "$PORT" --model "$MODEL" --ollama "$OLLAMA/api/chat"
-else
-    CLIENT="$here/ollama_director.py"
-    [ -f "$CLIENT" ] || CLIENT="$here/../ollama_director.py"
-    if [ ! -f "$CLIENT" ] || [ -z "$PY" ]; then
-        warn "no director binary and no Python+ollama_director.py -- game runs without the director."
-        trap - EXIT INT TERM; wait "$GAME_PID"; exit 0
-    fi
-    info "native director not built; using Python fallback: $MODEL -> 127.0.0.1:$PORT (ollama $OLLAMA)"
-    "$PY" "$CLIENT" --port "$PORT" --model "$MODEL" --ollama "$OLLAMA/api/chat"
+if [ ! -x "$DIRBIN" ]; then
+    warn "director binary not found -- build it first:  tools/build_director.sh"
+    warn "game runs without the LLM director."
+    trap - EXIT INT TERM; wait "$GAME_PID"; exit 0
 fi
+info "starting director: $MODEL -> 127.0.0.1:$PORT (ollama $OLLAMA)"
+"$DIRBIN" --port "$PORT" --model "$MODEL" --ollama "$OLLAMA/api/chat"

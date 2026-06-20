@@ -3,7 +3,7 @@
 
   Checks the local Ollama server is up and the model is available, optionally
   warms the model into memory, then starts aidoom.exe with the -aidirector TCP
-  server and the Python director client that drives the monsters.
+  server and the native director.exe (no Python) that drives the monsters.
 
   Usage (or just double-click start_aidoom.bat):
     .\start_aidoom.ps1
@@ -107,27 +107,13 @@ if ($NoDirector) {
     exit 0
 }
 
-# --- 5. start the LLM director client ---
-# Prefer the native director.exe (no Python needed; build: tools/build_director_win.sh).
-# Fall back to the Python client only if the binary isn't present.
+# --- 5. start the native SDL3 LLM director ---
 Start-Sleep -Seconds 2   # give the game a moment to open the listening socket
 $dirbin = Join-Path $here "director.exe"
-if (Test-Path $dirbin) {
-    Info "starting native director: $Model -> 127.0.0.1:$Port"
-    & $dirbin --port $Port --model $Model --ollama "$Ollama/api/chat"
+if (-not (Test-Path $dirbin)) {
+    Warn "director.exe not found -- build it first:  tools/build_director_win.sh"
+    Warn "game runs without the LLM director."
     exit 0
 }
-
-$py = $null
-foreach ($cand in @("python","py")) {
-    $c = Get-Command $cand -ErrorAction SilentlyContinue
-    if ($c) { $py = $c.Source; break }
-}
-if (-not $py -and (Test-Path "C:\Python313\python.exe")) { $py = "C:\Python313\python.exe" }
-if (-not $py) { Warn "no director.exe and no Python -- game runs without the LLM director."; exit 0 }
-
-$client = Join-Path $here "ollama_director.py"
-if (-not (Test-Path $client)) { Warn "no director.exe and no ollama_director.py -- game runs without director."; exit 0 }
-
-Info "native director.exe not built; using Python fallback: $Model -> 127.0.0.1:$Port"
-& $py $client --port $Port --model $Model --ollama "$Ollama/api/chat"
+Info "starting director: $Model -> 127.0.0.1:$Port"
+& $dirbin --port $Port --model $Model --ollama "$Ollama/api/chat"
