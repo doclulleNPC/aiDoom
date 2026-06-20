@@ -89,22 +89,24 @@ static patch_t* p_stbar;
 static patch_t* p_starmsbg;
 static patch_t* p_stkeys[6];
 static patch_t* p_sttminus;
+static patch_t* p_face[5];		// STFST00..STFST40 (healthy..near-death mugshot)
+static patch_t* p_facedead;		// STFDEAD0
 
 //
-// Resolution scaling.  The strip is authored in BASE (320x200) pixels but the
-// 3D framebuffer screens[0] is the NATIVE SCREENWIDTHxSCREENHEIGHT (hi-res), so a
-// 1:1 BASE write would leave the bar a tiny 160x16 patch in the corner.  We scale
-// every BASE pixel to an `bs_scale` x `bs_scale` screen block (bs_scale = hires) and
-// centre the bar horizontally in SCREENWIDTH (so it also centres in widescreen).
-// Set once per frame in HU_Buddy_DrawStrip.
+// Resolution scaling.  The panel is authored in BASE (320x200) pixels but the 3D
+// framebuffer screens[0] is the NATIVE SCREENWIDTHxSCREENHEIGHT (hi-res), so a 1:1
+// BASE write would leave it a tiny patch in the corner.  We scale every BASE pixel
+// to a bs_scale x bs_scale screen block (bs_scale = hires) and offset it to the
+// top-RIGHT of the screen.  Set once per frame in HU_Buddy_DrawStrip.
 static int bs_scale = 1;
 static int bs_xoff  = 0;
+static int bs_yoff  = 0;
 
-// Write one BASE-pixel as a bs_scale x bs_scale block at (bx,by) BASE coords.
+// Write one BASE-pixel as a bs_scale x bs_scale block at (bx,by) panel-local coords.
 static void HU_Buddy_PutBlock (int bx, int by, byte pix)
 {
     int sx0 = bx * bs_scale + bs_xoff;
-    int sy0 = by * bs_scale;
+    int sy0 = by * bs_scale + bs_yoff;
     int i, j;
     for (j = 0; j < bs_scale; j++)
     {
@@ -117,6 +119,15 @@ static void HU_Buddy_PutBlock (int bx, int by, byte pix)
 	    screens[0][sy * SCREENWIDTH + sx] = pix;
 	}
     }
+}
+
+// Fill a panel-local BASE rectangle (used for the panel background + border).
+static void HU_Buddy_FillRect (int bx, int by, int bw, int bh, byte col)
+{
+    int x, y;
+    for (y = by; y < by + bh; y++)
+	for (x = bx; x < bx + bw; x++)
+	    HU_Buddy_PutBlock (x, y, col);
 }
 
 //
@@ -172,6 +183,14 @@ void HU_Buddy_Init (void)
 	sprintf (namebuf, "STKEYS%d", i);
 	p_stkeys[i] = (patch_t*) W_CacheLumpName (namebuf, PU_STATIC);
     }
+
+    // Mugshot faces: STFST00 (healthy) .. STFST40 (near death), + STFDEAD0.
+    for (i = 0; i < 5; i++)
+    {
+	sprintf (namebuf, "STFST%d0", i);
+	p_face[i] = (patch_t*) W_CacheLumpName (namebuf, PU_STATIC);
+    }
+    p_facedead = (patch_t*) W_CacheLumpName ("STFDEAD0", PU_STATIC);
 }
 
 void HU_Buddy_SetRes (void)
@@ -321,118 +340,107 @@ static void HU_Buddy_DrawNumberTall (int x, int y, int n, byte col, int width)
 
 
 // ===========================================================================
-//  Strip layout (centred, half-scale, mimics the player STBAR field order)
+//  Panel layout -- a compact, readable mini status bar pinned to the TOP-RIGHT,
+//  styled like the player STBAR (mugshot + big STTNUM numbers) but half size:
 //
-//	  HP 100%   WEAPON   AMMO 042   88U   STATE:FOLLOW
-//	  ^TTF  ^patch  ^TTF  ^patch  ^patch ^TTF
+//	+--------------------------------+
+//	| [FACE]  HP 100%   AM 050       |
+//	|         AR 099    CHAINGUN     |
+//	+--------------------------------+
+//
+//  Authored in panel-local BASE pixels (origin = panel top-left); PutBlock scales
+//  by hires and offsets to the top-right corner (set in HU_Buddy_DrawStrip).
 // ===========================================================================
 
-// All X positions are absolute BASE pixels inside the centred 160-wide bar.
-// Y positions are the top of the relevant glyph (baseline-style -- patches and
-// TTF both drawn from their top edge here).
-#define X_HP_LABEL   (BUDDY_BAR_X + 4)            // "HP" label
-#define X_HP_VALUE   (X_HP_LABEL + 12)            // 3-digit value (right-justified here)
-#define X_HP_PCT     (X_HP_VALUE + 0)             // % glyph after value
-#define X_WEAPON     (X_HP_PCT + 9)               // weapon name
-#define X_AMMO_LBL   (X_WEAPON + 32)              // "AM" label
-#define X_AMMO_VALUE (X_AMMO_LBL + 12)            // 3-digit ammo
-#define X_DIST_VALUE (X_AMMO_VALUE + 18)          // 3-digit dist + 'U'
-#define X_STATE_LBL  (X_DIST_VALUE + 22)          // "S:" label
-#define X_STATE_VAL  (X_STATE_LBL + 8)            // FOLLOW/FIGHT/etc.
+#define PANEL_W        116     // panel size (BASE px)
+#define PANEL_H        26
+#define PANEL_RMARGIN  4       // gap from the right screen edge (BASE px)
+#define PANEL_TMARGIN  4       // gap from the top screen edge
 
-// Y values: all elements aligned to the patch baseline (Y=2..15 inside the
-// 16-tall bar).
-#define Y_LABEL      (BUDDY_BAR_Y + 8)            // TTF label baseline
-#define Y_PATCH      (BUDDY_BAR_Y + 8)            // patch top (matches label baseline)
-#define Y_DIGITS     (BUDDY_BAR_Y + 4)            // digits sit higher (taller glyphs)
+#define FACE_X         5       // mugshot (24x29 -> 12x14 half)
+#define FACE_Y         6
+#define C1_LBL         22      // column 1: label x / number right-edge x
+#define C1_NUM         54
+#define C2_LBL         72      // column 2
+#define C2_NUM         104
+#define ROW1           5       // two text rows (top of the 8px-tall glyphs)
+#define ROW2           15
+
+#define BUDDY_FG       231     // bright yellow (labels + numbers)
+#define BUDDY_BORDER   96      // light-grey border
+#define BUDDY_BG_DARK  24      // colormap index used to darken the backdrop
+
+// Darken the (scaled) panel rect through a colormap so the panel reads against any
+// 3D background without fully hiding it.
+static void HU_Buddy_DarkenRect (int bx, int by, int bw, int bh, int mapidx)
+{
+    int x0 = bx * bs_scale + bs_xoff, y0 = by * bs_scale + bs_yoff;
+    int x1 = x0 + bw * bs_scale,      y1 = y0 + bh * bs_scale;
+    int x, y;
+    for (y = y0; y < y1; y++)
+    {
+	if (y < 0 || y >= SCREENHEIGHT) continue;
+	for (x = x0; x < x1; x++)
+	{
+	    if (x < 0 || x >= SCREENWIDTH) continue;
+	    byte* p = &screens[0][y * SCREENWIDTH + x];
+	    *p = colormaps[mapidx * 256 + *p];
+	}
+    }
+}
 
 
 static void HU_Buddy_DrawStrip (player_t* bot, mobj_t* bot_mo)
 {
-    int     hp   = bot->health;
-    int     arm  = bot->armorpoints;
-    int     w    = bot->readyweapon;
-    int     ammo = -1;
-    int     dist = -1;
-    int     st   = P_AICoop_State ();
-    mobj_t* lis;
-    int     i;
-    fixed_t dx, dy;
-    char    cell[16];
+    int      hp   = bot->health;
+    int      arm  = bot->armorpoints;
+    int      w    = bot->readyweapon;
+    int      ammo = -1;
+    int      pain;
+    patch_t* face;
 
-    // Scale to the current resolution and centre the bar horizontally (so it grows
-    // with hires and also centres in widescreen).  Everything below is authored in
-    // BASE pixels and routed through HU_Buddy_PutBlock, which applies these.
+    (void) bot_mo;
+
+    // Pin to the TOP-RIGHT corner, scaled by hires.  Everything below is authored in
+    // panel-local BASE pixels and routed through PutBlock, which applies these.
     bs_scale = hires;
-    bs_xoff  = (SCREENWIDTH - BUDDY_BAR_W * bs_scale) / 2 - BUDDY_BAR_X * bs_scale;
+    bs_xoff  = SCREENWIDTH - (PANEL_W + PANEL_RMARGIN) * bs_scale;
+    bs_yoff  = PANEL_TMARGIN * bs_scale;
 
     if (w >= 0 && w < NUMWEAPONS && weaponinfo[w].ammo < NUMAMMO)
 	ammo = bot->ammo[weaponinfo[w].ammo];
 
-    // Distance to nearest live human (consoleplayer preferred).
-    lis = players[consoleplayer].mo;
-    if (!lis || players[consoleplayer].playerstate != PST_LIVE)
+    // Background: darken the backdrop, then a light border.
+    HU_Buddy_DarkenRect (0, 0, PANEL_W, PANEL_H, BUDDY_BG_DARK);
     {
-	lis = NULL;
-	for (i = 0; i < MAXPLAYERS; i++)
-	{
-	    if (i == P_AICoop_Slot () || !playeringame[i]) continue;
-	    if (players[i].playerstate != PST_LIVE || !players[i].mo) continue;
-	    lis = players[i].mo;
-	    break;
-	}
-    }
-    if (lis)
-    {
-	dx = bot_mo->x - lis->x;
-	dy = bot_mo->y - lis->y;
-	dist = (int)(P_AproxDistance (dx, dy) >> FRACBITS);
+	int x, y;
+	for (x = 0; x < PANEL_W; x++) { HU_Buddy_PutBlock (x, 0, BUDDY_BORDER); HU_Buddy_PutBlock (x, PANEL_H - 1, BUDDY_BORDER); }
+	for (y = 0; y < PANEL_H; y++) { HU_Buddy_PutBlock (0, y, BUDDY_BORDER); HU_Buddy_PutBlock (PANEL_W - 1, y, BUDDY_BORDER); }
     }
 
-    // Separator lines (top + bottom of the bar).  PLAYPAL index 96 is a
-    // light grey that reads against both the dark sky and bright walls.
-    {
-	int x;
-	for (x = BUDDY_BAR_X; x < BUDDY_BAR_X + BUDDY_BAR_W; x++)
-	{
-	    HU_Buddy_PutBlock (x, BUDDY_BAR_Y,                  BUDDY_BAR_COL);
-	    HU_Buddy_PutBlock (x, BUDDY_BAR_Y + BUDDY_BAR_H - 1, BUDDY_BAR_COL);
-	}
-    }
+    // Mugshot, picked by health (healthy -> near-death; dead face at 0 HP).
+    pain = (100 - (hp < 0 ? 0 : hp > 100 ? 100 : hp)) / 20;
+    if (pain < 0) pain = 0;
+    if (pain > 4) pain = 4;
+    face = (hp <= 0) ? p_facedead : p_face[pain];
+    if (face) HU_Buddy_DrawPatchHalf (FACE_X, FACE_Y, face);
 
-    // HP: TTF "HP" + STTNUM-style 3 digits + STTPRCNT percent sign
-    HU_Buddy_DrawTtfString   (X_HP_LABEL, Y_LABEL, "HP", 231);    // bright yellow
-    HU_Buddy_DrawNumberTall  (X_HP_VALUE, Y_DIGITS, hp, 231, 3);
-    HU_Buddy_DrawPatchHalf   (X_HP_PCT + 6, Y_DIGITS, p_sttprcnt);
+    // Column 1: HP% (row1), Armor% (row2)
+    HU_Buddy_DrawTtfString  (C1_LBL, ROW1, "HP", BUDDY_FG);
+    HU_Buddy_DrawNumberTall (C1_NUM, ROW1, hp, BUDDY_FG, 3);
+    HU_Buddy_DrawPatchHalf  (C1_NUM, ROW1, p_sttprcnt);
+    HU_Buddy_DrawTtfString  (C1_LBL, ROW2, "AR", BUDDY_FG);
+    HU_Buddy_DrawNumberTall (C1_NUM, ROW2, arm, BUDDY_FG, 3);
+    HU_Buddy_DrawPatchHalf  (C1_NUM, ROW2, p_sttprcnt);
 
-    // Weapon name -- always present (melee weapons show their name too).
-    if (w >= 0 && w < NUMWEAPONS)
-	HU_Buddy_DrawTtfString (X_WEAPON, Y_LABEL, weapon_short[w], 231);
-
-    // Ammo: only for weapons that actually take ammo.  TTF "A:" label +
-    // STTNUM digits.
+    // Column 2: ammo (row1, if the weapon uses it), weapon name (row2)
     if (ammo >= 0)
     {
-	HU_Buddy_DrawTtfString  (X_AMMO_LBL, Y_LABEL, "A:", 231);
-	HU_Buddy_DrawNumberTall (X_AMMO_VALUE, Y_DIGITS, ammo, 231, 3);
+	HU_Buddy_DrawTtfString  (C2_LBL, ROW1, "AM", BUDDY_FG);
+	HU_Buddy_DrawNumberTall (C2_NUM, ROW1, ammo, BUDDY_FG, 3);
     }
-
-    // Distance: TTF "D:" + digits + TTF "U" suffix.
-    if (dist >= 0)
-    {
-	HU_Buddy_DrawTtfString  (X_DIST_VALUE - 12, Y_LABEL, "D:", 231);
-	HU_Buddy_DrawNumberTall (X_DIST_VALUE,      Y_DIGITS, dist, 231, 3);
-	HU_Buddy_DrawTtfChar    (X_DIST_VALUE + 4,  Y_LABEL, 'U', 231);
-    }
-
-    // State: TTF "S:" + state string.
-    if (st >= 0 && st < (int)(sizeof(state_str)/sizeof(state_str[0])))
-    {
-	HU_Buddy_DrawTtfString (X_STATE_LBL, Y_LABEL, "S:", 231);
-	HU_Buddy_DrawTtfString (X_STATE_VAL, Y_LABEL, state_str[st], 231);
-    }
-
-    (void) cell;
+    if (w >= 0 && w < NUMWEAPONS)
+	HU_Buddy_DrawTtfString (C2_LBL, ROW2, weapon_short[w], BUDDY_FG);
 }
 
 
