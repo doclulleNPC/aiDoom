@@ -698,10 +698,19 @@ void R_ExecuteSetViewSize (void)
     else
     {
 	scaledviewwidth_nonwide = (setblocks*32) * hires;
-	viewheight = ((setblocks*168/10)&~7) * hires;
-	// widescreen: full-width view at the largest windowed size, else 4:3 window
-	scaledviewwidth = (widescreen && setblocks == 10) ? SCREENWIDTH
-							  : scaledviewwidth_nonwide;
+	// Widescreen at the largest windowed size: render the view FULL screen (width
+	// and height) so the game shows on both sides of the centred status bar, which
+	// is then drawn as an overlay (see D_Display / st_stuff WIDESCREENDELTA).
+	if (widescreen && setblocks == 10)
+	{
+	    scaledviewwidth = SCREENWIDTH;
+	    viewheight = SCREENHEIGHT;
+	}
+	else
+	{
+	    scaledviewwidth = scaledviewwidth_nonwide;
+	    viewheight = ((setblocks*168/10)&~7) * hires;
+	}
     }
 
     detailshift = setdetail;

@@ -83,10 +83,10 @@ rcsid[] = "$Id: st_stuff.c,v 1.6 1997/02/03 22:45:13 b1 Exp $";
 #define ST_TOGGLECHAT		KEY_ENTER
 
 // Location of status bar
-#define ST_X				0
+#define ST_X				(0 + WIDESCREENDELTA)
 #define ST_X2				104
 
-#define ST_FX  			143
+#define ST_FX  			(143 + WIDESCREENDELTA)
 #define ST_FY  			169
 
 // Should be set to patch width
@@ -114,7 +114,7 @@ rcsid[] = "$Id: st_stuff.c,v 1.6 1997/02/03 22:45:13 b1 Exp $";
 #define ST_GODFACE			(ST_NUMPAINFACES*ST_FACESTRIDE)
 #define ST_DEADFACE			(ST_GODFACE+1)
 
-#define ST_FACESX			143
+#define ST_FACESX			(143 + WIDESCREENDELTA)
 #define ST_FACESY			168
 
 #define ST_EVILGRINCOUNT		(2*TICRATE)
@@ -136,105 +136,105 @@ rcsid[] = "$Id: st_stuff.c,v 1.6 1997/02/03 22:45:13 b1 Exp $";
 
 // AMMO number pos.
 #define ST_AMMOWIDTH		3	
-#define ST_AMMOX			44
+#define ST_AMMOX			(44 + WIDESCREENDELTA)
 #define ST_AMMOY			171
 
 // HEALTH number pos.
 #define ST_HEALTHWIDTH		3	
-#define ST_HEALTHX			90
+#define ST_HEALTHX			(90 + WIDESCREENDELTA)
 #define ST_HEALTHY			171
 
 // Weapon pos.
-#define ST_ARMSX			111
+#define ST_ARMSX			(111 + WIDESCREENDELTA)
 #define ST_ARMSY			172
-#define ST_ARMSBGX			104
+#define ST_ARMSBGX			(104 + WIDESCREENDELTA)
 #define ST_ARMSBGY			168
 #define ST_ARMSXSPACE		12
 #define ST_ARMSYSPACE		10
 
 // Frags pos.
-#define ST_FRAGSX			138
+#define ST_FRAGSX			(138 + WIDESCREENDELTA)
 #define ST_FRAGSY			171	
 #define ST_FRAGSWIDTH		2
 
 // ARMOR number pos.
 #define ST_ARMORWIDTH		3
-#define ST_ARMORX			221
+#define ST_ARMORX			(221 + WIDESCREENDELTA)
 #define ST_ARMORY			171
 
 // Key icon positions.
 #define ST_KEY0WIDTH		8
 #define ST_KEY0HEIGHT		5
-#define ST_KEY0X			239
+#define ST_KEY0X			(239 + WIDESCREENDELTA)
 #define ST_KEY0Y			171
 #define ST_KEY1WIDTH		ST_KEY0WIDTH
-#define ST_KEY1X			239
+#define ST_KEY1X			(239 + WIDESCREENDELTA)
 #define ST_KEY1Y			181
 #define ST_KEY2WIDTH		ST_KEY0WIDTH
-#define ST_KEY2X			239
+#define ST_KEY2X			(239 + WIDESCREENDELTA)
 #define ST_KEY2Y			191
 
 // Ammunition counter.
 #define ST_AMMO0WIDTH		3
 #define ST_AMMO0HEIGHT		6
-#define ST_AMMO0X			288
+#define ST_AMMO0X			(288 + WIDESCREENDELTA)
 #define ST_AMMO0Y			173
 #define ST_AMMO1WIDTH		ST_AMMO0WIDTH
-#define ST_AMMO1X			288
+#define ST_AMMO1X			(288 + WIDESCREENDELTA)
 #define ST_AMMO1Y			179
 #define ST_AMMO2WIDTH		ST_AMMO0WIDTH
-#define ST_AMMO2X			288
+#define ST_AMMO2X			(288 + WIDESCREENDELTA)
 #define ST_AMMO2Y			191
 #define ST_AMMO3WIDTH		ST_AMMO0WIDTH
-#define ST_AMMO3X			288
+#define ST_AMMO3X			(288 + WIDESCREENDELTA)
 #define ST_AMMO3Y			185
 
 // Indicate maximum ammunition.
 // Only needed because backpack exists.
 #define ST_MAXAMMO0WIDTH		3
 #define ST_MAXAMMO0HEIGHT		5
-#define ST_MAXAMMO0X		314
+#define ST_MAXAMMO0X		(314 + WIDESCREENDELTA)
 #define ST_MAXAMMO0Y		173
 #define ST_MAXAMMO1WIDTH		ST_MAXAMMO0WIDTH
-#define ST_MAXAMMO1X		314
+#define ST_MAXAMMO1X		(314 + WIDESCREENDELTA)
 #define ST_MAXAMMO1Y		179
 #define ST_MAXAMMO2WIDTH		ST_MAXAMMO0WIDTH
-#define ST_MAXAMMO2X		314
+#define ST_MAXAMMO2X		(314 + WIDESCREENDELTA)
 #define ST_MAXAMMO2Y		191
 #define ST_MAXAMMO3WIDTH		ST_MAXAMMO0WIDTH
-#define ST_MAXAMMO3X		314
+#define ST_MAXAMMO3X		(314 + WIDESCREENDELTA)
 #define ST_MAXAMMO3Y		185
 
 // pistol
-#define ST_WEAPON0X			110 
+#define ST_WEAPON0X			(110 + WIDESCREENDELTA)
 #define ST_WEAPON0Y			172
 
 // shotgun
-#define ST_WEAPON1X			122 
+#define ST_WEAPON1X			(122 + WIDESCREENDELTA)
 #define ST_WEAPON1Y			172
 
 // chain gun
-#define ST_WEAPON2X			134 
+#define ST_WEAPON2X			(134 + WIDESCREENDELTA)
 #define ST_WEAPON2Y			172
 
 // missile launcher
-#define ST_WEAPON3X			110 
+#define ST_WEAPON3X			(110 + WIDESCREENDELTA)
 #define ST_WEAPON3Y			181
 
 // plasma gun
-#define ST_WEAPON4X			122 
+#define ST_WEAPON4X			(122 + WIDESCREENDELTA)
 #define ST_WEAPON4Y			181
 
  // bfg
-#define ST_WEAPON5X			134
+#define ST_WEAPON5X			(134 + WIDESCREENDELTA)
 #define ST_WEAPON5Y			181
 
 // WPNS title
-#define ST_WPNSX			109 
+#define ST_WPNSX			(109 + WIDESCREENDELTA)
 #define ST_WPNSY			191
 
  // DETH title
-#define ST_DETHX			109
+#define ST_DETHX			(109 + WIDESCREENDELTA)
 #define ST_DETHY			191
 
 //Incoming messages window location

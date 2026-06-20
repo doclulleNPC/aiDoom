@@ -171,10 +171,10 @@ V_CopyRect
 
 #ifdef RANGECHECK
     if (srcx<0
-	||srcx+width >BASE_WIDTH
+	||srcx+width >SCREENWIDTH/hires	// widescreen: base space is wider than 320
 	|| srcy<0
 	|| srcy+height>BASE_HEIGHT
-	||destx<0||destx+width >BASE_WIDTH
+	||destx<0||destx+width >SCREENWIDTH/hires
 	|| desty<0
 	|| desty+height>BASE_HEIGHT
 	|| (unsigned)srcscrn>4
@@ -225,7 +225,7 @@ V_DrawPatch
     x -= SHORT(patch->leftoffset);
 #ifdef RANGECHECK
     if (x<0
-	||x+SHORT(patch->width) >BASE_WIDTH
+	||x+SHORT(patch->width) >SCREENWIDTH/hires	// widescreen: wider base space
 	|| y<0
 	|| y+SHORT(patch->height)>BASE_HEIGHT
 	|| (unsigned)scrn>4)
@@ -361,7 +361,7 @@ V_DrawPatchFlipped
     x -= SHORT(patch->leftoffset);
 #ifdef RANGECHECK
     if (x<0
-	||x+SHORT(patch->width) >BASE_WIDTH
+	||x+SHORT(patch->width) >SCREENWIDTH/hires	// widescreen: wider base space
 	|| y<0
 	|| y+SHORT(patch->height)>BASE_HEIGHT
 	|| (unsigned)scrn>4)

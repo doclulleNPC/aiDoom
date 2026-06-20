@@ -263,8 +263,8 @@ void D_Display (void)
 	if (menuactivestate)
 	    redrawsbar = true;             // the menu can overdraw the status bar
 					  //  (e.g. the 2x "Video" item) -- repaint it
-	ST_Drawer (viewheight == SCREENHEIGHT, redrawsbar );
-	fullscreen = viewheight == SCREENHEIGHT;
+	// status bar is drawn *after* R_RenderPlayerView below -- in widescreen the
+	// view is full-height and would otherwise overwrite the centred bar.
 	break;
 
       case GS_INTERMISSION:
@@ -288,6 +288,22 @@ void D_Display (void)
     {
 	R_RenderPlayerView (&players[displayplayer]);
 	R_DrawCrosshair ();		// over the 3D view, under the HUD/menu/console
+    }
+
+    // Status bar, drawn AFTER the view: in widescreen the bar mode renders a
+    // full-height view (game beside the bar), so the bar must overlay it.  Minimal
+    // HUD (no bar) only when the view is full AND the user didn't ask for the bar
+    // (setblocks==11), so widescreen's full-height bar mode still shows the bar.
+    if (gamestate == GS_LEVEL && gametic)
+    {
+	extern int setblocks;
+	boolean st_minimal = (viewheight == SCREENHEIGHT)
+			     && !(widescreen && setblocks <= 10);
+	// widescreen bar overlays a full-height view that overwrites it every frame,
+	// so force a full bar redraw (background + widgets) each tic.
+	boolean ws_bar = widescreen && setblocks <= 10 && !st_minimal;
+	ST_Drawer (st_minimal, redrawsbar || ws_bar);
+	fullscreen = st_minimal;
     }
 
     if (gamestate == GS_LEVEL && gametic)
