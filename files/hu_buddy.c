@@ -48,6 +48,11 @@ static const char* weapon_short[] = {
     "ROCKET", "PLASMA", "BFG", "CHAINSAW", "SSG",
 };
 
+// Buddy status line, indexed by P_AICoop_State() (0=follow .. 5=grab).
+static const char* buf_status[] = {
+    "FOLLOWING", "ATTACKING", "HEALING", "HOLDING", "COMING", "GRABBING",
+};
+
 
 // hu_font is loaded by HU_Init; nothing else to cache here.
 void HU_Buddy_Init  (void) {}
@@ -283,11 +288,12 @@ static void HU_Buddy_DrawStrip (player_t* bot)
     int      w    = bot->readyweapon;
     int      ammo = -1;
     int      wb   = SCREENWIDTH / hires;   // wide base width = the V_ coordinate space
-    int      textw, tx;
+    int      textw, tx, st;
     patch_t* face;
-    char     l1[40], l2[40];
+    char     l1[40], l2[40], l3[40];
 
     face = HU_Buddy_Face ();
+    st   = P_AICoop_State ();
 
     if (w >= 0 && w < NUMWEAPONS && weaponinfo[w].ammo < NUMAMMO)
 	ammo = bot->ammo[weaponinfo[w].ammo];
@@ -298,13 +304,17 @@ static void HU_Buddy_DrawStrip (player_t* bot)
 			     (w >= 0 && w < NUMWEAPONS) ? weapon_short[w] : "", ammo);
     else           snprintf (l2, sizeof l2, "%s",
 			     (w >= 0 && w < NUMWEAPONS) ? weapon_short[w] : "");
+    snprintf (l3, sizeof l3, "%s",
+	      (st >= 0 && st < (int)(sizeof(buf_status)/sizeof(buf_status[0]))) ? buf_status[st] : "");
 
     textw = HU_Buddy_TextW (l1);
     { int w2 = HU_Buddy_TextW (l2); if (w2 > textw) textw = w2; }
+    { int w3 = HU_Buddy_TextW (l3); if (w3 > textw) textw = w3; }
     tx = wb - 4 - textw;
 
     HU_Buddy_Text (tx, 2,  l1);
     HU_Buddy_Text (tx, 12, l2);
+    HU_Buddy_Text (tx, 22, l3);
 
     // Mugshot just left of the text block (BUF* patches carry a -5/-2 offset, so
     // V_DrawPatch shifts them right/down a touch -- accounted for in the x below).

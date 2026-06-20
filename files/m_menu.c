@@ -53,6 +53,8 @@ rcsid[] = "$Id: m_menu.c,v 1.7 1997/02/03 22:45:10 b1 Exp $";
 
 #include "doomstat.h"
 
+extern int key_buddy_stay;	// '-' defers to this buddy bind (G_Responder) instead of screen-size
+
 // Data.
 #include "sounds.h"
 
@@ -1708,6 +1710,8 @@ boolean M_Responder (event_t* ev)
 	  case KEY_MINUS:         // Screen size down
 	    if (automapactive || chat_on)
 		return false;
+	    if (KEY_MINUS == key_buddy_stay)
+		return false;	// '-' is bound to the buddy "stay" key -> let G_Responder handle it
 	    M_SizeDisplay(0);
 	    S_StartSound(NULL,sfx_stnmov);
 	    return true;

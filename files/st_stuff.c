@@ -803,8 +803,8 @@ void ST_updateFaceWidget(void)
 	{
 	    // being attacked
 	    priority = 7;
-	    
-	    if (plyr->health - st_oldhealth > ST_MUCHPAIN)
+
+	    if (st_oldhealth - plyr->health > ST_MUCHPAIN)	// fixed: a big DROP (vanilla had the subtraction reversed, so the ouch face almost never showed)
 	    {
 		st_facecount = ST_TURNCOUNT;
 		st_faceindex = ST_calcPainOffset() + ST_OUCHOFFSET;
@@ -857,7 +857,7 @@ void ST_updateFaceWidget(void)
 	// getting hurt because of your own damn stupidity
 	if (plyr->damagecount)
 	{
-	    if (plyr->health - st_oldhealth > ST_MUCHPAIN)
+	    if (st_oldhealth - plyr->health > ST_MUCHPAIN)	// fixed: a big DROP (see above)
 	    {
 		priority = 7;
 		st_facecount = ST_TURNCOUNT;

@@ -157,6 +157,10 @@ int             key_fire;
 int		key_use;
 int		key_strafe;
 int		key_speed;
+
+int		key_buddy_come;		// co-op buddy orders -- one bind each, set in aidoom.cfg
+int		key_buddy_attack;	//   (defaults ',' '.' '-'; see m_misc.c defaults[])
+int		key_buddy_stay;
 int		key_nextweapon;		// default: mouse wheel up
 int		key_prevweapon;		// default: mouse wheel down
 int		key_jump;		// MOD: jump (default: space)
@@ -632,6 +636,19 @@ boolean G_Responder (event_t* ev)
 	    autorun = !autorun;
 	    players[consoleplayer].message = autorun ? "Always run ON" : "Always run OFF";
 	    return true;
+	}
+	// Co-op buddy order keys (one bind each, configurable in aidoom.cfg): come /
+	// attack / stay(toggle hold).  Always bound while in a level -- the order funcs
+	// themselves report "(no companion)" when no buddy is active.
+	if (gamestate == GS_LEVEL)
+	{
+	    if (ev->data1 == key_buddy_attack)
+	    { players[consoleplayer].message = (char*) P_AICoop_Attack (); return true; }
+	    if (ev->data1 == key_buddy_come)
+	    { players[consoleplayer].message = P_AICoop_Summon ()
+		  ? "[Buddy] On my way!" : "[Buddy] (no companion)"; return true; }
+	    if (ev->data1 == key_buddy_stay)
+	    { players[consoleplayer].message = (char*) P_AICoop_Wait (); return true; }
 	}
 	if (ev->data1 <NUMKEYS)
 	    gamekeydown[ev->data1] = true;

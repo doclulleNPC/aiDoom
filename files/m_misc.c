@@ -180,6 +180,9 @@ extern int	key_speed;
 extern int	key_nextweapon;
 extern int	key_prevweapon;
 extern int	key_jump;
+extern int	key_buddy_come;
+extern int	key_buddy_attack;
+extern int	key_buddy_stay;
 extern int	autorun;
 extern int	key_console;
 extern int	crosshair;
@@ -250,6 +253,13 @@ default_t	defaults[] =
     {"key_down",&key_down, KEY_DOWNARROW},
     {"key_strafeleft",&key_strafeleft, ','},
     {"key_straferight",&key_straferight, '.'},
+
+    // Co-op buddy order keys -- one bind each, rebind here.  Defaults ',' '.' '-'
+    // take over those keys (',' / '.' are also the strafe defaults; the buddy bind
+    // wins, and '-' is taken from the screen-size shortcut while bound here).
+    {"key_buddy_come",&key_buddy_come, ','},
+    {"key_buddy_attack",&key_buddy_attack, '.'},
+    {"key_buddy_stay",&key_buddy_stay, KEY_MINUS},
 
     {"key_fire",&key_fire, KEY_RCTRL},
     {"key_use",&key_use, ' '},
