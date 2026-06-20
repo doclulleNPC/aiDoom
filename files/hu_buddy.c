@@ -2,29 +2,23 @@
 //-----------------------------------------------------------------------------
 //
 // DESCRIPTION:
-//	"Second STBAR" -- a small status-bar-style HUD at the top of the screen for
-//	the AI co-op companion, mirroring the player's bottom status bar in
-//	st_stuff.c but at half size (16 BASE-pixels tall instead of 32) and using
-//	a mix of patches (the same lumps STBAR/STTNUM/STYSNUM/STKEYS/STARMS use)
-//	and TTF text (for the weapon name + state label, since the IWAD has no
-//	"FIGHT"/"FOLLOW" patches).
+//	A compact status panel for the AI co-op companion, pinned to the TOP-RIGHT
+//	corner -- a mini version of the player's bottom STBAR (st_stuff.c): a mugshot
+//	that tracks the buddy's health (STFST00..40 / STFDEAD0) plus HP% / Armor% /
+//	ammo in the half-scale STTNUM number font and labels + weapon name in the
+//	small Doom HUD font (hu_font / STCFN*).  Sits on a colormap-darkened, bordered
+//	panel so it reads against any 3D background.
 //
-//	Layout (BASE coords, 320x200):
+//	Layout (panel-local BASE coords; PANEL_W x PANEL_H):
 //
-//	   X=80..240 (160 wide, centred)  Y=0..15 (16 tall)
-//	   +-------+------+------+ +-----+----+
-//	   | HP100 | PIST | 042  | | 88U | FOLLOW |
-//	   +-------+------+------+ +-----+----+
+//	   +----------------------------------+
+//	   | [FACE]  HP 100%      AM 050      |
+//	   |         AR 099       PISTOL      |
+//	   +----------------------------------+
 //
-//	Everything is rendered at half scale (each patch pixel becomes a single
-//	screen pixel in a sub-sampled 2x2 block read).  Labels use the baked
-//	DejaVuSansMono TTF atlas (tools/font_atlas.h, shared with the console),
-//	also rendered sub-sampled so they match the patch height (~7 px).
-//
-//	Authored in BASE_WIDTH (320) coordinates; the sub-sampled render writes
-//	1 byte per output pixel into screens[0], so at hires=1 each BASE pixel is
-//	one screen pixel.  At higher hires the whole buffer is then uniformly
-//	upscaled by SDL when I_FinishUpdate copies it to the texture.
+//	Authored in BASE pixels and written through HU_Buddy_PutBlock, which scales
+//	every BASE pixel to an hires x hires screen block and offsets the panel to the
+//	top-right, so it grows proportionally with the internal resolution.
 //
 //-----------------------------------------------------------------------------
 
@@ -48,10 +42,13 @@
 #include "w_wad.h"
 #include "z_zone.h"
 
-#include "../tools/font_atlas.h"   // baked DejaVuSansMono atlas (also used by the console)
+#include "hu_stuff.h"               // HU_FONTSTART / HU_FONTSIZE + the small Doom HUD font
 
 #include "hu_buddy.h"
 #include "p_ai_coop.h"
+
+// The small Doom HUD font (STCFN033..STCFN095), loaded by HU_Init in hu_stuff.c.
+extern patch_t* hu_font[HU_FONTSIZE];
 
 // On/off (persisted as config key `show_buddy_hud`).  Default ON; the Drawer
 // is a no-op when -aicoop isn't active anyway.
@@ -130,30 +127,17 @@ static void HU_Buddy_FillRect (int bx, int by, int bw, int bh, byte col)
 	    HU_Buddy_PutBlock (x, y, col);
 }
 
-//
-// TTF (DejaVuSansMono baked atlas, sub-sampled to match patch height)
-//
-#define BUDDY_TTF_SCALE_X   2   // take every 2nd atlas x pixel (10 -> 5)
-#define BUDDY_TTF_SCALE_Y   2   // take every 2nd atlas y pixel (19 -> ~9)
-
-//
-// Per-state / weapon strings (used both for TTF rendering and skip-detection)
-//
-static const char* state_str[] = {
-    "FOLLOW", "FIGHT", "HEAL", "HOLD", "COME", "GRAB",
-};
-
+// Short weapon names (readyweapon index -> label) for the panel -- kept <=7 chars
+// so they fit the column in the Doom HUD font.
 static const char* weapon_short[] = {
-    "FIST", "PISTOL", "SHOTGUN", "CHAINGUN",
-    "ROCKET", "PLASMA", "BFG", "CHAINSAW", "SSG",
+    "FIST", "PISTOL", "SHOTGUN", "CHAINGN",
+    "ROCKET", "PLASMA", "BFG", "SAW", "SSG",
 };
 
 
 // Forward decls
 static void HU_Buddy_DrawPatchHalf (int x, int y, patch_t* p);
-static void HU_Buddy_DrawTtfString (int x, int y, const char* s, byte col);
-static int  HU_Buddy_TtfStringWidth (const char* s);
-static void HU_Buddy_DrawTtfChar (int x, int y, char ch, byte col);
+static void HU_Buddy_DrawFontStr  (int x, int y, const char* s, byte col);
 static void HU_Buddy_DrawNumberTall (int x, int y, int n, byte col, int width);
 static void HU_Buddy_DrawStrip (player_t* bot, mobj_t* bot_mo);
 
@@ -263,46 +247,44 @@ static void HU_Buddy_DrawPatchHalf (int x, int y, patch_t* p)
 
 
 // ===========================================================================
-//  TTF rendering (sub-sampled, so each atlas pixel becomes one screen pixel
-//  but we only sample every Nth atlas pixel for the half-scale appearance).
+//  Small Doom HUD font (hu_font, STCFN*) -- full scale, recoloured to `col`.
+//  The font glyphs are ~8 px tall (matching the half-scale STTNUM digits), and
+//  far crisper/readable than the sub-sampled TTF the panel used before.
 // ===========================================================================
 
-static void HU_Buddy_DrawTtfChar (int x, int y, char ch, byte col)
+// Draw one hu_font glyph at full scale through PutBlock, recoloured to `col`.
+// Returns the glyph width (BASE px) to advance.
+static int HU_Buddy_DrawFontChar (int x, int y, patch_t* p, byte col)
 {
-    int c = (unsigned char) ch;
-    int idx, gy, gx;
-
-    if (c < FONT_FIRST || c >= FONT_FIRST + FONT_COUNT) return;
-    idx = c - FONT_FIRST;
-
-    for (gy = 0; gy < FONT_CH; gy += BUDDY_TTF_SCALE_Y)
+    int  pw = SHORT (p->width);
+    int* cofs = (int*) ((byte*) p + 8);
+    int  c;
+    for (c = 0; c < pw; c++)
     {
-	int dy = y + gy / BUDDY_TTF_SCALE_Y;
-	if (dy < 0 || dy >= SCREENHEIGHT) continue;
-	for (gx = 0; gx < FONT_CW; gx += BUDDY_TTF_SCALE_X)
+	column_t* column = (column_t*) ((byte*) p + LONG (cofs[c]));
+	while (column->topdelta != 0xff)
 	{
-	    int dx = x + gx / BUDDY_TTF_SCALE_X;
-	    if (dx < 0 || dx >= SCREENWIDTH) continue;
-	    byte a = font_alpha[gy * FONT_AW + idx * FONT_CW + gx];
-	    if (a < 64) continue;            // threshold for visible pixel
-	    HU_Buddy_PutBlock (dx, dy, col);
+	    int k;
+	    for (k = 0; k < column->length; k++)
+		HU_Buddy_PutBlock (x + c, y + column->topdelta + k, col);
+	    column = (column_t*) ((byte*) column + column->length + 4);
 	}
     }
+    return pw;
 }
 
-static int HU_Buddy_TtfStringWidth (const char* s)
+static void HU_Buddy_DrawFontStr (int x, int y, const char* s, byte col)
 {
-    int n = (int) strlen (s);
-    return n * (FONT_CW / BUDDY_TTF_SCALE_X);
-}
-
-static void HU_Buddy_DrawTtfString (int x, int y, const char* s, byte col)
-{
-    while (*s)
+    for (; *s; s++)
     {
-	HU_Buddy_DrawTtfChar (x, y, *s, col);
-	x += FONT_CW / BUDDY_TTF_SCALE_X;
-	s++;
+	char ch = *s;
+	if (ch >= 'a' && ch <= 'z') ch -= 'a' - 'A';        // uppercase
+	if (ch == ' ' || ch < HU_FONTSTART || ch > HU_FONTEND) { x += 4; continue; }
+	{
+	    patch_t* p = hu_font[ch - HU_FONTSTART];
+	    if (!p) { x += 4; continue; }
+	    x += HU_Buddy_DrawFontChar (x, y, p, col) + 1;
+	}
     }
 }
 
@@ -352,7 +334,7 @@ static void HU_Buddy_DrawNumberTall (int x, int y, int n, byte col, int width)
 //  by hires and offsets to the top-right corner (set in HU_Buddy_DrawStrip).
 // ===========================================================================
 
-#define PANEL_W        116     // panel size (BASE px)
+#define PANEL_W        140     // panel size (BASE px) -- wider for the Doom HUD font
 #define PANEL_H        26
 #define PANEL_RMARGIN  4       // gap from the right screen edge (BASE px)
 #define PANEL_TMARGIN  4       // gap from the top screen edge
@@ -360,9 +342,9 @@ static void HU_Buddy_DrawNumberTall (int x, int y, int n, byte col, int width)
 #define FACE_X         5       // mugshot (24x29 -> 12x14 half)
 #define FACE_Y         6
 #define C1_LBL         22      // column 1: label x / number right-edge x
-#define C1_NUM         54
-#define C2_LBL         72      // column 2
-#define C2_NUM         104
+#define C1_NUM         66
+#define C2_LBL         82      // column 2
+#define C2_NUM         126
 #define ROW1           5       // two text rows (top of the 8px-tall glyphs)
 #define ROW2           15
 
@@ -426,21 +408,21 @@ static void HU_Buddy_DrawStrip (player_t* bot, mobj_t* bot_mo)
     if (face) HU_Buddy_DrawPatchHalf (FACE_X, FACE_Y, face);
 
     // Column 1: HP% (row1), Armor% (row2)
-    HU_Buddy_DrawTtfString  (C1_LBL, ROW1, "HP", BUDDY_FG);
+    HU_Buddy_DrawFontStr  (C1_LBL, ROW1, "HP", BUDDY_FG);
     HU_Buddy_DrawNumberTall (C1_NUM, ROW1, hp, BUDDY_FG, 3);
     HU_Buddy_DrawPatchHalf  (C1_NUM, ROW1, p_sttprcnt);
-    HU_Buddy_DrawTtfString  (C1_LBL, ROW2, "AR", BUDDY_FG);
+    HU_Buddy_DrawFontStr  (C1_LBL, ROW2, "AR", BUDDY_FG);
     HU_Buddy_DrawNumberTall (C1_NUM, ROW2, arm, BUDDY_FG, 3);
     HU_Buddy_DrawPatchHalf  (C1_NUM, ROW2, p_sttprcnt);
 
     // Column 2: ammo (row1, if the weapon uses it), weapon name (row2)
     if (ammo >= 0)
     {
-	HU_Buddy_DrawTtfString  (C2_LBL, ROW1, "AM", BUDDY_FG);
+	HU_Buddy_DrawFontStr  (C2_LBL, ROW1, "AM", BUDDY_FG);
 	HU_Buddy_DrawNumberTall (C2_NUM, ROW1, ammo, BUDDY_FG, 3);
     }
     if (w >= 0 && w < NUMWEAPONS)
-	HU_Buddy_DrawTtfString (C2_LBL, ROW2, weapon_short[w], BUDDY_FG);
+	HU_Buddy_DrawFontStr (C2_LBL, ROW2, weapon_short[w], BUDDY_FG);
 }
 
 
