@@ -693,6 +693,8 @@ static fixed_t*	pf_cy;
 static int*	pf_nadj;		// edge count per sub-sector
 static int*	pf_adj;			// flat [pf_n*PF_MAXADJ] neighbour sub-sectors
 static int*	pf_adjw;		// flat [pf_n*PF_MAXADJ] edge weights
+static fixed_t*	pf_adjpx;		// flat [pf_n*PF_MAXADJ] PORTAL x: a walkable point
+static fixed_t*	pf_adjpy;		//   just inside neighbour v on the u|v boundary
 static int*	pf_dist;		// Dijkstra cost-so-far
 static int*	pf_prev;		// Dijkstra predecessor
 static byte*	pf_done;		// Dijkstra closed flag
@@ -833,17 +835,31 @@ static boolean PF_LineWalkable (fixed_t ax, fixed_t ay, fixed_t bx, fixed_t by,
     return true;
 }
 
-static void PF_AddEdge (int u, int v, int w)
+static void PF_AddEdge (int u, int v, int w, fixed_t px, fixed_t py)
 {
     int	k;
     if (u < 0 || v < 0 || u == v || w < 0) return;
     for (k = 0; k < pf_nadj[u]; k++)			// dedup, keep cheapest
 	if (pf_adj[u*PF_MAXADJ + k] == v)
-	{ if (w < pf_adjw[u*PF_MAXADJ + k]) pf_adjw[u*PF_MAXADJ + k] = w; return; }
+	{ if (w < pf_adjw[u*PF_MAXADJ + k])
+	    { pf_adjw[u*PF_MAXADJ + k] = w; pf_adjpx[u*PF_MAXADJ + k] = px; pf_adjpy[u*PF_MAXADJ + k] = py; }
+	  return; }
     if (pf_nadj[u] >= PF_MAXADJ) return;
     pf_adj [u*PF_MAXADJ + pf_nadj[u]] = v;
     pf_adjw[u*PF_MAXADJ + pf_nadj[u]] = w;
+    pf_adjpx[u*PF_MAXADJ + pf_nadj[u]] = px;
+    pf_adjpy[u*PF_MAXADJ + pf_nadj[u]] = py;
     pf_nadj[u]++;
+}
+
+// Portal point on the u->v edge (a walkable spot just inside v), or v's centroid.
+static boolean PF_Portal (int u, int v, fixed_t* px, fixed_t* py)
+{
+    int	k;
+    for (k = 0; k < pf_nadj[u]; k++)
+	if (pf_adj[u*PF_MAXADJ + k] == v)
+	{ *px = pf_adjpx[u*PF_MAXADJ + k]; *py = pf_adjpy[u*PF_MAXADJ + k]; return true; }
+    return false;
 }
 
 static void PF_Build (mobj_t* ref)
@@ -852,6 +868,7 @@ static void PF_Build (mobj_t* ref)
     int*	segss;
 
     free (pf_cx); free (pf_cy); free (pf_nadj); free (pf_adj); free (pf_adjw);
+    free (pf_adjpx); free (pf_adjpy);
     free (pf_dist); free (pf_prev); free (pf_done);
 
     pf_n    = numsubsectors;
@@ -863,6 +880,8 @@ static void PF_Build (mobj_t* ref)
     pf_nadj = calloc (pf_n, sizeof(int));
     pf_adj  = malloc (pf_n * PF_MAXADJ * sizeof(int));
     pf_adjw = malloc (pf_n * PF_MAXADJ * sizeof(int));
+    pf_adjpx= malloc (pf_n * PF_MAXADJ * sizeof(fixed_t));
+    pf_adjpy= malloc (pf_n * PF_MAXADJ * sizeof(fixed_t));
     segss   = malloc (numsegs * sizeof(int));
 
     // centroid of each sub-sector (mean of its segs' endpoints) + seg->ss map
@@ -907,7 +926,14 @@ static void PF_Build (mobj_t* ref)
 	v = (a != self) ? a : (b != self ? b : -1);
 	if (v < 0) continue;
 	w = PF_EdgeWeight (sg, self, v);
-	if (w >= 0) PF_AddEdge (self, v, w);
+	if (w >= 0)
+	{
+	    // Portal = the seg midpoint nudged ~16u INTO v (the destination side), so
+	    // steering at it crosses the shared edge instead of stopping on the wall
+	    // line.  ox,oy is the 4u normal; v sits on the +normal side iff v==a.
+	    int s = (v == a) ? 4 : -4;
+	    PF_AddEdge (self, v, w, mx + s*ox, my + s*oy);
+	}
     }
 
     // (2) Grid adjacency -- THE fix for isolated sub-sectors.  In vanilla Doom a
@@ -941,8 +967,10 @@ static void PF_Build (mobj_t* ref)
 		if (!PF_LineWalkable (gx, gy, tx, ty, ref, af)) continue;
 		w = (int)(P_AproxDistance (pf_cx[a]-pf_cx[b], pf_cy[a]-pf_cy[b]) >> FRACBITS);
 		if (w < 1) w = 1;
-		PF_AddEdge (a, b, w + (AICoop_DamagingFloor (pf_cx[b], pf_cy[b]) ? PF_HAZARD_PEN : 0));
-		PF_AddEdge (b, a, w + (AICoop_DamagingFloor (pf_cx[a], pf_cy[a]) ? PF_HAZARD_PEN : 0));
+		// Portal = a grid point INSIDE the destination sub-sector (the walkable
+		// sample we just trace-verified), so steering at it crosses the boundary.
+		PF_AddEdge (a, b, w + (AICoop_DamagingFloor (pf_cx[b], pf_cy[b]) ? PF_HAZARD_PEN : 0), tx, ty);
+		PF_AddEdge (b, a, w + (AICoop_DamagingFloor (pf_cx[a], pf_cy[a]) ? PF_HAZARD_PEN : 0), gx, gy);
 	    }
 	}
     }
@@ -1012,7 +1040,8 @@ static boolean PF_Dijkstra (int start, int goal)
 // Next point to steer toward to reach (dx,dy).  Returns false if unreachable.
 static boolean PF_NextWaypoint (mobj_t* mo, fixed_t dx, fixed_t dy, fixed_t* wx, fixed_t* wy)
 {
-    int	start, goal, len, i, pick, c;
+    int		start, goal, len, i, c, np, prev;
+    fixed_t	portx[PF_PATHMAX], porty[PF_PATHMAX];
 
     if (pf_level != gameepisode*100 + gamemap || !pf_cx)
     { PF_Build (mo); pf_level = gameepisode*100 + gamemap; pf_lastbuild = gametic; }
@@ -1040,16 +1069,26 @@ static boolean PF_NextWaypoint (mobj_t* mo, fixed_t dx, fixed_t dy, fixed_t* wx,
     while (c != -1 && c != start && len < PF_PATHMAX) { pf_path[len++] = c; c = pf_prev[c]; }
     if (len == 0) { *wx = dx; *wy = dy; return true; }
 
-    // string pull: steer to the furthest path node reachable in a straight walk
-    pick = len - 1;					// fallback: the first step
-    for (i = 0; i < len; i++)				// i=0 is the goal end
+    // Collect PORTAL points along the route (start -> n1 -> ... -> goal).  A portal
+    // is a walkable point on a sub-sector boundary, so -- unlike a sub-sector
+    // CENTROID, which can sit behind a wall and made the buddy grind/chase it -- it
+    // is always reachable, and the buddy can steer straight to it.
+    np = 0; prev = start;
+    for (i = len - 1; i >= 0; i--)			// path order: start -> goal
     {
-	fixed_t px = (i == 0) ? dx : pf_cx[pf_path[i]];
-	fixed_t py = (i == 0) ? dy : pf_cy[pf_path[i]];
-	if (AICoop_CanReach (mo, px, py, true)) { pick = i; break; }
+	fixed_t qx, qy;
+	if (PF_Portal (prev, pf_path[i], &qx, &qy)) { portx[np] = qx; porty[np] = qy; np++; }
+	prev = pf_path[i];
     }
-    if (pick == 0) { *wx = dx; *wy = dy; }
-    else { *wx = pf_cx[pf_path[pick]]; *wy = pf_cy[pf_path[pick]]; }
+
+    // Funnel-lite string pull: steer to the FURTHEST point we can straight-walk to --
+    // the goal itself if it's in sight, else the furthest reachable portal, else the
+    // first portal (always on our own sub-sector's boundary, hence reachable).
+    if (AICoop_CanReach (mo, dx, dy, true)) { *wx = dx; *wy = dy; return true; }
+    for (i = np - 1; i >= 0; i--)
+	if (AICoop_CanReach (mo, portx[i], porty[i], true)) { *wx = portx[i]; *wy = porty[i]; return true; }
+    if (np > 0) { *wx = portx[0]; *wy = porty[0]; return true; }
+    *wx = dx; *wy = dy;
     return true;
 }
 
