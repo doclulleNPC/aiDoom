@@ -317,10 +317,14 @@ static boolean AICoop_CanReach (mobj_t* self, fixed_t tx, fixed_t ty, boolean av
     fixed_t	fz = self->z;			// start at the buddy's feet
     int		steps, i;
 
-    if (dist < 24*FRACUNIT)
+    if (dist < 16*FRACUNIT)
 	return true;				// practically there
-    steps = dist / (24*FRACUNIT);
-    if (steps > 64)
+    // step by the buddy radius (16) so consecutive P_CheckPosition boxes (32 wide)
+    // overlap -> a wall BETWEEN samples can't slip through (a 24-unit step left a
+    // gap, so a waypoint just behind a thin wall looked reachable and the buddy
+    // wedged against it).
+    steps = dist / (16*FRACUNIT);
+    if (steps > 96)
 	return false;				// too far -- don't bother (bounds cost)
 
     for (i = 1; i <= steps; i++)
@@ -1126,10 +1130,11 @@ void P_AICoop_BuildCmd (void)
 	// (1) tap Use once for a possible door (gated -- spamming reverses DR doors).
 	if (doorwait == 0) { cmd->buttons |= BT_USE; doorwait = 40; }
 	// (2) strafe sideways to slip past a barrel / convex corner (forward stays,
-	//     so it slides around diagonally); flip the side every ~16 tics so if
-	//     one way is blocked it tries the other.
-	cmd->sidemove = ((wig++ >> 4) & 1) ? COOP_RUN : -COOP_RUN;
-	// (3) re-path so we stop aiming at the same blocked waypoint.
-	if (navigate) navtimer = 0;
+	//     so it slides around diagonally); flip the side every ~24 tics so if
+	//     one way is blocked it tries the other.  Do NOT re-path every tic here:
+	//     that made the waypoint flip between two routes at a junction so the
+	//     buddy oscillated in place instead of committing (normal 10-tic re-path
+	//     still recovers from a genuinely bad waypoint).
+	cmd->sidemove = ((wig++ / 24) & 1) ? COOP_RUN : -COOP_RUN;
     }
 }
