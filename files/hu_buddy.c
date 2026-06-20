@@ -23,7 +23,9 @@
 #include "d_player.h"
 #include "d_items.h"
 #include "m_swap.h"
+#include "tables.h"                 // ANG45 / ANG180 (attacker-direction face)
 #include "r_defs.h"
+#include "r_main.h"                 // R_PointToAngle2
 #include "v_video.h"
 #include "w_wad.h"                  // W_CheckNumForName / W_CacheLumpNum (buddy.wad faces)
 #include "z_zone.h"                 // PU_STATIC
@@ -54,40 +56,185 @@ void HU_Buddy_SetRes (void) {}
 
 // ---------------------------------------------------------------------------
 //  Buddy mugshot faces (BUF*) -- a distinct set from the player's STF*, packed
-//  into buddy.wad (tools/bake_buddy_face.py).  Loaded lazily on first draw: the
-//  WAD is added at startup (I_Voice_Init), so the lumps exist by the time the HUD
-//  draws; if buddy.wad is absent the faces stay NULL and the HUD shows text only.
+//  into buddy.wad (tools/bake_buddy_face.py).  Loaded lazily: the WAD is added at
+//  startup (I_Voice_Init), so the lumps exist by the time the HUD ticks/draws; if
+//  buddy.wad is absent the faces stay unloaded and the HUD falls back to a text
+//  label.  The face is ANIMATED exactly like the player's (st_stuff.c): a flat
+//  42-entry array in the same layout, driven by a ported ST_updateFaceWidget state
+//  machine ticked once per game tic (HU_Buddy_Ticker).
+//
+//  Layout per pain level p (0=healthy .. 4=near death), 8 faces each:
+//     +0,1,2  straight (look c/r/l)   +3 turn-right  +4 turn-left
+//     +5 ouch  +6 evil grin  +7 rampage     then GOD (40), DEAD (41).
 // ---------------------------------------------------------------------------
-static patch_t* buf_face[5];        // BUFST00/10/20/30/40 (healthy .. near-death)
-static patch_t* buf_dead;           // BUFDEAD0
-static int      faces_tried;        // 0 = not yet, 1 = attempted (loaded or absent)
+#define BF_NUMFACES		42
+#define BF_STRIDE		8
+#define BF_TURNOFFSET		3
+#define BF_OUCHOFFSET		5
+#define BF_EVILGRINOFFSET	6
+#define BF_RAMPAGEOFFSET	7
+#define BF_GODFACE		40
+#define BF_DEADFACE		41
+#define BF_EVILGRINCOUNT	(2*TICRATE)
+#define BF_STRAIGHTFACECOUNT	(TICRATE/2)
+#define BF_TURNCOUNT		(1*TICRATE)
+#define BF_RAMPAGEDELAY		(2*TICRATE)
+#define BF_MUCHPAIN		20
+
+static patch_t* buf_faces[BF_NUMFACES];
+static int      faces_tried;        // 0 = not yet, 1 = attempted
+static int      faces_ok;           // all 42 lumps present?
+static int      bf_index;           // current face (index into buf_faces), set by the Ticker
+static int      bf_count;           // tics left on the current expression
+
+// Cosmetic RNG for the random "look" direction.  Deliberately NOT M_Random -- the
+// HUD must never touch the game RNG (it would desync the deterministic playsim).
+static int HU_Buddy_FaceRand (void)
+{
+    static unsigned s = 1;
+    s = s * 1103515245u + 12345u;
+    return (int)((s >> 16) & 0x7fff);
+}
+
+static patch_t* HU_Buddy_LoadFace (const char* name, int* ok)
+{
+    char nm[9];
+    int  l;
+    strncpy (nm, name, 8); nm[8] = 0;
+    l = W_CheckNumForName (nm);
+    if (l < 0) { *ok = 0; return NULL; }
+    return (patch_t*) W_CacheLumpNum (l, PU_STATIC);
+}
 
 static void HU_Buddy_LoadFaces (void)
 {
-    int i, l;
+    int  i, j, fn = 0, ok = 1;
     char nm[9];
     if (faces_tried) return;
     faces_tried = 1;
     for (i = 0; i < 5; i++)
     {
-	sprintf (nm, "BUFST%d0", i);
-	l = W_CheckNumForName (nm);
-	buf_face[i] = (l >= 0) ? (patch_t*) W_CacheLumpNum (l, PU_STATIC) : NULL;
+	for (j = 0; j < 3; j++)
+	    { sprintf (nm, "BUFST%d%d", i, j); buf_faces[fn++] = HU_Buddy_LoadFace (nm, &ok); }
+	sprintf (nm, "BUFTR%d0", i);  buf_faces[fn++] = HU_Buddy_LoadFace (nm, &ok);  // turn right
+	sprintf (nm, "BUFTL%d0", i);  buf_faces[fn++] = HU_Buddy_LoadFace (nm, &ok);  // turn left
+	sprintf (nm, "BUFOUCH%d", i); buf_faces[fn++] = HU_Buddy_LoadFace (nm, &ok);  // ouch
+	sprintf (nm, "BUFEVL%d", i);  buf_faces[fn++] = HU_Buddy_LoadFace (nm, &ok);  // evil grin
+	sprintf (nm, "BUFKILL%d", i); buf_faces[fn++] = HU_Buddy_LoadFace (nm, &ok);  // rampage
     }
-    strcpy (nm, "BUFDEAD0");
-    l = W_CheckNumForName (nm);
-    buf_dead = (l >= 0) ? (patch_t*) W_CacheLumpNum (l, PU_STATIC) : NULL;
+    buf_faces[fn++] = HU_Buddy_LoadFace ("BUFGOD0",  &ok);
+    buf_faces[fn++] = HU_Buddy_LoadFace ("BUFDEAD0", &ok);
+    faces_ok = ok;
 }
 
-// Mugshot for the buddy's current health (mirrors the player's pain-offset buckets).
-static patch_t* HU_Buddy_Face (int hp)
+// FACESTRIDE * pain-bucket, exactly like ST_calcPainOffset.
+static int HU_Buddy_PainOffset (int health)
 {
-    int pain;
-    if (hp <= 0) return buf_dead;
-    pain = (100 - (hp > 100 ? 100 : hp)) / 20;
-    if (pain < 0) pain = 0;
-    if (pain > 4) pain = 4;
-    return buf_face[pain];
+    if (health > 100) health = 100;
+    if (health < 0)   health = 0;
+    return BF_STRIDE * (((100 - health) * 5) / 101);
+}
+
+// Ported ST_updateFaceWidget, driven by the buddy's player_t.  Runs once per tic
+// (HU_Buddy_Ticker).  Precedence: dead > evil grin > attacked/turn > self-hurt >
+// rampage > god > idle look.  (The vanilla "ouch" health-delta test is inverted
+// here so the ouch face actually triggers on a big hit -- the original `health -
+// oldhealth > MUCHPAIN` is the well-known Doom bug that all but disables it.)
+static void HU_Buddy_FaceTick (player_t* bot)
+{
+    static int     lastattackdown = -1;
+    static int     priority = 0;
+    static int     oldhealth = -1;
+    static boolean oldweap[NUMWEAPONS];
+    int            i;
+    angle_t        badang, diffang;
+    boolean        grin;
+
+    if (priority < 10 && !bot->health)
+	{ priority = 9; bf_index = BF_DEADFACE; bf_count = 1; }
+
+    if (priority < 9 && bot->bonuscount)
+    {
+	grin = false;
+	for (i = 0; i < NUMWEAPONS; i++)
+	    if (oldweap[i] != bot->weaponowned[i]) { grin = true; oldweap[i] = bot->weaponowned[i]; }
+	if (grin)
+	    { priority = 8; bf_count = BF_EVILGRINCOUNT;
+	      bf_index = HU_Buddy_PainOffset (bot->health) + BF_EVILGRINOFFSET; }
+    }
+
+    if (priority < 8 && bot->damagecount && bot->attacker && bot->attacker != bot->mo)
+    {
+	priority = 7;
+	if (oldhealth - bot->health > BF_MUCHPAIN)
+	    { bf_count = BF_TURNCOUNT; bf_index = HU_Buddy_PainOffset (bot->health) + BF_OUCHOFFSET; }
+	else
+	{
+	    badang = R_PointToAngle2 (bot->mo->x, bot->mo->y, bot->attacker->x, bot->attacker->y);
+	    if (badang > bot->mo->angle) { diffang = badang - bot->mo->angle; i = diffang > ANG180; }
+	    else                         { diffang = bot->mo->angle - badang; i = diffang <= ANG180; }
+	    bf_count = BF_TURNCOUNT;
+	    bf_index = HU_Buddy_PainOffset (bot->health);
+	    if      (diffang < ANG45) bf_index += BF_RAMPAGEOFFSET;   // head-on
+	    else if (i)               bf_index += BF_TURNOFFSET;      // turn right
+	    else                      bf_index += BF_TURNOFFSET + 1;  // turn left
+	}
+    }
+
+    if (priority < 7 && bot->damagecount)
+    {
+	if (oldhealth - bot->health > BF_MUCHPAIN)
+	    { priority = 7; bf_count = BF_TURNCOUNT;
+	      bf_index = HU_Buddy_PainOffset (bot->health) + BF_OUCHOFFSET; }
+	else
+	    { priority = 6; bf_count = BF_TURNCOUNT;
+	      bf_index = HU_Buddy_PainOffset (bot->health) + BF_RAMPAGEOFFSET; }
+    }
+
+    if (priority < 6)
+    {
+	if (bot->attackdown)
+	{
+	    if (lastattackdown == -1) lastattackdown = BF_RAMPAGEDELAY;
+	    else if (!--lastattackdown)
+		{ priority = 5; bf_index = HU_Buddy_PainOffset (bot->health) + BF_RAMPAGEOFFSET;
+		  bf_count = 1; lastattackdown = 1; }
+	}
+	else lastattackdown = -1;
+    }
+
+    if (priority < 5 && ((bot->cheats & CF_GODMODE) || bot->powers[pw_invulnerability]))
+	{ priority = 4; bf_index = BF_GODFACE; bf_count = 1; }
+
+    if (!bf_count)
+	{ bf_index = HU_Buddy_PainOffset (bot->health) + (HU_Buddy_FaceRand () % 3);
+	  bf_count = BF_STRAIGHTFACECOUNT; priority = 0; }
+
+    bf_count--;
+    oldhealth = bot->health;
+}
+
+// Per-tic face update (called from HU_Ticker).
+void HU_Buddy_Ticker (void)
+{
+    int       slot;
+    player_t* bot;
+
+    if (!show_buddy_hud) return;
+    slot = P_AICoop_Slot ();
+    if (slot < 0 || !playeringame[slot]) return;
+    HU_Buddy_LoadFaces ();
+    if (!faces_ok) return;
+    bot = &players[slot];
+    HU_Buddy_FaceTick (bot);
+}
+
+// The current animated mugshot (or NULL if the faces aren't available).
+static patch_t* HU_Buddy_Face (void)
+{
+    HU_Buddy_LoadFaces ();
+    if (!faces_ok || bf_index < 0 || bf_index >= BF_NUMFACES) return NULL;
+    return buf_faces[bf_index];
 }
 
 
@@ -140,8 +287,7 @@ static void HU_Buddy_DrawStrip (player_t* bot)
     patch_t* face;
     char     l1[40], l2[40];
 
-    HU_Buddy_LoadFaces ();
-    face = HU_Buddy_Face (hp);
+    face = HU_Buddy_Face ();
 
     if (w >= 0 && w < NUMWEAPONS && weaponinfo[w].ammo < NUMAMMO)
 	ammo = bot->ammo[weaponinfo[w].ammo];

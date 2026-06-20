@@ -33,6 +33,7 @@ rcsid[] = "$Id: hu_stuff.c,v 1.4 1997/02/03 16:47:52 b1 Exp $";
 
 #include "hu_stuff.h"
 #include "hu_lib.h"
+#include "hu_buddy.h"
 #include "w_wad.h"
 
 #include "s_sound.h"
@@ -511,6 +512,8 @@ void HU_Ticker(void)
 
     int i, rc;
     char c;
+
+    HU_Buddy_Ticker ();		// advance the buddy's animated mugshot
 
     // tick down message counter if message is up
     if (message_counter && !--message_counter)

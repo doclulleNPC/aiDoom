@@ -33,6 +33,9 @@ void HU_Buddy_Init (void);
 // dead/missing, or `show_buddy_hud` is off.
 void HU_Buddy_Drawer (void);
 
+// Per-tic update of the buddy's animated mugshot (called from HU_Ticker).
+void HU_Buddy_Ticker (void);
+
 // Called from i_video.c when the internal resolution changes.  Currently a
 // no-op (the HUD doesn't need a per-resolution scratch buffer), but kept as
 // a stable hook so the call site doesn't need to change if we add one later.
