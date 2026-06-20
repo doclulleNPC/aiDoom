@@ -1371,7 +1371,7 @@ void P_AICoop_BuildCmd (void)
     stx = tx; sty = ty;
     if (navigate)
     {
-	// Coarse route: BSP waypoint toward the player (cached, re-pathed ~3x/s).
+	// Coarse route: BSP portal waypoint toward the player (cached, re-pathed ~3x/s).
 	fixed_t goalx = tx, goaly = ty;
 	int gss = PF_SS (tx, ty);
 	if (--navtimer <= 0 || gss != navgoal)
