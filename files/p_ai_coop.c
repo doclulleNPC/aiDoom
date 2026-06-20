@@ -929,6 +929,24 @@ static void AICoop_ThrustToward (ticcmd_t* cmd, mobj_t* mo, fixed_t tx, fixed_t 
     cmd->sidemove    = -(signed char)(FixedMul (COOP_RUN*FRACUNIT, finesine[rel])   >> FRACBITS);
 }
 
+// Best ranged weapon the buddy owns with ammo (melee weapons excluded; rockets/BFG
+// skipped -- splash would hurt the buddy/human at the ranges it fights).  Used to
+// switch off the chainsaw/fist when the target is out of melee reach.
+static int AICoop_BestRanged (player_t* p)
+{
+    static const int	pri[] = { wp_chaingun, wp_supershotgun, wp_shotgun, wp_plasma, wp_pistol };
+    int			i;
+    for (i = 0; i < 5; i++)
+    {
+	int		w = pri[i];
+	ammotype_t	a;
+	if (!p->weaponowned[w]) continue;
+	a = weaponinfo[w].ammo;
+	if (a == am_noammo || p->ammo[a] > 0) return w;
+    }
+    return -1;
+}
+
 // Feet-trace steering -- the "item reachability" trick (AICoop_CanReach) applied
 // to movement.  Aim at the goal; if the straight floor-trace is blocked, sweep
 // the heading outward in 22.5° steps -- the *full* circle (±180°), so it can also
@@ -1226,6 +1244,18 @@ void P_AICoop_BuildCmd (void)
 
     if (fire && aimmon)
     {
+	// Wrong weapon?  If holding the chainsaw/fist but the target is out of melee
+	// reach, switch to a ranged weapon -- otherwise the buddy revs the saw at a foe
+	// it can never touch (the bug: it picked up the E1M3 chainsaw and got stuck on
+	// it).  The engine performs the switch via pendingweapon.
+	if ((bot->readyweapon == wp_fist || bot->readyweapon == wp_chainsaw)
+	    && bot->pendingweapon == wp_nochange
+	    && P_AproxDistance (aimmon->x - mo->x, aimmon->y - mo->y) > 80*FRACUNIT)
+	{
+	    int w = AICoop_BestRanged (bot);
+	    if (w >= 0) bot->pendingweapon = w;
+	}
+
 	// Aim vertically at the target's centre: if autoaim misses (target above or
 	// below) the weapon falls back to lookdir ("shoot where you look"), so the
 	// shot elevates instead of plugging the wall/crate in front.
