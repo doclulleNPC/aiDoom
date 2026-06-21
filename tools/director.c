@@ -354,9 +354,12 @@ static const char* SYSTEM_PROMPT =
     "(2) The human's AI COMPANION 'buddy' (the \\\"buddy\\\" field of the state), which you direct "
     "to HELP the human: engage dangerous monsters (add \\\"focus\\\":<monster id> to pick one), "
     "regroup or retreat it when its health is low, defend when the human is safe, grab to collect "
-    "items. Buddy orders: engage, defend, hold, regroup, retreat, grab. "
+    "items, or goto a specific spot. The buddy field includes \\\"route\\\":[[x,y],...] -- reachable "
+    "waypoints toward the human; for a goto, copy x,y from that route (or aim near a monster/item) "
+    "so the spot is walkable. Buddy orders: engage, defend, hold, regroup, retreat, grab, goto. "
     "Respond ONLY with JSON of the form {\\\"commands\\\":[{\\\"order\\\":\\\"flank_left\\\","
     "\\\"ids\\\":[1,3]}],\\\"buddy\\\":{\\\"order\\\":\\\"engage\\\",\\\"focus\\\":2}}. "
+    "For goto use {\\\"buddy\\\":{\\\"order\\\":\\\"goto\\\",\\\"x\\\":123,\\\"y\\\":456}}. "
     "Every monster id must appear in exactly one command. Omit \\\"buddy\\\" if the state has no buddy.";
 
 static int is_order (const char* o)
@@ -369,7 +372,7 @@ static int is_order (const char* o)
 
 static int is_buddy_order (const char* o)
 {
-    static const char* k[] = { "engage","defend","hold","regroup","retreat","grab","auto", NULL };
+    static const char* k[] = { "engage","defend","hold","regroup","retreat","grab","goto","auto", NULL };
     for (int i = 0; k[i]; i++) if (!strcmp (o, k[i])) return 1;
     return 0;
 }
@@ -515,16 +518,29 @@ static int worker (void* unused)
                     for (char* p = bl; *p; p++) *p = (char) tolower ((unsigned char)*p);
                     if (is_buddy_order (bl))
                     {
-                        json* bf = json_get (bo, "focus");
-                        int fid = (bf && bf->t == JNUM) ? (int) bf->num : 0;
-                        int fok = 0;
-                        for (int i = 0; i < nids; i++) if (ids[i] == fid) { fok = 1; break; }
-                        char bc[128];
-                        int bn = fok ? snprintf (bc, sizeof bc, "buddy order=%s focus=%d for=105\n", bl, fid)
+                        char bc[128]; int bn; char tag[24];
+                        if (!strcmp (bl, "goto"))
+                        {
+                            json* jx = json_get (bo, "x");
+                            json* jy = json_get (bo, "y");
+                            int gx = (jx && jx->t == JNUM) ? (int) jx->num : 0;
+                            int gy = (jy && jy->t == JNUM) ? (int) jy->num : 0;
+                            bn = snprintf (bc, sizeof bc, "buddy order=goto x=%d y=%d for=105\n", gx, gy);
+                            snprintf (tag, sizeof tag, "goto(%d,%d)", gx, gy);
+                        }
+                        else
+                        {
+                            json* bf = json_get (bo, "focus");
+                            int fid = (bf && bf->t == JNUM) ? (int) bf->num : 0;
+                            int fok = 0;
+                            for (int i = 0; i < nids; i++) if (ids[i] == fid) { fok = 1; break; }
+                            bn = fok ? snprintf (bc, sizeof bc, "buddy order=%s focus=%d for=105\n", bl, fid)
                                      : snprintf (bc, sizeof bc, "buddy order=%s for=105\n", bl);
+                            snprintf (tag, sizeof tag, "%s%s", bl, fok ? "*" : "");
+                        }
                         send_all (gs, bc, bn);
                         recv_line (gs, line, sizeof line);   // "ok"
-                        char piece[48]; snprintf (piece, sizeof piece, "buddy:%s%s ", bl, fok ? "*" : "");
+                        char piece[48]; snprintf (piece, sizeof piece, "buddy:%s ", tag);
                         strncat (summary, piece, sizeof summary - strlen (summary) - 1);
                         issued++;
                     }

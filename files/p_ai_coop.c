@@ -1192,6 +1192,49 @@ static boolean PF_NextWaypoint (mobj_t* mo, fixed_t dx, fixed_t dy, fixed_t* wx,
     return true;
 }
 
+// Topological route for the LLM director: fill (xs,ys) with up to `maxpts` reachable
+// waypoints along the buddy->player path (the portal route, downsampled), so the
+// director has real spatial context + valid coordinates it can steer the buddy to
+// with a `goto`.  Returns the number of points (0 if same room / no route).
+int P_AICoop_NavRoute (fixed_t* xs, fixed_t* ys, int maxpts)
+{
+    mobj_t*	mo = AICoop_Mo ();
+    mobj_t*	pl;
+    int		start, goal, len, i, c, n, prev, np, step;
+    fixed_t	px[PF_PATHMAX], py[PF_PATHMAX];
+
+    if (!mo || maxpts <= 0) return 0;
+    pl = AICoop_NearestHuman (mo->x, mo->y);
+    if (!pl) return 0;
+
+    if (pf_level != gameepisode*100 + gamemap || !pf_cx)
+	{ PF_Build (mo); pf_level = gameepisode*100 + gamemap; pf_lastbuild = gametic; }
+
+    start = PF_SS (mo->x, mo->y);
+    goal  = PF_SS (pl->x, pl->y);
+    if (start == goal || !PF_Dijkstra (start, goal)) return 0;
+
+    len = 0; c = goal;
+    while (c != -1 && c != start && len < PF_PATHMAX) { pf_path[len++] = c; c = pf_prev[c]; }
+    if (len == 0) return 0;
+
+    n = 0; prev = start;
+    for (i = len - 1; i >= 0; i--)			// start -> goal portal points
+    {
+	fixed_t qx, qy;
+	if (PF_Portal (prev, pf_path[i], &qx, &qy)) { px[n] = qx; py[n] = qy; n++; }
+	prev = pf_path[i];
+    }
+    if (n == 0) return 0;
+
+    step = (n + maxpts - 1) / maxpts; if (step < 1) step = 1;	// downsample to fit
+    np = 0;
+    for (i = 0; i < n && np < maxpts; i += step) { xs[np] = px[i]; ys[np] = py[i]; np++; }
+    if (np && np < maxpts && (xs[np-1] != px[n-1] || ys[np-1] != py[n-1]))
+	{ xs[np] = px[n-1]; ys[np] = py[n-1]; np++; }	// always keep the last (nearest player)
+    return np;
+}
+
 
 // Move toward a world point using forward+side thrust, so the buddy heads
 // straight there *regardless of which way it's facing*.  Pure forwardmove only

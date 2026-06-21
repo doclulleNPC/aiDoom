@@ -85,4 +85,8 @@ int  P_AICoop_AIMode (void);
 // is the monster to engage (NULL = nearest); x,y the BUD_GOTO point.
 void P_AICoop_SetDirective (int tactic, struct mobj_s* focus, fixed_t x, fixed_t y, int tics);
 
+// Fill (xs,ys) with up to maxpts reachable waypoints along the buddy->player route
+// (downsampled portal path), for the AI `observe` stream.  Returns the count.
+int  P_AICoop_NavRoute (fixed_t* xs, fixed_t* ys, int maxpts);
+
 #endif

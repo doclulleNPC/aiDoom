@@ -409,11 +409,16 @@ static int AI_Serialize (void)
 			       ? b->ammo[weaponinfo[w].ammo] : -1;
 	    static const char* sname[] = {"follow","fight","heal","hold","come","grab"};
 	    int		st = P_AICoop_State ();
+	    fixed_t	rx[6], ry[6];
+	    int		nr = P_AICoop_NavRoute (rx, ry, 6), r;
 	    n += snprintf (obsbuf+n, OBSBUF-n,
 		",\"buddy\":{\"pos\":[%d,%d],\"health\":%d,\"armor\":%d,"
-		"\"weapon\":%d,\"ammo\":%d,\"state\":\"%s\"}",
+		"\"weapon\":%d,\"ammo\":%d,\"state\":\"%s\",\"route\":[",
 		b->mo->x/fx, b->mo->y/fx, b->health, b->armorpoints,
 		w, ammo, (st>=0 && st<6) ? sname[st] : "follow");
+	    for (r = 0; r < nr; r++)
+		n += snprintf (obsbuf+n, OBSBUF-n, "%s[%d,%d]", r?",":"", rx[r]/fx, ry[r]/fx);
+	    n += snprintf (obsbuf+n, OBSBUF-n, "]}");
 	}
     }
 
