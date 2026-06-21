@@ -37,4 +37,15 @@ int  P_Director_Intensity (void);
 // True if the rule-based director is active (-director).
 int  P_Director_Active (void);
 
+// Stress fields for the LLM `observe` stream (p_ai_llm.c).
+int  P_Director_State (void);		// 0 buildup, 1 sustain, 2 fade
+int  P_Director_RecentDmg (void);	// damage in the recent burst window
+int  P_Director_AmmoPct (void);		// carried-ammo fill 0..100
+
+// LLM director act verbs (-aidirector): spawn monsters / drop an item / relax.
+// No-ops unless the LLM director is active; each defers the rule-FSM fallback.
+void P_Director_LLMSpawn (const char* type, int count);
+void P_Director_LLMItem  (const char* kind);
+void P_Director_Relax    (void);
+
 #endif

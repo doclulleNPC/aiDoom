@@ -19,6 +19,7 @@
 //
 //-----------------------------------------------------------------------------
 
+#include <string.h>
 #include "doomdef.h"
 #include "doomstat.h"
 #include "m_argv.h"
@@ -43,32 +44,49 @@
 
 enum { DIR_BUILDUP, DIR_SUSTAIN, DIR_FADE };
 
-static int	dir_on;			// -director given
+#define DIR_EMERG_HP		25	// drop an emergency medkit when a survivor is below this
+#define DIR_EMERG_NEAR		(768*FRACUNIT)	// ...and no medkit already within this
+#define DIR_EMERG_COOLDOWN	(20*TICRATE)	// at most one emergency medkit per this
+#define DIR_LLM_FALLBACK	(15*TICRATE)	// FSM resumes if the LLM hasn't spawned in this
+
+static int	dir_on;			// -director given (rule FSM active)
+static int	dir_llm;		// -aidirector/-aidemo: LLM drives spawns, FSM = fallback
 static int	dir_acc;		// intensity * 100 (0..DIR_MAX)
 static int	dir_state;
 static int	dir_timer;		// SUSTAIN countdown
 static int	dir_spawntic;		// tics until next monster spawn
 static int	dir_recentdmg;		// damage in the recent window (burst), decaying
 static int	dir_relaxstart;		// gametic FADE began
+static int	dir_emergtic;		// gametic of the last emergency medkit
+static int	dir_llmlast;		// gametic of the last LLM spawn/relax command
 
 // "common" + "special" monster pools (specials lean in at the peak).
 static const mobjtype_t dir_common[]  = { MT_POSSESSED, MT_SHOTGUY, MT_TROOP, MT_SERGEANT };
 static const mobjtype_t dir_special[] = { MT_UNDEAD, MT_KNIGHT, MT_HEAD, MT_CHAINGUY };
 
-int  P_Director_Active   (void) { return dir_on; }
-int  P_Director_Intensity (void) { return dir_on ? dir_acc / 100 : 0; }
+#define DIR_TRACK	(dir_on || dir_llm)	// intensity is tracked in either mode
+
+int  P_Director_Active    (void) { return dir_on; }
+int  P_Director_Intensity (void) { return DIR_TRACK ? dir_acc / 100 : 0; }
+int  P_Director_State     (void) { return dir_state; }
+int  P_Director_RecentDmg (void) { return dir_recentdmg; }
 
 void P_Director_Init (void)
 {
-    dir_on = (M_CheckParm ("-director") > 0);
+    dir_on  = (M_CheckParm ("-director") > 0);
+    dir_llm = (M_CheckParm ("-aidirector") > 0) || (M_CheckParm ("-aidemo") > 0);
     if (dir_on)
 	fprintf (stderr, "P_Director: rule-based L4D director ON (-director)\n");
+    else if (dir_llm)
+	fprintf (stderr, "P_Director: stress tracking ON for the LLM director (-aidirector)\n");
 }
 
 void P_Director_Reset (void)
 {
     dir_acc = 0; dir_state = DIR_BUILDUP; dir_timer = 0;
     dir_spawntic = 3*TICRATE; dir_recentdmg = 0; dir_relaxstart = 0;
+    dir_emergtic = gametic - DIR_EMERG_COOLDOWN;	// allow an emergency medkit immediately
+    dir_llmlast = 0;
 }
 
 // ---- stress feeds ----------------------------------------------------------
@@ -76,7 +94,7 @@ void P_Director_Reset (void)
 void P_Director_NoteDamage (mobj_t* victim, int damage)
 {
     int	burst;
-    if (!dir_on || damage <= 0 || !victim || !victim->player) return;
+    if (!DIR_TRACK || damage <= 0 || !victim || !victim->player) return;
     dir_recentdmg += damage;
     burst = dir_recentdmg * 300 / 40;		// 0..300 (% extra) over a ~40-HP window
     if (burst > 300) burst = 300;
@@ -87,7 +105,7 @@ void P_Director_NoteDamage (mobj_t* victim, int damage)
 void P_Director_NoteKill (mobj_t* victim, mobj_t* killer)
 {
     int	r, cq, w, wp;
-    if (!dir_on || !victim || !killer || !killer->player) return;
+    if (!DIR_TRACK || !victim || !killer || !killer->player) return;
     if (!(victim->flags & MF_COUNTKILL)) return;
     r  = (int)(P_AproxDistance (victim->x - killer->x, victim->y - killer->y) >> FRACBITS);
     cq = (r < 200) ? 100 : (r < 450) ? 40 : 0;	// close-quarters factor (sniping ~ 0)
@@ -101,7 +119,7 @@ void P_Director_NoteKill (mobj_t* victim, mobj_t* killer)
 // ---- helpers ---------------------------------------------------------------
 
 // Average carried-ammo fill across survivors, 0 (empty) .. 100 (full).
-static int P_Director_AmmoPct (void)
+int P_Director_AmmoPct (void)
 {
     int	i, a, total = 0, max = 0;
     for (i = 0; i < MAXPLAYERS; i++)
@@ -144,9 +162,9 @@ static mobjtype_t P_Director_PickType (void)
     return dir_common[P_Random () % (int)(sizeof(dir_common)/sizeof(dir_common[0]))];
 }
 
-// Spawn one monster out of sight, in the distance band behind a survivor, and set
-// it charging.  Bails quietly if no valid hidden spot is found.
-static void P_Director_SpawnMonster (void)
+// Spawn one monster of type `mt` out of sight, in the distance band behind a survivor,
+// and set it charging.  Bails quietly if no valid hidden spot is found.
+static void P_Director_SpawnMonsterOf (mobjtype_t mt)
 {
     mobj_t*	sv;
     int		t;
@@ -162,7 +180,6 @@ static void P_Director_SpawnMonster (void)
 	fixed_t		dist = DIR_NEAR + (P_Random () * ((DIR_FAR - DIR_NEAR) >> 8));
 	fixed_t		x = sv->x + FixedMul (dist, finecosine[fa]);
 	fixed_t		y = sv->y + FixedMul (dist, finesine[fa]);
-	mobjtype_t	mt = P_Director_PickType ();
 	mobj_t*		mo;
 	int		i, seen = 0;
 
@@ -181,6 +198,24 @@ static void P_Director_SpawnMonster (void)
 	P_SetMobjState (mo, mo->info->seestate);
 	return;
     }
+}
+
+static void P_Director_SpawnMonster (void) { P_Director_SpawnMonsterOf (P_Director_PickType ()); }
+
+// Is a medkit/stimpack already lying within `range` of (x,y)?  (emergency-medkit guard)
+static boolean P_Director_MedkitNear (fixed_t x, fixed_t y, fixed_t range)
+{
+    thinker_t*	th;
+    for (th = thinkercap.next; th != &thinkercap; th = th->next)
+    {
+	mobj_t* m;
+	if (th->function.acp1 != (actionf_p1)P_MobjThinker) continue;
+	m = (mobj_t*)th;
+	if ((m->type == MT_MISC10 || m->type == MT_MISC11)
+	    && P_AproxDistance (m->x - x, m->y - y) < range)
+	    return true;
+    }
+    return false;
 }
 
 static void P_Director_DropNear (mobj_t* sv, mobjtype_t mt)
@@ -212,9 +247,9 @@ static void P_Director_SpawnItems (void)
 
 void P_Director_Ticker (void)
 {
-    int	floor;
+    int	floor, i, runfsm;
 
-    if (!dir_on || gamestate != GS_LEVEL || paused) return;
+    if (!DIR_TRACK || gamestate != GS_LEVEL || paused) return;
 
     // burst window + intensity decay
     if (dir_recentdmg > 0) dir_recentdmg -= (dir_recentdmg >> 4) + 1;	// fades over ~1-2 s
@@ -226,6 +261,25 @@ void P_Director_Ticker (void)
     floor = (100 - P_Director_AmmoPct ()) * 15 / 100;	// 0..15 intensity (x100 below)
     floor *= 100;
     if (dir_acc < floor) dir_acc = floor;
+
+    // (A) Emergency medkit: any survivor critically low and none nearby -> drop one
+    // by them (rate-limited).  Runs in both modes so you're never stranded at 1 HP.
+    if (gametic - dir_emergtic > DIR_EMERG_COOLDOWN)
+	for (i = 0; i < MAXPLAYERS; i++)
+	{
+	    player_t* p = &players[i];
+	    if (!playeringame[i] || !p->mo || p->health <= 0 || p->health >= DIR_EMERG_HP)
+		continue;
+	    if (P_Director_MedkitNear (p->mo->x, p->mo->y, DIR_EMERG_NEAR)) continue;
+	    P_Director_DropNear (p->mo, MT_MISC11);	// medikit within reach
+	    dir_emergtic = gametic;
+	    break;
+	}
+
+    // (B) Under the LLM director the model drives spawns; the rule FSM only runs as a
+    // fallback when the LLM has gone quiet.  Pure -director always runs the FSM.
+    runfsm = !dir_llm || (gametic - dir_llmlast > DIR_LLM_FALLBACK);
+    if (!runfsm) return;
 
     switch (dir_state)
     {
@@ -253,4 +307,56 @@ void P_Director_Ticker (void)
 	    { dir_state = DIR_BUILDUP; dir_spawntic = TICRATE; }
 	break;
     }
+}
+
+// ---- LLM-driven spawns (the -aidirector model calls these via act verbs) ----
+
+static mobjtype_t P_Director_TypeByName (const char* s)
+{
+    if (!strcmp(s,"zombie")   || !strcmp(s,"zombieman"))   return MT_POSSESSED;
+    if (!strcmp(s,"shotgun")  || !strcmp(s,"shotguy"))     return MT_SHOTGUY;
+    if (!strcmp(s,"chaingun") || !strcmp(s,"chaingunner")) return MT_CHAINGUY;
+    if (!strcmp(s,"imp"))                                  return MT_TROOP;
+    if (!strcmp(s,"pinky")    || !strcmp(s,"demon"))       return MT_SERGEANT;
+    if (!strcmp(s,"spectre"))                              return MT_SHADOWS;
+    if (!strcmp(s,"lost")     || !strcmp(s,"lostsoul"))    return MT_SKULL;
+    if (!strcmp(s,"caco")     || !strcmp(s,"cacodemon"))   return MT_HEAD;
+    if (!strcmp(s,"pain"))                                 return MT_PAIN;
+    if (!strcmp(s,"knight")   || !strcmp(s,"hellknight"))  return MT_KNIGHT;
+    if (!strcmp(s,"baron"))                                return MT_BRUISER;
+    if (!strcmp(s,"revenant"))                             return MT_UNDEAD;
+    if (!strcmp(s,"mancubus"))                             return MT_FATSO;
+    if (!strcmp(s,"arachnotron"))                          return MT_BABY;
+    return MT_TROOP;					// default
+}
+
+// LLM act: spawn `count` (1..8) monsters of `type` out of sight behind the survivors.
+void P_Director_LLMSpawn (const char* type, int count)
+{
+    mobjtype_t	mt = P_Director_TypeByName (type);
+    int		i;
+    if (!dir_llm) return;
+    if (count < 1) count = 1;
+    if (count > 8) count = 8;
+    for (i = 0; i < count; i++) P_Director_SpawnMonsterOf (mt);
+    dir_llmlast = gametic;				// defer the FSM fallback
+}
+
+// LLM act: drop an item near a survivor ("medkit"/"health" -> medikit, else ammo).
+void P_Director_LLMItem (const char* kind)
+{
+    mobj_t* sv = P_Director_RandomSurvivor ();
+    if (!dir_llm || !sv) return;
+    if (!strcmp(kind,"medkit") || !strcmp(kind,"health") || !strcmp(kind,"medikit"))
+	P_Director_DropNear (sv, MT_MISC11);
+    else
+	P_Director_DropNear (sv, MT_MISC23);		// box of bullets
+    dir_llmlast = gametic;
+}
+
+// LLM act: enter the relax phase (stop spawning for a while).
+void P_Director_Relax (void)
+{
+    if (!dir_llm) return;
+    dir_state = DIR_FADE; dir_relaxstart = gametic; dir_llmlast = gametic;
 }

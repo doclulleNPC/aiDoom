@@ -62,6 +62,7 @@
 
 #include "p_ai_llm.h"
 #include "p_ai_coop.h"		// buddy observation + director directives (-aicoop)
+#include "p_ai_director.h"	// L4D stress fields + spawn act verbs (-aidirector)
 
 extern boolean	P_SetMobjState (mobj_t* mobj, statenum_t state);
 extern boolean	P_CheckSight (mobj_t* t1, mobj_t* t2);
@@ -571,6 +572,12 @@ static int AI_Serialize (void)
 	n += snprintf (obsbuf+n, OBSBUF-n, "]");
     }
 
+    // L4D director stress (so the LLM can pace spawns): intensity 0..100, FSM state,
+    // recent burst damage, carried-ammo %.  See p_ai_director.c.
+    n += snprintf (obsbuf+n, OBSBUF-n,
+	",\"director\":{\"intensity\":%d,\"state\":%d,\"recent_dmg\":%d,\"ammo_pct\":%d}",
+	P_Director_Intensity(), P_Director_State(), P_Director_RecentDmg(), P_Director_AmmoPct());
+
     n += snprintf (obsbuf+n, OBSBUF-n, "}\n");
     return n;
 }
@@ -689,6 +696,33 @@ static void AI_HandleLine (char* line, int client)
 	    else if (!strcmp(kv,"after")) after = atoi(eq);
 	}
 	AI_Apply (AI_OrderByName(order_s), ids, tx, ty, focus, fortics, after);
+	if (client >= 0) (void)!write (client, "ok\n", 3);
+	return;
+    }
+    // L4D director:  spawn type=<name> count=<n>  |  spawn item=<medkit|ammo>
+    if (!strncmp(line, "spawn", 5))
+    {
+	char	type_s[32] = "imp", item_s[32] = "";
+	int	count = 1;
+	char*	kv;
+	char	work[256];
+	strncpy (work, line+5, sizeof(work)-1); work[sizeof(work)-1] = 0;
+	for (kv = strtok(work, " \t\r\n"); kv; kv = strtok(NULL, " \t\r\n"))
+	{
+	    char* eq = strchr(kv, '='); if (!eq) continue; *eq++ = 0;
+	    if      (!strcmp(kv,"type"))  { strncpy(type_s,eq,sizeof(type_s)-1); type_s[sizeof(type_s)-1]=0; }
+	    else if (!strcmp(kv,"item"))  { strncpy(item_s,eq,sizeof(item_s)-1); item_s[sizeof(item_s)-1]=0; }
+	    else if (!strcmp(kv,"count")) count = atoi(eq);
+	}
+	if (item_s[0]) P_Director_LLMItem (item_s);
+	else           P_Director_LLMSpawn (type_s, count);
+	if (client >= 0) (void)!write (client, "ok\n", 3);
+	return;
+    }
+    // director relax  -- enter the calm/relax phase (stop spawning for a while)
+    if (!strncmp(line, "director", 8))
+    {
+	if (strstr(line, "relax")) P_Director_Relax ();
 	if (client >= 0) (void)!write (client, "ok\n", 3);
 	return;
     }

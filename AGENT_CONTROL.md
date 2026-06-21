@@ -443,6 +443,24 @@ difficulty live against a human player.
 
 ---
 
+### L4D stress director (observe + spawn verbs)
+
+The Left-4-Dead-style **AI Director** (`files/p_ai_director.c`, `-director` rule-based /
+tracked under `-aidirector`) feeds the LLM so it can pace encounters:
+
+- **`observe`** gains a `"director"` block:
+  `"director":{"intensity":0..100,"state":0|1|2,"recent_dmg":N,"ammo_pct":0..100}`
+  (state 0 buildup / 1 sustain / 2 fade).  Intensity rises with damage taken
+  (burst-weighted), close-quarters kills, and low ammo; it decays over time.
+- **act verbs** the model can emit:
+  - `spawn type=<imp|zombie|revenant|baron|caco|…> count=<1..8>` — spawn monsters out
+    of sight behind the survivors, charging.
+  - `spawn item=<medkit|ammo>` — drop an item near a survivor.
+  - `director relax` — enter the calm phase (stop spawning for a while).
+- The rule-based spawn FSM runs as a **fallback** when the LLM goes quiet (~15 s).
+- Independent safety: a survivor below 25 HP with no medkit nearby gets one dropped
+  (≤1 per 20 s), in both modes.
+
 ## 13. The AI-Director implementation (shipped)
 
 §12 is now implemented in **`files/p_ai_llm.c` / `p_ai_llm.h`** and verified
