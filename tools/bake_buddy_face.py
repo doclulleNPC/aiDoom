@@ -58,7 +58,7 @@ def main():
     here = Path(__file__).resolve().parent.parent
     ap = argparse.ArgumentParser()
     ap.add_argument("--wad", default=str(here / "run" / "buddy.wad"))
-    ap.add_argument("--faces", default=str(here / "run" / "buddyface"))
+    ap.add_argument("--faces", default=str(here / "tools" / "buddyface"))
     args = ap.parse_args()
 
     wad = Path(args.wad)

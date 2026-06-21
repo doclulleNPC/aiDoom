@@ -227,11 +227,11 @@ def cfg_value(cfg_path, key):
     return None
 
 
-def load_face_lumps(out_path):
-    """Buddy HUD mugshots (run/buddyface/BUF*.lmp).  ALWAYS packed into buddy.wad so a
-    voice re-bake never drops the BUF* faces the HUD needs (hu_buddy.c).  Same lumps as
-    tools/bake_buddy_face.py -- voice bake includes them so you don't have to run that too."""
-    faces_dir = Path(out_path).parent / "buddyface"
+def load_face_lumps():
+    """Buddy HUD mugshots (tools/buddyface/BUF*.lmp -- the source of truth).  ALWAYS
+    packed into buddy.wad so a voice re-bake never drops the BUF* faces the HUD needs
+    (hu_buddy.c); you don't have to run bake_buddy_face.py separately."""
+    faces_dir = Path(__file__).resolve().parent / "buddyface"
     lumps = [(f.stem.upper(), f.read_bytes()) for f in sorted(faces_dir.glob("BUF*.lmp"))]
     if not lumps:
         print(f"WARNING: no BUF*.lmp in {faces_dir} -- buddy HUD faces will be MISSING!",
@@ -450,7 +450,7 @@ def main():
             lumps.append((name, data))
             manifest_lines.append(f"{name}\t{phrase}\toffline-sine({freq}Hz)\t{len(data)}\n")
             print(f"  [{i:2d}/{len(PHRASES)}] {name}  '{phrase}' -> {freq} Hz")
-        lumps += load_face_lumps(out_path)	# buddy HUD mugshots -- always included
+        lumps += load_face_lumps()	# buddy HUD mugshots -- always included
         manifest_txt = (f"OFFLINE-TEST MODE (sine tones)\n"
                         f"generated={time.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
                         + "".join(manifest_lines))
@@ -510,7 +510,7 @@ def main():
         lumps.append((name, data))
         manifest_lines.append(f"{name}\t{phrase}\t{src}\t{len(data)}\n")
 
-    lumps += load_face_lumps(out_path)		# buddy HUD mugshots -- always included
+    lumps += load_face_lumps()		# buddy HUD mugshots -- always included
 
     # Pack the lump<->phrase mapping INTO the WAD as a text lump ("VOICEMAP") so the
     # WAD is self-documenting -- no external file needed to know what each lump says.
