@@ -52,6 +52,11 @@ rcsid[] = "$Id: p_inter.c,v 1.4 1997/02/03 22:45:11 b1 Exp $";
 
 #define BONUSADD	6
 
+// -nofriendlyfire (alias -noff): when set, the human player and the AI buddy
+// can't damage each other (friendly-fire protection between players[0] and the
+// buddy).  Default 0 = vanilla co-op (they can).  Set in D_DoomMain.
+int		ff_protect = 0;
+
 
 
 
@@ -804,6 +809,13 @@ P_DamageMobj
 	return;	// shouldn't happen...
 		
     if (target->health <= 0)
+	return;
+
+    // -nofriendlyfire: the human player and the AI buddy can't hurt each other
+    // (default off = vanilla co-op, where they can).  Bail before any thrust,
+    // momentum reset, damage or retaliation, so it's as if the shot never hit.
+    if (ff_protect && source && source->player && target->player
+	&& (P_AICoop_IsBuddy (source->player) ^ P_AICoop_IsBuddy (target->player)))
 	return;
 
     if ( target->flags & MF_SKULLFLY )

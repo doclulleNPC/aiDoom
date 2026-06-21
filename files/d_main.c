@@ -602,6 +602,7 @@ static const struct { const char* name; int mode; } known_iwads[] = {
     { "freedoom2.wad", commercial },
     { "freedoom1.wad", retail     },
     { "freedm.wad",    commercial },
+    { "chex3.wad",     retail     },	// Chex Quest 3 (Ultimate-Doom format)
 };
 
 // Steam install locations (relative to steamapps/common) + game mode.
@@ -653,6 +654,7 @@ static int IWAD_ModeFromName (const char* path)
     if ((s = strrchr(b,'\\'))) b = s+1;
     for (i=0; b[i] && i<63; i++) { c = b[i]; if (c>='A'&&c<='Z') c+=32; low[i]=(char)c; }
     low[i] = 0;
+    if (strstr(low,"chex")) return retail;		// Chex Quest (1/2/3): Ultimate-Doom format
     if (strstr(low,"doom2") || strstr(low,"plutonia") || strstr(low,"tnt")
 	|| strstr(low,"freedoom2") || strstr(low,"freedm")) return commercial;
     if (strstr(low,"doomu") || strstr(low,"freedoom1")) return retail;
@@ -754,16 +756,28 @@ void IdentifyVersion (void)
     // 4) Steam install locations
     if (!found)
     {
-	char roots[6][512]; int nr = 0;
+	// Default Steam library "common" folder, per OS.  We only probe the
+	// default library (extra library folders on other drives live in
+	// libraryfolders.vdf, which we don't parse) -- drop the IWAD in iwads/
+	// if Steam installed it elsewhere.
+	char roots[8][512]; int nr = 0;
 	char* home = getenv ("HOME");
+#if defined(__APPLE__)
+	if (home)
+	    snprintf (roots[nr++], 512, "%s/Library/Application Support/Steam/steamapps/common", home);
+#elif defined(_WIN32)
+	snprintf (roots[nr++], 512, "C:/Program Files (x86)/Steam/steamapps/common");
+	snprintf (roots[nr++], 512, "C:/Program Files/Steam/steamapps/common");
+#else	/* Linux / *BSD */
 	if (home)
 	{
 	    snprintf (roots[nr++], 512, "%s/.steam/steam/steamapps/common", home);
 	    snprintf (roots[nr++], 512, "%s/.local/share/Steam/steamapps/common", home);
 	    snprintf (roots[nr++], 512, "%s/.steam/root/steamapps/common", home);
+	    // Flatpak Steam (com.valvesoftware.Steam) sandboxed data dir.
+	    snprintf (roots[nr++], 512, "%s/.var/app/com.valvesoftware.Steam/.local/share/Steam/steamapps/common", home);
 	}
-	snprintf (roots[nr++], 512, "C:/Program Files (x86)/Steam/steamapps/common");
-	snprintf (roots[nr++], 512, "C:/Program Files/Steam/steamapps/common");
+#endif
 
 	for (i=0; !found && i < (int)(sizeof(steam_iwads)/sizeof(steam_iwads[0])); i++)
 	    for (r=0; r<nr; r++)
@@ -864,12 +878,79 @@ void FindResponseFile (void)
 //
 // D_DoomMain
 //
+//
+// D_PrintHelp
+// Print every command-line flag aidoom understands, grouped, then the caller
+// exits.  Triggered by -help / -h / -? / /?.  Keep in sync with AIDOOM_PARAMETERS.md.
+//
+static void D_PrintHelp (void)
+{
+    puts (
+"aidoom -- SDL3 DOOM with an AI co-op buddy + LLM monster director.\n"
+"Usage: aidoom [options]   (bring your own IWAD)\n"
+"\n"
+"GAME / LEVEL\n"
+"  -iwad <file>      IWAD to use (doom/doom2/plutonia/tnt/freedoom*); else auto-detect\n"
+"  -file <wad>...    load extra PWAD(s) over the IWAD (repeatable)\n"
+"  -warp <e> <m>     jump to episode/map (commercial: -warp <map>); default 1 1\n"
+"  -episode <n>      start episode (registered/retail)\n"
+"  -skill <1-5>      1 ITYTD .. 4 UV .. 5 Nightmare (default 3)\n"
+"  -nomonsters       spawn no monsters\n"
+"  -respawn          monsters respawn after death\n"
+"  -fast             fast monsters\n"
+"  -turbo <%>        player speed percent (default 100)\n"
+"  -loadgame <slot>  load a saved game on startup\n"
+"\n"
+"VIDEO\n"
+"  -1 / -2 / -3 / -4 resolution scale 1..4 (320x200 .. 1280x800)\n"
+"  -render <1-7>     resolution scale (overrides -1..-4)\n"
+"  -fullscreen       force fullscreen        -window      force windowed\n"
+"  -nomouse          disable mouse input     -nograb      don't grab the mouse\n"
+"  -nodraw / -noblit headless/benchmark (skip rendering / skip blit)\n"
+"\n"
+"AI DIRECTOR / CO-OP BUDDY\n"
+"  -coop             rule-based co-op buddy (player 2; map needs Player_2_Start)\n"
+"  -aicoop           AI buddy: rule-based base + LLM director (opens TCP 31666)\n"
+"  -buddyreact <t>   buddy first-shot delay in tics (0=instant, ~14 ~= human)\n"
+"  -aidirector [port] LLM monster director; opens TCP listener (default 31666)\n"
+"  -aidemo           built-in test director (no Ollama)\n"
+"  -director         rule-based L4D-style spawn director (offline, no LLM)\n"
+"  -infight          monsters' projectiles hurt same-species (infighting on)\n"
+"  -nofriendlyfire   player and AI buddy can't damage each other (alias -noff)\n"
+"\n"
+"DEMOS\n"
+"  -record <lmp>     record a demo      -playdemo <lmp>  play a demo\n"
+"  -timedemo <lmp>   benchmark a demo   -maxdemo <n>     max demo size\n"
+"\n"
+"NETWORK (LAN)\n"
+"  -net / -server    host a game        -connect/-netclient <ip>  join a host\n"
+"  -port <n>         UDP port (default 5029)   -netplayers <n>  max players\n"
+"  -deathmatch / -altdeath   deathmatch modes   -timer <min>  frag time limit\n"
+"\n"
+"DEV / MISC\n"
+"  -devparm          developer mode (cheats, fps)   -debugfile  write debug.txt\n"
+"  -cdrom            CD-ROM save paths\n"
+"  -help / -h / -?   show this help and exit\n"
+"\n"
+"See AIDOOM_PARAMETERS.md for the full reference, and run/README.md for the\n"
+"launchers (start_aidoom.sh / start_aibuddy.sh) and the GUI launcher."
+    );
+}
+
 void D_DoomMain (void)
 {
     int             p;
     char                    file[256];
 
     FindResponseFile ();
+
+    // -help / -h / -? / /?: print the flag reference and exit.
+    if (M_CheckParm ("-help") || M_CheckParm ("-h")
+	|| M_CheckParm ("-?") || M_CheckParm ("/?"))
+    {
+	D_PrintHelp ();
+	exit (0);
+    }
 
     // Chocolate/Crispy multiplayer interop (clean-room reimpl; see i_udp.c/d_netcl.c).
     // -querychoc <host[:port]>           query a server and exit
@@ -902,7 +983,11 @@ void D_DoomMain (void)
     nomonsters = M_CheckParm ("-nomonsters");
     respawnparm = M_CheckParm ("-respawn");
     fastparm = M_CheckParm ("-fast");
-    { extern int friendlyfire; friendlyfire = M_CheckParm ("-friendlyfire") ? 1 : 0; }
+    // -infight: monster same-species infighting (was -friendlyfire).
+    { extern int infight; infight = M_CheckParm ("-infight") ? 1 : 0; }
+    // -nofriendlyfire (alias -noff): the player and the AI buddy can't damage each other.
+    { extern int ff_protect;
+      ff_protect = (M_CheckParm ("-nofriendlyfire") || M_CheckParm ("-noff")) ? 1 : 0; }
     devparm = M_CheckParm ("-devparm");
     if (M_CheckParm ("-altdeath"))
 	deathmatch = 2;

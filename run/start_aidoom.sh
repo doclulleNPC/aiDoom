@@ -18,7 +18,7 @@
 #   ./start_aidoom.sh                          # FULL LLM: AI buddy + director (default)
 #   ./start_aidoom.sh --buddy                  # rule-based buddy + LLM monsters
 #   ./start_aidoom.sh --offline                # plain aidoom (offline, fast)
-#   ./start_aidoom.sh --model qwen3:8b --skill 4 --friendlyfire
+#   ./start_aidoom.sh --model qwen3:8b --skill 4 --nofriendlyfire
 #   ./start_aidoom.sh --ollama http://localhost:11434
 #
 # Requires: SDL3 installed (to run the binaries) and the aidoom binary built
@@ -35,6 +35,7 @@ MAP=1
 SKILL=4
 OLLAMA="http://192.168.2.114:11434"
 FRIENDLYFIRE=0
+INFIGHT=0
 NODIRECTOR=0		# default ON -- full LLM: the director drives monsters + the AI buddy
 NOWARM=0
 BUDDY=0			# rule-based companion (--buddy); off by default (the AI buddy is on instead)
@@ -66,7 +67,8 @@ while [ $# -gt 0 ]; do
         --map)          MAP="$2"; shift 2;;
         --skill)        SKILL="$2"; shift 2;;
         --ollama)       OLLAMA="$2"; shift 2;;
-        --friendlyfire) FRIENDLYFIRE=1; shift;;
+        --nofriendlyfire|--noff) FRIENDLYFIRE=1; shift;;   # player & AI buddy can't hurt each other
+        --infight)      INFIGHT=1; shift;;        # monster same-species infighting
         --director)     DIRECTOR=1; NODIRECTOR=0; shift;;
         --no-director)  NODIRECTOR=1; shift;;
         --buddy)        BUDDY=1; AIBUDDY=0; shift;;        # rule-based companion instead of the AI buddy
@@ -141,7 +143,8 @@ gameargs=( -warp "$EPISODE" "$MAP" -skill "$SKILL" )
 [ "$NODIRECTOR" = 0 ] && gameargs+=( -aidirector "$PORT" )
 [ "$BUDDY" = 1 ] && [ "$AIBUDDY" = 0 ] && gameargs+=( -coop )    # rule-based buddy
 [ "$AIBUDDY" = 1 ]   && gameargs+=( -aicoop )   # AI/LLM buddy; -coop and -aicoop are mutually exclusive (aicoop wins)
-[ "$FRIENDLYFIRE" = 1 ] && gameargs+=( -friendlyfire )
+[ "$FRIENDLYFIRE" = 1 ] && gameargs+=( -nofriendlyfire )
+[ "$INFIGHT" = 1 ]      && gameargs+=( -infight )
 [ ${#GAME_EXTRA[@]} -gt 0 ] && gameargs+=( "${GAME_EXTRA[@]}" )
 
 info "launching: $AIDOOM ${gameargs[*]}"

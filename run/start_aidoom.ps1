@@ -11,7 +11,7 @@
     .\start_aidoom.ps1 -RuleCoop          # rule-based companion instead of the AI buddy
     .\start_aidoom.ps1 -NoCoop            # no companion at all
     .\start_aidoom.ps1 -NoDirector        # just the game, no LLM director
-    .\start_aidoom.ps1 -Model qwen2.5-coder:1.5b -Skill 4 -FriendlyFire
+    .\start_aidoom.ps1 -Model qwen2.5-coder:1.5b -Skill 4 -NoFriendlyFire
 #>
 param(
     [string]$Model     = "mistral:7b-instruct",
@@ -20,7 +20,8 @@ param(
     [int]   $Map       = 1,
     [int]   $Skill     = 4,
     [string]$Ollama    = "http://localhost:11434",
-    [switch]$FriendlyFire,
+    [switch]$NoFriendlyFire, # player & AI buddy can't hurt each other (-nofriendlyfire)
+    [switch]$Infight,        # monster same-species infighting
     [switch]$NoDirector,
     [switch]$NoWarm,
     [switch]$NoCoop,         # no co-op companion at all
@@ -102,7 +103,8 @@ $gameArgs = @("-warp","$Episode","$Map","-skill","$Skill","-aidirector","$Port")
 if     ($NoCoop)   { }                        # no companion
 elseif ($RuleCoop) { $gameArgs += "-coop" }   # rule-based companion instead of the AI buddy
 else               { $gameArgs += "-aicoop" } # default: AI/LLM co-op buddy (full LLM)
-if ($FriendlyFire) { $gameArgs += "-friendlyfire" }
+if ($NoFriendlyFire) { $gameArgs += "-nofriendlyfire" }
+if ($Infight)        { $gameArgs += "-infight" }
 Info "launching aidoom.exe $($gameArgs -join ' ')"
 Start-Process -FilePath (Join-Path $here "aidoom.exe") -ArgumentList $gameArgs -WorkingDirectory $here
 

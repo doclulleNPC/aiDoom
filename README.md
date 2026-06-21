@@ -23,8 +23,10 @@ a language model drive monster tactics in real time.
   scrollback + input line over a dimmed view, commands: `help clear echo quit god
   noclip give map`/`warp`.
 - **Free-look** (mouse aims the view up/down and your shots follow), **jump**
-  (default **Space**, with a grunt), toggle **autorun**, and an optional
-  **`-friendlyfire`** flag that enables same-species monster infighting.
+  (default **Space**, with a grunt), toggle **autorun**, an optional
+  **`-infight`** flag that enables same-species monster infighting, and
+  **`-nofriendlyfire`** (alias `-noff`) which keeps the player and the AI buddy
+  from hurting each other.
 - **AI co-op companion** (`files/p_ai_coop.c`, `-aicoop`) — a second marine (player 2)
   driven by a small built-in bot: it acquires the nearest visible monster and fires,
   seeks health when hurt, otherwise follows you. A real co-op player (weapons, damage,
@@ -126,7 +128,7 @@ waits for Ollama, then starts the game with the AI director and connects the cli
 
 ```bat
 run\start_aidoom.bat                       REM default model mistral:7b-instruct
-run\start_aidoom.bat -Skill 4 -FriendlyFire
+run\start_aidoom.bat -Skill 4 -NoFriendlyFire
 run\start_aidoom.bat -NoDirector           REM just the game
 ```
 
@@ -134,7 +136,7 @@ On Linux/macOS use `run/start_aidoom.sh` (same idea — waits for Ollama, then s
 game + director; see `run/README.md`):
 
 ```sh
-run/start_aidoom.sh --skill 4 --friendlyfire
+run/start_aidoom.sh --skill 4 --infight
 ```
 
 The director protocol (`observe` / `act` / `wake`) and design rationale are documented

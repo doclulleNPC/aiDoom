@@ -7,7 +7,7 @@ Vollständige Liste aller CLI-Flags die `aidoom` akzeptiert, extrahiert via
 
 | Flag | Parameter | Default | Wirkung |
 |------|-----------|---------|---------|
-| `-iwad` | `<file>` | auto-detect | Pfad zur IWAD-Datei (DOOM/DOOM2/Plutonia/TNT). Identifikation via Filename (`doom.wad`, `doom2.wad`, `plutonia.wad`, `tnt.wad`, `freedoom*.wad`). |
+| `-iwad` | `<file>` | auto-detect | Pfad zur IWAD-Datei (DOOM/DOOM2/Plutonia/TNT/Chex Quest 3). Identifikation via Filename (`doom.wad`, `doom2.wad`, `plutonia.wad`, `tnt.wad`, `freedoom*.wad`, `chex3.wad`). |
 | `-file` | `<file>` | — | Lädt zusätzliche PWADs die das IWAD überschreiben. Mehrfach verwendbar. |
 | `-warp` | `<ep> <map>` | `1 1` | Direktsprung zu Episode/Map. Im Commercial-Mode ist `ep` die Map-Nummer (`map01`..`map32`), im Registered-Mode `E?M?` (z.B. `-warp 2 1` → MAP02 oder E2M1 je nach IWAD). |
 | `-skill` | `<1-5>` | `3` | Schwierigkeitsgrad: 1=I'm Too Young, 2=Hey Not Too Rough, 3=Hurt Me Plenty, 4=Ultra-Violence, 5=Nightmare. |
@@ -95,7 +95,19 @@ Vollständige Liste aller CLI-Flags die `aidoom` akzeptiert, extrahiert via
 | `-coop` | — | off | Aktiviert den regelbasierten Co-op-Buddy (Player 2). Verlangt dass die Map ein `Player_2_Start`-Thing hat; sonst WARNING und Buddy disabled. Single-Player only. |
 | `-aicoop` | — | off | Aktiviert den AI-gesteuerten Companion (Player 2): die regelbasierte Basis **plus** den LLM-Director. Öffnet den AI-Transport (TCP, `-aidirector`-Port oder Default 31666), exponiert den Buddy im `observe`-Stream und nimmt `buddy order=…`-Befehle an. Der Director (`run/director`) setzt damit pro Zyklus die Buddy-Taktik (engage/defend/hold/regroup/retreat/grab); ohne Director-Verbindung läuft der Buddy autonom (regelbasiert). Start am einfachsten via `start_aidoom.sh --aicoop`. |
 | `-buddyreact` | `<tics>` | 0 | Reaktionszeit/Skill des Buddys: Verzögerung (in Tics, 35/s) zwischen dem Erblicken eines **neuen** Ziels und dem ersten Schuss. `0` = frame-perfekt (altes Verhalten), `~14` ≈ menschliche ~0,4 s, höher = träger. Beeinflusst nur das Eröffnen des Feuers, nicht das Zielen/Navigieren. |
-| `-friendlyfire` | — | off | Erlaubt Friendly-Fire zwischen Spielern (Buddy kann Spieler 1 treffen). |
+| `-nofriendlyfire` (alias `-noff`) | — | off | Friendly-Fire-**Schutz**: Spieler und AI-Buddy können sich **nicht** gegenseitig verletzen. Default aus = Vanilla-Co-op (sie können). |
+
+### Monster-Infight
+
+| Flag | Parameter | Default | Wirkung |
+|------|-----------|---------|---------|
+| `-infight` | — | off | Monster-Projektile treffen auch die **eigene** Spezies → Same-Species-Infighting an. (Hieß früher `-friendlyfire`.) Default aus = Vanilla. |
+
+### Hilfe
+
+| Flag | Wirkung |
+|------|---------|
+| `-help` / `-h` / `-?` / `/?` | Gibt die komplette Flag-Übersicht aus und beendet sich. |
 
 **`-coop` und `-aicoop` sind mutually exclusive.** Werden beide zusammen
 gesetzt, gibt `P_AICoop_Init` eine Fehlermeldung aus und deaktiviert den
@@ -120,7 +132,7 @@ nur die Config-Option.
 ./aidoom -iwad doom2.wad -coop -aidirector 31666
 
 # Custom WAD überlagert DOOM2, HiRes, VSync aus
-./aidoom -iwad doom2.wad -file mymod.wad -3 -friendlyfire
+./aidoom -iwad doom2.wad -file mymod.wad -3 -infight
 
 # Demo-Aufzeichnung
 ./aidoom -iwad doom2.wad -record demo1 -warp 1 1 -skill 3

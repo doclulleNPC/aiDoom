@@ -257,10 +257,10 @@ boolean PIT_CheckLine (line_t* ld)
 //
 // PIT_CheckThing
 //
-// When set (-friendlyfire), monsters' projectiles damage same-species monsters
+// When set (-infight), monsters' projectiles damage same-species monsters
 // too, so infighting is no longer suppressed between same types. Default 0 =
 // vanilla behaviour. Set in D_DoomMain.
-int		friendlyfire = 0;
+int		infight = 0;
 
 boolean PIT_CheckThing (mobj_t* thing)
 {
@@ -318,11 +318,11 @@ boolean PIT_CheckThing (mobj_t* thing)
 	    if (thing == tmthing->target)
 		return true;		// never hit the shooter itself
 
-	    if (thing->type != MT_PLAYER && !friendlyfire)
+	    if (thing->type != MT_PLAYER && !infight)
 	    {
 		// Explode, but do no damage.
 		// Let players missile other players.
-		// (-friendlyfire bypasses this so same-species infighting works.)
+		// (-infight bypasses this so same-species infighting works.)
 		return false;
 	    }
 	}
