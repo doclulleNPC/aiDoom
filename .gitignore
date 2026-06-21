@@ -93,3 +93,9 @@ CMakeFiles/
 cmake_install.cmake
 tools/gpumon
 run/gpumon
+# native LLM director (built by tools/build_director.sh, copied to run/)
+tools/director
+run/director
+# SDL3 launcher (built by tools/build_launcher.sh, copied to run/)
+tools/launcher
+run/launcher

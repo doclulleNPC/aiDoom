@@ -20,6 +20,7 @@ model, start the game with its `-aidirector` TCP server, then run the native
 | (`../tools/buddy_voice.py`) | all | AI co-op **buddy voice**: tails `buddy_say.txt` (written here by `-aicoop`) and speaks lines via ElevenLabs (Joker-HL). Run from here: `python3 ../tools/buddy_voice.py`. Needs `ELEVENLABS_API_KEY` (env or `elevenlabs_api_key` in `aidoom.cfg`) + ffplay/mpg123. |
 | `gpumon` / `gpumon.exe` | Linux / Windows | GPU monitor as a small **SDL window** (bars for load/VRAM/temp/power). On error it stops and shows a **Reconnect** button (no auto-retry). Build: Linux `tools/build_gpumon.sh`; Windows via CMake or `build_all_win.bat`. See **`../GPUMON.md`**. |
 | `aidoom_config` / `aidoom_config.exe` | Linux / Windows | SDL3 settings editor; reads/writes `aidoom.cfg` here. Build: Linux `tools/build_config.sh`; Windows via CMake or `build_all_win.bat`. |
+| `launcher` / `launcher.exe` | Linux / Windows | SDL3 **launcher GUI**: scans this folder (+ `~/.doom`) for IWADs, lets you pick the IWAD and the Buddy (off / `-coop` / `-aicoop`) and Monster (vanilla / L4D / `-aidirector`) modes, then launches the game with the right flags (auto-starting the native `director` sidecar when AI monsters are picked). Build: Linux `tools/build_launcher.sh`; Windows via CMake or `build_all_win.bat`. |
 | `aidoom.cfg` | all | The single config file (game keys/video + Ollama), read by the game and all tools from this folder. |
 
 (The source `aidoom.ico` lives one level up, in the repo root.)

@@ -69,10 +69,10 @@ if(WIN32)
                 $<TARGET_FILE:SDL3::SDL3> ${RUNDIR}/)
 endif()
 
-# ---------------------------------------------------------------------------
-# tools -- aidoom_config + gpumon_sdl (SDL3 GUI apps that own main())
-# ---------------------------------------------------------------------------
-foreach(tool aidoom_config gpumon_sdl)
+# -------------------------------------------------------------------
+# tools -- aidoom_config + gpumon_sdl + launcher (SDL3 GUI apps that own main())
+# -------------------------------------------------------------------
+foreach(tool aidoom_config gpumon_sdl launcher)
     add_executable(${tool} ${CMAKE_SOURCE_DIR}/tools/${tool}.c)
     target_include_directories(${tool} PRIVATE ${CMAKE_SOURCE_DIR}/tools)
     aidoom_common(${tool})
@@ -86,8 +86,12 @@ endforeach()
 # The GPU monitor ships as plain "gpumon" (source file is gpumon_sdl.c).
 set_target_properties(gpumon_sdl PROPERTIES OUTPUT_NAME gpumon)
 
+# Launcher ships as plain "launcher" (source file is launcher.c).
+set_target_properties(launcher PROPERTIES OUTPUT_NAME launcher)
+
 # tools: embed the shared aidoom.ico as the .exe icon on Windows.
 if(WIN32)
     target_sources(gpumon_sdl    PRIVATE ${CMAKE_SOURCE_DIR}/tools/gpumon.rc)
     target_sources(aidoom_config PRIVATE ${CMAKE_SOURCE_DIR}/tools/aidoom_config.rc)
+    target_sources(launcher     PRIVATE ${CMAKE_SOURCE_DIR}/tools/launcher.rc)
 endif()

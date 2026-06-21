@@ -1,11 +1,12 @@
 # Makefile.msvc -- build aiDoom's SDL3 tools with Visual Studio 2019 (MSVC).
 #   aidoom_config.exe  (settings editor)   gpumon.exe (GPU monitor)
+#   launcher.exe       (IWAD / mode picker GUI)
 #
 # Usage (x86 Native Tools Command Prompt for VS 2019), in tools\:
 #     nmake /f Makefile.msvc
 #     nmake /f Makefile.msvc SDL=C:\path\to\SDL3
 #
-# Both are SDL3 GUI apps that own main() (SDL_MAIN_HANDLED), so we link the
+# All are SDL3 GUI apps that own main() (SDL_MAIN_HANDLED), so we link the
 # WINDOWS subsystem (no console window) with the CRT's mainCRTStartup entry.
 # Binaries are copied into ..\run\ next to aidoom.exe.
 
@@ -17,7 +18,7 @@ CFLAGS = /nologo /O2 /MD /W3 /I. /I"$(SDL)\include" /DSDL_MAIN_HANDLED \
 LIBS = "$(SDL)\lib\x86\SDL3.lib"
 LDFLAGS = /link /SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup
 
-all: aidoom_config.exe gpumon.exe
+all: aidoom_config.exe gpumon.exe launcher.exe
 
 aidoom_config.res: aidoom_config.rc ..\aidoom.ico
 	rc /nologo /fo aidoom_config.res aidoom_config.rc
@@ -36,5 +37,13 @@ gpumon.exe: gpumon_sdl.c gpumon.res font_atlas.h ..\files\aidoom_icon.h
 	@if not exist ..\run mkdir ..\run
 	@copy /Y gpumon.exe ..\run\gpumon.exe >nul
 
+launcher.res: launcher.rc ..\aidoom.ico
+	rc /nologo /fo launcher.res launcher.rc
+
+launcher.exe: launcher.c launcher.res font_atlas.h ..\files\aidoom_icon.h
+	$(CC) $(CFLAGS) /Fe:launcher.exe launcher.c launcher.res $(LDFLAGS) $(LIBS)
+	@if not exist ..\run mkdir ..\run
+	@copy /Y launcher.exe ..\run\launcher.exe >nul
+
 clean:
-	-del *.obj *.res aidoom_config.exe gpumon.exe gpumon_sdl.exe 2>nul
+	-del *.obj *.res aidoom_config.exe gpumon.exe gpumon_sdl.exe launcher.exe 2>nul
