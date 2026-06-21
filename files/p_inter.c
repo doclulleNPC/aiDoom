@@ -885,7 +885,9 @@ P_DamageMobj
 	player->health -= damage; 	// mirror mobj health here for Dave
 	if (player->health < 0)
 	    player->health = 0;
-	
+
+	P_AICoop_NoteDamage (target, damage);	// feed the buddy's danger heatmap (Safe route)
+
 	player->attacker = source;
 	player->damagecount += damage;	// add damage after armor / invuln
 

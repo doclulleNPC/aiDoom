@@ -89,6 +89,7 @@ static void AICoop_CrumbAdd (fixed_t x, fixed_t y)
 #define COOP_KEEP	(192*FRACUNIT)	// advance toward a monster until this close
 #define COOP_RUN	0x32		// forwardmove "run" magnitude
 #define COOP_HEAL_HP	50		// seek a med-pack below this health
+#define COOP_SAFE_HP	40		// below this HP the buddy routes home the low-danger way
 #define COOP_HEAL_RANGE	(1024*FRACUNIT)	// how far to look for one
 #define COOP_ITEM_RANGE	(128*FRACUNIT)	// idle pickups only when right nearby (not "miles away")
 #define COOP_GRAB_NEAR	(512*FRACUNIT)	// only grab items while still near the human (else follow)
@@ -835,6 +836,8 @@ const char* P_AICoop_StatusReport (void)
 #define PF_PATHMAX	512		// max sub-sectors in a reconstructed path
 #define PF_INF		0x7fffffff
 #define PF_MAXADJ	32		// max graph edges per sub-sector
+#define PF_DANGER_W	8		// Safe mode: cost added per danger-point on entering a node
+#define PF_DANGER_MAX	2000		// clamp per-sub-sector danger so one hot spot can't dominate
 
 static int	pf_level = -1;		// episode*100+map the graph was built for
 static int	pf_lastbuild;		// gametic of the last graph (re)build
@@ -849,6 +852,8 @@ static fixed_t*	pf_adjpy;		//   just inside neighbour v on the u|v boundary
 static int*	pf_dist;		// Dijkstra cost-so-far
 static int*	pf_prev;		// Dijkstra predecessor
 static byte*	pf_done;		// Dijkstra closed flag
+static int*	pf_danger;		// per-sub-sector "recently took damage here" heatmap
+static int	pf_safemode;		// when set, PF_AStar weights edges by pf_danger (Safe route)
 static int	pf_path[PF_PATHMAX];
 
 static int PF_SS (fixed_t x, fixed_t y)
@@ -1020,9 +1025,10 @@ static void PF_Build (mobj_t* ref)
 
     free (pf_cx); free (pf_cy); free (pf_nadj); free (pf_adj); free (pf_adjw);
     free (pf_adjpx); free (pf_adjpy);
-    free (pf_dist); free (pf_prev); free (pf_done);
+    free (pf_dist); free (pf_prev); free (pf_done); free (pf_danger);
 
     pf_n    = numsubsectors;
+    pf_danger = calloc (pf_n, sizeof(int));	// fresh (zeroed) danger heatmap for this graph
     pf_cx   = malloc (pf_n * sizeof(fixed_t));
     pf_cy   = malloc (pf_n * sizeof(fixed_t));
     pf_dist = malloc (pf_n * sizeof(int));
@@ -1194,6 +1200,7 @@ static boolean PF_AStar (int start, int goal)
 	    int	v = pf_adj[u*PF_MAXADJ + s];
 	    int	w = pf_adjw[u*PF_MAXADJ + s];
 	    if (pf_done[v]) continue;
+	    if (pf_safemode) w += pf_danger[v] * PF_DANGER_W;	// Safe mode: detour around hot sub-sectors
 	    if (pf_dist[u] + w < pf_dist[v]) { pf_dist[v] = pf_dist[u] + w; pf_prev[v] = u; }
 	}
     }
@@ -1253,6 +1260,20 @@ static boolean PF_NextWaypoint (mobj_t* mo, fixed_t dx, fixed_t dy, fixed_t* wx,
     if (np > 0) { *wx = portx[0]; *wy = porty[0]; return true; }
     *wx = dx; *wy = dy;
     return true;
+}
+
+// Record that a player (human or buddy) took damage where it is standing, so the
+// buddy's Safe route mode (low HP / retreat) can later steer around that sub-sector.
+// Called from P_DamageMobj.  Runtime-only + decaying (no savegame impact); a no-op
+// until the nav graph (and thus pf_danger) exists.
+void P_AICoop_NoteDamage (mobj_t* victim, int damage)
+{
+    int	ss;
+    if (!pf_danger || damage <= 0) return;
+    ss = PF_SS (victim->x, victim->y);
+    if (ss < 0 || ss >= pf_n) return;
+    pf_danger[ss] += damage;
+    if (pf_danger[ss] > PF_DANGER_MAX) pf_danger[ss] = PF_DANGER_MAX;
 }
 
 // Public pathfinder: next reachable waypoint for `mo` toward (dx,dy).  The sub-sector
@@ -1683,6 +1704,12 @@ void P_AICoop_BuildCmd (void)
     // steer toward the next waypoint (re-pathed every ~10 tics / on goal change).
     // Combat aims directly (monsters are in sight), so it leaves stx/sty == tx/ty.
     stx = tx; sty = ty;
+
+    // Danger heatmap decays toward zero each second so it tracks RECENT damage
+    // (~5 s half-life), not everywhere a fight ever happened.
+    if (pf_danger && (gametic % 35) == 0)
+	{ int di; for (di = 0; di < pf_n; di++) pf_danger[di] -= pf_danger[di] >> 3; }
+
     if (navigate)
     {
 	// Coarse route: BSP portal waypoint toward the player (cached, re-pathed ~3x/s).
@@ -1691,7 +1718,12 @@ void P_AICoop_BuildCmd (void)
 	if (--navtimer <= 0 || gss != navgoal)
 	{
 	    navtimer = 10; navgoal = gss;
+	    // Safe route when retreating/regrouping (summon) or hurt: weight the A* by
+	    // pf_danger so the buddy comes home through calm corridors, not the crossfire.
+	    // Scoped to THIS call so monster/observe queries keep using the shortest path.
+	    pf_safemode = (summon > 0 || bot->health < COOP_SAFE_HP);
 	    navok = PF_NextWaypoint (mo, tx, ty, &navwx, &navwy);
+	    pf_safemode = 0;
 	}
 	if (navok && !chase_player) { goalx = navwx; goaly = navwy; }
 	// A closed door on the way?  Head STRAIGHT at the doorway (no sweep) so we

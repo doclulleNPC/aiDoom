@@ -99,4 +99,8 @@ boolean P_AICoop_NextWaypoint (struct mobj_s* mo, fixed_t dx, fixed_t dy, fixed_
 void P_AICoop_ArchiveTrail (void);
 void P_AICoop_UnArchiveTrail (void);
 
+// Note that a player took `damage` at its current position, feeding the buddy's
+// danger heatmap (Safe route mode).  Called from P_DamageMobj; runtime-only/decaying.
+void P_AICoop_NoteDamage (struct mobj_s* victim, int damage);
+
 #endif
