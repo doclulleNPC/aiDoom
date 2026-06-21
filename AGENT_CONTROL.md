@@ -526,7 +526,10 @@ and accepts `buddy` orders.  `start_aidoom.sh --aicoop` launches game + director
 
 ### Protocol additions
 - **Observation** gains a `"buddy"` object when `-aicoop` is active:
-  `"buddy":{"pos":[x,y],"health":h,"armor":a,"weapon":w,"ammo":n,"state":"follow|fight|heal|hold|come|grab"}`
+  `"buddy":{"pos":[x,y],"health":h,"armor":a,"weapon":w,"ammo":n,"state":"follow|fight|heal|hold|come|grab","route":[[x,y],...]}`
+  — `route` is a downsampled list of **reachable** waypoints along the buddy→player
+  path (engine-computed via the portal graph), giving the director real spatial
+  context + valid coordinates to `goto`.
 - **Command:** `buddy order=<tactic> [focus=<monster id>] [x=<n> y=<n>] [for=<tics>]\n`
   → `ok\n`.  Tactics: `engage` (focus a specific monster, else nearest), `defend`,
   `hold`, `regroup`, `retreat`, `goto` (x,y), `grab`.
