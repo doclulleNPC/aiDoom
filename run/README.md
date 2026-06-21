@@ -22,7 +22,7 @@ model, start the game with its `-aidirector` TCP server, then run the native
 | `aidoom_config` / `aidoom_config.exe` | Linux / Windows | SDL3 settings editor; reads/writes `aidoom.cfg` here. Build: Linux `tools/build_config.sh`; Windows via CMake or `build_all_win.bat`. |
 | `aidoom.cfg` | all | The single config file (game keys/video + Ollama), read by the game and all tools from this folder. |
 
-(The terminal monitor `gpumon.py` and the source `aidoom.ico` now live one level up, in the repo root.)
+(The source `aidoom.ico` lives one level up, in the repo root.)
 
 ## What the launcher does
 
@@ -124,8 +124,8 @@ override. It's the same file the game uses for keys/video.
 ## GPU monitor
 
 While the AI Director runs, watch the Ollama machine's GPU with **`gpumon`** (an SDL3
-window, built into this folder) or **`gpumon.py`** (terminal, now in the repo root).
-Both read `gpu_host` / `gpu_user` / `gpu_ssh_port` from `aidoom.cfg` here and use
+window, built into this folder).
+It reads `gpu_host` / `gpu_user` / `gpu_ssh_port` from `aidoom.cfg` here and uses
 `nvidia-smi` over SSH (or directly for `localhost`); the SDL one has a **Reconnect**
 button. Full docs: **`../GPUMON.md`**.
 

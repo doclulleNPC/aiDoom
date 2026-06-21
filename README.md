@@ -257,8 +257,8 @@ On Windows the config editor (and the GPU monitor) are built by the CMake build 
 
 A small **GPU monitor** shows live load / VRAM / temperature / power of the Ollama
 machine via `nvidia-smi` — over SSH, or directly when the host is `localhost` (no
-SSH/key needed). Two flavours: `gpumon.py` (terminal) and `gpumon` (SDL3 window with a
-**Reconnect** button). See **GPUMON.md**.
+SSH/key needed). It's a native `gpumon` (SDL3 window with a **Reconnect** button).
+See **GPUMON.md**.
 
 The **game** reads/writes the same `aidoom.cfg` from its working directory, and the
 config app preserves any keys it doesn't manage (so neither side clobbers the
@@ -269,7 +269,7 @@ writes one on exit; the editor shows those defaults too.
 
 - `AGENT_CONTROL.md` — full player- and monster-control API & TCP protocol
 - `MONSTER_AGENT_GUIDE.md` — guide to directing monsters with an LLM
-- `GPUMON.md` — the GPU monitor (`gpumon.py` / `gpumon`)
+- `GPUMON.md` — the GPU monitor (`gpumon`, SDL3)
 - `run/README.md` — the launchers in `run/`
 - `CLAUDE.md` — architecture notes & build/porting gotchas
 

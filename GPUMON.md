@@ -1,28 +1,26 @@
 # gpumon — GPU monitor for the Ollama machine
 
 A small live monitor for the GPU that runs your Ollama models — handy while the
-**LLM AI Director** is driving monsters. It comes in two flavours:
+**LLM AI Director** is driving monsters/the buddy. It's a native **SDL3 window**
+(`run/gpumon` / `run\gpumon.exe`, source `tools/gpumon_sdl.c`) with live bars and a
+**Reconnect** button. No Python.
 
-| Tool | What | Where |
-|------|------|-------|
-| **`gpumon.py`** | terminal monitor (ANSI bars), Python, no build | repo root |
-| **`gpumon` / `gpumon.exe`** | small **SDL3 window** with live bars + a **Reconnect** button | built into `run/` |
-
-Both show **GPU load %, VRAM, temperature and power** via `nvidia-smi`, and both
-read their target from the same `aidoom.cfg`.
+It shows **GPU load %, VRAM, temperature and power** via `nvidia-smi`, reading its
+target from `aidoom.cfg`.
 
 ## Where the data comes from
 
-- **`nvidia-smi` over SSH** → true GPU utilisation, VRAM, temp, power (the good one).
+- **`nvidia-smi` over SSH** → true GPU utilisation, VRAM, temp, power.
 - **localhost** → `nvidia-smi` is run **directly, without SSH** (no key needed) when
   the host is empty / `localhost` / `127.0.0.1`.
-- **Ollama `/api/ps`** (`gpumon.py --ollama-only`) → only the VRAM of currently
-  loaded models, no SSH. A fallback when you can't SSH.
+- **WSL hosts:** if the SSH session lands in a WSL shell (where `nvidia-smi` isn't on
+  PATH), it falls back to `nvidia-smi.exe`, then `/mnt/c/Windows/System32/nvidia-smi.exe`,
+  so it works whether SSH lands in cmd/PowerShell or WSL.
 
 ## Configuration
 
-Both tools read **`aidoom.cfg`** (written by the `aidoom_config` settings app, in the
-`run/` folder). Keys used:
+Reads **`aidoom.cfg`** (written by the `aidoom_config` settings app, in the `run/`
+folder). Keys used:
 
 | Key | Meaning | Default |
 |-----|---------|---------|
@@ -31,6 +29,7 @@ Both tools read **`aidoom.cfg`** (written by the `aidoom_config` settings app, i
 | `gpu_ssh_port` | SSH port | `22` |
 
 Set `gpu_host` to **`localhost`** to monitor the local GPU with no SSH at all.
+Override at launch with `--host` / `--user` / `--port`.
 
 ## SSH setup (remote host)
 
@@ -47,29 +46,13 @@ ssh-copy-id -p 22 lubee@192.168.2.114      # Linux/macOS
 > redirected to `SysWOW64`, where `nvidia-smi` isn't). It also runs all commands via
 > `CreateProcess`/`CREATE_NO_WINDOW`, so no console window flashes on each poll.
 
-## `gpumon.py` (terminal)
-
-```sh
-python3 gpumon.py                 # host/user from aidoom.cfg, else 192.168.2.114 / lubee
-python3 gpumon.py --host localhost --user ""   # local GPU, no SSH
-python3 gpumon.py --once          # one snapshot instead of the live loop
-python3 gpumon.py --ollama-only   # no SSH, model VRAM only (Ollama /api/ps)
-```
-
-Options: `--host --user --ssh-port --key --ollama-port --ollama-only --once
---interval`. On startup it self-tests the SSH read and falls back to Ollama mode if
-that fails, so it won't error on every frame.
-
-## `gpumon` (SDL3 window)
+## Run
 
 Run `run/gpumon` (Linux) / `run\gpumon.exe` (Windows). It polls every ~2 s and draws
 load / VRAM / temp / power bars. **On a connection error it stops** (no silent
 auto-retry) and shows a **Reconnect** button — click it to try again. `Esc` quits.
-Accepts `--host` / `--user` / `--port` to override the config.
 
-## Build (the SDL window version)
-
-`gpumon.py` needs no build. The SDL `gpumon`:
+## Build
 
 ```sh
 cmake -B build && cmake --build build      # any platform — also builds the game + config app
