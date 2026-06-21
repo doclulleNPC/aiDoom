@@ -41,6 +41,7 @@
 
 static int	companion_active;	// buddy enabled (-coop OR -aicoop)
 static int	aicoop_layer;		// -aicoop given: AI-driven layer requested
+static int	buddy_react;		// reaction delay (tics) before firing a fresh target (-buddyreact)
 static int	coop_state;		// 0 follow 1 fight 2 heal 3 hold 4 come 5 items
 static int	summon;			// "come": tics left running to the player
 static int	hold;			// "wait/stay": hold position
@@ -48,6 +49,11 @@ static int	forceaggro;		// "attack": tics left charging forcetarget
 static mobj_t*	forcetarget;		// the forced attack target
 static int	ai_goto;		// LLM "goto": tics left moving to (ai_gx,ai_gy)
 static fixed_t	ai_gx, ai_gy;		// LLM goto destination
+static int	react_timer;		// tics left before firing a freshly-sighted target
+static mobj_t*	react_last;		// the target the reaction timer is counting for
+
+#define COOP_BLAST_SAFE	(176*FRACUNIT)	// don't fire rocket/BFG at a target closer than this (splash)
+#define COOP_DODGE_RANGE (256*FRACUNIT)	// react to incoming missiles within this range
 
 // Breadcrumb trail: the human's recent walkable positions.  When the buddy can't
 // make progress toward the player (the portal pathfinder is stuck in some tight
@@ -105,6 +111,16 @@ void P_AICoop_Init (void)
     //          goes quiet.  See AGENT_CONTROL.md / p_ai_llm.c.
     int coop    = M_CheckParm ("-coop")    > 0;
     int aicoop  = M_CheckParm ("-aicoop")  > 0;
+    int rp      = M_CheckParm ("-buddyreact");	// reaction-time / skill knob (tics)
+
+    // -buddyreact <tics>: delay between sighting a fresh target and opening fire
+    // (0 = frame-perfect, the old behaviour; ~14 = a human-ish ~0.4s; higher = dumber).
+    if (rp && rp < myargc-1)
+    {
+	buddy_react = atoi (myargv[rp+1]);
+	if (buddy_react < 0)  buddy_react = 0;
+	if (buddy_react > 70) buddy_react = 70;
+    }
 
     if (!coop && !aicoop)
 	return;
@@ -1303,6 +1319,43 @@ static void AICoop_ThrustToward (ticcmd_t* cmd, mobj_t* mo, fixed_t tx, fixed_t 
     cmd->sidemove    = -(signed char)(FixedMul (COOP_RUN*FRACUNIT, finesine[rel])   >> FRACBITS);
 }
 
+// Cajun-bot-style missile dodge: if a live projectile is closing on us roughly on a
+// collision heading, sidestep perpendicular to it (toward whichever side is walkable).
+// Sets the move to the dodge and returns 1; the caller still aims/fires this tic.
+static int AICoop_DodgeMissile (ticcmd_t* cmd, mobj_t* mo)
+{
+    thinker_t*	th;
+    for (th = thinkercap.next; th != &thinkercap; th = th->next)
+    {
+	mobj_t*	m;
+	angle_t	mv;
+	int	side;
+	if (th->function.acp1 != (actionf_p1)P_MobjThinker) continue;
+	m = (mobj_t*)th;
+	if (!(m->flags & MF_MISSILE)) continue;
+	if (m->target == mo) continue;				// our own shot -- ignore
+	if (!m->momx && !m->momy) continue;			// not travelling
+	if (P_AproxDistance (m->x - mo->x, m->y - mo->y) > COOP_DODGE_RANGE) continue;
+	mv = R_PointToAngle2 (0, 0, m->momx, m->momy);		// the missile's heading
+	// is it heading at us? compare its heading to the bearing from it to us
+	if (abs ((int)(mv - R_PointToAngle2 (m->x, m->y, mo->x, mo->y))) > (int)(ANG45/2))
+	    continue;						// >~22 deg off -> it'll miss
+	for (side = 0; side < 2; side++)			// step perpendicular, walkable side
+	{
+	    angle_t perp = mv + (side ? (angle_t)-ANG90 : ANG90);
+	    int     a    = perp >> ANGLETOFINESHIFT;
+	    fixed_t dx   = mo->x + FixedMul (96*FRACUNIT, finecosine[a]);
+	    fixed_t dy   = mo->y + FixedMul (96*FRACUNIT, finesine[a]);
+	    if (AICoop_CanReach (mo, dx, dy, false))
+	    {
+		AICoop_ThrustToward (cmd, mo, dx, dy);
+		return 1;
+	    }
+	}
+    }
+    return 0;
+}
+
 // Best ranged weapon the buddy owns with ammo (melee weapons excluded; rockets/BFG
 // skipped -- splash would hurt the buddy/human at the ranges it fights).  Used to
 // switch off the chainsaw/fist when the target is out of melee reach.
@@ -1704,6 +1757,22 @@ void P_AICoop_BuildCmd (void)
 	    if (w >= 0) bot->pendingweapon = w;
 	}
 
+	// Splash-weapon suicide guard: a rocket/BFG fired at a target inside blast range
+	// gibs the buddy too.  Switch to a non-splash weapon (BestRanged skips both) and
+	// hold the shot until the swap lands.
+	int splash_close = (bot->readyweapon == wp_missile || bot->readyweapon == wp_bfg)
+		&& P_AproxDistance (aimmon->x - mo->x, aimmon->y - mo->y) < COOP_BLAST_SAFE;
+	if (splash_close && bot->pendingweapon == wp_nochange)
+	{
+	    int w = AICoop_BestRanged (bot);
+	    if (w >= 0) bot->pendingweapon = w;
+	}
+
+	// Reaction time (-buddyreact): wait a beat after sighting a *fresh* target before
+	// opening fire, so the buddy isn't frame-perfect (0 = instant, the old behaviour).
+	if (aimmon != react_last) { react_timer = buddy_react; react_last = aimmon; }
+	if (react_timer > 0) react_timer--;
+
 	// Aim vertically at the target's centre: if autoaim misses (target above or
 	// below) the weapon falls back to lookdir ("shoot where you look"), so the
 	// shot elevates instead of plugging the wall/crate in front.
@@ -1726,7 +1795,7 @@ void P_AICoop_BuildCmd (void)
 		// the angle so the next tic has a safe shot.
 		cmd->sidemove += ((gametic / 16) & 1) ? COOP_RUN : -COOP_RUN;
 	    }
-	    else if (linetarget && abs(rem) < COOP_FACING)
+	    else if (linetarget && abs(rem) < COOP_FACING && react_timer == 0 && !splash_close)
 		cmd->buttons |= BT_ATTACK;
 	    else if (!linetarget && dist < 768*FRACUNIT)
 		backoff = true;
@@ -1826,4 +1895,9 @@ void P_AICoop_BuildCmd (void)
 	// Sideways wiggle to slip past a barrel / convex corner (non-door wedge).
 	cmd->sidemove += ((wig++ / 24) & 1) ? COOP_RUN : -COOP_RUN;
     }
+
+    // Missile dodge has the final say on movement: if a projectile is closing on us,
+    // sidestep it (overriding the approach/backoff move for this tic).  Aim and fire
+    // are separate fields, so the buddy keeps shooting while it strafes clear.
+    AICoop_DodgeMissile (cmd, mo);
 }
