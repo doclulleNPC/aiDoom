@@ -1335,11 +1335,16 @@ void G_DoLoadGame (void)
     P_UnArchiveThinkers (); 
     P_UnArchiveSpecials (); 
  
-    if (*save_p != 0x1d) 
+    if (*save_p++ != 0x1d)
 	I_Error ("Bad savegame");
-    
-    // done 
-    Z_Free (savebuffer); 
+
+    // Newer saves append the buddy breadcrumb trail after the marker; older saves
+    // end here, so only read it when there are still bytes left in the file.
+    if (save_p - savebuffer < length)
+	P_AICoop_UnArchiveTrail ();
+
+    // done
+    Z_Free (savebuffer);
  
     if (setsizeneeded)
 	R_ExecuteSetViewSize ();
@@ -1401,9 +1406,11 @@ void G_DoSaveGame (void)
     P_ArchiveThinkers (); 
     P_ArchiveSpecials (); 
 	 
-    *save_p++ = 0x1d;		// consistancy marker 
-	 
-    length = save_p - savebuffer; 
+    *save_p++ = 0x1d;		// consistancy marker
+
+    P_AICoop_ArchiveTrail ();	// buddy breadcrumb trail (after the marker -> back-compatible)
+
+    length = save_p - savebuffer;
     if (length > SAVEGAMESIZE) 
 	I_Error ("Savegame buffer overrun"); 
     M_WriteFile (name, savebuffer, length); 

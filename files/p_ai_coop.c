@@ -178,6 +178,41 @@ void P_AICoop_ResetSlot (void)
     crumb_n = 0; trail_active = 0;	// drop the previous map's breadcrumb trail
 }
 
+// ---------------------------------------------------------------------------
+//  Savegame: persist the breadcrumb trail so the buddy keeps following the
+//  human's path across a save/load (otherwise the trail is empty on load and the
+//  buddy can be stranded behind a door the human already walked through).  Written
+//  AFTER the consistency marker (see g_game.c), so older saves without the block
+//  still load -- the loader only reads it when there are bytes left in the file.
+// ---------------------------------------------------------------------------
+extern byte* save_p;
+
+void P_AICoop_ArchiveTrail (void)
+{
+    int i;
+    memcpy (save_p, &crumb_n, sizeof(int)); save_p += sizeof(int);
+    for (i = 0; i < crumb_n; i++)
+    {
+	memcpy (save_p, &crumbx[i], sizeof(fixed_t)); save_p += sizeof(fixed_t);
+	memcpy (save_p, &crumby[i], sizeof(fixed_t)); save_p += sizeof(fixed_t);
+    }
+}
+
+void P_AICoop_UnArchiveTrail (void)
+{
+    int i, n = 0;
+    memcpy (&n, save_p, sizeof(int)); save_p += sizeof(int);
+    if (n < 0 || n > CRUMB_MAX)		// corrupt/short block -> ignore, start fresh
+	{ crumb_n = 0; trail_active = 0; return; }
+    for (i = 0; i < n; i++)
+    {
+	memcpy (&crumbx[i], save_p, sizeof(fixed_t)); save_p += sizeof(fixed_t);
+	memcpy (&crumby[i], save_p, sizeof(fixed_t)); save_p += sizeof(fixed_t);
+    }
+    crumb_n = n;
+    trail_active = 0;			// let the watchdog re-engage if the buddy lags
+}
+
 static boolean P_AICoop_VerifySpawn_warned = false;	// one-shot per process
 
 void P_AICoop_VerifySpawn (void)

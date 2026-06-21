@@ -89,4 +89,9 @@ void P_AICoop_SetDirective (int tactic, struct mobj_s* focus, fixed_t x, fixed_t
 // (downsampled portal path), for the AI `observe` stream.  Returns the count.
 int  P_AICoop_NavRoute (fixed_t* xs, fixed_t* ys, int maxpts);
 
+// Savegame persistence for the breadcrumb trail.  Written/read AFTER the savegame
+// consistency marker (g_game.c), so older saves without the block still load.
+void P_AICoop_ArchiveTrail (void);
+void P_AICoop_UnArchiveTrail (void);
+
 #endif
