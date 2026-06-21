@@ -154,6 +154,29 @@ def cfg_value(cfg_path, key):
     return None
 
 
+def env_file_value(path, *names):
+    """Read KEY=VALUE from a dotenv file (e.g. ~/hermes/.env), trying each name.
+    Secrets (the ElevenLabs key) live HERE, never in aidoom.cfg."""
+    try:
+        with open(os.path.expanduser(path)) as f:
+            env = {}
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                k = k.strip()
+                if k.startswith("export "):
+                    k = k[len("export "):].strip()
+                env[k] = v.strip().strip('"').strip("'")
+        for n in names:
+            if env.get(n):
+                return env[n]
+    except OSError:
+        pass
+    return None
+
+
 def fetch_mp3(phrase, voice, model, key, retries=3):
     """POST to ElevenLabs TTS, return raw MP3 bytes (mp3_44100_128)."""
     body = json.dumps({
@@ -267,7 +290,9 @@ def write_wad(out_path, lumps):
 
 def main():
     ap = argparse.ArgumentParser(description="Bake aiDoom buddy voice into buddy.wad")
-    ap.add_argument("--voice", default=DEFAULT_VOICE)
+    ap.add_argument("--voice", default=None,
+                    help="ElevenLabs voice id (default: buddy_voice_id in aidoom.cfg, "
+                         "else built-in Joker-HL)")
     ap.add_argument("--model", default=DEFAULT_MODEL)
     ap.add_argument("--key",   default=None)
     ap.add_argument("--cfg",   default="aidoom.cfg")
@@ -286,6 +311,9 @@ def main():
                     help="keep leading/trailing silence in OGGs "
                          "(default: trim via ffmpeg silenceremove)")
     args = ap.parse_args()
+
+    # Voice id MAY live in aidoom.cfg (it's not a secret); fall back to Joker-HL.
+    args.voice = args.voice or cfg_value(args.cfg, "buddy_voice_id") or DEFAULT_VOICE
 
     out_path = Path(args.out).resolve()
     cache_dir = Path(args.cache).resolve()
@@ -342,11 +370,14 @@ def main():
         print(f"\nbake_buddy_voice: wrote {out_path}  ({len(lumps)} lumps, {total} bytes)")
         return 0
 
+    # Key precedence: --key > env var > ~/hermes/.env.  NEVER aidoom.cfg -- secrets
+    # don't belong in the game config (which can be shared / committed by accident).
     key = args.key or os.environ.get("ELEVENLABS_API_KEY") \
-          or cfg_value(args.cfg, "elevenlabs_api_key")
+          or env_file_value("~/hermes/.env",
+                            "ELEVENLABS_API_KEY", "ELEVEN_API_KEY", "XI_API_KEY")
     if not key:
-        print("ERROR: no ElevenLabs API key (set ELEVENLABS_API_KEY or "
-              "pass --key / put 'elevenlabs_api_key ...' in aidoom.cfg).",
+        print("ERROR: no ElevenLabs API key.  Put 'ELEVENLABS_API_KEY=sk_...' in "
+              "~/hermes/.env (preferred), export ELEVENLABS_API_KEY, or pass --key.",
               file=sys.stderr)
         return 2
 
