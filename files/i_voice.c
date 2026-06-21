@@ -117,14 +117,14 @@ static const voicemap_t VOICE_MAP[] =
     { "clear:1",         "DSCL02" },
     { "clear:2",         "DSCL03" },
     // State (where-report; HP/distance spoken by HUD, voice just carries state)
-    { "state:following", "DSWFOLLOW" },
+    { "state:following", "DSWFOLLO" },
     { "state:fighting",  "DSWFIGHT"  },
     { "state:healing",   "DSWHEAL"   },
     { "state:holding",   "DSWHOLD"   },
     { "state:coming",    "DSWCOME"   },
     { "state:grabbing",  "DSWGRAB"   },
     // Console replies
-    { "summon_ok",       "DSSUMONOK" },
+    { "summon_ok",       "DSSUMONO" },
     { "wait_hold",       "DSWAITHD"  },
     { "wait_move",       "DSWAITMV"  },
     { "attack_ok",       "DSATACK"   },
@@ -350,6 +350,18 @@ void I_Voice_Say (const char* tag, int lvol, int rvol)
     const char* lumpname = tag_to_lumpname (tag);
     if (!lumpname) return;                 // unknown tag -> silent
     I_Voice_SayByName (lumpname, lvol, rvol);
+}
+
+int I_Voice_Busy (void)
+{
+    if (!voice_stream) return 0;
+    // Bytes still queued for the device == the buddy is still talking.
+    return SDL_GetAudioStreamQueued (voice_stream) > 0;
+}
+
+void I_Voice_Stop (void)
+{
+    if (voice_stream) SDL_ClearAudioStream (voice_stream);
 }
 
 

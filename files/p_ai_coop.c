@@ -384,29 +384,71 @@ static void AICoop_SayTag (const char* tag)
     I_Voice_Say (tag, lvol, rvol);
 }
 
-// Rate-limited automatic line (combat/ambient): at most one every few seconds,
-// rotating through the tag suffixes "0","1","2","3" so the buddy doesn't
-// repeat the same phrase back-to-back.  tagprefix is e.g. "contact:" or
-// "hurt:"; the index is appended (e.g. "contact:2").
+// --- Voice priority --------------------------------------------------------
+// Lines fall into four tiers; a higher tier preempts a lower one that's still
+// playing and is rate-limited less.  This keeps low-value chatter ("I'm
+// stuck!") from burying the things the player actually needs to hear: a reply
+// to an order, then a weapon-state warning, then a kill quip, then the rest.
+//   3 VP_COMMAND  answers to come/wait/attack/grab orders  -- always, preempts
+//   2 VP_WEAPON   "out of ammo" / "down to fists"
+//   1 VP_KILL     monster kill / gib / spree / nice
+//   0 VP_AMBIENT  everything else (stuck/lost/idle/contact/hurt/door/...)
+enum { VP_AMBIENT = 0, VP_KILL = 1, VP_WEAPON = 2, VP_COMMAND = 3 };
+static const int VP_GAP[4] = { 8*TICRATE, 4*TICRATE, 4*TICRATE, 0 };
+static int vp_last[4];           // last gametic each tier spoke
+static int vp_cur = -1;          // tier of the line currently sounding (-1 = idle)
+
+// Decide whether a line of priority `prio` may speak right now; if so, reserve
+// the voice slot (and preempt a lower-tier line in progress) and return true.
+static boolean AICoop_VoiceGate (int prio)
+{
+    boolean busy = I_Voice_Busy ();
+    if (!busy) vp_cur = -1;                       // previous line finished -> free
+    else if (prio <= vp_cur) return false;        // equal/more important still talking
+    else I_Voice_Stop ();                         // higher tier barges in
+
+    if (gametic - vp_last[prio] < VP_GAP[prio])   // per-tier rate limit (cmd = 0)
+        return false;
+    vp_last[prio] = gametic;
+    vp_cur        = prio;
+    return true;
+}
+
+// Rate-limited automatic line at a given priority: rotates the tag suffixes
+// "0".."n-1" so the buddy doesn't repeat the same phrase back-to-back.
+// tagprefix is e.g. "contact:" or "kill:"; the index is appended ("contact:2").
+static void AICoop_CalloutP (const char* tagprefix, int n, int prio)
+{
+    static int idx;
+    if (!AICoop_VoiceGate (prio)) return;
+    char buf[32];
+    snprintf (buf, sizeof(buf), "%s%d", tagprefix, idx++ % n);
+    AICoop_SayTag (buf);
+}
+
+// Most callouts are low-value ambient chatter.
 static void AICoop_Callout (const char* tagprefix, int n)
 {
-    static int last, idx;
-    if (gametic - last < 4*TICRATE) return;
-    last = gametic;
-    static char buf[32];
-    snprintf (buf, sizeof(buf), "%s%d", tagprefix, idx % n);
-    AICoop_SayTag (buf);
-    idx++;
+    AICoop_CalloutP (tagprefix, n, VP_AMBIENT);
+}
+
+// A specific (non-rotated) tag at a given priority -- for command acks etc.
+static void AICoop_SayTagP (const char* tag, int prio)
+{
+    if (!AICoop_VoiceGate (prio)) return;
+    AICoop_SayTag (tag);
 }
 
 // Speak a tagged phrase through i_voice.c (offline OGG via buddy.wad).
 // The "[Buddy] ..." console text is unaffected -- this is just the audio.
 // Callers pick the exact tag (e.g. "summon_ok", "state:fighting"); the
-// tag -> lump-name mapping lives in i_voice.c.
+// tag -> lump-name mapping lives in i_voice.c.  This is the console-command
+// reply path (come/wait/attack/where), so it runs at VP_COMMAND: it always
+// answers the player and preempts any lower-tier chatter in progress.
 void P_AICoop_VoiceTag (const char* tag)
 {
     if (!companion_active || !tag) return;
-    AICoop_SayTag (tag);
+    AICoop_SayTagP (tag, VP_COMMAND);
 }
 
 // Public wrapper so other modules (p_inter.c) can trigger a rotated callout.
@@ -461,19 +503,19 @@ void P_AICoop_NoteKill (mobj_t* victim, mobj_t* killer)
     {
 	static int cnt, t;
 	if (victim->info && victim->health < -victim->info->spawnhealth && P_Random () < 96)
-	    AICoop_Callout ("gib:", 3);			// satisfying overkill
+	    AICoop_CalloutP ("gib:", 3, VP_KILL);	// satisfying overkill
 	else if (P_Random () < 64)			// otherwise a rare per-type quip
 	{
 	    int n; const char* tag = AICoop_KillTag (victim->type, &n);
-	    AICoop_Callout (tag, n);
+	    AICoop_CalloutP (tag, n, VP_KILL);
 	}
-	if (gametic - t < 5*TICRATE) { if (++cnt >= 4) { AICoop_Callout ("spree:", 4); cnt = 0; } }
+	if (gametic - t < 5*TICRATE) { if (++cnt >= 4) { AICoop_CalloutP ("spree:", 4, VP_KILL); cnt = 0; } }
 	else cnt = 1;
 	t = gametic;
     }
     else if (killer && killer->player == &players[0]
 	     && P_AproxDistance (victim->x - buddy->x, victim->y - buddy->y) < COOP_SIGHT)
-	AICoop_Callout ("nice:", 2);			// the human scored, buddy approves
+	AICoop_CalloutP ("nice:", 2, VP_KILL);		// the human scored, buddy approves
 }
 
 
@@ -838,7 +880,7 @@ void P_AICoop_SetDirective (int tactic, struct mobj_s* focus, fixed_t x, fixed_t
 	  case BUD_GRAB:    vtag = "state:grabbing";  break;
 	  default:          break;				// engage/defend/auto -> silent
 	}
-	if (vtag) P_AICoop_VoiceTag (vtag);
+	if (vtag) AICoop_SayTagP (vtag, VP_COMMAND);	// orders preempt lower chatter
 	ai_last_tactic = tactic;
     }
 
@@ -1786,9 +1828,9 @@ void P_AICoop_BuildCmd (void)
     	if (bot->health < 20 && lasthp >= 20)		AICoop_Callout ("crit:", 3);
     	if (bot->health >= COOP_HEAL_HP && lasthp < COOP_HEAL_HP) AICoop_Callout ("healed:", 2);
 
-    	{ int dry = (curammo <= 0); if (dry && !lastdry) AICoop_Callout ("dry:", 3); lastdry = dry; }
+    	{ int dry = (curammo <= 0); if (dry && !lastdry) AICoop_CalloutP ("dry:", 3, VP_WEAPON); lastdry = dry; }
     	{ int onlyfist = (bot->readyweapon == wp_fist && AICoop_BestRanged (bot) < 0);
-    	  if (onlyfist && !lastfist) AICoop_Callout ("fists:", 2); lastfist = onlyfist; }
+    	  if (onlyfist && !lastfist) AICoop_CalloutP ("fists:", 2, VP_WEAPON); lastfist = onlyfist; }
 
     	if (human->mo) {
     	    if (human->health > 0 && human->health < 35 && lastplhp >= 35) AICoop_Callout ("plhurt:", 3);
@@ -2172,6 +2214,7 @@ void P_AICoop_BuildCmd (void)
 
     // Wedged while trying to move -- most often a closed door on the path, else a
     // corner / a blocking thing (e.g. a barrel; we don't shoot those).
+    static boolean wasstuck;
     if (triedmove && stuck)
     {
 	static int wig;
@@ -2184,8 +2227,12 @@ void P_AICoop_BuildCmd (void)
 	if (doorwait == 0) { cmd->buttons |= BT_USE; doorwait = 45; AICoop_Callout ("door:", 2); }
 	// Sideways wiggle to slip past a barrel / convex corner (non-door wedge).
 	cmd->sidemove += ((wig++ / 24) & 1) ? COOP_RUN : -COOP_RUN;
-	AICoop_Callout ("stuck:", 3);
+	// Announce ONCE per wedge (rising edge) -- this used to fire every tic, so the
+	// buddy complained about being stuck constantly and starved every other line.
+	if (!wasstuck) AICoop_Callout ("stuck:", 3);
+	wasstuck = true;
     }
+    else wasstuck = false;
 
     // (E) Careful near edges: if the chosen move heads toward a drop-off or a damaging
     // floor, crawl -- a slower step overshoots the lip far less, so the buddy stops

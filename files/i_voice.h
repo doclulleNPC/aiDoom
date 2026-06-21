@@ -39,6 +39,16 @@ void I_Voice_SayByName (const char* lumpname, int lvol, int rvol);
 // forwards to I_Voice_SayByName.  Unknown tags are no-ops.
 void I_Voice_Say (const char* tag, int lvol, int rvol);
 
+// Is the buddy still speaking?  Nonzero while PCM remains queued on the voice
+// stream.  The playsim uses this to avoid piling lines on top of each other and
+// to let a higher-priority line decide whether to barge in (see I_Voice_Stop).
+int  I_Voice_Busy (void);
+
+// Cut off whatever is currently playing/queued on the voice stream, so a more
+// important line (e.g. a command ack) can start immediately instead of waiting
+// the current line out.  No-op if voice init failed.
+void I_Voice_Stop (void);
+
 // Init / shutdown -- called from D_DoomMain around the I_Init*/I_Shutdown*
 // pair.  Loads the buddy WAD (cwd-relative "buddy.wad" by default, or from
 // the "buddy_wad" entry in aidoom.cfg).  Opens the dedicated audio stream.
