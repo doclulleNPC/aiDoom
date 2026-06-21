@@ -663,6 +663,17 @@ P_SetupLevel
 
     bodyqueslot = 0;
     deathmatch_p = deathmatchstarts;
+
+    // Co-op buddy: before P_LoadThings reads THINGS, drop any stale mobj/flags
+    // for the buddy slot.  Without this, playerstarts[] / players[].mo retain
+    // values from the previous map's load (PWAD overlay of an E?M? keeps the
+    // IWAD's Player_2_Start intact even though the PWAD has no P2 thing), which
+    // would mask a missing P2_Start.  Reset here so P_AICoop_VerifySpawn can
+    // reliably distinguish "this map had a P2_Start" (mo != NULL after spawn)
+    // from "this map had no P2_Start" (mo == NULL because we just nulled it
+    // and P_LoadThings didn't set it).
+    P_AICoop_ResetSlot ();
+
     P_LoadThings (lumpnum+ML_THINGS);
     
     // if deathmatch, randomly spawn the active players
@@ -685,6 +696,12 @@ P_SetupLevel
 
     // LLM AI Director: drop any monster directives from the previous level
     P_AI_Reset ();
+
+    // Co-op buddy: -coop/-aicoop requested Player 2 to spawn on this map.
+    // If the map has no Player_2_Start (only Player_1_Start), the buddy has
+    // nowhere to spawn -- emit a one-shot warning and disable it for this
+    // level instead of silently failing.
+    P_AICoop_VerifySpawn ();
 	
     // build subsector connect matrix
     //	UNUSED P_ConnectSubsectors ();

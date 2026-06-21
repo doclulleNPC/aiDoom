@@ -1207,7 +1207,11 @@ printf("added\n");
     printf ("D_CheckNetGame: Checking network game status.\n");
     D_CheckNetGame ();
 
-    // -aicoop: add an AI-controlled co-op companion (player 2).  Must run after
+    // -coop or -aicoop: enable the co-op companion (player 2).  -coop is the
+    // autonomous rule-based bot; -aicoop adds the LLM director layer (the
+    // director sets the buddy's tactics over the same TCP transport as the
+    // monsters -- see p_ai_coop.c / p_ai_llm.c).  The two flags are mutually
+    // exclusive -- specifying both aborts in P_AICoop_Init.  Must run after
     // D_CheckNetGame (which sets playeringame[]) and before the first level.
     P_AICoop_Init ();
 
@@ -1220,7 +1224,7 @@ printf("added\n");
     C_Init ();		// developer console (toggle with `)
 
     printf ("HU_Buddy_Init: Companion HUD.\n");
-    HU_Buddy_Init ();	// small top-strip HUD for the AI co-op buddy
+    HU_Buddy_Init ();	// small top-strip HUD for the co-op buddy
 
     printf ("ST_Init: Init status bar.\n");
     ST_Init ();
