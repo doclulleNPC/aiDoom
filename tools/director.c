@@ -42,6 +42,8 @@
   #include <arpa/inet.h>
   #include <netdb.h>
   #include <unistd.h>
+  #include <fcntl.h>
+  #include <errno.h>
   typedef int sock_t;
   #define CLOSESOCK(s) close(s)
   #define SOCKERR      (-1)
@@ -249,6 +251,32 @@ static void setsub    (const char* s) { SDL_LockMutex (g_lock); snprintf (g_sub,
 //  Sockets
 // ===========================================================================
 
+static void set_blocking (sock_t s, int blocking)
+{
+#ifdef _WIN32
+    u_long nb = blocking ? 0 : 1;
+    ioctlsocket (s, FIONBIO, &nb);
+#else
+    int fl = fcntl (s, F_GETFL, 0);
+    if (fl >= 0) fcntl (s, F_SETFL, blocking ? (fl & ~O_NONBLOCK) : (fl | O_NONBLOCK));
+#endif
+}
+
+// Bound recv()/send() so a stalled peer (e.g. Ollama dropping mid-reply) can never
+// block the worker forever.
+static void set_io_timeout (sock_t s, int sec)
+{
+#ifdef _WIN32
+    DWORD ms = (DWORD) sec * 1000;
+    setsockopt (s, SOL_SOCKET, SO_RCVTIMEO, (const char*)&ms, sizeof ms);
+    setsockopt (s, SOL_SOCKET, SO_SNDTIMEO, (const char*)&ms, sizeof ms);
+#else
+    struct timeval tv; tv.tv_sec = sec; tv.tv_usec = 0;
+    setsockopt (s, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof tv);
+    setsockopt (s, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof tv);
+#endif
+}
+
 static sock_t tcp_connect (const char* host, int port, int timeout_s)
 {
     char portstr[16]; snprintf (portstr, sizeof portstr, "%d", port);
@@ -258,9 +286,36 @@ static sock_t tcp_connect (const char* host, int port, int timeout_s)
     if (getaddrinfo (host, portstr, &hints, &res) != 0 || !res) return SOCKERR;
     sock_t s = socket (res->ai_family, res->ai_socktype, res->ai_protocol);
     if (s == SOCKERR) { freeaddrinfo (res); return SOCKERR; }
-    if (connect (s, res->ai_addr, (int)res->ai_addrlen) != 0) { CLOSESOCK (s); freeaddrinfo (res); return SOCKERR; }
+    if (timeout_s <= 0) timeout_s = 5;
+
+    // Non-blocking connect with a real timeout: an unreachable/lost host now fails
+    // in `timeout_s` instead of blocking the director loop until the OS TCP timeout.
+    set_blocking (s, 0);
+    int rc = connect (s, res->ai_addr, (int)res->ai_addrlen);
+    if (rc != 0)
+    {
+#ifdef _WIN32
+        int pending = (WSAGetLastError () == WSAEWOULDBLOCK);
+#else
+        int pending = (errno == EINPROGRESS);
+#endif
+        if (!pending) { CLOSESOCK (s); freeaddrinfo (res); return SOCKERR; }
+        fd_set wf; FD_ZERO (&wf); FD_SET (s, &wf);
+        struct timeval tv; tv.tv_sec = timeout_s; tv.tv_usec = 0;
+        if (select ((int)s + 1, NULL, &wf, NULL, &tv) <= 0)
+            { CLOSESOCK (s); freeaddrinfo (res); return SOCKERR; }	// timed out
+        int err = 0;
+#ifdef _WIN32
+        int el = sizeof err;
+#else
+        socklen_t el = sizeof err;
+#endif
+        getsockopt (s, SOL_SOCKET, SO_ERROR, (char*)&err, &el);
+        if (err) { CLOSESOCK (s); freeaddrinfo (res); return SOCKERR; }
+    }
     freeaddrinfo (res);
-    (void) timeout_s;
+    set_blocking (s, 1);
+    set_io_timeout (s, timeout_s);
     return s;
 }
 
@@ -301,6 +356,7 @@ static char* http_post_json (const char* host, int port, const char* path, const
 {
     sock_t s = tcp_connect (host, port, 5);
     if (s == SOCKERR) return NULL;
+    set_io_timeout (s, 120);	// allow slow generation, but never hang forever
 
     char hdr[512];
     int  blen = (int) strlen (json_body);
