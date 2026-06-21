@@ -376,34 +376,93 @@ static mobj_t* P_AI_MobjForId (int id)
     return NULL;
 }
 
+#include "r_state.h"		// sectors / numsectors / lines / numlines (room topology)
+
 #define OBSBUF	32768
 static char obsbuf[OBSBUF];
+
+// Sector index a map object stands in (its "region" / room for the LLM).
+#define AI_REGION(mo)	((int)((mo)->subsector->sector - sectors))
+
+// Set of sectors that currently contain an entity (player / buddy / monsters);
+// the room-link graph is built only over these so it stays small + token-cheap.
+#define AI_MAXOCC	64
+static int  ai_occ[AI_MAXOCC], ai_nocc;
+static void AI_OccReset (void) { ai_nocc = 0; }
+static void AI_OccAdd (int s)
+{
+    int i;
+    if (s < 0) return;
+    for (i = 0; i < ai_nocc; i++) if (ai_occ[i] == s) return;
+    if (ai_nocc < AI_MAXOCC) ai_occ[ai_nocc++] = s;
+}
+static int AI_InOcc (int s)
+{
+    int i;
+    for (i = 0; i < ai_nocc; i++) if (ai_occ[i] == s) return 1;
+    return 0;
+}
+static int AI_InOccN (int s, int upto)	// membership in just the first `upto` entries
+{
+    int i;
+    for (i = 0; i < upto && i < ai_nocc; i++) if (ai_occ[i] == s) return 1;
+    return 0;
+}
+static int AI_OccIndex (int s)
+{
+    int i;
+    for (i = 0; i < ai_nocc; i++) if (ai_occ[i] == s) return i;
+    return -1;
+}
+
+// Classify a linedef special: 0 = plain opening, 1 = door, 2 = locked door.
+static int AI_DoorKind (int sp)
+{
+    switch (sp)
+    {
+      case 26: case 27: case 28: case 32: case 33: case 34:
+      case 99: case 133: case 134: case 135: case 136: case 137:
+	return 2;						// needs a key
+      case 1: case 2: case 3: case 4: case 16: case 29: case 31: case 42:
+      case 46: case 50: case 61: case 63: case 75: case 76: case 86: case 90:
+      case 103: case 105: case 106: case 107: case 108: case 109: case 110:
+      case 111: case 112: case 113: case 114: case 115: case 116: case 117: case 118:
+	return 1;						// a door
+    }
+    return 0;
+}
 
 static int AI_Serialize (void)
 {
     player_t*	pl = &players[consoleplayer];
+    int		bs = P_AICoop_Slot ();
+    mobj_t*	bmo = (P_AICoop_AIMode () && bs >= 0 && playeringame[bs]) ? players[bs].mo : NULL;
     int		n = 0;
     int		i;
     int		fx = FRACUNIT;
 
     AI_BuildRegistry ();
+    AI_OccReset ();
 
     n += snprintf (obsbuf+n, OBSBUF-n, "{\"tic\":%d,\"player\":{", leveltime);
     if (pl->mo)
+    {
+	int reg = AI_REGION (pl->mo); AI_OccAdd (reg);
 	n += snprintf (obsbuf+n, OBSBUF-n,
-		"\"pos\":[%d,%d,%d],\"angle\":%u,\"health\":%d,\"armor\":%d,\"weapon\":%d}",
+		"\"pos\":[%d,%d,%d],\"angle\":%u,\"health\":%d,\"armor\":%d,\"weapon\":%d,\"region\":%d}",
 		pl->mo->x/fx, pl->mo->y/fx, pl->mo->z/fx,
 		(unsigned)(((uint64_t)pl->mo->angle * 360u) >> 32),	// BAM -> degrees
-		pl->health, pl->armorpoints, pl->readyweapon);
+		pl->health, pl->armorpoints, pl->readyweapon, reg);
+    }
     else
 	n += snprintf (obsbuf+n, OBSBUF-n, "\"dead\":true}");
 
     // Buddy (-aicoop only): the director also commands the player's AI companion.
     {
-	int bs = P_AICoop_Slot ();
-	if (P_AICoop_AIMode () && bs >= 0 && playeringame[bs] && players[bs].mo)
+	if (bmo)
 	{
 	    player_t*	b = &players[bs];
+	    int		breg = AI_REGION (bmo); AI_OccAdd (breg);
 	    int		w = b->readyweapon;
 	    int		ammo = (w >= 0 && w < NUMWEAPONS && weaponinfo[w].ammo < NUMAMMO)
 			       ? b->ammo[weaponinfo[w].ammo] : -1;
@@ -413,9 +472,9 @@ static int AI_Serialize (void)
 	    int		nr = P_AICoop_NavRoute (rx, ry, 6), r;
 	    n += snprintf (obsbuf+n, OBSBUF-n,
 		",\"buddy\":{\"pos\":[%d,%d],\"health\":%d,\"armor\":%d,"
-		"\"weapon\":%d,\"ammo\":%d,\"state\":\"%s\",\"route\":[",
+		"\"weapon\":%d,\"ammo\":%d,\"state\":\"%s\",\"region\":%d,\"route\":[",
 		b->mo->x/fx, b->mo->y/fx, b->health, b->armorpoints,
-		w, ammo, (st>=0 && st<6) ? sname[st] : "follow");
+		w, ammo, (st>=0 && st<6) ? sname[st] : "follow", breg);
 	    for (r = 0; r < nr; r++)
 		n += snprintf (obsbuf+n, OBSBUF-n, "%s[%d,%d]", r?",":"", rx[r]/fx, ry[r]/fx);
 	    n += snprintf (obsbuf+n, OBSBUF-n, "]}");
@@ -426,18 +485,77 @@ static int AI_Serialize (void)
     for (i = 0; i < aient_count; i++)
     {
 	mobj_t* m = aient[i].mo;
-	int see = (pl->mo && P_CheckSight (m, pl->mo)) ? 1 : 0;
+	int see   = (pl->mo && P_CheckSight (m, pl->mo)) ? 1 : 0;
+	int seeb  = (bmo && P_CheckSight (m, bmo)) ? 1 : 0;
+	int dpl   = pl->mo ? (int)(P_AproxDistance (m->x - pl->mo->x, m->y - pl->mo->y) >> FRACBITS) : -1;
+	int dbud  = bmo    ? (int)(P_AproxDistance (m->x - bmo->x,    m->y - bmo->y)    >> FRACBITS) : -1;
+	int reg   = AI_REGION (m); AI_OccAdd (reg);
 	if (i)
 	    n += snprintf (obsbuf+n, OBSBUF-n, ",");
 	n += snprintf (obsbuf+n, OBSBUF-n,
-	    "{\"id\":%d,\"type\":\"%s\",\"pos\":[%d,%d],\"hp\":%d,"
-	    "\"see_player\":%s,\"order\":\"%s\"}",
-	    i+1, AI_TypeName(m->type), m->x/fx, m->y/fx, m->health,
-	    see ? "true" : "false", AI_OrderName(aient[i].order));
-	if (n > OBSBUF - 256)
+	    "{\"id\":%d,\"type\":\"%s\",\"pos\":[%d,%d],\"hp\":%d,\"region\":%d,"
+	    "\"see_player\":%s,\"see_buddy\":%s,\"d_player\":%d,\"d_buddy\":%d,\"order\":\"%s\"}",
+	    i+1, AI_TypeName(m->type), m->x/fx, m->y/fx, m->health, reg,
+	    see ? "true" : "false", seeb ? "true" : "false", dpl, dbud,
+	    AI_OrderName(aient[i].order));
+	if (n > OBSBUF - 512)
 	    break;		// buffer guard
     }
-    n += snprintf (obsbuf+n, OBSBUF-n, "],\"count\":%d}\n", aient_count);
+    n += snprintf (obsbuf+n, OBSBUF-n, "],\"count\":%d", aient_count);
+
+    // Room graph: lets the LLM reason about walls / flanking lanes / doors, not just
+    // raw coordinates.  Expand the entity-occupied regions by one hop (so the
+    // corridors/connectors *between* rooms appear), give each region a centroid the
+    // LLM can navigate to, then list the connections:
+    //   "regions":[[id,x,y],...]   "links":[[a,b,"open"|"door"|"locked"],...]
+    {
+	struct { int a, b, k; } pr[160];
+	int      npr = 0, j, p, base = ai_nocc;
+	int64_t  cx[AI_MAXOCC], cy[AI_MAXOCC]; int cnt[AI_MAXOCC];
+
+	// one hop: pull in sectors directly adjacent to an entity-occupied one
+	for (j = 0; j < numlines && ai_nocc < AI_MAXOCC; j++)
+	{
+	    line_t* ld = &lines[j];
+	    int s1, s2;
+	    if (!ld->backsector) continue;
+	    s1 = (int)(ld->frontsector - sectors);
+	    s2 = (int)(ld->backsector  - sectors);
+	    if (AI_InOccN (s1, base) && !AI_InOcc (s2)) AI_OccAdd (s2);
+	    else if (AI_InOccN (s2, base) && !AI_InOcc (s1)) AI_OccAdd (s1);
+	}
+
+	for (p = 0; p < ai_nocc; p++) { cx[p] = cy[p] = 0; cnt[p] = 0; }
+
+	// single pass over lines: accumulate region centroids + collect links
+	for (j = 0; j < numlines; j++)
+	{
+	    line_t* ld = &lines[j];
+	    int s1, s2, i1, i2, k;
+	    s1 = (int)(ld->frontsector - sectors); i1 = AI_OccIndex (s1);
+	    if (i1 >= 0) { cx[i1] += (ld->v1->x + ld->v2->x) >> 1; cy[i1] += (ld->v1->y + ld->v2->y) >> 1; cnt[i1]++; }
+	    if (!ld->backsector) continue;
+	    s2 = (int)(ld->backsector - sectors); i2 = AI_OccIndex (s2);
+	    if (i2 >= 0) { cx[i2] += (ld->v1->x + ld->v2->x) >> 1; cy[i2] += (ld->v1->y + ld->v2->y) >> 1; cnt[i2]++; }
+	    if (i1 < 0 || i2 < 0 || s1 == s2) continue;
+	    { int a = s1, b = s2; if (a > b) { int t = a; a = b; b = t; }
+	      k = AI_DoorKind (ld->special);
+	      for (p = 0; p < npr; p++) if (pr[p].a == a && pr[p].b == b) { if (k > pr[p].k) pr[p].k = k; break; }
+	      if (p == npr && npr < 160) { pr[p].a = a; pr[p].b = b; pr[p].k = k; npr++; } }
+	}
+
+	n += snprintf (obsbuf+n, OBSBUF-n, ",\"regions\":[");
+	for (p = 0; p < ai_nocc; p++)
+	    n += snprintf (obsbuf+n, OBSBUF-n, "%s[%d,%d,%d]", p ? "," : "", ai_occ[p],
+		cnt[p] ? (int)(cx[p]/cnt[p]/fx) : 0, cnt[p] ? (int)(cy[p]/cnt[p]/fx) : 0);
+	n += snprintf (obsbuf+n, OBSBUF-n, "],\"links\":[");
+	for (p = 0; p < npr; p++)
+	    n += snprintf (obsbuf+n, OBSBUF-n, "%s[%d,%d,\"%s\"]", p ? "," : "",
+		pr[p].a, pr[p].b, pr[p].k == 2 ? "locked" : pr[p].k == 1 ? "door" : "open");
+	n += snprintf (obsbuf+n, OBSBUF-n, "]");
+    }
+
+    n += snprintf (obsbuf+n, OBSBUF-n, "}\n");
     return n;
 }
 
