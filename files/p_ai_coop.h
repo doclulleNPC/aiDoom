@@ -110,4 +110,8 @@ void P_AICoop_NoteDamage (struct mobj_s* victim, struct mobj_s* source, int dama
 void P_AICoop_NoteKill (struct mobj_s* victim, struct mobj_s* killer);
 void P_AICoop_Callout (const char* prefix, int n);
 
+// Human pressed USE: if over the downed buddy, donate 10 HP and revive it.  Returns
+// true if the press was consumed (caller then skips P_UseLines).  From P_PlayerThink.
+boolean P_AICoop_RevivePress (player_t* presser);
+
 #endif

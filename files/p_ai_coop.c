@@ -90,6 +90,7 @@ static void AICoop_CrumbAdd (fixed_t x, fixed_t y)
 #define COOP_RUN	0x32		// forwardmove "run" magnitude
 #define COOP_HEAL_HP	50		// seek a med-pack below this health
 #define COOP_SAFE_HP	40		// below this HP the buddy routes home the low-danger way
+#define COOP_REVIVE_RANGE (96*FRACUNIT)	// human must stand this close (and press USE) to revive
 #define COOP_HEAL_RANGE	(1024*FRACUNIT)	// how far to look for one
 #define COOP_ITEM_RANGE	(128*FRACUNIT)	// idle pickups only when right nearby (not "miles away")
 #define COOP_GRAB_NEAR	(512*FRACUNIT)	// only grab items while still near the human (else follow)
@@ -1605,6 +1606,50 @@ static boolean AICoop_GrabStuck (mobj_t* item)
     return false;
 }
 
+// Stand the downed buddy back up in place (L4D revive) with `hp` health -- undoes
+// P_KillMobj on its own mobj instead of reborning at a player start, so it gets up
+// where it fell.
+static void P_AICoop_Revive (int hp)
+{
+    player_t*	bot = &players[coop_slot];
+    mobj_t*	mo  = bot->mo;
+    if (!mo) return;
+    mo->flags |= (MF_SOLID | MF_SHOOTABLE);
+    mo->flags &= ~(MF_CORPSE | MF_DROPOFF);
+    mo->height = mo->info->height;		// un-squash the corpse
+    mo->health = hp;
+    bot->health = hp;
+    bot->playerstate = PST_LIVE;
+    bot->damagecount = 0;
+    bot->attacker = NULL;
+    bot->viewheight = VIEWHEIGHT;
+    bot->deltaviewheight = 0;
+    P_SetMobjState (mo, mo->info->spawnstate);	// stand up (S_PLAY)
+    bot->pendingweapon = bot->readyweapon;	// raise the weapon again
+    AICoop_Callout ("revived:", 3);
+}
+
+// Human pressed USE: if standing over the downed buddy, transfer 10 HP to it and
+// bring it back into the fight.  Returns true if the press was consumed (so the
+// caller doesn't also open a door with the same press).
+boolean P_AICoop_RevivePress (player_t* presser)
+{
+    player_t*	bot;
+    mobj_t*	dmo;
+    if (!companion_active || coop_slot < 0) return false;
+    bot = &players[coop_slot];
+    if (presser == bot || bot->playerstate != PST_DEAD) return false;
+    dmo = bot->mo;
+    if (!dmo || !presser->mo) return false;
+    if (P_AproxDistance (presser->mo->x - dmo->x, presser->mo->y - dmo->y) >= COOP_REVIVE_RANGE)
+	return false;
+    if (presser->health <= 10) return false;	// can't spare it (would down the human)
+    presser->health -= 10;			// transfer 10 HP human -> buddy
+    if (presser->mo) presser->mo->health = presser->health;
+    P_AICoop_Revive (10);			// buddy back up with the donated 10 HP
+    return true;
+}
+
 void P_AICoop_BuildCmd (void)
 {
     player_t*	bot;
@@ -1634,12 +1679,15 @@ void P_AICoop_BuildCmd (void)
     bot = &players[coop_slot];
     cmd = &bot->cmd;
 
-    // Dead: tap "use" so co-op reborns the companion at its start.
+    // Down (L4D-style incapacitation): NOT game over -- the buddy lies on the ground
+    // (its corpse) and calls for help.  We clear the cmd (never tap USE, which would
+    // reborn it at a start) so it stays put; the human revives it by standing close
+    // for a few seconds, and it gets back up where it fell.
     if (bot->playerstate == PST_DEAD)
     {
-	memset (cmd, 0, sizeof(*cmd));
-	cmd->buttons |= BT_USE;
-	return;
+	memset (cmd, 0, sizeof(*cmd));		// never tap USE -> stays down (no reborn)
+	AICoop_Callout ("help:", 5);		// scream for help (4s cooldown gates it)
+	return;					// revived by the human's USE (P_AICoop_RevivePress)
     }
     if (bot->playerstate != PST_LIVE || !bot->mo)
 	return;

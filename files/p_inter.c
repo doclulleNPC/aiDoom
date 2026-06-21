@@ -909,6 +909,10 @@ P_DamageMobj
 	P_AICoop_NoteKill (target, source);	// buddy kill-quip / spree / "nice" callout
 	P_Director_NoteKill (target, source);	// L4D stress: close-quarters kill credit
 	P_KillMobj (source, target);
+	// Downed buddy: snap to the type-15 dead-marine lying pose (no gib), so it reads
+	// as a revivable body on the ground (gray via its player colour translation).
+	if (target->player && P_AICoop_IsBuddy (target->player))
+	    P_SetMobjState (target, S_PLAY_DIE7);
 	return;
     }
 

@@ -1,6 +1,6 @@
 voice=wJmFT75XSkFKaBF1R0rX
 model=eleven_turbo_v2_5
-generated=2026-06-21 20:48:29
+generated=2026-06-21 21:44:28
 
 DSCT001	Contact!	cached	8583
 DSCT002	Tango, engaging!	cached	16098
@@ -150,3 +150,11 @@ DSID01	Quiet... too quiet.	cached	14580
 DSID02	Anything?	cached	9525
 DSID03	Still with me?	cached	12437
 DSID04	I hate the waiting.	cached	14712
+DSHELP01	Man down! Help!	fetched	12093
+DSHELP02	I'm hit bad -- get over here!	fetched	19706
+DSHELP03	Don't leave me!	fetched	12035
+DSHELP04	Buddy down! Medic!	fetched	15614
+DSHELP05	Help me up, damn it!	fetched	13371
+DSREV01	Back in the fight!	fetched	10963
+DSREV02	Thanks -- I owe you one.	fetched	14780
+DSREV03	Let's finish this.	fetched	13350

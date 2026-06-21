@@ -32,6 +32,7 @@ rcsid[] = "$Id: p_user.c,v 1.3 1997/01/28 22:08:29 b1 Exp $";
 #include "d_event.h"
 
 #include "p_local.h"
+#include "p_ai_coop.h"		// P_AICoop_RevivePress -- USE revives a downed buddy
 
 #include "doomstat.h"
 #include "s_sound.h"
@@ -348,7 +349,8 @@ void P_PlayerThink (player_t* player)
     {
 	if (!player->usedown)
 	{
-	    P_UseLines (player);
+	    if (!P_AICoop_RevivePress (player))	// revive a downed buddy (donate 10 HP) first
+		P_UseLines (player);
 	    player->usedown = true;
 	}
     }

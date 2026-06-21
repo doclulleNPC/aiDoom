@@ -193,6 +193,15 @@ EVENTS = [
     ("DSWN01", "All dead. Nice."), ("DSWN02", "Find the exit."), ("DSWN03", "Hail to the king."),
     ("DSSE01", "Secret!"), ("DSSE02", "Ooh, hidden stash."),
     ("DSID01", "Quiet... too quiet."), ("DSID02", "Anything?"), ("DSID03", "Still with me?"), ("DSID04", "I hate the waiting."),
+    # -- buddy DOWN (incapacitated) / revived
+    ("DSHELP01", "Man down! Help!"),
+    ("DSHELP02", "I'm hit bad -- get over here!"),
+    ("DSHELP03", "Don't leave me!"),
+    ("DSHELP04", "Buddy down! Medic!"),
+    ("DSHELP05", "Help me up, damn it!"),
+    ("DSREV01", "Back in the fight!"),
+    ("DSREV02", "Thanks -- I owe you one."),
+    ("DSREV03", "Let's finish this."),
 ]
 for _n, _p in EVENTS:
     _lump(_n)   # enforce the 8-char Doom lump limit at import time

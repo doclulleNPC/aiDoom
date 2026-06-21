@@ -188,6 +188,9 @@ static const voicemap_t VOICE_MAP[] =
     { "lvlclear:0","DSWN01" },{ "lvlclear:1","DSWN02" },{ "lvlclear:2","DSWN03" },
     { "secret:0","DSSE01" },{ "secret:1","DSSE02" },
     { "idle:0","DSID01" },{ "idle:1","DSID02" },{ "idle:2","DSID03" },{ "idle:3","DSID04" },
+    { "help:0","DSHELP01" },{ "help:1","DSHELP02" },{ "help:2","DSHELP03" },
+    { "help:3","DSHELP04" },{ "help:4","DSHELP05" },
+    { "revived:0","DSREV01" },{ "revived:1","DSREV02" },{ "revived:2","DSREV03" },
 };
 #define NUM_VOICE_MAP ((int)(sizeof(VOICE_MAP)/sizeof(VOICE_MAP[0])))
 
