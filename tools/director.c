@@ -352,6 +352,10 @@ static int recv_line (sock_t s, char* out, int cap)
 //  Returns malloc'd body (caller frees), or NULL.
 // ===========================================================================
 
+// Ceiling on a single HTTP response body.  A director plan is a few KB; this is
+// the runaway-generation backstop (see the read loop below).
+#define HTTP_MAX_RESP (4 * 1024 * 1024)   /* 4 MB */
+
 static char* http_post_json (const char* host, int port, const char* path, const char* json_body)
 {
     sock_t s = tcp_connect (host, port, 5);
@@ -370,18 +374,33 @@ static char* http_post_json (const char* host, int port, const char* path, const
     if (send_all (s, hdr, hn) != 0 || send_all (s, json_body, blen) != 0)
         { CLOSESOCK (s); return NULL; }
 
-    // read the whole response until the server closes the connection
+    // Read the whole response until the server closes the connection, but
+    // HARD-CAP the buffer.  A stuck/runaway Ollama generation (some models loop
+    // and emit tokens without end) made this grow by doubling -- 64K, 128K, ...
+    // -- to multiple GB, exhausting RAM and freezing the machine.  A real
+    // director reply is a few KB; anything past the cap is a malfunction, so we
+    // stop and treat it as an error rather than buffering gigabytes.
     size_t cap = 65536, len = 0;
     char*  resp = malloc (cap);
+    if (!resp) { CLOSESOCK (s); return NULL; }
+    int over = 0;
     for (;;)
     {
-        if (len + 4096 > cap) { cap *= 2; resp = realloc (resp, cap); }
+        if (len + 4096 + 1 > cap)
+        {
+            if (cap >= HTTP_MAX_RESP) { over = 1; break; }   // runaway -> stop reading
+            cap *= 2;
+            char* nb = realloc (resp, cap);
+            if (!nb) { free (resp); CLOSESOCK (s); return NULL; }
+            resp = nb;
+        }
         int r = (int) recv (s, resp + len, 4096, 0);
         if (r <= 0) break;
         len += r;
     }
-    resp[len] = '\0';
     CLOSESOCK (s);
+    if (over) { free (resp); return NULL; }   // oversized response: treat as error
+    resp[len] = '\0';
 
     char* body = strstr (resp, "\r\n\r\n");
     if (!body) { free (resp); return NULL; }
@@ -533,7 +552,9 @@ static int worker (void* unused)
         char* body = malloc (16000);
         snprintf (body, 16000,
             "{\"model\":\"%s\",\"stream\":false,\"format\":\"json\","
-            "\"options\":{\"temperature\":0.6},\"messages\":["
+            // num_predict caps generation so a model that loops can't run away
+            // (the runaway response was what ballooned the director's RAM).
+            "\"options\":{\"temperature\":0.6,\"num_predict\":768},\"messages\":["
             "{\"role\":\"system\",\"content\":\"%s\"},"
             "{\"role\":\"user\",\"content\":\"Recent rounds (oldest first):\\n%s\\nGame state: %s\\nAssign orders now as JSON.\"}]}",
             opt_model, SYSTEM_PROMPT, histesc, esc);
