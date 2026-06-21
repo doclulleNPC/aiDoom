@@ -86,6 +86,7 @@ Vollständige Liste aller CLI-Flags die `aidoom` akzeptiert, extrahiert via
 |------|-----------|---------|---------|
 | `-aidirector` | `<port>` | off | Aktiviert den LLM-Director. Öffnet TCP-Listener auf `<port>` (aidoom.cfg-Default: 31666), erwartet einen Director-Client (`run/director`, SDL3/C) der das Monster-Verhalten steuert. |
 | `-aidemo` | — | off | Eingebauter AI-Director ohne Ollama (deterministisches Test-Mode für Director-Protokoll). |
+| `-director` | — | off | **L4D-Style Spawn-Director (regelbasiert, offline, kein LLM).** Misst pro Tic ein Spieler-Stresslevel (0–100) aus: erlittenem Schaden (burst-gewichtet), Close-Quarters-Kills (Nahkampf/Schrotflinte zählt, Snipen kaum) und niedriger Munition. Fährt damit einen Build-up→Peak→Relax-Zyklus: spawnt Extra-Monster **außer Sicht** hinter den Survivors während des Aufbaus, droppt im Relax Items. Deterministisch (P_Random, tic-locked). Läuft *zusätzlich* zu den normalen Map-Monstern (am besten mit `-skill 4`). Die LLM-Variante liest dasselbe Stresslevel via `-aidirector`. |
 
 ### Co-op Companion (Buddy)
 

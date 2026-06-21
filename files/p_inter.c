@@ -39,7 +39,8 @@ rcsid[] = "$Id: p_inter.c,v 1.4 1997/02/03 22:45:11 b1 Exp $";
 #include "am_map.h"
 
 #include "p_local.h"
-#include "p_ai_coop.h"	// P_AICoop_IsBuddy -- buddy must not pocket keys
+#include "p_ai_coop.h"		// P_AICoop_IsBuddy -- buddy must not pocket keys
+#include "p_ai_director.h"	// L4D stress director (-director)
 
 #include "s_sound.h"
 
@@ -887,6 +888,7 @@ P_DamageMobj
 	    player->health = 0;
 
 	P_AICoop_NoteDamage (target, source, damage);	// buddy danger heatmap + friendly-fire callout
+	P_Director_NoteDamage (target, damage);		// L4D stress: damage taken (burst-weighted)
 
 	player->attacker = source;
 	player->damagecount += damage;	// add damage after armor / invuln
@@ -905,6 +907,7 @@ P_DamageMobj
     if (target->health <= 0)
     {
 	P_AICoop_NoteKill (target, source);	// buddy kill-quip / spree / "nice" callout
+	P_Director_NoteKill (target, source);	// L4D stress: close-quarters kill credit
 	P_KillMobj (source, target);
 	return;
     }

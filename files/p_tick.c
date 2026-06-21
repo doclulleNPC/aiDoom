@@ -29,6 +29,7 @@ rcsid[] = "$Id: p_tick.c,v 1.4 1997/02/03 16:47:55 b1 Exp $";
 #include "p_local.h"
 #include "p_ai_llm.h"
 #include "p_ai_coop.h"
+#include "p_ai_director.h"
 
 #include "doomstat.h"
 
@@ -154,6 +155,7 @@ void P_Ticker (void)
 	    P_PlayerThink (&players[i]);
 			
     P_AI_Ticker ();		// LLM AI Director: poll orders, age timers
+    P_Director_Ticker ();	// L4D rule-based director: intensity decay + spawn FSM
 
     P_RunThinkers ();
     P_UpdateSpecials ();

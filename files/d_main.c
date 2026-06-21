@@ -84,6 +84,7 @@ static int access(char *file, int mode)
 
 #include "p_setup.h"
 #include "p_ai_coop.h"
+#include "p_ai_director.h"
 #include "c_console.h"
 #include "i_udp.h"		// Chocolate/Crispy net: UDP + packet layer (-querychoc/-chocsyn)
 #include "d_netcl.h"		// Chocolate/Crispy net client (-connect/-netclient)
@@ -1214,6 +1215,7 @@ printf("added\n");
     // exclusive -- specifying both aborts in P_AICoop_Init.  Must run after
     // D_CheckNetGame (which sets playeringame[]) and before the first level.
     P_AICoop_Init ();
+    P_Director_Init ();		// L4D-style rule-based spawn director (-director)
 
     printf ("S_Init: Setting up sound.\n");
     S_Init (snd_SfxVolume /* *8 */, snd_MusicVolume /* *8*/ );
