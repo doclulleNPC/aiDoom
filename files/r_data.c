@@ -252,8 +252,12 @@ void R_GenerateComposite (int texnum)
     texture = textures[texnum];
 
     block = Z_Malloc (texturecompositesize[texnum],
-		      PU_STATIC, 
-		      &texturecomposite[texnum]);	
+		      PU_STATIC,
+		      &texturecomposite[texnum]);
+
+    // VANILLA BUG (tutti-frutti): zero-fill so rows not covered by any patch are
+    // deterministic (palette 0) instead of whatever heap garbage Z_Malloc left.
+    memset (block, 0, texturecompositesize[texnum]);
 
     collump = texturecolumnlump[texnum];
     colofs = texturecolumnofs[texnum];
@@ -315,22 +319,32 @@ void R_GenerateLookup (int texnum)
     int			i;
     short*		collump;
     unsigned short*	colofs;
-	
+    // VANILLA BUG (tutti-frutti): vanilla read single-patch columns directly
+    // from the WAD patch; if the patch didn't span the full texture height the
+    // column drawer ran past it -> garbage stripe.  Track each column's
+    // covering-patch vertical span so partially-covered columns can be forced
+    // through the (zero-filled) composite path.  Normal full-height columns are
+    // unaffected (still direct); worst case is just more compositing.
+    short*		coltop;
+    short*		colbot;
+
     texture = textures[texnum];
 
     // Composited texture not created yet.
     texturecomposite[texnum] = 0;
-    
+
     texturecompositesize[texnum] = 0;
     collump = texturecolumnlump[texnum];
     colofs = texturecolumnofs[texnum];
-    
+
     // Now count the number of columns
     //  that are covered by more than one patch.
     // Fill in the lump / offset, so columns
     //  with only a single patch are all done.
     patchcount = (byte *)alloca (texture->width);
     memset (patchcount, 0, texture->width);
+    coltop = (short *)alloca (texture->width * sizeof(short));
+    colbot = (short *)alloca (texture->width * sizeof(short));
     patch = texture->patches;
 		
     for (i=0 , patch = texture->patches;
@@ -353,9 +367,11 @@ void R_GenerateLookup (int texnum)
 	    patchcount[x]++;
 	    collump[x] = patch->patch;
 	    colofs[x] = LONG(realpatch->columnofs[x-x1])+3;
+	    coltop[x] = patch->originy;
+	    colbot[x] = patch->originy + SHORT(realpatch->height);
 	}
     }
-	
+
     for (x=0 ; x<texture->width ; x++)
     {
 	if (!patchcount[x])
@@ -365,11 +381,16 @@ void R_GenerateLookup (int texnum)
 	    return;
 	}
 	// I_Error ("R_GenerateLookup: column without a patch");
-	
-	if (patchcount[x] > 1)
+
+	// Composite the column if it has multiple patches OR a single patch
+	// that doesn't span the full texture height (the latter is the
+	// tutti-frutti fix -- vanilla only checked patchcount > 1).
+	if (patchcount[x] > 1
+	    || coltop[x] > 0
+	    || colbot[x] < texture->height)
 	{
 	    // Use the cached block.
-	    collump[x] = -1;	
+	    collump[x] = -1;
 	    colofs[x] = texturecompositesize[texnum];
 	    
 	    if (texturecompositesize[texnum] > 0x10000-texture->height)
