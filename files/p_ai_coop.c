@@ -1381,7 +1381,7 @@ void P_AICoop_BuildCmd (void)
     if (pl)
     {
 	static int     prog_tic;
-	static fixed_t prog_pld;
+	static fixed_t best_pld = 0x7fffffff;	// closest we've gotten to the player
 	static int     noprog;
 	fixed_t        pld = P_AproxDistance (mo->x - pl->x, mo->y - pl->y);
 
@@ -1390,16 +1390,18 @@ void P_AICoop_BuildCmd (void)
 	if (gametic - prog_tic >= 35)			// re-check ~1x/s
 	{
 	    prog_tic = gametic;
-	    // far from the player and not >=32u closer than last check -> no progress
-	    if (pld > COOP_NEAR && pld + 32*FRACUNIT > prog_pld) noprog++;
-	    else                                                 noprog = 0;
-	    prog_pld = pld;
-	    if (noprog >= 3 && crumb_n > 1)			// ~3 s stuck -> trail
-		trail_active = 1;
-	    if (noprog == 0)					// progress -> normal nav
-		trail_active = 0;
+	    // Progress = reaching a NEW minimum distance.  Tracking the best (not the
+	    // last) defeats jitter: oscillating in place bounces pld ~+/-100u, which the
+	    // old "closer than last second" test mistook for progress, so the watchdog
+	    // never tripped and the trail/fallback never kicked in.
+	    if (pld < best_pld - 32*FRACUNIT) { best_pld = pld; noprog = 0; }
+	    else                                noprog++;
+	    if (pld <= COOP_NEAR) { best_pld = pld; noprog = 0; trail_active = 0; }
+	    else if (noprog >= 3)  trail_active = 1;		// ~3 s no closer -> trail/fallback
+	    else if (noprog == 0)  trail_active = 0;		// gaining -> normal nav
 	}
-	if (pld <= COOP_NEAR) trail_active = 0;			// reached the player
+	else if (pld <= COOP_NEAR) trail_active = 0;		// reached the player
+	if (pld < best_pld) best_pld = pld;			// keep the running minimum fresh
     }
     else
 	trail_active = 0;
@@ -1546,16 +1548,27 @@ void P_AICoop_BuildCmd (void)
     // Steer STRAIGHT at the NEWEST crumb we can directly reach (closest to the player
     // on the human's actual path) -- not via the pathfinder, so we never detour the
     // wrong way around a wall, and each step is a verified-walkable hop toward them.
-    if (trail_active && pl && (coop_state == 0 || coop_state == 4) && crumb_n > 0)
+    int chase_player = 0;
+    if (trail_active && pl && (coop_state == 0 || coop_state == 4))
     {
-	int i;
+	int i, used = 0;
 	for (i = crumb_n-1; i >= 0; i--)
 	    if (AICoop_CanReach (mo, crumbx[i], crumby[i], false))
 	    {
 		tx = crumbx[i]; ty = crumby[i];
 		navigate = 0; movethresh = 24*FRACUNIT;	// steer straight, no PF detour
-		break;
+		used = 1; break;
 	    }
+	// No reachable crumb (e.g. loaded a save where the human never laid a trail,
+	// or a closed door cut the trail off): chase the human DIRECTLY -- keep
+	// navigate on but aim its door-aware corner-rounding (FindDoorAhead + ChaseDir)
+	// at the human instead of the oscillating BSP waypoint, so it rounds corners and
+	// Uses shut doors on the way instead of grinding one wall.
+	if (!used)
+	{
+	    tx = pl->x; ty = pl->y;
+	    navigate = 1; chase_player = 1; movethresh = COOP_NEAR/2;
+	}
     }
 
     // Navigate: if asked to walk somewhere, route there via the BSP pathfinder and
@@ -1572,7 +1585,7 @@ void P_AICoop_BuildCmd (void)
 	    navtimer = 10; navgoal = gss;
 	    navok = PF_NextWaypoint (mo, tx, ty, &navwx, &navwy);
 	}
-	if (navok) { goalx = navwx; goaly = navwy; }
+	if (navok && !chase_player) { goalx = navwx; goaly = navwy; }
 	// A closed door on the way?  Head STRAIGHT at the doorway (no sweep) so we
 	// enter the corridor toward it -- TraceSteer would sweep away from the shut
 	// door (it reads as a wall) and the buddy would oscillate beside it forever.

@@ -46,9 +46,14 @@ for c in ./aidoom ../files/aidoom; do [ -x "$c" ] && { AIDOOM="$c"; break; }; do
 DIRBIN=./director; [ -x "$DIRBIN" ] || DIRBIN=../tools/director
 [ -x "$DIRBIN" ]   || { echo "[aibuddy] director not found -- build it: tools/build_director.sh" >&2; exit 1; }
 
-# Default-warp to MAP01 unless the caller already passed -warp.
-warp=0; for a in ${GAME_ARGS[@]+"${GAME_ARGS[@]}"}; do [ "$a" = "-warp" ] && warp=1; done
-[ "$warp" = 1 ] || GAME_ARGS=(-warp 1 1 ${GAME_ARGS[@]+"${GAME_ARGS[@]}"})
+# Default-warp to MAP01 and default to skill 4 unless the caller passed their own.
+warp=0; skill=0
+for a in ${GAME_ARGS[@]+"${GAME_ARGS[@]}"}; do
+    [ "$a" = "-warp" ]  && warp=1
+    [ "$a" = "-skill" ] && skill=1
+done
+[ "$skill" = 1 ] || GAME_ARGS=(-skill 4 ${GAME_ARGS[@]+"${GAME_ARGS[@]}"})
+[ "$warp"  = 1 ] || GAME_ARGS=(-warp 1 1 ${GAME_ARGS[@]+"${GAME_ARGS[@]}"})
 
 echo "[aibuddy] game:     $AIDOOM -aicoop -aidirector $PORT ${GAME_ARGS[*]}"
 "$AIDOOM" -aicoop -aidirector "$PORT" "${GAME_ARGS[@]}" &
