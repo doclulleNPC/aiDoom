@@ -61,8 +61,13 @@ def ssh_smi(user, host, key, port):
            "-o", "StrictHostKeyChecking=accept-new"]
     if key:
         cmd += ["-i", key]
+    # Try nvidia-smi on PATH first (Windows OpenSSH / Linux host), then nvidia-smi.exe
+    # (WSL with the Windows PATH appended), then the explicit WSL System32 path -- so it
+    # works whether the SSH lands in cmd/PowerShell or a WSL shell.
+    args = f"--query-gpu={SMI_QUERY} --format=csv,noheader,nounits"
     cmd += [f"{user}@{host}",
-            f"nvidia-smi --query-gpu={SMI_QUERY} --format=csv,noheader,nounits"]
+            f"nvidia-smi {args} || nvidia-smi.exe {args} "
+            f"|| /mnt/c/Windows/System32/nvidia-smi.exe {args}"]
     r = subprocess.run(cmd, capture_output=True, text=True, timeout=12)
     if r.returncode != 0:
         raise RuntimeError((r.stderr.strip() or "ssh/nvidia-smi failed").splitlines()[-1])

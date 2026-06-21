@@ -149,8 +149,19 @@ static int run_query(const char* cmd, char* line, int n)
     CloseHandle(pi.hProcess); CloseHandle(pi.hThread);
 
     if (total <= 0) return 0;
+    // Pick the stats line (starts with a digit), skipping shell noise like the WSL
+    // fallback's "bash: nvidia-smi: command not found"; keep the first line as a
+    // fallback so a real ssh/connection error still shows.
+    char* best = NULL; char* p = buf;
+    while (*p)
+    {
+        if (!best) best = p;
+        if (*p >= '0' && *p <= '9') { best = p; break; }
+        while (*p && *p != '\n' && *p != '\r') p++;
+        while (*p == '\n' || *p == '\r') p++;
+    }
     int i = 0;
-    for (; i < n-1 && buf[i] && buf[i] != '\n' && buf[i] != '\r'; i++) line[i] = buf[i];
+    for (; i < n-1 && best && best[i] && best[i] != '\n' && best[i] != '\r'; i++) line[i] = best[i];
     line[i] = 0;
     return 1;
 }
@@ -158,9 +169,20 @@ static int run_query(const char* cmd, char* line, int n)
 static int run_query(const char* cmd, char* line, int n)
 {
     FILE* p = popen(cmd, "r");
-    int ok = (p && fgets(line, n, p)) ? 1 : 0;
-    if (p) pclose(p);
-    return ok;
+    char buf[1024];
+    int  got = 0;
+    if (!p) return 0;
+    line[0] = 0;
+    // Pick the stats line (starts with a digit), skipping shell noise like the WSL
+    // fallback's "bash: nvidia-smi: command not found".  Keep the first line as a
+    // fallback so a real ssh/connection error still gets displayed.
+    while (fgets(buf, sizeof(buf), p))
+    {
+        if (!line[0]) { strncpy(line, buf, n-1); line[n-1] = 0; got = 1; }
+        if (buf[0] >= '0' && buf[0] <= '9') { strncpy(line, buf, n-1); line[n-1] = 0; got = 1; break; }
+    }
+    pclose(p);
+    return got;
 }
 #endif
 
@@ -168,7 +190,7 @@ static int run_query(const char* cmd, char* line, int n)
 static int fetch_thread(void* unused)
 {
     (void)unused;
-    char cmd[512], line[256];
+    char cmd[1024], line[256];
     const char* smiargs =
         "--query-gpu=utilization.gpu,memory.used,memory.total,"
         "temperature.gpu,power.draw,name --format=csv,noheader,nounits";
@@ -193,9 +215,14 @@ static int fetch_thread(void* unused)
 #endif
         }
         else
+            // Try nvidia-smi on PATH first (Windows OpenSSH / Linux host), then
+            // nvidia-smi.exe (WSL with the Windows PATH appended), then the explicit
+            // WSL System32 path -- so it works whether the SSH lands in cmd/PowerShell
+            // or a WSL shell where nvidia-smi.exe is at /mnt/c/Windows/System32.
             snprintf(cmd, sizeof(cmd),
-                "ssh -o BatchMode=yes -o ConnectTimeout=5 -p %d %s@%s \"nvidia-smi %s\" 2>&1",
-                sshport, user, host, smiargs);
+                "ssh -o BatchMode=yes -o ConnectTimeout=5 -p %d %s@%s "
+                "\"nvidia-smi %s || nvidia-smi.exe %s || /mnt/c/Windows/System32/nvidia-smi.exe %s\" 2>&1",
+                sshport, user, host, smiargs, smiargs, smiargs);
 
         gpustat_t s; memset(&s, 0, sizeof(s));
         if (run_query(cmd, line, sizeof(line))) {
