@@ -11,11 +11,16 @@ to distribute than 37 loose .ogg files.  See CLAUDE.md / LEGACY_FIXES.md
 ("offline buddy voice via stb_vorbis + dedicated SDL audio stream").
 
 Output:
-    run/buddy.wad              (~2-5 MB; PWAD with 37 DS* lumps, OGG/Vorbis data)
-    run/buddy_voice_manifest.txt  (lump name <-> phrase, for reproducibility)
+    run/buddy.wad              (PWAD with ~130 DS* OGG/Vorbis lumps + a VOICEMAP
+                                text lump carrying the lump<->phrase mapping)
+    run/buddy_voice_manifest.txt  (same mapping, as a loose file)
 
-Phrases (37 total): combat callouts (10), state-where (6), wait/hold/move (2),
-attack/no-target (2), summon (1), status per weapon x 2 variants (18).
+Phrases: the original 37 (callouts/state/replies/status) PLUS event callouts
+(kill/dodge/dry/barrel/crit/taunt/bigmon/edge/jump/door/stuck/lost/ff/plhurt/
+pldown/healed/god/arm/lvlstart/lvlclear/idle/...), Joker-HL voice.
+
+Pipeline: ElevenLabs returns MP3 -> ffmpeg transcodes to OGG/Vorbis -> packed into
+the WAD.  API key from ~/.hermes/.env (or --key / $ELEVENLABS_API_KEY), NEVER aidoom.cfg.
 
 ElevenLabs:
     - voice id        configurable; default Joker-HL (matches in-game default)
@@ -127,8 +132,56 @@ for code, _wkey, wname in WEAPON_CODES:
     if code in WEAPONS_WITH_AMMO:
         STATUS_LUMPS.append((_lump("DSST" + code + "A"), wname + " Loaded."))
 
-PHRASES = CALLOUTS + STATES + REPLIES + STATUS_LUMPS
-assert len(PHRASES) == 37, f"phrase count drifted: {len(PHRASES)} != 37"
+# Extra event callouts (rotated by AICoop_Callout).  Tag = prefix + index (e.g.
+# "kill:0"); lump <= 8 chars; mapping mirrored in files/i_voice.c.  Joker-HL voice.
+EVENTS = [
+    # -- combat
+    ("DSKL01", "Got him!"), ("DSKL02", "Down!"), ("DSKL03", "Scratch one."), ("DSKL04", "Stay down."),
+    # Duke-style monster-specific kill quips (imp gets its own)
+    ("DSKI01", "I pimped that imp!"), ("DSKI02", "Imp? More like wimp."), ("DSKI03", "Hot-footed that imp."),
+    ("DSDG01", "Incoming!"), ("DSDG02", "Whoa!"), ("DSDG03", "Not today."),
+    ("DSDRY01", "I'm dry!"), ("DSDRY02", "Out of ammo!"), ("DSDRY03", "Need a reload!"),
+    ("DSBR01", "Not near that barrel!"), ("DSBR02", "Barrel -- hold up."), ("DSBR03", "That thing'll blow."),
+    ("DSSP01", "On a roll!"), ("DSSP02", "Can't stop me!"), ("DSSP03", "They keep coming!"), ("DSSP04", "Damn, I'm good."),
+    ("DSGB01", "Chunky."), ("DSGB02", "Boom!"), ("DSGB03", "Cleanup on aisle hell."),
+    ("DSCR01", "I'm dying here!"), ("DSCR02", "Critical -- cover me!"), ("DSCR03", "Patch me up, now!"),
+    ("DSFS01", "Just my fists now."), ("DSFS02", "Knuckle up."),
+    ("DSTN01", "Come get some!"), ("DSTN02", "Is that all?"), ("DSTN03", "I do this for fun."), ("DSTN04", "Rest in pieces!"),
+    ("DSBIG01", "Big one!"), ("DSBIG02", "Oh, that's a Cyberdemon..."), ("DSBIG03", "We're gonna need more ammo."),
+    ("DSFL01", "Behind you!"), ("DSFL02", "They're flanking!"), ("DSFL03", "On your six!"),
+    ("DSIF01", "Let 'em fight."), ("DSIF02", "They're killing each other!"),
+    # -- navigation / movement
+    ("DSED01", "Careful -- nukage."), ("DSED02", "Watch the edge."), ("DSED03", "Easy, long drop."),
+    ("DSJP01", "Hup!"), ("DSJP02", "Up we go."),
+    ("DSDO01", "Door!"), ("DSDO02", "Opening up."),
+    ("DSSK01", "I'm stuck!"), ("DSSK02", "Gimme a sec."), ("DSSK03", "Snagged on something."),
+    ("DSLS01", "Where'd you go?"), ("DSLS02", "Wait up!"), ("DSLS03", "I lost you!"),
+    ("DSLK01", "Locked. Need a key."), ("DSLK02", "Can't open this one."),
+    ("DSCU01", "Crusher!"), ("DSCU02", "Don't get squished."),
+    # -- co-op / player
+    ("DSPH01", "You okay?!"), ("DSPH02", "I got you covered!"), ("DSPH03", "Fall back, I'll hold!"),
+    ("DSPD01", "No! ...I'll avenge you."), ("DSPD02", "Stay down, I got this."),
+    ("DSFF01", "Hey! Watch it!"), ("DSFF02", "Friendly fire!"), ("DSFF03", "That's MY blood, pal."),
+    ("DSFF04", "Friendly fire, jackass!"), ("DSFF05", "I'm on YOUR side, genius!"), ("DSFF06", "Shoot them, not me!"),
+    ("DSNC01", "Nice shot!"), ("DSNC02", "Good kill."),
+    # -- items / power-ups / status
+    ("DSPU01", "Nice, ammo!"), ("DSPU02", "Health -- sweet."), ("DSPU03", "Don't mind if I do."),
+    ("DSHL01", "Patched up."), ("DSHL02", "Better. Let's go."),
+    ("DSBK01", "Berserk! Get over here!"), ("DSBK02", "Now I'm untouchable!"),
+    ("DSGOD01", "Invincible!"), ("DSGOD02", "Can't touch me."),
+    ("DSARM01", "Loaded for bear!"), ("DSARM02", "Now we're talking."),
+    # -- progression / banter
+    ("DSLV01", "Fresh hell."), ("DSLV02", "Here we go again."), ("DSLV03", "Let's clear it."),
+    ("DSWN01", "All dead. Nice."), ("DSWN02", "Find the exit."), ("DSWN03", "Hail to the king."),
+    ("DSSE01", "Secret!"), ("DSSE02", "Ooh, hidden stash."),
+    ("DSID01", "Quiet... too quiet."), ("DSID02", "Anything?"), ("DSID03", "Still with me?"), ("DSID04", "I hate the waiting."),
+]
+for _n, _p in EVENTS:
+    _lump(_n)   # enforce the 8-char Doom lump limit at import time
+
+PHRASES = CALLOUTS + STATES + REPLIES + STATUS_LUMPS + EVENTS
+_allnames = [n for n, _ in PHRASES]
+assert len(_allnames) == len(set(_allnames)), "duplicate lump name in PHRASES"
 
 
 # ---------- ElevenLabs API ----------
@@ -157,7 +210,7 @@ def cfg_value(cfg_path, key):
 
 
 def env_file_value(path, *names):
-    """Read KEY=VALUE from a dotenv file (e.g. ~/hermes/.env), trying each name.
+    """Read KEY=VALUE from a dotenv file (e.g. ~/.hermes/.env), trying each name.
     Secrets (the ElevenLabs key) live HERE, never in aidoom.cfg."""
     try:
         with open(os.path.expanduser(path)) as f:
@@ -344,6 +397,7 @@ def main():
             print("ERROR: --offline-test needs ffmpeg on PATH.", file=sys.stderr)
             return 2
         out_path.parent.mkdir(parents=True, exist_ok=True)
+        cache_dir.mkdir(parents=True, exist_ok=True)
         lumps = []
         manifest_lines = []
         print(f"bake_buddy_voice: OFFLINE-TEST mode (sine-tone OGGs) -> {out_path}")
@@ -364,24 +418,24 @@ def main():
             lumps.append((name, data))
             manifest_lines.append(f"{name}\t{phrase}\toffline-sine({freq}Hz)\t{len(data)}\n")
             print(f"  [{i:2d}/{len(PHRASES)}] {name}  '{phrase}' -> {freq} Hz")
+        manifest_txt = (f"OFFLINE-TEST MODE (sine tones)\n"
+                        f"generated={time.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                        + "".join(manifest_lines))
+        lumps.append(("VOICEMAP", manifest_txt.encode("utf-8")))
         write_wad(out_path, lumps)
-        (out_path.parent / "buddy_voice_manifest.txt").write_text(
-            f"OFFLINE-TEST MODE (sine tones)\n"
-            f"generated={time.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-            + "".join(manifest_lines)
-        )
+        (out_path.parent / "buddy_voice_manifest.txt").write_text(manifest_txt)
         total = sum(len(d) for _n, d in lumps)
         print(f"\nbake_buddy_voice: wrote {out_path}  ({len(lumps)} lumps, {total} bytes)")
         return 0
 
-    # Key precedence: --key > env var > ~/hermes/.env.  NEVER aidoom.cfg -- secrets
+    # Key precedence: --key > env var > ~/.hermes/.env.  NEVER aidoom.cfg -- secrets
     # don't belong in the game config (which can be shared / committed by accident).
     key = args.key or os.environ.get("ELEVENLABS_API_KEY") \
-          or env_file_value("~/hermes/.env",
+          or env_file_value("~/.hermes/.env",
                             "ELEVENLABS_API_KEY", "ELEVEN_API_KEY", "XI_API_KEY")
     if not key:
         print("ERROR: no ElevenLabs API key.  Put 'ELEVENLABS_API_KEY=sk_...' in "
-              "~/hermes/.env (preferred), export ELEVENLABS_API_KEY, or pass --key.",
+              "~/.hermes/.env (preferred), export ELEVENLABS_API_KEY, or pass --key.",
               file=sys.stderr)
         return 2
 
@@ -423,14 +477,17 @@ def main():
         lumps.append((name, data))
         manifest_lines.append(f"{name}\t{phrase}\t{src}\t{len(data)}\n")
 
+    # Pack the lump<->phrase mapping INTO the WAD as a text lump ("VOICEMAP") so the
+    # WAD is self-documenting -- no external file needed to know what each lump says.
+    manifest_txt = (f"voice={args.voice}\nmodel={args.model}\n"
+                    f"generated={time.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                    + "".join(manifest_lines))
+    lumps.append(("VOICEMAP", manifest_txt.encode("utf-8")))
+
     write_wad(out_path, lumps)
 
-    # Manifest next to the WAD for reproducibility.
-    (out_path.parent / "buddy_voice_manifest.txt").write_text(
-        f"voice={args.voice}\nmodel={args.model}\n"
-        f"generated={time.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-        + "".join(manifest_lines)
-    )
+    # ... and a copy next to the WAD for reproducibility/grep.
+    (out_path.parent / "buddy_voice_manifest.txt").write_text(manifest_txt)
 
     total = sum(len(d) for _n, d in lumps)
     print(f"\nbake_buddy_voice: wrote {out_path}  ({len(lumps)} lumps, {total} bytes)")

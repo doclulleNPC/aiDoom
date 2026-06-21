@@ -1,41 +1,134 @@
 voice=wJmFT75XSkFKaBF1R0rX
 model=eleven_turbo_v2_5
-generated=2026-06-19 09:59:57
+generated=2026-06-21 20:33:30
 
-DSCT001	Contact!	fetched	11237
-DSCT002	Tango, engaging!	fetched	14083
-DSCT003	I see one!	fetched	10680
-DSCT004	Got movement!	fetched	10144
-DSHR01	I'm hit!	fetched	10179
-DSHR02	Taking fire!	fetched	13393
-DSHR03	I need health!	fetched	10834
-DSCL01	Area clear.	fetched	12477
-DSCL02	All quiet.	fetched	12470
-DSCL03	Watch our six.	fetched	13491
-DSWFOLLOW	Following you.	fetched	11859
-DSWFIGHT	Fighting.	fetched	9156
-DSWHEAL	Getting health.	fetched	14978
-DSWHOLD	Holding position.	fetched	13848
-DSWCOME	Coming to you.	fetched	11426
-DSWGRAB	Grabbing an item.	fetched	13702
-DSSUMONOK	On my way!	fetched	10735
-DSWAITHD	Holding position.	fetched	13351
-DSWAITMV	Moving out.	fetched	10250
-DSATACK	Attacking!	fetched	10001
-DSATNONE	No targets around.	fetched	13737
-DSSTFISP	Fists.	fetched	11266
-DSSTPISP	Pistol.	fetched	8619
-DSSTPISA	Pistol. Loaded.	fetched	10916
-DSSTSHTP	Shotgun.	fetched	10295
-DSSTSHTA	Shotgun. Loaded.	fetched	14317
-DSSTCHGP	Chaingun.	fetched	10282
-DSSTCHGA	Chaingun. Loaded.	fetched	14074
-DSSTRCKP	Rocket launcher.	fetched	13210
-DSSTRCKA	Rocket launcher. Loaded.	fetched	16620
-DSSTPLSP	Plasma rifle.	fetched	11750
-DSSTPLSA	Plasma rifle. Loaded.	fetched	16735
-DSSTBFGP	B. F. G.	fetched	11972
-DSSTBFGA	B. F. G. Loaded.	fetched	13912
-DSSTCSWP	Chainsaw.	fetched	9822
-DSSTSSHP	Super shotgun.	fetched	12541
-DSSTSSHA	Super shotgun. Loaded.	fetched	18134
+DSCT001	Contact!	fetched	8583
+DSCT002	Tango, engaging!	fetched	16098
+DSCT003	I see one!	fetched	9407
+DSCT004	Got movement!	fetched	10250
+DSHR01	I'm hit!	fetched	11811
+DSHR02	Taking fire!	fetched	11877
+DSHR03	I need health!	fetched	15341
+DSCL01	Area clear.	fetched	14450
+DSCL02	All quiet.	fetched	9543
+DSCL03	Watch our six.	fetched	12922
+DSWFOLLOW	Following you.	fetched	10013
+DSWFIGHT	Fighting.	fetched	9798
+DSWHEAL	Getting health.	fetched	12502
+DSWHOLD	Holding position.	fetched	11435
+DSWCOME	Coming to you.	fetched	11666
+DSWGRAB	Grabbing an item.	fetched	13877
+DSSUMONOK	On my way!	fetched	11258
+DSWAITHD	Holding position.	fetched	11611
+DSWAITMV	Moving out.	fetched	10169
+DSATACK	Attacking!	fetched	9084
+DSATNONE	No targets around.	fetched	15667
+DSSTFISP	Fists.	fetched	10170
+DSSTPISP	Pistol.	fetched	8489
+DSSTPISA	Pistol. Loaded.	fetched	13481
+DSSTSHTP	Shotgun.	fetched	9643
+DSSTSHTA	Shotgun. Loaded.	fetched	13333
+DSSTCHGP	Chaingun.	fetched	10115
+DSSTCHGA	Chaingun. Loaded.	fetched	14425
+DSSTRCKP	Rocket launcher.	fetched	14345
+DSSTRCKA	Rocket launcher. Loaded.	fetched	17525
+DSSTPLSP	Plasma rifle.	fetched	12810
+DSSTPLSA	Plasma rifle. Loaded.	fetched	18428
+DSSTBFGP	B. F. G.	fetched	13628
+DSSTBFGA	B. F. G. Loaded.	fetched	14177
+DSSTCSWP	Chainsaw.	fetched	12371
+DSSTSSHP	Super shotgun.	fetched	13566
+DSSTSSHA	Super shotgun. Loaded.	fetched	16981
+DSKL01	Got him!	fetched	7695
+DSKL02	Down!	fetched	9445
+DSKL03	Scratch one.	fetched	11420
+DSKL04	Stay down.	fetched	12506
+DSKI01	I pimped that imp!	fetched	14492
+DSKI02	Imp? More like wimp.	fetched	17217
+DSKI03	Hot-footed that imp.	fetched	17436
+DSDG01	Incoming!	fetched	10387
+DSDG02	Whoa!	fetched	9918
+DSDG03	Not today.	fetched	13328
+DSDRY01	I'm dry!	fetched	11296
+DSDRY02	Out of ammo!	fetched	11714
+DSDRY03	Need a reload!	fetched	14525
+DSBR01	Not near that barrel!	fetched	16345
+DSBR02	Barrel -- hold up.	fetched	11170
+DSBR03	That thing'll blow.	fetched	16301
+DSSP01	On a roll!	fetched	11127
+DSSP02	Can't stop me!	fetched	13546
+DSSP03	They keep coming!	fetched	12006
+DSSP04	Damn, I'm good.	fetched	14655
+DSGB01	Chunky.	fetched	8217
+DSGB02	Boom!	fetched	8474
+DSGB03	Cleanup on aisle hell.	fetched	16083
+DSCR01	I'm dying here!	fetched	12585
+DSCR02	Critical -- cover me!	fetched	15002
+DSCR03	Patch me up, now!	fetched	12668
+DSFS01	Just my fists now.	fetched	15214
+DSFS02	Knuckle up.	fetched	10760
+DSTN01	Come get some!	fetched	13270
+DSTN02	Is that all?	fetched	11220
+DSTN03	I do this for fun.	fetched	13179
+DSTN04	Rest in pieces!	fetched	10581
+DSBIG01	Big one!	fetched	8699
+DSBIG02	Oh, that's a Cyberdemon...	fetched	18848
+DSBIG03	We're gonna need more ammo.	fetched	19412
+DSFL01	Behind you!	fetched	10787
+DSFL02	They're flanking!	fetched	12583
+DSFL03	On your six!	fetched	11942
+DSIF01	Let 'em fight.	fetched	11300
+DSIF02	They're killing each other!	fetched	15410
+DSED01	Careful -- nukage.	fetched	14994
+DSED02	Watch the edge.	fetched	13119
+DSED03	Easy, long drop.	fetched	10290
+DSJP01	Hup!	fetched	7086
+DSJP02	Up we go.	fetched	10417
+DSDO01	Door!	fetched	8784
+DSDO02	Opening up.	fetched	8959
+DSSK01	I'm stuck!	fetched	10238
+DSSK02	Gimme a sec.	fetched	12199
+DSSK03	Snagged on something.	fetched	16643
+DSLS01	Where'd you go?	fetched	11708
+DSLS02	Wait up!	fetched	7476
+DSLS03	I lost you!	fetched	10523
+DSLK01	Locked. Need a key.	fetched	14038
+DSLK02	Can't open this one.	fetched	13269
+DSCU01	Crusher!	fetched	10009
+DSCU02	Don't get squished.	fetched	13255
+DSPH01	You okay?!	fetched	11629
+DSPH02	I got you covered!	fetched	12423
+DSPH03	Fall back, I'll hold!	fetched	13674
+DSPD01	No! ...I'll avenge you.	fetched	22134
+DSPD02	Stay down, I got this.	fetched	18160
+DSFF01	Hey! Watch it!	fetched	11396
+DSFF02	Friendly fire!	fetched	11336
+DSFF03	That's MY blood, pal.	fetched	13814
+DSFF04	Friendly fire, jackass!	fetched	19075
+DSFF05	I'm on YOUR side, genius!	fetched	19576
+DSFF06	Shoot them, not me!	fetched	13727
+DSNC01	Nice shot!	fetched	11532
+DSNC02	Good kill.	fetched	11563
+DSPU01	Nice, ammo!	fetched	14016
+DSPU02	Health -- sweet.	fetched	11280
+DSPU03	Don't mind if I do.	fetched	15101
+DSHL01	Patched up.	fetched	10516
+DSHL02	Better. Let's go.	fetched	13084
+DSBK01	Berserk! Get over here!	fetched	16859
+DSBK02	Now I'm untouchable!	fetched	17540
+DSGOD01	Invincible!	fetched	10371
+DSGOD02	Can't touch me.	fetched	12216
+DSARM01	Loaded for bear!	fetched	12461
+DSARM02	Now we're talking.	fetched	15943
+DSLV01	Fresh hell.	fetched	10117
+DSLV02	Here we go again.	fetched	13668
+DSLV03	Let's clear it.	fetched	12355
+DSWN01	All dead. Nice.	fetched	14258
+DSWN02	Find the exit.	fetched	11527
+DSWN03	Hail to the king.	fetched	15586
+DSSE01	Secret!	fetched	10117
+DSSE02	Ooh, hidden stash.	fetched	15070
+DSID01	Quiet... too quiet.	fetched	14580
+DSID02	Anything?	fetched	9525
+DSID03	Still with me?	fetched	12437
+DSID04	I hate the waiting.	fetched	14712

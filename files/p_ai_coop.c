@@ -408,6 +408,39 @@ void P_AICoop_VoiceTag (const char* tag)
     AICoop_SayTag (tag);
 }
 
+// Public wrapper so other modules (p_inter.c) can trigger a rotated callout.
+void P_AICoop_Callout (const char* prefix, int n)
+{
+    if (!companion_active) return;
+    AICoop_Callout (prefix, n);
+}
+
+// A monster just died.  From P_DamageMobj.  Buddy kill -> kill/imp/gib quip + spree;
+// human kill near the buddy -> "nice".  Monsters only (skips barrels/players).
+void P_AICoop_NoteKill (mobj_t* victim, mobj_t* killer)
+{
+    mobj_t* buddy;
+    if (!companion_active || !victim || !(victim->flags & MF_COUNTKILL)) return;
+    buddy = AICoop_Mo ();
+    if (!buddy) return;
+    if (killer == buddy)
+    {
+	static int cnt, t;
+	if (victim->info && victim->health < -victim->info->spawnhealth)
+	    AICoop_Callout ("gib:", 3);			// overkill / gibbed
+	else if (victim->type == MT_TROOP)
+	    AICoop_Callout ("killimp:", 3);		// Duke-style imp quip
+	else
+	    AICoop_Callout ("kill:", 4);
+	if (gametic - t < 5*TICRATE) { if (++cnt >= 3) { AICoop_Callout ("spree:", 4); cnt = 0; } }
+	else cnt = 1;
+	t = gametic;
+    }
+    else if (killer && killer->player == &players[0]
+	     && P_AproxDistance (victim->x - buddy->x, victim->y - buddy->y) < COOP_SIGHT)
+	AICoop_Callout ("nice:", 2);			// the human scored, buddy approves
+}
+
 
 // ---- "hopeless target" blacklist ------------------------------------------
 // If the buddy fires at a monster and its health just won't drop (shots blocked /
@@ -834,6 +867,7 @@ const char* P_AICoop_God (void)
     {
 	bot->health = 100;
 	if (bot->mo) bot->mo->health = 100;
+	AICoop_Callout ("god:", 2);
 	return "[Buddy] God mode ON.";
     }
     return "[Buddy] God mode OFF.";
@@ -849,6 +883,7 @@ const char* P_AICoop_GiveAll (void)
     for (i = 0; i < NUMWEAPONS; i++) bot->weaponowned[i] = true;
     for (i = 0; i < NUMAMMO; i++)    bot->ammo[i] = bot->maxammo[i];
     bot->armorpoints = 200; bot->armortype = 2;
+    AICoop_Callout ("arm:", 2);
     return "[Buddy] Locked and loaded.";
 }
 
@@ -1295,14 +1330,21 @@ static boolean PF_NextWaypoint (mobj_t* mo, fixed_t dx, fixed_t dy, fixed_t* wx,
 // buddy's Safe route mode (low HP / retreat) can later steer around that sub-sector.
 // Called from P_DamageMobj.  Runtime-only + decaying (no savegame impact); a no-op
 // until the nav graph (and thus pf_danger) exists.
-void P_AICoop_NoteDamage (mobj_t* victim, int damage)
+void P_AICoop_NoteDamage (mobj_t* victim, mobj_t* source, int damage)
 {
-    int	ss;
-    if (!pf_danger || damage <= 0) return;
-    ss = PF_SS (victim->x, victim->y);
-    if (ss < 0 || ss >= pf_n) return;
-    pf_danger[ss] += damage;
-    if (pf_danger[ss] > PF_DANGER_MAX) pf_danger[ss] = PF_DANGER_MAX;
+    if (!companion_active || damage <= 0) return;
+    if (pf_danger)					// danger heatmap (Safe route)
+    {
+	int ss = PF_SS (victim->x, victim->y);
+	if (ss >= 0 && ss < pf_n)
+	{
+	    pf_danger[ss] += damage;
+	    if (pf_danger[ss] > PF_DANGER_MAX) pf_danger[ss] = PF_DANGER_MAX;
+	}
+    }
+    // Friendly fire: the human shot the buddy -> Duke-style protest.
+    if (P_AICoop_IsBuddy (victim->player) && source && source->player == &players[0])
+	AICoop_Callout ("ff:", 6);
 }
 
 // Public pathfinder: next reachable waypoint for `mo` toward (dx,dy).  The sub-sector
@@ -1399,6 +1441,7 @@ static int AICoop_DodgeMissile (ticcmd_t* cmd, mobj_t* mo)
 	    if (AICoop_CanReach (mo, dx, dy, false))
 	    {
 		AICoop_ThrustToward (cmd, mo, dx, dy);
+		AICoop_Callout ("dodge:", 3);
 		return 1;
 	    }
 	}
@@ -1445,6 +1488,21 @@ static boolean AICoop_FallAhead (mobj_t* mo, fixed_t px, fixed_t py)
     if (AICoop_DamagingFloor (px, py))             return true;	// nukage/lava ahead
     if (mo->floorz - s->floorheight > 24*FRACUNIT) return true;	// a fall ahead
     return false;
+}
+
+// Count alive, killable monsters -- for the "level cleared" callout.
+static int AICoop_LiveMonsters (void)
+{
+    thinker_t* th;
+    int        n = 0;
+    for (th = thinkercap.next; th != &thinkercap; th = th->next)
+    {
+	mobj_t* m;
+	if (th->function.acp1 != (actionf_p1)P_MobjThinker) continue;
+	m = (mobj_t*)th;
+	if ((m->flags & MF_COUNTKILL) && m->health > 0) n++;
+    }
+    return n;
 }
 
 // Best ranged weapon the buddy owns with ammo (melee weapons excluded; rockets/BFG
@@ -1622,17 +1680,54 @@ void P_AICoop_BuildCmd (void)
     tgt  = AICoop_FindTarget (mo);
     heal = (bot->health < COOP_HEAL_HP) ? AICoop_FindHealth (mo) : NULL;
 
-    // Voice: automatic combat / hurt / all-clear callouts (rate-limited).
-        // The phrases themselves live as OGG lumps in buddy.wad; we just hand
-        // the tag prefix to AICoop_Callout, which appends the rotated index.
+    // Voice: automatic callouts (rate-limited; tags -> OGG lumps in buddy.wad).
         {
     	static mobj_t*	lasttgt;
-    	static int	lasthp = 100;
+    	static int	lasthp = 100, lastplhp = 100, lastlevel = -1, lastdry = 0, lastfist = 0;
+    	player_t*	human = &players[0];
+    	int		lvl = gameepisode*100 + gamemap;
+    	int		w = bot->readyweapon;
+    	int		curammo = (weaponinfo[w].ammo < NUMAMMO) ? bot->ammo[weaponinfo[w].ammo] : 1;
+
+    	if (lvl != lastlevel) { if (lastlevel >= 0) AICoop_Callout ("lvlstart:", 3); lastlevel = lvl; }
+
     	if (tgt && !lasttgt)				AICoop_Callout ("contact:", 4);
     	else if (!tgt && lasttgt)			AICoop_Callout ("clear:",   3);
+
+    	// A heavy hitter newly in our sights -> a wary callout.
+    	if (tgt && tgt != lasttgt &&
+    	    (tgt->type==MT_BRUISER||tgt->type==MT_KNIGHT||tgt->type==MT_HEAD||tgt->type==MT_CYBORG
+    	     ||tgt->type==MT_SPIDER||tgt->type==MT_BABY||tgt->type==MT_FATSO||tgt->type==MT_VILE
+    	     ||tgt->type==MT_PAIN))			AICoop_Callout ("bigmon:", 3);
+
     	if (bot->health < COOP_HEAL_HP && lasthp >= COOP_HEAL_HP) AICoop_Callout ("hurt:", 3);
+    	if (bot->health < 20 && lasthp >= 20)		AICoop_Callout ("crit:", 3);
+    	if (bot->health >= COOP_HEAL_HP && lasthp < COOP_HEAL_HP) AICoop_Callout ("healed:", 2);
+
+    	{ int dry = (curammo <= 0); if (dry && !lastdry) AICoop_Callout ("dry:", 3); lastdry = dry; }
+    	{ int onlyfist = (bot->readyweapon == wp_fist && AICoop_BestRanged (bot) < 0);
+    	  if (onlyfist && !lastfist) AICoop_Callout ("fists:", 2); lastfist = onlyfist; }
+
+    	if (human->mo) {
+    	    if (human->health > 0 && human->health < 35 && lastplhp >= 35) AICoop_Callout ("plhurt:", 3);
+    	    if (human->health <= 0 && lastplhp > 0)		AICoop_Callout ("pldown:", 2);
+    	    lastplhp = human->health;
+    	}
+
     	lasttgt = tgt; lasthp = bot->health;
         }
+
+    // Once/sec: "all clear -- level done" when the last monster drops, plus idle
+    // banter after a long lull with nothing to shoot.
+    if ((gametic % 35) == 0)
+    {
+	static int	lastlive = -1, idletic;
+	int		live = AICoop_LiveMonsters ();
+	if (lastlive > 0 && live == 0)			AICoop_Callout ("lvlclear:", 3);
+	lastlive = live;
+	if (tgt) idletic = gametic;
+	else if (gametic - idletic > 25*TICRATE)	{ AICoop_Callout ("idle:", 4); idletic = gametic; }
+    }
 
     // Announce a newly picked-up weapon ("Buddy: got the shotgun!") -- text to the
     // human + a voice line (reusing the status:<weapon> phrase that names it).
@@ -1767,6 +1862,7 @@ void P_AICoop_BuildCmd (void)
 	{
 	    tx = pl->x; ty = pl->y;
 	    navigate = 1; chase_player = 1; movethresh = COOP_NEAR/2;
+	    AICoop_Callout ("lost:", 3);		// can't path -- beeline to the human
 	}
     }
 
@@ -1897,9 +1993,16 @@ void P_AICoop_BuildCmd (void)
 		// the angle so the next tic has a safe shot.
 		cmd->sidemove += ((gametic / 16) & 1) ? COOP_RUN : -COOP_RUN;
 	    }
-	    else if (linetarget && abs(rem) < COOP_FACING && react_timer == 0 && !splash_close
-		     && !AICoop_BarrelNear (mo))		// (D) don't detonate a barrel on ourselves
-		cmd->buttons |= BT_ATTACK;
+	    else if (linetarget && abs(rem) < COOP_FACING && react_timer == 0 && !splash_close)
+	    {
+		if (AICoop_BarrelNear (mo))			// (D) don't detonate a barrel on ourselves
+		    AICoop_Callout ("barrel:", 3);
+		else
+		{
+		    cmd->buttons |= BT_ATTACK;
+		    if ((gametic & 255) == 0) AICoop_Callout ("taunt:", 4);	// occasional swagger
+		}
+	    }
 	    else if (!linetarget && dist < 768*FRACUNIT)
 		backoff = true;
 	}
@@ -1994,11 +2097,12 @@ void P_AICoop_BuildCmd (void)
 	// doorway when one is ahead).  Gated so we don't reverse a DR door mid-rise:
 	// 45 tics > the ~32-tic open, so by the next tap the door is passable and we
 	// are walking through (no longer stuck), so no second tap fires.
-	if (doorwait == 0) { cmd->buttons |= BT_USE; doorwait = 45; }
+	// (B) Low ledge it can't step up?  Jump it -- the player can (disabled in netgame).
+	if (!netgame && AICoop_JumpableStep (mo, stx, sty)) { cmd->buttons |= BT_JUMP; AICoop_Callout ("jump:", 2); }
+	if (doorwait == 0) { cmd->buttons |= BT_USE; doorwait = 45; AICoop_Callout ("door:", 2); }
 	// Sideways wiggle to slip past a barrel / convex corner (non-door wedge).
 	cmd->sidemove += ((wig++ / 24) & 1) ? COOP_RUN : -COOP_RUN;
-	// (B) Low ledge it can't step up?  Jump it -- the player can (disabled in netgame).
-	if (!netgame && AICoop_JumpableStep (mo, stx, sty)) cmd->buttons |= BT_JUMP;
+	AICoop_Callout ("stuck:", 3);
     }
 
     // (E) Careful near edges: if the chosen move heads toward a drop-off or a damaging
@@ -2012,7 +2116,7 @@ void P_AICoop_BuildCmd (void)
 	int     ma = R_PointToAngle2 (0, 0, vx, vy) >> ANGLETOFINESHIFT;
 	fixed_t nx = mo->x + FixedMul (40*FRACUNIT, finecosine[ma]);
 	fixed_t ny = mo->y + FixedMul (40*FRACUNIT, finesine[ma]);
-	if (AICoop_FallAhead (mo, nx, ny)) { cmd->forwardmove /= 3; cmd->sidemove /= 3; }
+	if (AICoop_FallAhead (mo, nx, ny)) { cmd->forwardmove /= 3; cmd->sidemove /= 3; AICoop_Callout ("edge:", 3); }
     }
 
     // Missile dodge has the final say on movement: if a projectile is closing on us,

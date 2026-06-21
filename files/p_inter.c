@@ -886,7 +886,7 @@ P_DamageMobj
 	if (player->health < 0)
 	    player->health = 0;
 
-	P_AICoop_NoteDamage (target, damage);	// feed the buddy's danger heatmap (Safe route)
+	P_AICoop_NoteDamage (target, source, damage);	// buddy danger heatmap + friendly-fire callout
 
 	player->attacker = source;
 	player->damagecount += damage;	// add damage after armor / invuln
@@ -900,10 +900,11 @@ P_DamageMobj
 	    I_Tactile (40,10,40+temp*2);
     }
     
-    // do the damage	
-    target->health -= damage;	
+    // do the damage
+    target->health -= damage;
     if (target->health <= 0)
     {
+	P_AICoop_NoteKill (target, source);	// buddy kill-quip / spree / "nice" callout
 	P_KillMobj (source, target);
 	return;
     }

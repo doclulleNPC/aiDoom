@@ -102,7 +102,12 @@ void P_AICoop_ArchiveTrail (void);
 void P_AICoop_UnArchiveTrail (void);
 
 // Note that a player took `damage` at its current position, feeding the buddy's
-// danger heatmap (Safe route mode).  Called from P_DamageMobj; runtime-only/decaying.
-void P_AICoop_NoteDamage (struct mobj_s* victim, int damage);
+// danger heatmap (Safe route mode) + a friendly-fire callout.  From P_DamageMobj.
+void P_AICoop_NoteDamage (struct mobj_s* victim, struct mobj_s* source, int damage);
+
+// A monster died (from P_DamageMobj): buddy-kill quip + spree, or "nice" if the human
+// scored near the buddy.  And a public rotated-callout wrapper for other modules.
+void P_AICoop_NoteKill (struct mobj_s* victim, struct mobj_s* killer);
+void P_AICoop_Callout (const char* prefix, int n);
 
 #endif
