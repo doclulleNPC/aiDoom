@@ -240,8 +240,11 @@ typedef struct
  // max # of wall switches in a level
 #define MAXSWITCHES		50
 
- // 4 players, 4 buttons each at once, max.
-#define MAXBUTTONS		16
+ // VANILLA BUG (button overflow): vanilla's 16 (4 players x 4) made
+ // P_StartButton I_Error ("no button slots left") when many switches animated at
+ // once.  Raised so realistic maps can't hit it.  Every loop sizes off this
+ // define, so one bump is consistent.
+#define MAXBUTTONS		256
 
  // 1 second, in ticks. 
 #define BUTTONTIME      35             
@@ -303,7 +306,11 @@ typedef struct
 
 #define PLATWAIT		3
 #define PLATSPEED		FRACUNIT
-#define MAXPLATS		30
+// VANILLA BUG (activeplats overflow): vanilla's 30 made P_AddActivePlat I_Error
+// ("no more plats") on maps with many simultaneously-moving floors/lifts
+// (slaughtermaps).  Raised well past any realistic count; every loop sizes off
+// this define so the bump stays consistent.
+#define MAXPLATS		8192
 
 
 extern plat_t*	activeplats[MAXPLATS];

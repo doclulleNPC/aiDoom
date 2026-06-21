@@ -152,9 +152,9 @@ typedef struct
     }			d;
 } intercept_t;
 
-#define MAXINTERCEPTS	128
+#define MAXINTERCEPTS	128	// initial capacity; the list now grows past it
 
-extern intercept_t	intercepts[MAXINTERCEPTS];
+extern intercept_t*	intercepts;	// was intercepts[MAXINTERCEPTS] -- grows
 extern intercept_t*	intercept_p;
 
 typedef boolean (*traverser_t) (intercept_t *in);

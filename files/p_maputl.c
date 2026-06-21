@@ -541,8 +541,24 @@ P_BlockThingsIterator
 //
 // INTERCEPT ROUTINES
 //
-intercept_t	intercepts[MAXINTERCEPTS];
+intercept_t*	intercepts;		// grows from MAXINTERCEPTS on demand
 intercept_t*	intercept_p;
+static int	num_intercepts;		// allocated capacity
+
+// VANILLA BUG (intercepts overflow): vanilla used a fixed intercepts[128] and
+// ran intercept_p past it on shots/LOS across complex geometry, smashing
+// adjacent globals.  Grow the list instead (realloc), fixing up intercept_p.
+// Behaviour-identical for any traversal that didn't actually overflow.
+static void P_CheckIntercepts (void)
+{
+    int	offset = intercept_p - intercepts;
+    if (offset >= num_intercepts)
+    {
+	num_intercepts = num_intercepts ? num_intercepts*2 : MAXINTERCEPTS;
+	intercepts = realloc (intercepts, num_intercepts * sizeof(*intercepts));
+	intercept_p = intercepts + offset;
+    }
+}
 
 divline_t 	trace;
 boolean 	earlyout;
@@ -600,6 +616,7 @@ PIT_AddLineIntercepts (line_t* ld)
     }
     
 	
+    P_CheckIntercepts ();
     intercept_p->frac = frac;
     intercept_p->isaline = true;
     intercept_p->d.line = ld;
@@ -665,6 +682,7 @@ boolean PIT_AddThingIntercepts (mobj_t* thing)
     if (frac < 0)
 	return true;		// behind source
 
+    P_CheckIntercepts ();
     intercept_p->frac = frac;
     intercept_p->isaline = false;
     intercept_p->d.thing = thing;

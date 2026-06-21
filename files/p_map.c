@@ -64,10 +64,11 @@ line_t*		ceilingline;
 
 // keep track of special lines as they are hit,
 // but don't process them until the move is proven valid
-#define MAXSPECIALCROSS		8
+#define MAXSPECIALCROSS		8	// initial capacity; the list now grows
 
-line_t*		spechit[MAXSPECIALCROSS];
-int		numspechit;
+line_t**	spechit;			// VANILLA BUG (spechit overflow):
+int		numspechit;			// was spechit[8] -- grows on demand
+static int	spechit_max;
 
 
 
@@ -236,9 +237,16 @@ boolean PIT_CheckLine (line_t* ld)
     if (lowfloor < tmdropoffz)
 	tmdropoffz = lowfloor;
 		
-    // if contacted a special line, add it to the list
+    // if contacted a special line, add it to the list.  Vanilla overran the
+    // fixed spechit[8] when >8 special lines were crossed in one move (the
+    // "Donut overrun"); grow the list instead.
     if (ld->special)
     {
+	if (numspechit >= spechit_max)
+	{
+	    spechit_max = spechit_max ? spechit_max*2 : MAXSPECIALCROSS;
+	    spechit = realloc (spechit, spechit_max * sizeof(*spechit));
+	}
 	spechit[numspechit] = ld;
 	numspechit++;
     }
