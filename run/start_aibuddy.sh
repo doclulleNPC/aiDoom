@@ -10,15 +10,29 @@
 #   offline rule-based buddy instead?   ./start_buddy.sh        (no LLM)
 #   full launcher (model warmup, etc.)? ./start_aidoom.sh --aicoop
 #
+# Default IWAD is doom.wad (DOOM1, Registered/Retail format).  Override with:
+#   ./start_aibuddy.sh -iwad doom2.wad
+#   ./start_aibuddy.sh -iwad /path/to/some.wad
+#
 # Ollama host/port/model come from aidoom.cfg; override with:
 #   ./start_aibuddy.sh --ollama http://192.168.2.114:11434 --model qwen3:8b
-# Any other args pass straight to the game (default warp: MAP01):
+# Any other args pass straight to the game (default warp: E1M1 in doom.wad):
 #   ./start_aibuddy.sh -warp 3 1 -skill 4
 #
 set -u
 cd "$(dirname "${BASH_SOURCE[0]}")" || exit 1
 
 PORT=31666
+
+# Default IWAD: doom.wad (DOOM1).  Look in run/ first (where the user drops
+# their IWADs); fall back to files/ (the SDL3 build dir which ships doom.wad
+# as a development sample); let the user override with -iwad on the command
+# line later.  Empty string = no IWAD pre-set, let the game's autodetect
+# run (it walks DOOMWADDIR, the cwd, ~/.doom, Steam, etc.).
+IWAD=""
+for c in ./doom.wad ../files/doom.wad; do
+    [ -f "$c" ] && { IWAD="$c"; break; }
+done
 
 # Ollama defaults from aidoom.cfg (next to this script), then built-in fallbacks.
 HOST=$(awk '$1=="ollama_host"{print $2}'  aidoom.cfg 2>/dev/null | tail -1)
@@ -36,9 +50,17 @@ while [ $# -gt 0 ]; do
         --ollama) OLLAMA="$2"; shift 2;;
         --model)  MODEL="$2";  shift 2;;
         --port)   PORT="$2";   shift 2;;
+        -iwad)    IWAD="$2";   shift 2;;        # explicit -iwad wins over our default
         *)        GAME_ARGS+=("$1"); shift;;
     esac
 done
+
+# If we found a default IWAD and the user didn't pass -iwad, prepend it.
+if [ -n "$IWAD" ]; then
+    have_iwad=0
+    for a in ${GAME_ARGS[@]+"${GAME_ARGS[@]}"}; do [ "$a" = "-iwad" ] && have_iwad=1; done
+    [ "$have_iwad" = 0 ] && GAME_ARGS=(-iwad "$IWAD" ${GAME_ARGS[@]+"${GAME_ARGS[@]}"})
+fi
 
 # Locate the binaries (run/ first, then the build dirs).
 for c in ./aidoom ../files/aidoom; do [ -x "$c" ] && { AIDOOM="$c"; break; }; done
@@ -46,7 +68,8 @@ for c in ./aidoom ../files/aidoom; do [ -x "$c" ] && { AIDOOM="$c"; break; }; do
 DIRBIN=./director; [ -x "$DIRBIN" ] || DIRBIN=../tools/director
 [ -x "$DIRBIN" ]   || { echo "[aibuddy] director not found -- build it: tools/build_director.sh" >&2; exit 1; }
 
-# Default-warp to MAP01 and default to skill 4 unless the caller passed their own.
+# Default-warp to E1M1 (MAP01 in DOOM1 / MAP01 in DOOM2 both work with -warp 1 1)
+# and default to skill 4 unless the caller passed their own.
 warp=0; skill=0
 for a in ${GAME_ARGS[@]+"${GAME_ARGS[@]}"}; do
     [ "$a" = "-warp" ]  && warp=1
