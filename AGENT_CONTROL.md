@@ -535,7 +535,11 @@ and accepts `buddy` orders.  `start_aidoom.sh --aicoop` launches game + director
   `"regions":[[id,x,y],...]` (room centres, occupied rooms + their one-hop
   connectors) and `"links":[[a,b,"open"|"door"|"locked"],...]` (how those rooms
   connect).  Each monster also gives `"see_buddy"` and distances `"d_player"` /
-  `"d_buddy"` (was only `see_player`).
+  `"d_buddy"` (was only `see_player`); the buddy carries `"d_player"`.  All
+  distances are precomputed in map units so the model needn't infer them.
+- **Cross-round memory:** the director keeps the last few rounds (state digest +
+  the order it issued) and prepends them to each prompt, so the LLM has continuity
+  (trends, what it just ordered) instead of a fully stateless call.
 - **Command:** `buddy order=<tactic> [focus=<monster id>] [x=<n> y=<n>] [for=<tics>]\n`
   → `ok\n`.  Tactics: `engage` (focus a specific monster, else nearest), `defend`,
   `hold`, `regroup`, `retreat`, `goto` (x,y), `grab`.

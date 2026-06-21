@@ -470,11 +470,13 @@ static int AI_Serialize (void)
 	    int		st = P_AICoop_State ();
 	    fixed_t	rx[6], ry[6];
 	    int		nr = P_AICoop_NavRoute (rx, ry, 6), r;
+	    int dpl = pl->mo ? (int)(P_AproxDistance (b->mo->x - pl->mo->x,
+						     b->mo->y - pl->mo->y) >> FRACBITS) : -1;
 	    n += snprintf (obsbuf+n, OBSBUF-n,
 		",\"buddy\":{\"pos\":[%d,%d],\"health\":%d,\"armor\":%d,"
-		"\"weapon\":%d,\"ammo\":%d,\"state\":\"%s\",\"region\":%d,\"route\":[",
+		"\"weapon\":%d,\"ammo\":%d,\"state\":\"%s\",\"region\":%d,\"d_player\":%d,\"route\":[",
 		b->mo->x/fx, b->mo->y/fx, b->health, b->armorpoints,
-		w, ammo, (st>=0 && st<6) ? sname[st] : "follow", breg);
+		w, ammo, (st>=0 && st<6) ? sname[st] : "follow", breg, dpl);
 	    for (r = 0; r < nr; r++)
 		n += snprintf (obsbuf+n, OBSBUF-n, "%s[%d,%d]", r?",":"", rx[r]/fx, ry[r]/fx);
 	    n += snprintf (obsbuf+n, OBSBUF-n, "]}");

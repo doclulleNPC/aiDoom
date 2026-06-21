@@ -365,7 +365,10 @@ static const char* SYSTEM_PROMPT =
     "Respond ONLY with JSON of the form {\\\"commands\\\":[{\\\"order\\\":\\\"flank_left\\\","
     "\\\"ids\\\":[1,3]}],\\\"buddy\\\":{\\\"order\\\":\\\"engage\\\",\\\"focus\\\":2}}. "
     "For goto use {\\\"buddy\\\":{\\\"order\\\":\\\"goto\\\",\\\"x\\\":123,\\\"y\\\":456}}. "
-    "Every monster id must appear in exactly one command. Omit \\\"buddy\\\" if the state has no buddy.";
+    "Every monster id must appear in exactly one command. Omit \\\"buddy\\\" if the state has no buddy. "
+    "Distances are precomputed in map units (d_player / d_buddy; buddy has d_player). You also get "
+    "the last few rounds above the state -- use them for continuity: keep the buddy on a consistent "
+    "tactic and don't flip-flop the same monsters every round.";
 
 static int is_order (const char* o)
 {
@@ -423,7 +426,8 @@ static int worker (void* unused)
     send_all (gs, "wake\n", 5);
     recv_line (gs, line, sizeof line);     // "ok"
 
-    int round = 0;
+    int  round = 0;
+    char hist[4][120]; int nh = 0;	// rolling cross-round memory (last N rounds)
     while (!g_quit)
     {
         round++;
@@ -454,13 +458,20 @@ static int worker (void* unused)
         // build the chat request body (state embedded as escaped strings)
         char esc[6000];
         json_escape (esc, sizeof esc, line);
+        // cross-round memory: the last few rounds' state+decision, so the model has
+        // continuity (trends, what it just ordered) beyond one stateless call.
+        char histesc[800] = "";
+        if (nh) { char j[700] = ""; int hi;
+            for (hi = 0; hi < nh; hi++) { strncat (j, hist[hi], sizeof j - strlen(j) - 1);
+                                          strncat (j, "\n",    sizeof j - strlen(j) - 1); }
+            json_escape (histesc, sizeof histesc, j); }
         char* body = malloc (16000);
         snprintf (body, 16000,
             "{\"model\":\"%s\",\"stream\":false,\"format\":\"json\","
             "\"options\":{\"temperature\":0.6},\"messages\":["
             "{\"role\":\"system\",\"content\":\"%s\"},"
-            "{\"role\":\"user\",\"content\":\"Game state: %s\\nAssign orders now as JSON.\"}]}",
-            opt_model, SYSTEM_PROMPT, esc);
+            "{\"role\":\"user\",\"content\":\"Recent rounds (oldest first):\\n%s\\nGame state: %s\\nAssign orders now as JSON.\"}]}",
+            opt_model, SYSTEM_PROMPT, histesc, esc);
 
         Uint64 t0 = SDL_GetTicks ();
         char*  resp = http_post_json (opt_host, opt_oport, "/api/chat", body);
@@ -557,6 +568,20 @@ static int worker (void* unused)
             logln ("round %d  mon=%d  hp=%d  llm=%.1fs  %s", round, nids,
                    hp && hp->t==JNUM ? (int)hp->num : -1, dt,
                    issued ? summary : "(no valid orders)");
+
+            // remember this round (ring buffer) for next round's prompt
+            {
+                json* bud2 = json_get (state, "buddy");
+                json* bhp  = bud2 ? json_get (bud2, "health") : NULL;
+                char  h[120];
+                snprintf (h, sizeof h, "r%d: php=%d bhp=%d mon=%d -> %s", round,
+                          hp  && hp->t==JNUM  ? (int)hp->num  : -1,
+                          bhp && bhp->t==JNUM ? (int)bhp->num : -1, nids,
+                          issued ? summary : "(none)");
+                if (nh < 4) snprintf (hist[nh++], 120, "%s", h);
+                else { for (int k = 0; k < 3; k++) snprintf (hist[k], 120, "%s", hist[k+1]);
+                       snprintf (hist[3], 120, "%s", h); }
+            }
         }
         else
         {
