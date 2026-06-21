@@ -413,6 +413,11 @@ static const char* SYSTEM_PROMPT =
     "items, or goto a specific spot. The buddy field includes \\\"route\\\":[[x,y],...] -- reachable "
     "waypoints toward the human; for a goto, copy x,y from that route (or aim near a monster/item) "
     "so the spot is walkable. Buddy orders: engage, defend, hold, regroup, retreat, grab, goto. "
+    "(3) PACING via the \\\"director\\\" field {\\\"intensity\\\":0-100,\\\"state\\\":0|1|2,\\\"recent_dmg\\\":n,"
+    "\\\"ammo_pct\\\":0-100}: shape the Left-4-Dead tension curve. When intensity is LOW (<30) and few "
+    "monsters are alive, SPAWN a few extra monsters behind the survivors to build pressure; when "
+    "intensity is HIGH (>65) -- or ammo_pct is low and the human is hurt -- ease off: relax and/or "
+    "drop an item so they recover. Spawn sparingly (a wave, then let it breathe), not every round. "
     "MAP AWARENESS: every entity has a \\\"region\\\" (room id); \\\"regions\\\":[[id,x,y],...] are room "
     "centres and \\\"links\\\":[[a,b,type],...] how rooms connect (type open/door/locked). Monsters "
     "also give \\\"see_buddy\\\" and distances \\\"d_player\\\"/\\\"d_buddy\\\". Use these: prioritise "
@@ -421,6 +426,10 @@ static const char* SYSTEM_PROMPT =
     "Respond ONLY with JSON of the form {\\\"commands\\\":[{\\\"order\\\":\\\"flank_left\\\","
     "\\\"ids\\\":[1,3]}],\\\"buddy\\\":{\\\"order\\\":\\\"engage\\\",\\\"focus\\\":2}}. "
     "For goto use {\\\"buddy\\\":{\\\"order\\\":\\\"goto\\\",\\\"x\\\":123,\\\"y\\\":456}}. "
+    "To pace, optionally add a \\\"spawn\\\" field: {\\\"spawn\\\":{\\\"type\\\":\\\"imp\\\",\\\"count\\\":3}} spawns "
+    "monsters (types: zombie, shotgun, chaingun, imp, pinky, spectre, lost, caco, pain, knight, baron, "
+    "revenant, mancubus, arachnotron), {\\\"spawn\\\":{\\\"item\\\":\\\"medkit\\\"}} (or ammo) drops an item, "
+    "{\\\"spawn\\\":{\\\"relax\\\":true}} calms the encounter. Omit \\\"spawn\\\" most rounds. "
     "Every monster id must appear in exactly one command. Omit \\\"buddy\\\" if the state has no buddy. "
     "Distances are precomputed in map units (d_player / d_buddy; buddy has d_player). You also get "
     "the last few rounds above the state -- use them for continuity: keep the buddy on a consistent "
@@ -618,6 +627,49 @@ static int worker (void* unused)
                     }
                 }
             }
+            // L4D spawn director -- {"spawn":{"type":"imp","count":2}} |
+            //   {"spawn":{"item":"medkit"}} | {"spawn":{"relax":true}}.  Names are
+            //   sanitised to lowercase letters so they can't inject extra commands.
+            {
+                json* sp = json_get (plan, "spawn");
+                if (sp && sp->t == JOBJ)
+                {
+                    json* jrelax = json_get (sp, "relax");
+                    json* jitem  = json_get (sp, "item");
+                    json* jtype  = json_get (sp, "type");
+                    char  sc[128]; int sn = 0; char tag[48] = "";
+                    char  nm[32];
+                    if (jrelax && jrelax->t == JBOOL && jrelax->num)
+                        { sn = snprintf (sc, sizeof sc, "director relax\n"); snprintf (tag, sizeof tag, "relax"); }
+                    else if (jitem && jitem->t == JSTR)
+                    {
+                        int i = 0; for (const char* p = jitem->str; *p && i < 31; p++)
+                            if (*p >= 'A' && *p <= 'Z') nm[i++] = *p + 32; else if (*p >= 'a' && *p <= 'z') nm[i++] = *p;
+                        nm[i] = 0;
+                        if (i) { sn = snprintf (sc, sizeof sc, "spawn item=%s\n", nm); snprintf (tag, sizeof tag, "item:%s", nm); }
+                    }
+                    else if (jtype && jtype->t == JSTR)
+                    {
+                        json* jc = json_get (sp, "count");
+                        int cnt = (jc && jc->t == JNUM) ? (int) jc->num : 1;
+                        int i = 0; for (const char* p = jtype->str; *p && i < 31; p++)
+                            if (*p >= 'A' && *p <= 'Z') nm[i++] = *p + 32; else if (*p >= 'a' && *p <= 'z') nm[i++] = *p;
+                        nm[i] = 0;
+                        if (cnt < 1) cnt = 1; if (cnt > 8) cnt = 8;
+                        if (i) { sn = snprintf (sc, sizeof sc, "spawn type=%s count=%d\n", nm, cnt);
+                                 snprintf (tag, sizeof tag, "spawn:%sx%d", nm, cnt); }
+                    }
+                    if (sn > 0)
+                    {
+                        send_all (gs, sc, sn);
+                        recv_line (gs, line, sizeof line);   // "ok"
+                        char piece[56]; snprintf (piece, sizeof piece, "dir:%s ", tag);
+                        strncat (summary, piece, sizeof summary - strlen (summary) - 1);
+                        issued++;
+                    }
+                }
+            }
+
             json_free (plan);
 
             json* hp = plr ? json_get (plr, "health") : NULL;
