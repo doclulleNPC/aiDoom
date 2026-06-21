@@ -64,9 +64,10 @@ model, start the game with its `-aidirector` TCP server, then run the native
 
 ```sh
 cd run
-./start_aidoom.sh                                   # defaults
+./start_aidoom.sh                                   # FULL LLM: AI buddy (-aicoop) + director (default)
+./start_aidoom.sh --buddy                           # rule-based buddy instead of the AI buddy
+./start_aidoom.sh --offline                         # plain aidoom, no LLM/Ollama
 ./start_aidoom.sh --model qwen3:8b --skill 4 --friendlyfire
-./start_aidoom.sh --no-director                     # just the game, no LLM
 ./start_aidoom.sh --ollama http://localhost:11434   # override the server
 ```
 
@@ -93,9 +94,10 @@ directs the enemy squad *and* the ally buddy from the same observation.
 Double-click **`start_aidoom.bat`**, or run the PowerShell script with params:
 
 ```powershell
-.\start_aidoom.ps1
+.\start_aidoom.ps1                  # FULL LLM: AI buddy (-aicoop) + director (default)
+.\start_aidoom.ps1 -RuleCoop        # rule-based buddy instead of the AI buddy
+.\start_aidoom.ps1 -NoDirector      # just the game, no LLM director
 .\start_aidoom.ps1 -Model qwen2.5-coder:1.5b -Skill 4 -FriendlyFire
-.\start_aidoom.ps1 -NoDirector
 ```
 
 Params: `-Model -Port -Episode -Map -Skill -Ollama -FriendlyFire -NoCoop -NoDirector -NoWarm`.

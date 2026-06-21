@@ -1,16 +1,17 @@
 <#
-  start_aidoom.ps1 -- wait for Ollama, then launch aiDoom (+ the LLM director).
+  start_aidoom.ps1 -- wait for Ollama, then launch aiDoom with FULL LLM support.
 
-  Checks the local Ollama server is up and the model is available, optionally
-  warms the model into memory, then starts aidoom.exe with the -aidirector TCP
-  server and the native director.exe (no Python) that drives the monsters.
+  DEFAULT = the AI co-op buddy (-aicoop) PLUS the LLM director (-aidirector +
+  director.exe): the model drives the monsters, the L4D stress/spawn pacing, and the
+  buddy's tactics in one loop.  Checks Ollama is up, warms the model, then launches
+  the game + the native director.exe (no Python).
 
   Usage (or just double-click start_aidoom.bat):
-    .\start_aidoom.ps1
+    .\start_aidoom.ps1                    # FULL LLM: AI buddy + director (default)
+    .\start_aidoom.ps1 -RuleCoop          # rule-based companion instead of the AI buddy
+    .\start_aidoom.ps1 -NoCoop            # no companion at all
+    .\start_aidoom.ps1 -NoDirector        # just the game, no LLM director
     .\start_aidoom.ps1 -Model qwen2.5-coder:1.5b -Skill 4 -FriendlyFire
-    .\start_aidoom.ps1 -NoDirector        # just the game, no LLM
-    .\start_aidoom.ps1 -NoCoop            # disable the rule-based co-op companion
-  The rule-based co-op companion (player 2) is ON by default; -NoCoop turns it off.
 #>
 param(
     [string]$Model     = "mistral:7b-instruct",
@@ -22,7 +23,8 @@ param(
     [switch]$FriendlyFire,
     [switch]$NoDirector,
     [switch]$NoWarm,
-    [switch]$NoCoop          # rule-based co-op companion (player 2) is on by default
+    [switch]$NoCoop,         # no co-op companion at all
+    [switch]$RuleCoop        # rule-based companion (-coop) instead of the default AI buddy (-aicoop)
 )
 
 $ErrorActionPreference = "Stop"
@@ -97,7 +99,9 @@ if (-not (Test-Path (Join-Path $here "SDL3.dll"))) { Die "SDL3.dll missing next 
 # IWAD selection is handled by the engine itself, in this order:
 #   -iwad <file>  >  aidoom.cfg "iwad"  >  iwads\  >  this folder  >  Steam.
 $gameArgs = @("-warp","$Episode","$Map","-skill","$Skill","-aidirector","$Port")
-if (-not $NoCoop)  { $gameArgs += "-coop" }
+if     ($NoCoop)   { }                        # no companion
+elseif ($RuleCoop) { $gameArgs += "-coop" }   # rule-based companion instead of the AI buddy
+else               { $gameArgs += "-aicoop" } # default: AI/LLM co-op buddy (full LLM)
 if ($FriendlyFire) { $gameArgs += "-friendlyfire" }
 Info "launching aidoom.exe $($gameArgs -join ' ')"
 Start-Process -FilePath (Join-Path $here "aidoom.exe") -ArgumentList $gameArgs -WorkingDirectory $here

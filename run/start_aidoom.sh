@@ -4,28 +4,21 @@
 # the AI co-op companion).  Linux/macOS counterpart of start_aidoom.bat /
 # start_aidoom.ps1.
 #
-# Modes (defaults: OFF for everything; plain `aidoom` with no extras):
-#   default       : plain aiDoom -- no LLM director, no buddy, no Ollama check.
-#                   Fastest startup; works fully offline.
-#   --buddy       : enable the rule-based co-op companion ("buddy", player 2).
-#                   Passes -coop to aidoom.  Local + deterministic, no LLM needed.
-#                   (For buddy-only with NO director, use start_buddy.sh.)
-#   --aicoop      : enable the AI/LLM-backed companion.  Passes -aicoop (DISTINCT from
-#                   -coop; the two are mutually exclusive) and turns the director ON --
-#                   the LLM then directs the buddy's tactics (engage/defend/regroup/...)
-#                   in the same loop it directs the monsters.
-#   --director    : enable the LLM monster director.  Waits for Ollama, warms
-#                   the model, launches the game + director client.  Implies
-#                   Ollama host/port/model from aidoom.cfg or flags.
-#   --director --buddy : both -- buddy + LLM-driven monsters.
+# DEFAULT = FULL LLM: the AI co-op buddy (-aicoop) PLUS the LLM director (monsters +
+# the L4D stress/spawn pacing).  Just run ./start_aidoom.sh -- it waits for Ollama,
+# warms the model, launches the game + the native director.  Opt out with the flags:
+#   (default)     : -aicoop + -aidirector + director  (AI buddy + LLM monsters/spawns).
+#   --buddy       : rule-based companion (-coop) instead of the AI buddy (still LLM monsters
+#                   unless --no-director).  Local + deterministic.
+#   --no-buddy    : no companion at all (LLM monsters only).
+#   --no-director : no LLM director (the AI buddy then runs autonomously / rule-based).
+#   --offline     : plain aiDoom -- no LLM, no buddy, no Ollama check (fastest).
 #
 # Usage:
-#   ./start_aidoom.sh                          # plain aidoom (offline, fast)
-#   ./start_aidoom.sh --buddy                  # + rule-based co-op buddy
-#   ./start_aidoom.sh --aicoop                  # + AI/LLM co-op buddy (-aicoop)
-#   ./start_aidoom.sh --director               # + LLM monster director
-#   ./start_aidoom.sh --director --buddy       # + buddy + LLM director
-#   ./start_aidoom.sh --director --model qwen3:8b --skill 4 --friendlyfire
+#   ./start_aidoom.sh                          # FULL LLM: AI buddy + director (default)
+#   ./start_aidoom.sh --buddy                  # rule-based buddy + LLM monsters
+#   ./start_aidoom.sh --offline                # plain aidoom (offline, fast)
+#   ./start_aidoom.sh --model qwen3:8b --skill 4 --friendlyfire
 #   ./start_aidoom.sh --ollama http://localhost:11434
 #
 # Requires: SDL3 installed (to run the binaries) and the aidoom binary built
@@ -42,11 +35,11 @@ MAP=1
 SKILL=4
 OLLAMA="http://192.168.2.114:11434"
 FRIENDLYFIRE=0
-NODIRECTOR=1		# default OFF -- plain aidoom, no LLM, no Ollama check
+NODIRECTOR=0		# default ON -- full LLM: the director drives monsters + the AI buddy
 NOWARM=0
-BUDDY=0			# default OFF -- plain aidoom, no co-op companion
-AIBUDDY=0			# default OFF -- --aicoop enables the AI/LLM buddy (-aicoop)
-DIRECTOR=0		# default OFF -- explicit --director enables the LLM monster director
+BUDDY=0			# rule-based companion (--buddy); off by default (the AI buddy is on instead)
+AIBUDDY=1			# default ON -- AI/LLM co-op buddy (-aicoop)
+DIRECTOR=1		# default ON -- LLM monster director
 GAME_EXTRA=()
 
 # aidoom.cfg (next to this script, written by the SDL3 config app) overrides the
@@ -75,9 +68,10 @@ while [ $# -gt 0 ]; do
         --ollama)       OLLAMA="$2"; shift 2;;
         --friendlyfire) FRIENDLYFIRE=1; shift;;
         --director)     DIRECTOR=1; NODIRECTOR=0; shift;;
-        --no-director)  NODIRECTOR=1; shift;;    # legacy alias
-        --buddy)        BUDDY=1; shift;;
-        --no-buddy)     BUDDY=0; shift;;
+        --no-director)  NODIRECTOR=1; shift;;
+        --buddy)        BUDDY=1; AIBUDDY=0; shift;;        # rule-based companion instead of the AI buddy
+        --no-buddy)     BUDDY=0; AIBUDDY=0; shift;;        # no companion at all
+        --offline)      AIBUDDY=0; BUDDY=0; NODIRECTOR=1; shift;;   # plain aidoom, no LLM/Ollama
         --aicoop)       AIBUDDY=1; NODIRECTOR=0; shift;;   # AI/LLM buddy (-aicoop): needs the director, so enable it too
         --no-coop)      warn "--no-coop is deprecated, use --no-buddy"; BUDDY=0; shift;;
         --coop)         warn "--coop is deprecated, use --buddy"; BUDDY=1; shift;;
