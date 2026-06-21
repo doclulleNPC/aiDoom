@@ -89,6 +89,11 @@ void P_AICoop_SetDirective (int tactic, struct mobj_s* focus, fixed_t x, fixed_t
 // (downsampled portal path), for the AI `observe` stream.  Returns the count.
 int  P_AICoop_NavRoute (fixed_t* xs, fixed_t* ys, int maxpts);
 
+// Next reachable waypoint for `mo` toward (dx,dy) via the BSP portal graph (the same
+// pathfinder the buddy uses).  Used by director-controlled monsters (p_ai_llm.c) to
+// navigate around corners instead of the vanilla straight 8-dir chase.
+boolean P_AICoop_NextWaypoint (struct mobj_s* mo, fixed_t dx, fixed_t dy, fixed_t* wx, fixed_t* wy);
+
 // Savegame persistence for the breadcrumb trail.  Written/read AFTER the savegame
 // consistency marker (g_game.c), so older saves without the block still load.
 void P_AICoop_ArchiveTrail (void);

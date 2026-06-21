@@ -495,11 +495,14 @@ loop never waits on the director.
   the struct and the savegame format are untouched (see the `p_saveg.c` 64-bit
   notes). Each `observe` rebuilds the id registry but **preserves** still-valid
   directives for monsters that are still alive.
-- **`A_LLMChase` reuses the engine's primitives** — `P_Move`/`P_NewChaseDir` for
-  pathing, `A_FaceTarget` for aim, and the stock melee/missile state transitions
-  for firing. It only swaps the *movement* per order (e.g. fallback = move in the
-  direction opposite the target; flank = ±90° of it). So directed monsters still
-  acquire targets and shoot normally.
+- **`A_LLMChase` navigates with the BSP portal pathfinder** for "approach" orders
+  (chase/focus_fire/use_door/ambush): it steps toward `P_AICoop_NextWaypoint`'s next
+  reachable waypoint (the same A* graph the buddy uses), so directed monsters round
+  corners and cross rooms instead of grinding the nearest wall.  Tactical orders that
+  aren't destinations stay simple 8-dir (fallback = away from target; flank = ±90°).
+  Aim is `A_FaceTarget`, firing the stock melee/missile state transitions, so they
+  still acquire + shoot normally.  (The shared pathfinder is A*, not Dijkstra, so
+  per-monster queries are cheap even with a roomful of directed monsters.)
 - **Latched + gated.** `P_AI_Active` only diverts for an active, non-`chase` order
   (`after<=0`, `for>0`); when `for` expires the monster reverts to vanilla
   `A_Chase`. While the director "thinks", monsters keep executing the last order.

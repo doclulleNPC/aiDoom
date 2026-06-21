@@ -1144,21 +1144,33 @@ static int PF_EdgeWeight (seg_t* sg, int u, int v)
     return w;
 }
 
-static boolean PF_Dijkstra (int start, int goal)
+// A* over the sub-sector graph: same edges + relaxation as Dijkstra, but the node we
+// pop is the one with the lowest f = g + h, where g = pf_dist (cost so far) and h =
+// the straight-line centroid distance to the goal.  h is admissible (edge weights are
+// distances plus only positive door/hazard penalties, so they never undershoot the
+// straight line), so the path stays optimal while far fewer nodes get expanded toward
+// a distant goal than plain Dijkstra (which fans out to everything closer first).
+static boolean PF_AStar (int start, int goal)
 {
     int	i, pop = 0;
+    fixed_t	gx = pf_cx[goal], gy = pf_cy[goal];
 
     for (i = 0; i < pf_n; i++) { pf_dist[i] = PF_INF; pf_prev[i] = -1; pf_done[i] = 0; }
     pf_dist[start] = 0;
 
     while (pop < PF_MAXPOP)
     {
-	int		u = -1, best = PF_INF, s;
+	int	u = -1, bestf = PF_INF, s;
 
-	for (i = 0; i < pf_n; i++)			// pop nearest unvisited
-	    if (!pf_done[i] && pf_dist[i] < best) { best = pf_dist[i]; u = i; }
+	for (i = 0; i < pf_n; i++)			// pop lowest f = g + h
+	    if (!pf_done[i] && pf_dist[i] < PF_INF)
+	    {
+		int h = (int)(P_AproxDistance (pf_cx[i]-gx, pf_cy[i]-gy) >> FRACBITS);
+		int f = pf_dist[i] + h;
+		if (f < bestf) { bestf = f; u = i; }
+	    }
 	if (u < 0) break;				// nothing left reachable
-	if (u == goal) return true;
+	if (u == goal) return true;			// goal popped -> optimal path found
 	pf_done[u] = 1; pop++;
 
 	for (s = 0; s < pf_nadj[u]; s++)
@@ -1184,7 +1196,7 @@ static boolean PF_NextWaypoint (mobj_t* mo, fixed_t dx, fixed_t dy, fixed_t* wx,
     start = PF_SS (mo->x, mo->y);
     goal  = PF_SS (dx, dy);
     if (start == goal) { *wx = dx; *wy = dy; return true; }
-    if (!PF_Dijkstra (start, goal))
+    if (!PF_AStar (start, goal))
     {
 	// No route -- the graph is built once at level start, so a door/lift/secret
 	// wall that has since OPENED isn't in it yet (it had no passable edge when
@@ -1193,7 +1205,7 @@ static boolean PF_NextWaypoint (mobj_t* mo, fixed_t dx, fixed_t dy, fixed_t* wx,
 	if (gametic - pf_lastbuild > 50)
 	{
 	    PF_Build (mo); pf_lastbuild = gametic;
-	    if (!PF_Dijkstra (start, goal)) return false;
+	    if (!PF_AStar (start, goal)) return false;
 	}
 	else
 	    return false;
@@ -1227,6 +1239,14 @@ static boolean PF_NextWaypoint (mobj_t* mo, fixed_t dx, fixed_t dy, fixed_t* wx,
     return true;
 }
 
+// Public pathfinder: next reachable waypoint for `mo` toward (dx,dy).  The sub-sector
+// graph is map-global, so director-controlled MONSTERS use it too (p_ai_llm.c) to
+// round corners toward their target instead of the vanilla straight-line 8-dir walk.
+boolean P_AICoop_NextWaypoint (mobj_t* mo, fixed_t dx, fixed_t dy, fixed_t* wx, fixed_t* wy)
+{
+    return PF_NextWaypoint (mo, dx, dy, wx, wy);
+}
+
 // Topological route for the LLM director: fill (xs,ys) with up to `maxpts` reachable
 // waypoints along the buddy->player path (the portal route, downsampled), so the
 // director has real spatial context + valid coordinates it can steer the buddy to
@@ -1247,7 +1267,7 @@ int P_AICoop_NavRoute (fixed_t* xs, fixed_t* ys, int maxpts)
 
     start = PF_SS (mo->x, mo->y);
     goal  = PF_SS (pl->x, pl->y);
-    if (start == goal || !PF_Dijkstra (start, goal)) return 0;
+    if (start == goal || !PF_AStar (start, goal)) return 0;
 
     len = 0; c = goal;
     while (c != -1 && c != start && len < PF_PATHMAX) { pf_path[len++] = c; c = pf_prev[c]; }

@@ -196,6 +196,19 @@ static void AI_MoveDir (mobj_t* a, int dir)
 	P_NewChaseDir (a);		// blocked -> fall back to pathing
 }
 
+// Step toward (gx,gy) by following the BSP portal pathfinder's next waypoint -- so a
+// directed monster rounds corners and crosses rooms toward its target instead of the
+// vanilla straight-line 8-dir walk that jams on the first wall.  Falls back to a
+// direct bearing if there is no route (same graph the buddy navigates).
+static void AI_MoveToward (mobj_t* a, fixed_t gx, fixed_t gy)
+{
+    fixed_t wx, wy;
+    if (P_AICoop_NextWaypoint (a, gx, gy, &wx, &wy))
+	AI_MoveDir (a, AI_DirTo (a, wx, wy));
+    else
+	AI_MoveDir (a, AI_DirTo (a, gx, gy));
+}
+
 // ---------------------------------------------------------------------------
 // A_LLMChase -- execute the current directive.
 // Mirrors A_Chase's upkeep + attack logic; only the *movement* changes per
@@ -300,17 +313,18 @@ void A_LLMChase (mobj_t* actor)
 	break;
 
       case AIO_AMBUSH:
-	dir = AI_DirTo (actor, e ? e->tx : actor->target->x,
-			       e ? e->ty : actor->target->y);
-	AI_MoveDir (actor, dir);
+	// navigate to the ambush point via the pathfinder (not straight 8-dir)
+	AI_MoveToward (actor, e ? e->tx : actor->target->x,
+			      e ? e->ty : actor->target->y);
 	break;
 
-      case AIO_USEDOOR:		// approximate: head to target, P_Move opens doors
+      case AIO_USEDOOR:		// head to target via the pathfinder (P_Move opens doors)
       case AIO_FOCUS:
       case AIO_CHASE:
       default:
-	if (--actor->movecount < 0 || !P_Move (actor))
-	    P_NewChaseDir (actor);
+	// Pathfind toward the target so the monster rounds corners / crosses rooms
+	// instead of grinding the nearest wall with the vanilla straight chase.
+	AI_MoveToward (actor, actor->target->x, actor->target->y);
 	break;
     }
 
