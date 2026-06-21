@@ -49,6 +49,31 @@ static mobj_t*	forcetarget;		// the forced attack target
 static int	ai_goto;		// LLM "goto": tics left moving to (ai_gx,ai_gy)
 static fixed_t	ai_gx, ai_gy;		// LLM goto destination
 
+// Breadcrumb trail: the human's recent walkable positions.  When the buddy can't
+// make progress toward the player (the portal pathfinder is stuck in some tight
+// geometry), it replays this trail -- every crumb is a spot the human actually
+// stood on, so it is guaranteed reachable and threads the exact gap the human used.
+#define CRUMB_MAX	48
+#define CRUMB_GAP	(48*FRACUNIT)	// drop a crumb each ~48u the human moves
+static fixed_t	crumbx[CRUMB_MAX], crumby[CRUMB_MAX];
+static int	crumb_n;		// crumbs held (crumb[0]=oldest .. crumb[n-1]=newest≈player)
+static int	trail_active;		// currently following the breadcrumb trail
+
+static void AICoop_CrumbAdd (fixed_t x, fixed_t y)
+{
+    if (crumb_n > 0 &&
+	P_AproxDistance (x - crumbx[crumb_n-1], y - crumby[crumb_n-1]) < CRUMB_GAP)
+	return;				// human hasn't moved a full step yet
+    if (crumb_n == CRUMB_MAX)		// full -> drop the oldest
+    {
+	memmove (crumbx, crumbx+1, (CRUMB_MAX-1)*sizeof(fixed_t));
+	memmove (crumby, crumby+1, (CRUMB_MAX-1)*sizeof(fixed_t));
+	crumb_n--;
+    }
+    crumbx[crumb_n] = x; crumby[crumb_n] = y; crumb_n++;
+}
+
+
 #define COOP_SIGHT	(1280*FRACUNIT)	// monster acquisition range
 #define COOP_TURN	1300		// max angleturn per tic (~7 deg)
 #define COOP_FACING	1500		// |remaining turn| under which we open fire
@@ -149,6 +174,8 @@ void P_AICoop_ResetSlot (void)
     playerstarts[coop_slot].y = 0;
     playerstarts[coop_slot].angle = 0;
     playerstarts[coop_slot].options = 0;
+
+    crumb_n = 0; trail_active = 0;	// drop the previous map's breadcrumb trail
 }
 
 static boolean P_AICoop_VerifySpawn_warned = false;	// one-shot per process
@@ -1307,6 +1334,33 @@ void P_AICoop_BuildCmd (void)
 
     pl = AICoop_NearestHuman (mo->x, mo->y);
 
+    // Breadcrumb trail upkeep + long-horizon "stuck reaching the player" watchdog.
+    if (pl)
+    {
+	static int     prog_tic;
+	static fixed_t prog_pld;
+	static int     noprog;
+	fixed_t        pld = P_AproxDistance (mo->x - pl->x, mo->y - pl->y);
+
+	AICoop_CrumbAdd (pl->x, pl->y);
+
+	if (gametic - prog_tic >= 35)			// re-check ~1x/s
+	{
+	    prog_tic = gametic;
+	    // far from the player and not >=32u closer than last check -> no progress
+	    if (pld > COOP_NEAR && pld + 32*FRACUNIT > prog_pld) noprog++;
+	    else                                                 noprog = 0;
+	    prog_pld = pld;
+	    if (noprog >= 3 && crumb_n > 1)			// ~3 s stuck -> trail
+		trail_active = 1;
+	    if (noprog == 0)					// progress -> normal nav
+		trail_active = 0;
+	}
+	if (pld <= COOP_NEAR) trail_active = 0;			// reached the player
+    }
+    else
+	trail_active = 0;
+
     // Yield (top priority): the human is bumping into us -> get out of the way by
     // stepping straight away from them.  Use forward+side move so we slide aside
     // immediately instead of slowly turning around (which keeps blocking).
@@ -1444,6 +1498,22 @@ void P_AICoop_BuildCmd (void)
 
     if (!haveaim)
 	{ triedmove = 0; return; }		// nothing to do -> stand still
+
+    // Breadcrumb override: when stuck reaching the player, replay the human's trail.
+    // Steer STRAIGHT at the NEWEST crumb we can directly reach (closest to the player
+    // on the human's actual path) -- not via the pathfinder, so we never detour the
+    // wrong way around a wall, and each step is a verified-walkable hop toward them.
+    if (trail_active && pl && (coop_state == 0 || coop_state == 4) && crumb_n > 0)
+    {
+	int i;
+	for (i = crumb_n-1; i >= 0; i--)
+	    if (AICoop_CanReach (mo, crumbx[i], crumby[i], false))
+	    {
+		tx = crumbx[i]; ty = crumby[i];
+		navigate = 0; movethresh = 24*FRACUNIT;	// steer straight, no PF detour
+		break;
+	    }
+    }
 
     // Navigate: if asked to walk somewhere, route there via the BSP pathfinder and
     // steer toward the next waypoint (re-pathed every ~10 tics / on goal change).
