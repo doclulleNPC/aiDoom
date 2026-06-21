@@ -415,8 +415,41 @@ void P_AICoop_Callout (const char* prefix, int n)
     AICoop_Callout (prefix, n);
 }
 
-// A monster just died.  From P_DamageMobj.  Buddy kill -> kill/imp/gib quip + spree;
-// human kill near the buddy -> "nice".  Monsters only (skips barrels/players).
+// Duke-style per-monster kill quip: tag (+ variant count in *n) for a victim type.
+static const char* AICoop_KillTag (mobjtype_t t, int* n)
+{
+    *n = 1;
+    switch (t)
+    {
+      case MT_TROOP:     *n = 3; return "killimp:";
+      case MT_POSSESSED:        return "killzm:";
+      case MT_SHOTGUY:          return "killsg:";
+      case MT_CHAINGUY:         return "killcg:";
+      case MT_SERGEANT:         return "killpk:";
+      case MT_SHADOWS:          return "killsc:";
+      case MT_SKULL:            return "killsl:";
+      case MT_HEAD:             return "killcd:";
+      case MT_PAIN:             return "killpe:";
+      case MT_KNIGHT:           return "killhk:";
+      case MT_BRUISER:          return "killbn:";
+      case MT_UNDEAD:           return "killrv:";
+      case MT_FATSO:            return "killmc:";
+      case MT_BABY:             return "killar:";
+      case MT_SPIDER:           return "killmm:";
+      case MT_CYBORG:           return "killcy:";
+      case MT_VILE:             return "killav:";
+      case MT_WOLFSS:           return "killns:";
+      case MT_KEEN:             return "killkn:";
+      default:           *n = 4; return "kill:";
+    }
+}
+
+// A monster just died.  From P_DamageMobj.  Buddy kill -> a (rare) per-monster quip
+// + spree milestone; human kill near the buddy -> "nice".  Monsters only.
+//
+// Anti-spam: each kill only ~1-in-4 even attempts a quip, and AICoop_Callout's global
+// 4s cooldown means at most one line plays at a time -- so it's an occasional treat,
+// not a line every kill.  P_Random keeps it demo-deterministic.
 void P_AICoop_NoteKill (mobj_t* victim, mobj_t* killer)
 {
     mobj_t* buddy;
@@ -426,13 +459,14 @@ void P_AICoop_NoteKill (mobj_t* victim, mobj_t* killer)
     if (killer == buddy)
     {
 	static int cnt, t;
-	if (victim->info && victim->health < -victim->info->spawnhealth)
-	    AICoop_Callout ("gib:", 3);			// overkill / gibbed
-	else if (victim->type == MT_TROOP)
-	    AICoop_Callout ("killimp:", 3);		// Duke-style imp quip
-	else
-	    AICoop_Callout ("kill:", 4);
-	if (gametic - t < 5*TICRATE) { if (++cnt >= 3) { AICoop_Callout ("spree:", 4); cnt = 0; } }
+	if (victim->info && victim->health < -victim->info->spawnhealth && P_Random () < 96)
+	    AICoop_Callout ("gib:", 3);			// satisfying overkill
+	else if (P_Random () < 64)			// otherwise a rare per-type quip
+	{
+	    int n; const char* tag = AICoop_KillTag (victim->type, &n);
+	    AICoop_Callout (tag, n);
+	}
+	if (gametic - t < 5*TICRATE) { if (++cnt >= 4) { AICoop_Callout ("spree:", 4); cnt = 0; } }
 	else cnt = 1;
 	t = gametic;
     }

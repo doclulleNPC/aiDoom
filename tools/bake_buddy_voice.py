@@ -137,8 +137,26 @@ for code, _wkey, wname in WEAPON_CODES:
 EVENTS = [
     # -- combat
     ("DSKL01", "Got him!"), ("DSKL02", "Down!"), ("DSKL03", "Scratch one."), ("DSKL04", "Stay down."),
-    # Duke-style monster-specific kill quips (imp gets its own)
+    # Duke-style monster-specific kill quips -- one per monster type (rare, see NoteKill).
     ("DSKI01", "I pimped that imp!"), ("DSKI02", "Imp? More like wimp."), ("DSKI03", "Hot-footed that imp."),
+    ("DSKZM01", "Zombie down."),               # zombieman
+    ("DSKSG01", "Thanks for the shells!"),      # shotgun guy
+    ("DSKCG01", "Quit hoggin' the chaingun."),  # chaingunner
+    ("DSKPK01", "Bad dog!"),                    # pinky / demon
+    ("DSKSC01", "I see you, fuzzy."),           # spectre
+    ("DSKSL01", "Lost soul, meet floor."),      # lost soul
+    ("DSKCD01", "Eat dirt, meatball!"),         # cacodemon
+    ("DSKPE01", "No more skull spam."),         # pain elemental
+    ("DSKHK01", "Knight, night!"),              # hell knight
+    ("DSKBN01", "Baron? Barely."),              # baron of hell
+    ("DSKRV01", "Rest in pieces, bonehead!"),   # revenant
+    ("DSKMC01", "Lay off the donuts."),         # mancubus
+    ("DSKAR01", "Squashed that bug."),          # arachnotron
+    ("DSKMM01", "Big spider, big splat."),      # spider mastermind
+    ("DSKCY01", "Tim-ber!"),                    # cyberdemon
+    ("DSKAV01", "Stay dead this time!"),        # arch-vile
+    ("DSKNS01", "Wrong game, pal."),            # SS nazi
+    ("DSKKN01", "Door's open!"),                # commander keen
     ("DSDG01", "Incoming!"), ("DSDG02", "Whoa!"), ("DSDG03", "Not today."),
     ("DSDRY01", "I'm dry!"), ("DSDRY02", "Out of ammo!"), ("DSDRY03", "Need a reload!"),
     ("DSBR01", "Not near that barrel!"), ("DSBR02", "Barrel -- hold up."), ("DSBR03", "That thing'll blow."),

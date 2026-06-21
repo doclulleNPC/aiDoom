@@ -151,6 +151,12 @@ static const voicemap_t VOICE_MAP[] =
     // ---- event callouts (see tools/bake_buddy_voice.py EVENTS) -------------
     { "kill:0","DSKL01" },{ "kill:1","DSKL02" },{ "kill:2","DSKL03" },{ "kill:3","DSKL04" },
     { "killimp:0","DSKI01" },{ "killimp:1","DSKI02" },{ "killimp:2","DSKI03" },
+    { "killzm:0","DSKZM01" },{ "killsg:0","DSKSG01" },{ "killcg:0","DSKCG01" },
+    { "killpk:0","DSKPK01" },{ "killsc:0","DSKSC01" },{ "killsl:0","DSKSL01" },
+    { "killcd:0","DSKCD01" },{ "killpe:0","DSKPE01" },{ "killhk:0","DSKHK01" },
+    { "killbn:0","DSKBN01" },{ "killrv:0","DSKRV01" },{ "killmc:0","DSKMC01" },
+    { "killar:0","DSKAR01" },{ "killmm:0","DSKMM01" },{ "killcy:0","DSKCY01" },
+    { "killav:0","DSKAV01" },{ "killns:0","DSKNS01" },{ "killkn:0","DSKKN01" },
     { "dodge:0","DSDG01" },{ "dodge:1","DSDG02" },{ "dodge:2","DSDG03" },
     { "dry:0","DSDRY01" },{ "dry:1","DSDRY02" },{ "dry:2","DSDRY03" },
     { "barrel:0","DSBR01" },{ "barrel:1","DSBR02" },{ "barrel:2","DSBR03" },
