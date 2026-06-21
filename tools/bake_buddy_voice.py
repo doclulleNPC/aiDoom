@@ -133,7 +133,9 @@ assert len(PHRASES) == 37, f"phrase count drifted: {len(PHRASES)} != 37"
 
 # ---------- ElevenLabs API ----------
 
-DEFAULT_VOICE = "wJmFT75XSkFKaBF1R0rX"      # "Joker-HL"; matches engine default
+# Buddy voice id ("Joker-HL").  Stored HERE in tools/ -- it's only needed for the
+# offline bake; the game ships pre-baked OGGs (buddy.wad) and never does live TTS.
+DEFAULT_VOICE = "wJmFT75XSkFKaBF1R0rX"
 DEFAULT_MODEL = "eleven_turbo_v2_5"
 # ElevenLabs does NOT support ogg_vorbis (their docs say so; we tried).
 # We fetch MP3 (mp3_44100_128) and transcode to OGG/Vorbis with ffmpeg below.
@@ -291,8 +293,8 @@ def write_wad(out_path, lumps):
 def main():
     ap = argparse.ArgumentParser(description="Bake aiDoom buddy voice into buddy.wad")
     ap.add_argument("--voice", default=None,
-                    help="ElevenLabs voice id (default: buddy_voice_id in aidoom.cfg, "
-                         "else built-in Joker-HL)")
+                    help="ElevenLabs voice id override (default: DEFAULT_VOICE in this "
+                         "tool -- Joker-HL)")
     ap.add_argument("--model", default=DEFAULT_MODEL)
     ap.add_argument("--key",   default=None)
     ap.add_argument("--cfg",   default="aidoom.cfg")
@@ -312,8 +314,10 @@ def main():
                          "(default: trim via ffmpeg silenceremove)")
     args = ap.parse_args()
 
-    # Voice id MAY live in aidoom.cfg (it's not a secret); fall back to Joker-HL.
-    args.voice = args.voice or cfg_value(args.cfg, "buddy_voice_id") or DEFAULT_VOICE
+    # Voice id lives in tools/ (DEFAULT_VOICE below) -- it's only used here, offline,
+    # when baking buddy.wad; the game just plays the pre-baked OGGs, never live TTS.
+    # NOT in aidoom.cfg.  --voice can override for a one-off bake.
+    args.voice = args.voice or DEFAULT_VOICE
 
     out_path = Path(args.out).resolve()
     cache_dir = Path(args.cache).resolve()
