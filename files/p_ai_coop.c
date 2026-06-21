@@ -823,6 +823,35 @@ const char* P_AICoop_StatusReport (void)
     return buf;
 }
 
+// Console "buddygod": toggle god mode on the buddy (mirrors the IDDQD flag for its
+// player slot, so P_DamageMobj ignores damage to it).
+const char* P_AICoop_God (void)
+{
+    player_t* bot = &players[coop_slot];
+    if (!AICoop_Mo ()) return "[Buddy] (no companion -- launch with -coop)";
+    bot->cheats ^= CF_GODMODE;
+    if (bot->cheats & CF_GODMODE)
+    {
+	bot->health = 100;
+	if (bot->mo) bot->mo->health = 100;
+	return "[Buddy] God mode ON.";
+    }
+    return "[Buddy] God mode OFF.";
+}
+
+// Console "buddyarm": all weapons + full ammo + armor for the buddy (like IDFA).
+// Deliberately NOT keys -- the human needs those for locked doors (see P_AICoop_IsBuddy).
+const char* P_AICoop_GiveAll (void)
+{
+    player_t* bot = &players[coop_slot];
+    int i;
+    if (!AICoop_Mo ()) return "[Buddy] (no companion -- launch with -coop)";
+    for (i = 0; i < NUMWEAPONS; i++) bot->weaponowned[i] = true;
+    for (i = 0; i < NUMAMMO; i++)    bot->ammo[i] = bot->maxammo[i];
+    bot->armorpoints = 200; bot->armortype = 2;
+    return "[Buddy] Locked and loaded.";
+}
+
 
 // ================ BSP sub-sector Dijkstra pathfinder (Pathfinding.md) =======
 // Nodes  = walkable sub-sectors, represented by their centroid.
@@ -1377,6 +1406,47 @@ static int AICoop_DodgeMissile (ticcmd_t* cmd, mobj_t* mo)
     return 0;
 }
 
+// (B) A step toward (gx,gy) the buddy can't WALK up (>24) but a jump clears
+// (<=48; JUMPVELOCITY rises ~36u) -- so it presses BT_JUMP onto low ledges, like the
+// human can.  P_CheckPosition true == the box fits (it's a tall step, not a wall).
+static boolean AICoop_JumpableStep (mobj_t* mo, fixed_t gx, fixed_t gy)
+{
+    int     a  = R_PointToAngle2 (mo->x, mo->y, gx, gy) >> ANGLETOFINESHIFT;
+    fixed_t px = mo->x + FixedMul (24*FRACUNIT, finecosine[a]);
+    fixed_t py = mo->y + FixedMul (24*FRACUNIT, finesine[a]);
+    fixed_t up;
+    if (!P_CheckPosition (mo, px, py)) return false;		// a wall, not a step
+    up = tmfloorz - mo->floorz;
+    return up > 24*FRACUNIT && up <= 48*FRACUNIT
+	&& tmceilingz - tmfloorz >= mo->height;			// fits above the step
+}
+
+// (D) A live explosive barrel within blast range of the buddy?  If so it holds fire --
+// its own shot could detonate a point-blank barrel and gib it (cf. the rocket/BFG guard).
+static boolean AICoop_BarrelNear (mobj_t* mo)
+{
+    thinker_t* th;
+    for (th = thinkercap.next; th != &thinkercap; th = th->next)
+    {
+	mobj_t* m;
+	if (th->function.acp1 != (actionf_p1)P_MobjThinker) continue;
+	m = (mobj_t*)th;
+	if (m->type != MT_BARREL || m->health <= 0) continue;
+	if (P_AproxDistance (m->x - mo->x, m->y - mo->y) < COOP_BLAST_SAFE) return true;
+    }
+    return false;
+}
+
+// (E) Does the spot just ahead drop off (>24 below us) or sit on a damaging floor?
+// Used to make the buddy creep near nukage pits / ledges instead of running off them.
+static boolean AICoop_FallAhead (mobj_t* mo, fixed_t px, fixed_t py)
+{
+    sector_t* s = R_PointInSubsector (px, py)->sector;
+    if (AICoop_DamagingFloor (px, py))             return true;	// nukage/lava ahead
+    if (mo->floorz - s->floorheight > 24*FRACUNIT) return true;	// a fall ahead
+    return false;
+}
+
 // Best ranged weapon the buddy owns with ammo (melee weapons excluded; rockets/BFG
 // skipped -- splash would hurt the buddy/human at the ranges it fights).  Used to
 // switch off the chainsaw/fist when the target is out of melee reach.
@@ -1827,7 +1897,8 @@ void P_AICoop_BuildCmd (void)
 		// the angle so the next tic has a safe shot.
 		cmd->sidemove += ((gametic / 16) & 1) ? COOP_RUN : -COOP_RUN;
 	    }
-	    else if (linetarget && abs(rem) < COOP_FACING && react_timer == 0 && !splash_close)
+	    else if (linetarget && abs(rem) < COOP_FACING && react_timer == 0 && !splash_close
+		     && !AICoop_BarrelNear (mo))		// (D) don't detonate a barrel on ourselves
 		cmd->buttons |= BT_ATTACK;
 	    else if (!linetarget && dist < 768*FRACUNIT)
 		backoff = true;
@@ -1926,6 +1997,22 @@ void P_AICoop_BuildCmd (void)
 	if (doorwait == 0) { cmd->buttons |= BT_USE; doorwait = 45; }
 	// Sideways wiggle to slip past a barrel / convex corner (non-door wedge).
 	cmd->sidemove += ((wig++ / 24) & 1) ? COOP_RUN : -COOP_RUN;
+	// (B) Low ledge it can't step up?  Jump it -- the player can (disabled in netgame).
+	if (!netgame && AICoop_JumpableStep (mo, stx, sty)) cmd->buttons |= BT_JUMP;
+    }
+
+    // (E) Careful near edges: if the chosen move heads toward a drop-off or a damaging
+    // floor, crawl -- a slower step overshoots the lip far less, so the buddy stops
+    // sliding off ledges into nukage.  Direction is the actual (forward,side) vector.
+    if (cmd->forwardmove || cmd->sidemove)
+    {
+	int     fa = mo->angle >> ANGLETOFINESHIFT;
+	fixed_t vx = cmd->forwardmove*finecosine[fa] + cmd->sidemove*finesine[fa];
+	fixed_t vy = cmd->forwardmove*finesine[fa]   - cmd->sidemove*finecosine[fa];
+	int     ma = R_PointToAngle2 (0, 0, vx, vy) >> ANGLETOFINESHIFT;
+	fixed_t nx = mo->x + FixedMul (40*FRACUNIT, finecosine[ma]);
+	fixed_t ny = mo->y + FixedMul (40*FRACUNIT, finesine[ma]);
+	if (AICoop_FallAhead (mo, nx, ny)) { cmd->forwardmove /= 3; cmd->sidemove /= 3; }
     }
 
     // Missile dodge has the final say on movement: if a projectile is closing on us,

@@ -59,6 +59,8 @@ int		P_AICoop_Summon (void);		// "come"   -- run to the player
 const char*	P_AICoop_Wait (void);		// "wait"/"stay" -- toggle hold
 const char*	P_AICoop_Attack (void);		// "attack" -- charge nearest monster
 const char*	P_AICoop_StatusReport (void);	// "report" -- HP/armor/weapon/ammo
+const char*	P_AICoop_God (void);		// "buddygod" -- toggle buddy god mode
+const char*	P_AICoop_GiveAll (void);	// "buddyarm" -- buddy all weapons + ammo + armor
 
 // ---------------------------------------------------------------------------
 //  AI (LLM) director layer for the buddy (-aicoop).  The director sets a
