@@ -86,18 +86,23 @@ static const mobjtype_t dir_special2[] = { MT_UNDEAD, MT_FATSO, MT_KNIGHT, MT_BA
 // ---- spoken "game-master" lines (DD* lumps via the dir:* tags / I_Director_Say) ---
 // Rate-limited so the announcer stays a voice-of-god, not a chatterbox.  prefix is
 // e.g. "dir:horde"; one of n variants is appended ("dir:horde:2").
-//   force=1: an important event (phase change / item drop) -- barge in over any
-//            line in progress and ignore the cooldown.
-//   force=0: ambient flavour -- only when the director is idle and the gap elapsed.
-#define DIR_VOICE_GAP	(6*TICRATE)	// min gap between ambient lines
+//   force=1: an important event (phase change / item drop) -- may barge in over a
+//            line in progress, but still obeys a hard floor so events don't cascade.
+//   force=0: ambient flavour -- only when the director is idle and the long gap elapsed.
+#define DIR_VOICE_GAP	(16*TICRATE)	// min gap between ambient lines
+#define DIR_VOICE_FLOOR	(6*TICRATE)	// min gap between ANY two lines (even forced ones)
 static void P_Director_Voice (const char* prefix, int n, int force)
 {
     char tag[40];
     if (!DIR_TRACK) return;			// director not running -> silent
+    // A hard floor on EVERY line keeps the Director from machine-gunning: even
+    // back-to-back "important" events (peak -> big, relax -> gift) won't both fire.
+    if (gametic - dir_voicelast < (force ? DIR_VOICE_FLOOR : DIR_VOICE_GAP))
+	return;
     if (force)
 	I_Director_Stop ();			// important line preempts whatever's playing
-    else if (I_Director_Busy () || gametic - dir_voicelast < DIR_VOICE_GAP)
-	return;
+    else if (I_Director_Busy ())
+	return;					// ambient: don't talk over a line in progress
     dir_voicelast = gametic;
     snprintf (tag, sizeof tag, "%s:%d", prefix, (dir_vidx++) % n);
     I_Director_Say (tag, 127, 127);
@@ -231,11 +236,20 @@ static mobjtype_t P_Director_PickType (void)
     // critically low on health or ammo (don't drop a Cyberdemon on a dying player).
     if ((dir_state == DIR_SUSTAIN || dir_acc > DIR_PEAK/2) && P_Random () < 150
 	&& !P_Director_Stressed ())
-    {
-	P_Director_Voice ("dir:big", 3, 0);	// a special leans in (ambient, rate-limited)
-	return spec[P_Random () % nspec];
-    }
+	return spec[P_Random () % nspec];	// dir:big is spoken on a SUCCESSFUL spawn, not here
     return dir_common[P_Random () % (int)(sizeof(dir_common)/sizeof(dir_common[0]))];
+}
+
+// Is `mt` one of the "special" (tougher) monster types?  -> the Director's "big"
+// line; used only after one ACTUALLY spawns, so the quip matches what entered.
+static boolean P_Director_IsSpecial (mobjtype_t mt)
+{
+    int i;
+    for (i = 0; i < (int)(sizeof(dir_special1)/sizeof(dir_special1[0])); i++)
+	if (dir_special1[i] == mt) return true;
+    for (i = 0; i < (int)(sizeof(dir_special2)/sizeof(dir_special2[0])); i++)
+	if (dir_special2[i] == mt) return true;
+    return false;
 }
 
 // DOOM2-only monsters have no sprites in a DOOM1 IWAD (-> renderer I_Error).  In
@@ -286,16 +300,16 @@ static void P_Director_Announce (const char* msg)
 // and set it charging the nearest survivor.  cx==cy==0 -> centre on that survivor
 // (the default "in the dark behind you").  Pass the exit point to populate the room
 // the player is heading for.  Bails quietly if no valid hidden spot is found.
-static void P_Director_SpawnMonsterNear (mobjtype_t mt, fixed_t cx, fixed_t cy)
+static boolean P_Director_SpawnMonsterNear (mobjtype_t mt, fixed_t cx, fixed_t cy)
 {
     mobj_t*	sv;
     int		t;
     static int	lastname;	// rate-limit the per-monster "you hear a X" callout
 
     mt = P_Director_SafeType (mt);	// never spawn an IWAD-absent monster (crash guard)
-    if (P_Director_LiveMonsters () >= DIR_MAXMON) return;
+    if (P_Director_LiveMonsters () >= DIR_MAXMON) return false;
     sv = P_Director_RandomSurvivor ();
-    if (!sv) return;
+    if (!sv) return false;
     if (!cx && !cy) { cx = sv->x; cy = sv->y; }		// default: around the survivor
 
     for (t = 0; t < DIR_SPAWN_TRIES; t++)
@@ -331,12 +345,13 @@ static void P_Director_SpawnMonsterNear (mobjtype_t mt, fixed_t cx, fixed_t cy)
 		lastname = gametic;
 	    }
 	}
-	return;
+	return true;			// actually placed one
     }
+    return false;			// no valid hidden spot found this time
 }
 
 // Default placement: in the dark behind a survivor (the original behaviour).
-static void P_Director_SpawnMonsterOf (mobjtype_t mt) { P_Director_SpawnMonsterNear (mt, 0, 0); }
+static boolean P_Director_SpawnMonsterOf (mobjtype_t mt) { return P_Director_SpawnMonsterNear (mt, 0, 0); }
 
 // ---- exit-aware pressure ---------------------------------------------------
 // More heat the closer the player gets to the level exit, and the exit room is
@@ -398,15 +413,20 @@ static boolean P_Director_Stressed (void)
 
 static void P_Director_SpawnMonster (void)
 {
-    mobjtype_t	mt  = P_Director_PickType ();
+    mobjtype_t	mt  = P_Director_SafeType (P_Director_PickType ());
     int		exf = P_Director_ExitProximity ();
+    boolean	ok;
     // As the player nears the exit, route more spawns INTO the exit room ahead of
     // them; otherwise spawn in the dark behind them as usual.
     if (dir_exit_set && (P_Random () % 100) < exf)
-	P_Director_SpawnMonsterNear (mt, dir_exit_x, dir_exit_y);
+	ok = P_Director_SpawnMonsterNear (mt, dir_exit_x, dir_exit_y);
     else
-	P_Director_SpawnMonsterOf (mt);
-    P_Director_Voice ("dir:spawn", 2, 0);	// occasional "reinforcements" (rate-limited)
+	ok = P_Director_SpawnMonsterOf (mt);
+    // Only speak when something ACTUALLY entered (else the line wouldn't match the
+    // game), and pick the line by what spawned: a tougher type -> "big", else trash.
+    if (!ok) return;
+    if (P_Director_IsSpecial (mt)) P_Director_Voice ("dir:big", 3, 0);
+    else                           P_Director_Voice ("dir:spawn", 2, 0);
 }
 
 // (E) Spawn a horde -- a burst of `count` monsters of one type at once -- and (F)
@@ -414,8 +434,13 @@ static void P_Director_SpawnMonster (void)
 static void P_Director_SpawnWave (int count)
 {
     mobjtype_t	mt = P_Director_PickType ();
-    int		i;
-    for (i = 0; i < count; i++) P_Director_SpawnMonsterOf (mt);
+    int		i, spawned = 0;
+    for (i = 0; i < count; i++) if (P_Director_SpawnMonsterOf (mt)) spawned++;
+    // Only call it a horde (HUD + voice) if one actually materialised -- spawns can
+    // all fail (no hidden spot / monster cap), and "Here comes the horde" with no
+    // horde is exactly the mismatch we want to avoid.
+    if (spawned < 2)
+	return;
     P_Director_Announce ("A horde is closing in!");	// after, so it wins the HUD line
     P_Director_Voice ("dir:horde", 3, 1);		// the Director relishes it
 }

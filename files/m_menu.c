@@ -187,6 +187,7 @@ void M_EndGame(int choice);
 void M_ReadThis(int choice);
 void M_ReadThis2(int choice);
 void M_QuitDOOM(int choice);
+void M_QuitResponse(int ch);	// fwd: the quit prompt accepts ANY key (responder special-case)
 
 void M_ChangeMessages(int choice);
 void M_ChangeSensitivity(int choice);
@@ -1216,7 +1217,9 @@ int     quitsounds2[8] =
 
 void M_QuitResponse(int ch)
 {
-    if (ch != 'y')
+    // Any key quits; Escape (or 'n') backs out -- so a stray keypress on the
+    // "really quit?" prompt confirms instead of forcing you to find 'y'.
+    if (ch == KEY_ESCAPE || ch == 'n')
 	return;
     if (!netgame)
     {
@@ -1682,8 +1685,9 @@ boolean M_Responder (event_t* ev)
     // Take care of any messages that need input
     if (messageToPrint)
     {
-	if (messageNeedsInput == true &&
-	    !(ch == ' ' || ch == 'n' || ch == 'y' || ch == KEY_ESCAPE))
+	if (messageNeedsInput == true
+	    && messageRoutine != M_QuitResponse		// quit prompt: ANY key confirms
+	    && !(ch == ' ' || ch == 'n' || ch == 'y' || ch == KEY_ESCAPE))
 	    return false;
 		
 	menuactive = messageLastMenuActive;
