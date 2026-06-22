@@ -164,6 +164,7 @@ int		key_buddy_stay;
 int		key_nextweapon;		// default: mouse wheel up
 int		key_prevweapon;		// default: mouse wheel down
 int		key_jump;		// MOD: jump (default: space)
+int		key_spy;		// spy mode: view another player (the AI buddy in co-op); default F12
 int		autorun = 1;	// always-run; the run key toggles this (G_Responder)
 
 // MOD: free-look pitch clamp, in BASE-resolution horizon-shift pixels.
@@ -562,17 +563,21 @@ void G_CycleWeapon (int dir)
 boolean G_Responder (event_t* ev) 
 { 
     // allow spy mode changes even during the demo
-    if (gamestate == GS_LEVEL && ev->type == ev_keydown 
-	&& ev->data1 == KEY_F12 && (singledemo || !deathmatch) )
+    if (gamestate == GS_LEVEL && ev->type == ev_keydown
+	&& ev->data1 == key_spy && (singledemo || !deathmatch) )
     {
-	// spy mode 
-	do 
-	{ 
-	    displayplayer++; 
-	    if (displayplayer == MAXPLAYERS) 
-		displayplayer = 0; 
-	} while (!playeringame[displayplayer] && displayplayer != consoleplayer); 
-	return true; 
+	// spy mode -- view another player (e.g. the AI co-op buddy).  Skip any
+	// player that has no body right now (in-game but mo==NULL, e.g. a buddy
+	// mid-death/reborn/teleport): the renderer derefs player->mo unguarded, so
+	// switching to a bodyless player would crash.
+	do
+	{
+	    displayplayer++;
+	    if (displayplayer == MAXPLAYERS)
+		displayplayer = 0;
+	} while ((!playeringame[displayplayer] || !players[displayplayer].mo)
+		 && displayplayer != consoleplayer);
+	return true;
     }
     
     // any other key pops up menu if in demos

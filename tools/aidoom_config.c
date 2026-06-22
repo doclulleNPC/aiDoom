@@ -75,6 +75,7 @@ static setting_t settings[] = {
     {"Buddy keys","Buddy: come",    "key_buddy_come",   T_KEY,0,0,F_DOOMRC},
     {"Buddy keys","Buddy: attack",  "key_buddy_attack", T_KEY,0,0,F_DOOMRC},
     {"Buddy keys","Buddy: stay",    "key_buddy_stay",   T_KEY,0,0,F_DOOMRC},
+    {"Buddy keys","Buddy: view (spy)","key_spy",        T_KEY,0,0,F_DOOMRC},
 
     {"Video / mouse","Mouse sensitivity","mouse_sensitivity",T_INT,0,9,F_DOOMRC},
     {"Video / mouse","Resolution (1-6)", "screen_resolution",T_INT,1,6,F_DOOMRC},
@@ -205,6 +206,7 @@ static void set_default_int(setting_t* s)
     else if (!strcmp(n,"key_buddy_come"))   v = ',';
     else if (!strcmp(n,"key_buddy_attack")) v = '.';
     else if (!strcmp(n,"key_buddy_stay"))   v = '-';
+    else if (!strcmp(n,"key_spy"))          v = K_F12;
     else if (!strcmp(n,"mouse_sensitivity"))v = 5;
     else if (!strcmp(n,"screen_resolution"))v = 1;
     else if (!strcmp(n,"screenblocks"))     v = 9;

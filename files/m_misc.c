@@ -185,6 +185,7 @@ extern int	key_buddy_attack;
 extern int	key_buddy_stay;
 extern int	autorun;
 extern int	key_console;
+extern int	key_spy;
 extern int	crosshair;
 extern int	antialiasing;	// i_video.c -- smooth (bilinear) scaling
 extern int	blur;		// i_video.c -- soft blur post-process
@@ -270,6 +271,7 @@ default_t	defaults[] =
     {"key_jump",&key_jump, ' '},
     {"autorun",&autorun, 1},
     {"key_console",&key_console, KEY_F12},
+    {"key_spy",&key_spy, KEY_F12},	// spy mode (view the AI buddy); default F12
     {"crosshair",&crosshair, 0},
 
     {"monster_pack",&monster_pack, 0},		// default OFF -> vanilla 1993 monster AI

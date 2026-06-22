@@ -287,6 +287,11 @@ void D_Display (void)
     // draw the view directly
     if (gamestate == GS_LEVEL && !automapactive && gametic)
     {
+	// Safety: if the spied-on player (F12 spy mode) lost its body since we
+	// switched to it -- a co-op/AI buddy mid-death/reborn -- snap back to our
+	// own view rather than deref a NULL mo in R_SetupFrame.
+	if (!playeringame[displayplayer] || !players[displayplayer].mo)
+	    displayplayer = consoleplayer;
 	R_RenderPlayerView (&players[displayplayer]);
 	R_DrawCrosshair ();		// over the 3D view, under the HUD/menu/console
     }
