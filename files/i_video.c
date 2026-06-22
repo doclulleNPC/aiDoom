@@ -219,13 +219,19 @@ void I_GetEvent(SDL_Event *Event)
     {
       case SDL_EVENT_KEY_DOWN:
 	event.type = ev_keydown;
-	event.data1 = xlatekey(Event->key.key);
+	// The console-toggle key is the one LEFT of "1" -- detect it by physical
+	// SCANCODE (SDL_SCANCODE_GRAVE), not the produced character, so it works on
+	// non-US layouts (German `^`, etc.) where that key isn't backquote. (GZDoom
+	// does the same: keycode first, grave scancode as the layout-proof fallback.)
+	event.data1 = (Event->key.scancode == SDL_SCANCODE_GRAVE)
+		      ? KEY_BACKQUOTE : xlatekey(Event->key.key);
 	D_PostEvent(&event);
 	break;
 
       case SDL_EVENT_KEY_UP:
 	event.type = ev_keyup;
-	event.data1 = xlatekey(Event->key.key);
+	event.data1 = (Event->key.scancode == SDL_SCANCODE_GRAVE)
+		      ? KEY_BACKQUOTE : xlatekey(Event->key.key);
 	D_PostEvent(&event);
 	break;
 
@@ -235,6 +241,20 @@ void I_GetEvent(SDL_Event *Event)
 	event.data1 = I_MouseButtons(SDL_GetMouseState(NULL, NULL));
 	event.data2 = event.data3 = 0;
 	D_PostEvent(&event);
+	// Also emit the specific button as a bindable key press, so the config
+	// tool / `bind` can map a mouse button to an action (jump, spy, ...).
+	{
+	    int mk = (Event->button.button == SDL_BUTTON_LEFT)   ? KEY_MOUSE1
+		   : (Event->button.button == SDL_BUTTON_RIGHT)  ? KEY_MOUSE2
+		   : (Event->button.button == SDL_BUTTON_MIDDLE) ? KEY_MOUSE3 : 0;
+	    if (mk)
+	    {
+		event.type  = (Event->type == SDL_EVENT_MOUSE_BUTTON_DOWN) ? ev_keydown : ev_keyup;
+		event.data1 = mk;
+		event.data2 = event.data3 = 0;
+		D_PostEvent(&event);
+	    }
+	}
 	break;
 
       case SDL_EVENT_MOUSE_MOTION:

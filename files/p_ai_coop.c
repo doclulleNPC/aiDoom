@@ -44,6 +44,7 @@ static int	aicoop_layer;		// -aicoop given: AI-driven layer requested
 static int	buddy_react;		// reaction delay (tics) before firing a fresh target (-buddyreact)
 static int	coop_state;		// 0 follow 1 fight 2 heal 3 hold 4 come 5 items
 static int	summon;			// "come": tics left running to the player
+static int	summon_stay;		// "come" leash: stay near the player (LOS) until another order
 static int	hold;			// "wait/stay": hold position (director tactic BUD_HOLD)
 static int	user_hold;		// "stay" issued by the HUMAN: sticky, overrides the
 					// director, cleared only by come/attack (not by SetTactic)
@@ -97,6 +98,9 @@ static void AICoop_CrumbAdd (fixed_t x, fixed_t y)
 #define COOP_ITEM_RANGE	(128*FRACUNIT)	// idle pickups only when right nearby (not "miles away")
 #define COOP_GRAB_NEAR	(512*FRACUNIT)	// only grab items while still near the human (else follow)
 #define COOP_SUMMON_TICS (7*TICRATE)	// "come" runs to you for this long
+#define COOP_CAUTION_HP	50		// below this HP the buddy plays safe: stays near you
+#define COOP_LEASH	(640*FRACUNIT)	// come-stay / cautious: max stray from the player
+#define COOP_ENGAGE_NEAR (448*FRACUNIT)	// while staying close, only fight threats this near us
 #define COOP_ATTACK_TICS (10*TICRATE)	// "attack" charges the target for this long
 
 
@@ -196,6 +200,7 @@ void P_AICoop_ResetSlot (void)
     playerstarts[coop_slot].options = 0;
 
     crumb_n = 0; trail_active = 0;	// drop the previous map's breadcrumb trail
+    summon = 0; summon_stay = 0;	// drop any come/leash order from the previous map
 }
 
 // ---------------------------------------------------------------------------
@@ -822,6 +827,7 @@ int P_AICoop_Summon (void)
     if (!AICoop_Mo ())		return 0;
     if (netgame)		return 0;
     summon = COOP_SUMMON_TICS;
+    summon_stay = 1;		// ...and then stay tethered near you (LOS) until another order
     hold   = 0;
     user_hold = 0;		// "come" releases a manual stay
     return 1;
@@ -836,6 +842,7 @@ const char* P_AICoop_Wait (void)
     // Sticky stay: holds position until you order otherwise (come/attack), and the
     // LLM director can't override it (see P_AICoop_SetTactic).  Toggle to release.
     user_hold = !user_hold;
+    summon_stay = 0;		// "wait" is another order -> drop the come leash
     if (user_hold) { summon = 0; forceaggro = 0; forcetarget = NULL; ai_goto = 0; }
     return user_hold ? "[Buddy] Holding position -- staying put until you say otherwise."
 		     : "[Buddy] Moving out.";
@@ -859,6 +866,7 @@ const char* P_AICoop_Attack (void)
     forceaggro  = COOP_ATTACK_TICS;
     hold = 0;
     user_hold = 0;		// "attack" releases a manual stay
+    summon_stay = 0;		// ...and the come leash
     return "[Buddy] Attacking!";
 }
 
@@ -905,7 +913,7 @@ void P_AICoop_SetDirective (int tactic, struct mobj_s* focus, fixed_t x, fixed_t
     }
 
     // clear all overrides first; the chosen tactic re-arms the ones it needs
-    forceaggro = 0; forcetarget = NULL; hold = 0; summon = 0; ai_goto = 0;
+    forceaggro = 0; forcetarget = NULL; hold = 0; summon = 0; ai_goto = 0; summon_stay = 0;
 
     switch (tactic)
     {
@@ -1744,6 +1752,8 @@ void P_AICoop_BuildCmd (void)
     fixed_t	movethresh = -1;	// move when dist > this; -1 = stand still
     int		rem, turn, haveaim = 0, fire = 0, avoiddamage = 0, navigate = 0;
     boolean	stuck, backoff = false;	// backoff: can't hit the target, retreat to open the angle
+    boolean	stayclose = false;	// hurt or come-leashed -> keep near the player, fight only near threats
+    boolean	leash_return = false;	// come-leash: too far / no LOS -> return to the player
     static fixed_t lastx, lasty;	// where we were last tic (progress check)
     static int	doorwait, triedmove;	// door pulse cooldown / did we try to move
     static int	navtimer, navgoal = -1;	// pathfinder re-path cooldown / cached goal ss
@@ -1840,6 +1850,19 @@ void P_AICoop_BuildCmd (void)
 
     tgt  = AICoop_FindTarget (mo);
     heal = (bot->health < COOP_HEAL_HP) ? AICoop_FindHealth (mo) : NULL;
+
+    // "Stay close" to the player when hurt (<50% HP -> cautious, less kamikaze) OR
+    // when the human ordered "come" (summon_stay leash).  In this mode the buddy
+    // sticks near the player, keeps line of sight, and only fights threats that are
+    // near it or near the player instead of charging off after distant monsters.
+    // Explicit orders (attack/goto/wait) clear summon_stay and take priority below.
+    {
+	fixed_t plr_d   = pl ? P_AproxDistance (mo->x - pl->x, mo->y - pl->y) : 0;
+	boolean cautious = (bot->health < COOP_CAUTION_HP);
+	stayclose   = (cautious || summon_stay) && pl;
+	// hard leash (come-stay only): strayed past the leash or lost sight -> return.
+	leash_return = summon_stay && pl && (plr_d > COOP_LEASH || !P_CheckSight (mo, pl));
+    }
 
     // Voice: automatic callouts (rate-limited; tags -> OGG lumps in aidoom.wad).
         {
@@ -1967,17 +1990,27 @@ void P_AICoop_BuildCmd (void)
 	    coop_state = 4; haveaim = 1; movethresh = COOP_NEAR/2; navigate = 1;
 	    tx = pl->x; ty = pl->y;
 	}
+	// (come-stay leash) keep near the player with line of sight: strayed past the
+	// leash or lost sight of them -> return, overriding fights/items.
+	else if (leash_return)
+	{
+	    coop_state = 4; haveaim = 1; movethresh = COOP_NEAR; navigate = 1;
+	    tx = pl->x; ty = pl->y;
+	}
 	// hurt: break off and grab the nearest med-pack
 	else if (heal)
 	{
 	    coop_state = 2; haveaim = 1; movethresh = 16*FRACUNIT;
 	    tx = heal->x; ty = heal->y;
 	}
-	// fight the nearest monster
-	else if (tgt)
+	// fight the nearest monster -- but while staying close (hurt / come-leash) only
+	// engage threats near us or near the player, and keep extra distance (no charge).
+	else if (tgt && (!stayclose
+			 || P_AproxDistance (tgt->x - mo->x, tgt->y - mo->y) < COOP_ENGAGE_NEAR
+			 || (pl && P_AproxDistance (tgt->x - pl->x, tgt->y - pl->y) < COOP_LEASH)))
 	{
 	    coop_state = 1; haveaim = 1; fire = 1; aimmon = tgt;
-	    movethresh = COOP_KEEP;
+	    movethresh = stayclose ? COOP_KEEP*2 : COOP_KEEP;
 	    tx = tgt->x; ty = tgt->y;
 	}
 	// idle: collect a nearby item, but ONLY while still near the human (don't
@@ -1993,7 +2026,10 @@ void P_AICoop_BuildCmd (void)
 	}
 	else if (pl)
 	{
-	    coop_state = 0; haveaim = 1; movethresh = COOP_NEAR; avoiddamage = 1; navigate = 1;
+	    // follow -- stick closer when hurt / come-leashed.
+	    coop_state = 0; haveaim = 1;
+	    movethresh = stayclose ? COOP_NEAR/2 : COOP_NEAR;
+	    avoiddamage = 1; navigate = 1;
 	    tx = pl->x; ty = pl->y;
 	}
     }

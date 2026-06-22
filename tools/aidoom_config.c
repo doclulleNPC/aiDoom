@@ -40,6 +40,7 @@
 enum { K_RIGHT=0xae,K_LEFT=0xac,K_UP=0xad,K_DOWN=0xaf,
        K_RCTRL=0x9d,K_RSHIFT=0xb6,K_RALT=0xb8,
        K_MWHEELUP=0xb0,K_MWHEELDOWN=0xb1,K_ESC=27,K_ENTER=13,K_TAB=9,K_BKSP=127,
+       K_MOUSE1=0xb2,K_MOUSE2=0xb3,K_MOUSE3=0xb4,
        K_F11=0xd7,K_F12=0xd8 };
 
 enum { T_KEY, T_INT, T_TOGGLE, T_TEXT, T_CHOICE };
@@ -144,6 +145,9 @@ static void keyname(int k, char* out, int n)
       case K_RALT: snprintf(out,n,"Alt");  return;
       case K_MWHEELUP:  snprintf(out,n,"Wheel Up");  return;
       case K_MWHEELDOWN:snprintf(out,n,"Wheel Down");return;
+      case K_MOUSE1:    snprintf(out,n,"Mouse L");   return;
+      case K_MOUSE2:    snprintf(out,n,"Mouse R");   return;
+      case K_MOUSE3:    snprintf(out,n,"Mouse M");   return;
       case ' ':    snprintf(out,n,"Space");return;
       case K_ENTER:snprintf(out,n,"Enter");return;
       case K_TAB:  snprintf(out,n,"Tab");  return;
@@ -471,7 +475,7 @@ static void click(float mx,float my)
         float cx = s->col * COLW;
         SDL_FRect vr={cx+VALX-4,s->y,COLW-VALX,ROWH};
         if (!hit(mx,my,vr)) continue;
-        if (s->type==T_KEY) { mode=1; active=i; snprintf(status,sizeof(status),"Press a key (or mouse wheel) for \"%s\"  -  Esc cancels", s->label); }
+        if (s->type==T_KEY) { mode=1; active=i; snprintf(status,sizeof(status),"Press a key, mouse button, or wheel for \"%s\"  -  Esc cancels", s->label); }
         else if (s->type==T_TOGGLE) s->ival = !s->ival;
         else if (s->type==T_INT) {
             // hit-test against the actual "< N >" text: left half = '<', right = '>'
@@ -543,6 +547,13 @@ int main(int argc, char** argv)
                 }
                 if (e.type==SDL_EVENT_MOUSE_WHEEL) {
                     settings[active].ival = (e.wheel.y>0)?K_MWHEELUP:K_MWHEELDOWN; mode=0; status[0]=0; break;
+                }
+                if (e.type==SDL_EVENT_MOUSE_BUTTON_DOWN) {
+                    int mk = (e.button.button==SDL_BUTTON_LEFT)?K_MOUSE1
+                           : (e.button.button==SDL_BUTTON_RIGHT)?K_MOUSE2
+                           : (e.button.button==SDL_BUTTON_MIDDLE)?K_MOUSE3:0;
+                    if (mk) { settings[active].ival=mk; mode=0; status[0]=0; }
+                    break;
                 }
                 continue;
             }

@@ -172,6 +172,11 @@ static int C_KeyByName (const char* s)
     if (!strcmp(s,"down"))   return KEY_DOWNARROW;
     if (!strcmp(s,"left"))   return KEY_LEFTARROW;
     if (!strcmp(s,"right"))  return KEY_RIGHTARROW;
+    if (!strcmp(s,"mouse1") || !strcmp(s,"mousel")) return KEY_MOUSE1;
+    if (!strcmp(s,"mouse2") || !strcmp(s,"mouser")) return KEY_MOUSE2;
+    if (!strcmp(s,"mouse3") || !strcmp(s,"mousem")) return KEY_MOUSE3;
+    if (!strcmp(s,"mwheelup"))   return KEY_MWHEELUP;
+    if (!strcmp(s,"mwheeldown")) return KEY_MWHEELDOWN;
     if (s[0]=='f' && (s[1]>='1' && s[1]<='9'))
     {
 	int n = atoi (s+1);
@@ -197,6 +202,11 @@ static const char* C_KeyName (int k)
       case KEY_RIGHTARROW: return "right";
       case KEY_F11:        return "f11";
       case KEY_F12:        return "f12";
+      case KEY_MOUSE1:     return "mouse1";
+      case KEY_MOUSE2:     return "mouse2";
+      case KEY_MOUSE3:     return "mouse3";
+      case KEY_MWHEELUP:   return "mwheelup";
+      case KEY_MWHEELDOWN: return "mwheeldown";
     }
     if (k >= KEY_F1 && k <= KEY_F10) { snprintf(b,sizeof(b),"f%d", k-KEY_F1+1); return b; }
     if (k > 32 && k < 127) { b[0]=(char)k; b[1]=0; return b; }
