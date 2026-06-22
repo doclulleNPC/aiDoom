@@ -33,6 +33,7 @@ rcsid[] = "$Id: i_unix.c,v 1.5 1997/02/03 22:45:10 b1 Exp $";
 #include "m_swap.h"
 #include "i_system.h"
 #include "i_sound.h"
+#include "i_mus.h"		// native MUS music playback (OPL-style FM synth)
 #include "m_argv.h"
 #include "m_misc.h"
 #include "w_wad.h"
@@ -364,13 +365,13 @@ void I_SetSfxVolume(int volume)
   snd_SfxVolume = volume;
 }
 
-// MUSIC API - dummy. Some code from DOS version.
+// MUSIC API.  Music gain 0..15 (snd_MusicVolume range); read on the audio thread.
+int	i_music_gain = 15;
+
 void I_SetMusicVolume(int volume)
 {
-  // Internal state variable.
   snd_MusicVolume = volume;
-  // Now set volume on output device.
-  // Whatever( snd_MusciVolume );
+  i_music_gain = volume;		// 0..15
 }
 
 
@@ -652,63 +653,103 @@ I_InitSound()
 
 
 //
-// MUSIC API.
-// Still no music done.
-// Remains. Dummies.
+// MUSIC API -- native MUS playback via the OPL-style FM synth in i_mus.c.
 //
+// DOOM's music lumps are MUS (DMX), rendered by the GENMIDI-configured FM synth
+// in i_mus.c at SAMPLERATE (11025 Hz, S16 stereo).  We pull that PCM through a
+// second SDL audio stream bound to the same device as the SFX, so SDL mixes it.
+// A non-MUS lump (e.g. raw MIDI) registers as "no music" and is skipped.
+//
+static SDL_AudioStream*	mus_stream;	// music stream bound to the SFX device
+static int		mus_kind;	// 0 none, 2 MUS (synth)
+static int		mus_paused;
+static int		mus_geninit;	// MUS_Init() done?
+
 void I_InitMusic(void)		{ }
 void I_ShutdownMusic(void)	{ }
 
-static int	looping=0;
-static int	musicdies=-1;
+// SDL pulls more music PCM through here (runs on the audio thread).
+static void SDLCALL
+I_MusicStreamCallback (void* ud, SDL_AudioStream* s, int additional, int total)
+{
+    float	gain = mus_paused ? 0.0f : (i_music_gain / 15.0f);
+    short	buf[1024];		// 512 stereo frames
+
+    (void)ud; (void)total;
+    if (mus_kind != 2) return;
+    while (additional > 0)
+    {
+	int	frames = additional / (int)(2*sizeof(short));
+	int	i;
+	if (frames > 512) frames = 512;
+	if (frames <= 0) break;
+	MUS_Render (buf, frames);
+	for (i = 0 ; i < frames*2 ; i++)
+	    buf[i] = (short)(buf[i] * gain);
+	SDL_PutAudioStreamData (s, buf, frames*2*(int)sizeof(short));
+	additional -= frames*2*(int)sizeof(short);
+    }
+}
+
+int I_RegisterSong(void* data, int length)
+{
+    mus_kind = 0;
+    if (!mus_geninit) { MUS_Init (); mus_geninit = 1; }	// load GENMIDI once
+    if (MUS_Register (data, length)) { mus_kind = 2; return 2; }
+    return 0;	// not MUS (raw MIDI / GENMIDI missing) -> silently no music
+}
 
 void I_PlaySong(int handle, int looping)
 {
-  // UNUSED.
-  handle = looping = 0;
-  musicdies = gametic + TICRATE*30;
+    SDL_AudioSpec	src, dst;
+
+    if (!handle || mus_kind != 2)
+	return;
+
+    MUS_Start (looping);
+    mus_paused = 0;
+
+    src.format = SDL_AUDIO_S16; src.channels = 2; src.freq = SAMPLERATE;
+    dst.format = SDL_AUDIO_S16; dst.channels = 2; dst.freq = SAMPLERATE;
+    mus_stream = SDL_CreateAudioStream (&src, &dst);
+    if (!mus_stream)
+	return;
+    SDL_SetAudioStreamGetCallback (mus_stream, I_MusicStreamCallback, NULL);
+    SDL_BindAudioStream (SDL_GetAudioStreamDevice (audiostream), mus_stream);
 }
 
-void I_PauseSong (int handle)
-{
-  // UNUSED.
-  handle = 0;
-}
-
-void I_ResumeSong (int handle)
-{
-  // UNUSED.
-  handle = 0;
-}
+void I_PauseSong (int handle)	{ (void)handle; mus_paused = 1; }
+void I_ResumeSong (int handle)	{ (void)handle; mus_paused = 0; }
 
 void I_StopSong(int handle)
 {
-  // UNUSED.
-  handle = 0;
-  
-  looping = 0;
-  musicdies = 0;
+    (void)handle;
+    if (mus_stream)			// destroying the stream stops the callback
+    {
+	SDL_DestroyAudioStream (mus_stream);
+	mus_stream = NULL;
+    }
+    if (mus_kind == 2)
+	MUS_Stop ();
 }
 
 void I_UnRegisterSong(int handle)
 {
-  // UNUSED.
-  handle = 0;
-}
-
-int I_RegisterSong(void* data)
-{
-  // UNUSED.
-  data = NULL;
-  
-  return 1;
+    (void)handle;
+    if (mus_stream)
+    {
+	SDL_DestroyAudioStream (mus_stream);
+	mus_stream = NULL;
+    }
+    if (mus_kind == 2)
+	MUS_Stop ();
+    mus_kind = 0;
 }
 
 // Is the song playing?
 int I_QrySongPlaying(int handle)
 {
-  // UNUSED.
-  handle = 0;
-  return looping || musicdies > gametic;
+    (void)handle;
+    return mus_kind != 0;
 }
 
