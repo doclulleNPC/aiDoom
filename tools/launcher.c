@@ -679,9 +679,12 @@ static void build_command(char* out, int n, const char* iwad_path)
 
 // ----------------------------------------------------------------- launch
 //
-// We use system() so the launcher exits cleanly and aidoom can take over the
-// terminal.  We do not wait -- the launcher window stays open (so the user
-// can see what was launched) until they hit Launch again or close the window.
+// We launch the game (and, for any AI layer, the director sidecar) DETACHED and
+// return immediately, so the launcher's event loop keeps running -- otherwise
+// system() blocks until the game exits and the launcher window can't be closed
+// or reused.  On Linux the game's stderr is teed to run/aidoom_stderr.log so a
+// fatal I_Error is recoverable after the window vanishes.
+//
 // Whenever ANY AI layer is picked -- AI monsters (-aidirector) OR the AI buddy
 // (-aicoop) -- we ALSO launch the director sidecar so the LLM has someone to
 // talk to.  Both make the game listen on port 31666 (the game's default
@@ -707,36 +710,36 @@ static void do_launch(void)
 #endif
     int has_director = (access(dir_path, F_OK) == 0);
 
-    // Build a multi-command shell string when both halves run: start the
-    // director detached on port 31666, then run the game in the foreground.
-    char full[1280];
-    if (needs_director && has_director) {
+    // Build a DETACHED launch string so system() returns at once (non-blocking).
+    char full[1400];
 #ifdef _WIN32
-        // cmd.exe: `start /B` runs the director without a new console window.
+    // cmd.exe: `start` detaches each process into its own session.  /B = no new
+    // console for the director; the game gets its own window.
+    if (needs_director && has_director)
         snprintf(full, sizeof full,
-                 "start \"aiDoom Director\" /B \"%s\" --port 31666 && %s",
+                 "start \"aiDoom Director\" /B \"%s\" --port 31666 & start \"aiDoom\" %s",
                  dir_path, cmd);
+    else
+        snprintf(full, sizeof full, "start \"aiDoom\" %s", cmd);
 #else
-        // POSIX shell: director in a background subshell, game in foreground.
+    // POSIX: background both in subshells; tee the game's stderr to a log so a
+    // fatal I_Error survives the window vanishing.
+    if (needs_director && has_director)
         snprintf(full, sizeof full,
-                 "( \"%s\" --port 31666 & ) && %s",
+                 "( \"%s\" --port 31666 >/dev/null 2>&1 & ) ; ( %s >aidoom_stderr.log 2>&1 & )",
                  dir_path, cmd);
+    else
+        snprintf(full, sizeof full, "( %s >aidoom_stderr.log 2>&1 & )", cmd);
 #endif
-    } else {
-        snprintf(full, sizeof full, "%s", cmd);
-    }
 
-    // Print the command in the banner area briefly (overwrite with next draw).
-    // We use system() which forks+execs and waits for aidoom to exit.  For a
-    // non-blocking launcher we'd use popen() but the SDL event loop is dead
-    // simple so this is fine for a first cut.
     fprintf(stderr, "[launcher] %s\n", full);
-    int rc = system(full);
+    system(full);   // returns immediately -- the launcher stays responsive
 
-    // Log to a small file too so users can find the command they launched.
+    // Log the command so users can see what was launched (exit code is N/A now
+    // that we don't wait for it).
     FILE* f = fopen("launcher.log", "a");
     if (f) {
-        fprintf(f, "exit=%d  cmd=%s\n", rc, full);
+        fprintf(f, "launched: %s\n", full);
         fclose(f);
     }
 }
