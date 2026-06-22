@@ -28,7 +28,7 @@ config.status
 # Doom PWAD), not a game IWAD.  It must be in the repo so the engine can
 # play the buddy voice offline without anyone re-running the ElevenLabs
 # baker.  Listed AFTER the general *.wad rule so it takes precedence.
-!run/aidoom.wad
+!run/ID0/aidoom.wad
 doom.cfg
 .doomrc
 doomsav*.dsg

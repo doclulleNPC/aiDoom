@@ -172,8 +172,16 @@ void W_AddFile (char *filename)
 		
     if ( (handle = fopen (filename,"rb")) == NULL)
     {
-	printf (" couldn't open %s\n",filename);
-	return;
+	// Game WADs live in run/ID0/ -- retry there before giving up, so bare names
+	// (aidoom.wad, -file doom2stuff.wad, ...) resolve without an explicit path.
+	static char id0path[1024];
+	snprintf (id0path, sizeof(id0path), "ID0/%s", filename);
+	if ( (handle = fopen (id0path,"rb")) == NULL)
+	{
+	    printf (" couldn't open %s\n",filename);
+	    return;
+	}
+	filename = id0path;
     }
 
     printf (" adding %s\n",filename);

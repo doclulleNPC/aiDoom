@@ -495,7 +495,7 @@ def main():
     ap.add_argument("--model", default=DEFAULT_MODEL)
     ap.add_argument("--key",   default=None)
     ap.add_argument("--cfg",   default="aidoom.cfg")
-    ap.add_argument("--out",   default="run/aidoom.wad",
+    ap.add_argument("--out",   default="run/ID0/aidoom.wad",
                     help="output PWAD path (default: run/aidoom.wad)")
     ap.add_argument("--cache", default=".buddy_voice_cache",
                     help="dir for raw OGGs (skips re-download on rerun)")

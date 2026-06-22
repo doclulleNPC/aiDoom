@@ -83,11 +83,12 @@ def main():
     ap.add_argument("--doom2", default=None, help="path to doom2.wad (default: run/doom2.wad)")
     ap.add_argument("--doom1", default=None, help="path to a DOOM1 IWAD for the sound diff "
                                                   "(default: run/DOOM.WAD; optional)")
-    ap.add_argument("--out",   default="run/doom2stuff.wad", help="output PWAD path")
+    ap.add_argument("--out",   default="run/ID0/doom2stuff.wad", help="output PWAD path")
     args = ap.parse_args()
 
     here = Path(__file__).resolve().parent.parent      # repo root
-    d2 = Path(args.doom2) if args.doom2 else here / "run" / "doom2.wad"
+    id0 = here / "run" / "ID0"                          # game WADs live here
+    d2 = Path(args.doom2) if args.doom2 else id0 / "doom2.wad"
     if not d2.exists():
         print(f"ERROR: DOOM2 IWAD not found at {d2}. Pass --doom2 <path>.", file=sys.stderr)
         return 2
@@ -103,7 +104,7 @@ def main():
     sprite_lumps = [(e2[i][0], data2[e2[i][1]: e2[i][1] + e2[i][2]]) for i in range(s0, s1 + 1)]
 
     # --- sounds: DOOM2-exclusive DS*/DP* (not present in the DOOM1 IWAD) --------
-    d1 = Path(args.doom1) if args.doom1 else here / "run" / "DOOM.WAD"
+    d1 = Path(args.doom1) if args.doom1 else id0 / "DOOM.WAD"
     doom1_names = set()
     if d1.exists():
         _, e1 = read_wad(d1)

@@ -361,6 +361,10 @@ static void scan_iwads(void)
     // predictable -- we only want REAL IWADs, never stray PWADs/INIs/etc.
     const char* dirs[16]; int nd = 0;
     dirs[nd++] = run_dir();
+    // Game WADs now live in run/ID0/ (refactor) -- scan it first.
+    static char id0_d[300];
+    snprintf(id0_d, sizeof id0_d, "%s/ID0", run_dir());
+    dirs[nd++] = id0_d;
 
     const char* home = getenv("HOME");
     char home_d[260];

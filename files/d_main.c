@@ -716,26 +716,32 @@ void IdentifyVersion (void)
 	return;
     }
 
-    // 1) explicit -iwad <file>
+    // 1) explicit -iwad <file>  (try as-given, then under ID0/)
     p = M_CheckParm ("-iwad");
-    if (p && p < myargc-1 && !access (myargv[p+1], R_OK))
+    if (p && p < myargc-1)
     {
-	found = IWAD_Strdup (myargv[p+1]);
-	mode  = IWAD_ModeFromName (found);
+	char id0[1024];
+	snprintf (id0, sizeof(id0), "ID0/%s", myargv[p+1]);
+	if      (!access (myargv[p+1], R_OK)) found = IWAD_Strdup (myargv[p+1]);
+	else if (!access (id0,         R_OK)) found = IWAD_Strdup (id0);
+	if (found) mode = IWAD_ModeFromName (found);
     }
 
     // 2) "iwad <path>" from aidoom.cfg (written by the config app)
-    if (!found && IWAD_CfgGet ("iwad", cfgval, sizeof(cfgval))
-	&& cfgval[0] && !access (cfgval, R_OK))
+    if (!found && IWAD_CfgGet ("iwad", cfgval, sizeof(cfgval)) && cfgval[0])
     {
-	found = IWAD_Strdup (cfgval);
-	mode  = IWAD_ModeFromName (found);
+	char id0[1024];
+	snprintf (id0, sizeof(id0), "ID0/%s", cfgval);
+	if      (!access (cfgval, R_OK)) found = IWAD_Strdup (cfgval);
+	else if (!access (id0,    R_OK)) found = IWAD_Strdup (id0);
+	if (found) mode = IWAD_ModeFromName (found);
     }
 
     // 3) known names in:  iwads/  ->  .  ->  $DOOMWADDIR  (plus french doom2f.wad)
     if (!found)
     {
-	const char* dirs[3]; int nd = 0;
+	const char* dirs[4]; int nd = 0;
+	dirs[nd++] = "ID0";		// all game WADs live in run/ID0/ (refactor)
 	dirs[nd++] = "iwads";
 	dirs[nd++] = ".";
 	if (doomwaddir && strcmp (doomwaddir, ".")) dirs[nd++] = doomwaddir;
