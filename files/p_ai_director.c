@@ -52,6 +52,7 @@ enum { DIR_BUILDUP, DIR_SUSTAIN, DIR_FADE };
 #define DIR_EMERG_AMMO		30	// drop emergency ammo when total ammo is below this %
 #define DIR_EMERG_AMMO_COOLDOWN	(15*TICRATE)	// at most one emergency ammo drop per this
 #define DIR_LLM_FALLBACK	(15*TICRATE)	// FSM resumes if the LLM hasn't spawned in this
+#define DIR_HORDE_GAP		(25*TICRATE)	// min gap between LLM-mode periodic hordes
 
 static int	dir_on;			// -director given (rule FSM active)
 static int	dir_llm;		// -aidirector/-aidemo: LLM drives spawns, FSM = fallback
@@ -72,6 +73,7 @@ static boolean	dir_exit_set;		// found an exit linedef on this map?
 static int	dir_exit_found;		// 0 until P_Director_FindExit has run this level
 static int	dir_seeded;		// 0 until objectives (exit/keys) seeded this level
 static int	dir_guardtic;		// gametic of the last objective-guard spawn
+static int	dir_hordetic;		// gametic of the last LLM-mode periodic horde
 
 static int     P_Director_ObjProximity (void);	// 0..100, nearer exit/key = more
 static boolean P_Director_Stressed (void);	// player critically low hp/ammo?
@@ -153,7 +155,7 @@ void P_Director_Reset (void)
     dir_voicelast = gametic - DIR_VOICE_GAP;	// allow a line immediately
     dir_intro = 1;				// the Director greets you on the first tic
     dir_exit_found = 0; dir_exit_set = false;	// re-locate the exit on the new map
-    dir_seeded = 0; dir_guardtic = 0;		// re-seed objective guards on the new map
+    dir_seeded = 0; dir_guardtic = 0; dir_hordetic = 0;	// re-seed guards + reset hordes on the new map
 }
 
 // ---- stress feeds ----------------------------------------------------------
@@ -369,6 +371,34 @@ static boolean P_Director_SpawnMonsterNear (mobjtype_t mt, fixed_t cx, fixed_t c
     return false;			// no valid hidden spot found this time
 }
 
+// Spawn an IDLE GUARD close to (cx,cy): it stays at the objective (spawnstate /
+// A_Look) and only wakes when the player arrives, instead of charging off like the
+// behind-you spawns.  Small band so it's actually IN the room; hidden = no pop-in.
+static boolean P_Director_SpawnGuard (mobjtype_t mt, fixed_t cx, fixed_t cy)
+{
+    int	t;
+    mt = P_Director_SafeType (mt);
+    if (P_Director_LiveMonsters () >= DIR_MAXMON) return false;
+    for (t = 0; t < DIR_SPAWN_TRIES; t++)
+    {
+	angle_t	ang  = (angle_t)(P_Random () << 24);
+	int	fa   = ang >> ANGLETOFINESHIFT;
+	fixed_t	dist = 64*FRACUNIT + (P_Random () * ((320*FRACUNIT) >> 8));	// 64..384u
+	fixed_t	x    = cx + FixedMul (dist, finecosine[fa]);
+	fixed_t	y    = cy + FixedMul (dist, finesine[fa]);
+	mobj_t*	mo   = P_SpawnMobj (x, y, ONFLOORZ, mt);
+	int	i, seen = 0;
+	if (!P_CheckPosition (mo, x, y) || tmceilingz - tmfloorz < mo->height)
+	    { P_RemoveMobj (mo); continue; }
+	for (i = 0; i < MAXPLAYERS; i++)
+	    if (playeringame[i] && players[i].mo && P_CheckSight (players[i].mo, mo))
+		{ seen = 1; break; }
+	if (seen) { P_RemoveMobj (mo); continue; }
+	return true;			// left IDLE at spawnstate -> guards, wakes on sight
+    }
+    return false;
+}
+
 // Default placement: in the dark behind a survivor (the original behaviour).
 static boolean P_Director_SpawnMonsterOf (mobjtype_t mt) { return P_Director_SpawnMonsterNear (mt, 0, 0); }
 
@@ -569,14 +599,14 @@ static void P_Director_SeedObjectives (void)
     thinker_t*	th;
     int		n;
     if (dir_exit_set)
-	for (n = 0; n < 3; n++) P_Director_SpawnMonsterNear (P_Director_PickType (), dir_exit_x, dir_exit_y);
+	for (n = 0; n < 3; n++) P_Director_SpawnGuard (P_Director_PickType (), dir_exit_x, dir_exit_y);
     for (th = thinkercap.next; th != &thinkercap; th = th->next)
     {
 	mobj_t*	mo;
 	if (th->function.acp1 != (actionf_p1)P_MobjThinker) continue;
 	mo = (mobj_t*)th;
 	if (!P_Director_IsKey (mo)) continue;
-	for (n = 0; n < 2; n++) P_Director_SpawnMonsterNear (P_Director_PickType (), mo->x, mo->y);
+	for (n = 0; n < 2; n++) P_Director_SpawnGuard (P_Director_PickType (), mo->x, mo->y);
     }
 }
 
@@ -601,8 +631,21 @@ void P_Director_Ticker (void)
 	fixed_t ox, oy;
 	mobj_t*	sv = P_Director_RandomSurvivor ();
 	if (sv && P_Director_NearestObjective (sv->x, sv->y, &ox, &oy) != 0x7fffffff
-	    && P_Director_SpawnMonsterNear (P_Director_PickType (), ox, oy))
+	    && P_Director_SpawnGuard (P_Director_PickType (), ox, oy))
 	    dir_guardtic = gametic;
+    }
+
+    // Periodic HORDE -- guarantee real waves even when the LLM director has the FSM
+    // suppressed (the LLM tends to issue single spawns).  Pure -director runs hordes
+    // through the FSM, so only fire this when the FSM is currently suppressed.  Out
+    // of sight, behind/ahead of the player; skipped when the player is stressed.
+    {
+	boolean fsm_suppressed = dir_llm && (gametic - dir_llmlast <= DIR_LLM_FALLBACK);
+	if (fsm_suppressed && gametic - dir_hordetic > DIR_HORDE_GAP && !P_Director_Stressed ())
+	{
+	    P_Director_SpawnWave (5 + (P_Random () % 4));
+	    dir_hordetic = gametic;
+	}
     }
 
     // Director voice: greet the player once on the first in-level tic, then drop
