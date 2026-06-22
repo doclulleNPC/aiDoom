@@ -548,6 +548,15 @@ static void P_Director_SpawnItems (void)
     P_Director_DropNear (sv, MT_MISC17);	// box of bullets
     P_Director_DropNear (sv, MT_MISC23);	// box of shells
     P_Director_DropNear (sv, MT_MISC19);	// box of rockets
+    // DOOM1 + doom2stuff overlay: hand out the super shotgun (drop it near a survivor)
+    // until someone owns it, so the DOOM2 weapon actually reaches the player.
+    if (doom2_overlay)
+    {
+	int i, owned = 0;
+	for (i = 0; i < MAXPLAYERS; i++)
+	    if (playeringame[i] && players[i].weaponowned[wp_supershotgun]) { owned = 1; break; }
+	if (!owned) P_Director_DropNear (sv, MT_SUPERSHOTGUN);
+    }
     // Ambient (force=0): at the normal FADE transition the "relax" line is spoken
     // just before this, so leave it playing; "gift" only speaks on other drop paths.
     P_Director_Voice ("dir:gift", 3, 0);

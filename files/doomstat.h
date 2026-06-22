@@ -64,6 +64,9 @@ extern  boolean	devparm;	// DEBUG: launched with -devparm
 extern GameMode_t	gamemode;
 extern GameMission_t	gamemission;
 
+// 1 when playing DOOM1 with doom2stuff.wad auto-overlaid (DOOM2 monsters + SSG).
+extern int		doom2_overlay;
+
 // Set if homebrew PWAD stuff has been added.
 extern  boolean	modifiedgame;
 

@@ -552,8 +552,8 @@ void G_CycleWeapon (int dir)
 	w = (weapontype_t)(((int)w + dir + NUMWEAPONS) % NUMWEAPONS);
 	if (!p->weaponowned[w])
 	    continue;
-	if (w == wp_supershotgun && gamemode != commercial)
-	    continue;					// Doom II only
+	if (w == wp_supershotgun && gamemode != commercial && !doom2_overlay)
+	    continue;					// Doom II only (unless doom2stuff.wad overlaid)
 	if ((w == wp_plasma || w == wp_bfg) && gamemode == shareware)
 	    continue;					// not in shareware
 	p->pendingweapon = w;

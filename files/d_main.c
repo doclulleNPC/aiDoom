@@ -107,6 +107,10 @@ void D_DoomLoop (void);
 
 char*		wadfiles[MAXWADFILES];
 
+// Set when playing DOOM1 with doom2stuff.wad auto-overlaid: enables the DOOM2
+// monsters (director) and the super shotgun even though doom.wad lacks the assets.
+int		doom2_overlay = 0;
+
 
 boolean		devparm;	// started game with -devparm
 boolean         nomonsters;	// checkparm of -nomonsters
@@ -804,6 +808,16 @@ void IdentifyVersion (void)
 	printf ("IWAD: %s\n", found);
 	gamemode = mode;
 	D_AddFile (found);
+	// DOOM1 + a doom2stuff.wad on hand -> auto-overlay it so the director can spawn
+	// DOOM2 monsters and the super shotgun works (assets are absent from doom.wad).
+	// (W_AddFile resolves the bare name under ID0/.)
+	if (mode != commercial
+	    && (!access ("ID0/doom2stuff.wad", R_OK) || !access ("doom2stuff.wad", R_OK)))
+	{
+	    D_AddFile ("doom2stuff.wad");
+	    doom2_overlay = 1;
+	    printf ("DOOM2 overlay: doom2stuff.wad -> DOOM2 monsters + super shotgun enabled\n");
+	}
 	return;
     }
 
