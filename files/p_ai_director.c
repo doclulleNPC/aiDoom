@@ -60,9 +60,13 @@ static int	dir_relaxstart;		// gametic FADE began
 static int	dir_emergtic;		// gametic of the last emergency medkit
 static int	dir_llmlast;		// gametic of the last LLM spawn/relax command
 
-// "common" + "special" monster pools (specials lean in at the peak).
-static const mobjtype_t dir_common[]  = { MT_POSSESSED, MT_SHOTGUY, MT_TROOP, MT_SERGEANT };
-static const mobjtype_t dir_special[] = { MT_UNDEAD, MT_KNIGHT, MT_HEAD, MT_CHAINGUY };
+// "common" + "special" monster pools (specials lean in at the peak).  DOOM2-only
+// monsters (revenant/mancubus/hell knight/chaingunner/...) have NO sprites in a
+// DOOM1 IWAD, so spawning one there crashes the renderer -- hence a DOOM1-safe
+// special pool and a DOOM2 one, gated by gamemode (see P_Director_SafeType).
+static const mobjtype_t dir_common[]   = { MT_POSSESSED, MT_SHOTGUY, MT_TROOP, MT_SERGEANT };
+static const mobjtype_t dir_special1[] = { MT_HEAD, MT_BRUISER, MT_SHADOWS, MT_SKULL };           // DOOM1-safe: caco, baron, spectre, lost soul
+static const mobjtype_t dir_special2[] = { MT_UNDEAD, MT_FATSO, MT_KNIGHT, MT_BABY, MT_CHAINGUY, MT_HEAD }; // DOOM2: revenant, mancubus, hell knight, arachnotron, chaingunner, caco
 
 #define DIR_TRACK	(dir_on || dir_llm)	// intensity is tracked in either mode
 
@@ -156,10 +160,59 @@ static int P_Director_LiveMonsters (void)
 
 static mobjtype_t P_Director_PickType (void)
 {
-    // Lean on specials at/near the peak, commons while building up.
-    if ((dir_state == DIR_SUSTAIN || dir_acc > DIR_PEAK*3/4) && P_Random () < 110)
-	return dir_special[P_Random () % (int)(sizeof(dir_special)/sizeof(dir_special[0]))];
+    const mobjtype_t* spec = (gamemode == commercial) ? dir_special2 : dir_special1;
+    int nspec = (gamemode == commercial)
+	      ? (int)(sizeof(dir_special2)/sizeof(dir_special2[0]))
+	      : (int)(sizeof(dir_special1)/sizeof(dir_special1[0]));
+    // More high-tier pressure: specials lean in from mid-intensity (was 3/4 peak)
+    // and more often (was ~43%).
+    if ((dir_state == DIR_SUSTAIN || dir_acc > DIR_PEAK/2) && P_Random () < 150)
+	return spec[P_Random () % nspec];
     return dir_common[P_Random () % (int)(sizeof(dir_common)/sizeof(dir_common[0]))];
+}
+
+// DOOM2-only monsters have no sprites in a DOOM1 IWAD (-> renderer I_Error).  In
+// non-commercial gamemodes substitute a tough DOOM1 stand-in (baron); otherwise
+// pass the type through.  Guards BOTH the rule FSM and the LLM spawn path.
+static mobjtype_t P_Director_SafeType (mobjtype_t mt)
+{
+    if (gamemode == commercial) return mt;
+    switch (mt)
+    {
+      case MT_CHAINGUY: case MT_UNDEAD: case MT_FATSO: case MT_BABY:
+      case MT_PAIN:     case MT_KNIGHT: case MT_VILE:  case MT_WOLFSS: case MT_KEEN:
+	return MT_BRUISER;	// baron of hell -- present in every DOOM1 IWAD
+      default:
+	return mt;
+    }
+}
+
+// Human-readable name for notable monsters (NULL = common trash, no callout).
+static const char* P_Director_MonName (mobjtype_t mt)
+{
+    switch (mt)
+    {
+      case MT_UNDEAD:   return "Revenant";
+      case MT_FATSO:    return "Mancubus";
+      case MT_KNIGHT:   return "Hell Knight";
+      case MT_BRUISER:  return "Baron of Hell";
+      case MT_BABY:     return "Arachnotron";
+      case MT_HEAD:     return "Cacodemon";
+      case MT_CHAINGUY: return "Chaingunner";
+      case MT_VILE:     return "Arch-Vile";
+      case MT_SPIDER:   return "Spider Mastermind";
+      case MT_CYBORG:   return "Cyberdemon";
+      default:          return NULL;
+    }
+}
+
+// Flash a HUD message to the player (the director "announcing" a spawn).
+static void P_Director_Announce (const char* msg)
+{
+    static char buf[80];
+    if (!msg || consoleplayer < 0 || !playeringame[consoleplayer]) return;
+    snprintf (buf, sizeof buf, "%s", msg);
+    players[consoleplayer].message = buf;
 }
 
 // Spawn one monster of type `mt` out of sight, in the distance band behind a survivor,
@@ -168,7 +221,9 @@ static void P_Director_SpawnMonsterOf (mobjtype_t mt)
 {
     mobj_t*	sv;
     int		t;
+    static int	lastname;	// rate-limit the per-monster "you hear a X" callout
 
+    mt = P_Director_SafeType (mt);	// never spawn an IWAD-absent monster (crash guard)
     if (P_Director_LiveMonsters () >= DIR_MAXMON) return;
     sv = P_Director_RandomSurvivor ();
     if (!sv) return;
@@ -196,11 +251,31 @@ static void P_Director_SpawnMonsterOf (mobjtype_t mt)
 	// Good -- send it after the survivor immediately.
 	mo->target = sv;
 	P_SetMobjState (mo, mo->info->seestate);
+	// (F) announce a notable monster (rate-limited; common trash stays silent).
+	{
+	    const char* nm = P_Director_MonName (mt);
+	    if (nm && gametic - lastname > 4*TICRATE)
+	    {
+		char m[80]; snprintf (m, sizeof m, "You hear a %s nearby...", nm);
+		P_Director_Announce (m);
+		lastname = gametic;
+	    }
+	}
 	return;
     }
 }
 
 static void P_Director_SpawnMonster (void) { P_Director_SpawnMonsterOf (P_Director_PickType ()); }
+
+// (E) Spawn a horde -- a burst of `count` monsters of one type at once -- and (F)
+// announce it.  Used occasionally during build-up/peak for real pressure.
+static void P_Director_SpawnWave (int count)
+{
+    mobjtype_t	mt = P_Director_PickType ();
+    int		i;
+    for (i = 0; i < count; i++) P_Director_SpawnMonsterOf (mt);
+    P_Director_Announce ("A horde is closing in!");	// after, so it wins the HUD line
+}
 
 // Is a medkit/stimpack already lying within `range` of (x,y)?  (emergency-medkit guard)
 static boolean P_Director_MedkitNear (fixed_t x, fixed_t y, fixed_t range)
@@ -288,7 +363,9 @@ void P_Director_Ticker (void)
 	    { dir_state = DIR_SUSTAIN; dir_timer = DIR_SUSTAIN_TICS; }
 	else if (--dir_spawntic <= 0)
 	{
-	    P_Director_SpawnMonster ();
+	    // ~1-in-4 spawns is a horde (4-6 at once) instead of a single trickle.
+	    if (P_Random () < 64) P_Director_SpawnWave (4 + (P_Random () % 3));
+	    else                  P_Director_SpawnMonster ();
 	    // Faster trickle when calm (build tension), slower as intensity climbs.
 	    dir_spawntic = 35 + (dir_acc / 100) * 2;	// ~1 s (calm) .. ~3 s (near peak)
 	}
@@ -298,7 +375,12 @@ void P_Director_Ticker (void)
 	if (--dir_timer <= 0)
 	    { dir_state = DIR_FADE; dir_relaxstart = gametic; P_Director_SpawnItems (); }
 	else if (--dir_spawntic <= 0)
-	    { P_Director_SpawnMonster (); dir_spawntic = 2*TICRATE; }	// light peak pressure
+	{
+	    // At the peak, hordes are the norm (bigger, 5-7).
+	    if (P_Random () < 140) P_Director_SpawnWave (5 + (P_Random () % 3));
+	    else                   P_Director_SpawnMonster ();
+	    dir_spawntic = 2*TICRATE;
+	}
 	break;
 
       case DIR_FADE:

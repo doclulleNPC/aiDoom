@@ -8,7 +8,7 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 : "${SDL3:?Set SDL3 to your MinGW SDL3 dir (contains include/ lib/ bin/)}"
 [ -f "$here/font_atlas.h" ] || python3 "$here/bake_font.py"
 "$CC" -O2 -DSDL_MAIN_HANDLED -I"$here" -I"$SDL3/include" \
-    "$here/director.c" -L"$SDL3/lib" -lSDL3 -lws2_32 -mwindows -static-libgcc \
+    "$here/director.c" -L"$SDL3/lib" -lSDL3 -lws2_32 -lpsapi -mwindows -static-libgcc \
     -o "$here/director.exe"
 mkdir -p "$here/../run"
 cp -f "$here/director.exe" "$here/../run/director.exe"

@@ -32,7 +32,9 @@
 #ifdef _WIN32
   #include <winsock2.h>
   #include <ws2tcpip.h>
+  #include <psapi.h>                 // GetProcessMemoryInfo (self RSS readout)
   #pragma comment(lib, "ws2_32.lib")
+  #pragma comment(lib, "psapi.lib")
   typedef SOCKET sock_t;
   #define CLOSESOCK(s) closesocket(s)
   #define SOCKERR      INVALID_SOCKET
@@ -75,9 +77,14 @@ static char* js_str (const char** ps)   // parse a "..." string (input at openin
     const char* s = *ps;
     if (*s != '"') return NULL;
     s++;
-    // worst-case length = remaining; allocate generously then shrink-by-use
-    size_t cap = strlen (s) + 1;
-    char*  out = malloc (cap);
+    // Allocate proportional to THIS string (raw span to the closing quote), not
+    // strlen(remaining).  The old worst-case-remaining sizing was O(strings x
+    // document size) -- quadratic -- and ballooned the heap to multiple GB when
+    // parsing a large (runaway) LLM reply.  The unescaped result is never longer
+    // than the raw span (every escape consumes >= the bytes it emits).
+    const char* e = s;
+    while (*e && *e != '"') { if (*e == '\\' && e[1]) e += 2; else e++; }
+    char*  out = malloc ((size_t)(e - s) + 1);
     size_t n = 0;
     while (*s && *s != '"')
     {
@@ -354,7 +361,7 @@ static int recv_line (sock_t s, char* out, int cap)
 
 // Ceiling on a single HTTP response body.  A director plan is a few KB; this is
 // the runaway-generation backstop (see the read loop below).
-#define HTTP_MAX_RESP (4 * 1024 * 1024)   /* 4 MB */
+#define HTTP_MAX_RESP (1 * 1024 * 1024)   /* 1 MB -- a real director reply is < 10 KB */
 
 static char* http_post_json (const char* host, int port, const char* path, const char* json_body)
 {
@@ -737,6 +744,25 @@ static int worker (void* unused)
 #define WINW 760
 #define WINH 460
 
+// Resident memory of THIS process, in KB (0 if unavailable).  Shown live in the
+// header so a memory leak is visible at a glance (this director had one).
+static long self_rss_kb (void)
+{
+#ifdef _WIN32
+    PROCESS_MEMORY_COUNTERS pmc;
+    if (GetProcessMemoryInfo (GetCurrentProcess (), &pmc, sizeof pmc))
+        return (long)(pmc.WorkingSetSize / 1024);
+    return 0;
+#else
+    FILE* f = fopen ("/proc/self/statm", "r");
+    if (!f) return 0;
+    long pages_total = 0, pages_rss = 0;
+    if (fscanf (f, "%ld %ld", &pages_total, &pages_rss) != 2) pages_rss = 0;
+    fclose (f);
+    return pages_rss * (sysconf (_SC_PAGESIZE) / 1024);
+#endif
+}
+
 static SDL_Renderer* ren;
 static SDL_Texture*  font;
 
@@ -835,6 +861,17 @@ int main (int argc, char** argv)
         SDL_UnlockMutex (g_lock);
 
         text (10, 8,  "aiDoom AI Director  (Ollama LLM -> monster + buddy tactics)", 120, 200, 255);
+
+        // live memory readout (right-aligned on the title row): green when small,
+        // amber/red as it grows -- a runaway leak is now obvious at a glance.
+        long rss = self_rss_kb ();
+        char mem[48];
+        snprintf (mem, sizeof mem, "mem %.1f MB", rss / 1024.0);
+        Uint8 mr = 120, mg = 220, mb = 120;
+        if      (rss > 500*1024) { mr = 240; mg = 80;  mb = 80;  }   // > 500 MB: red
+        else if (rss > 200*1024) { mr = 240; mg = 200; mb = 80;  }   // > 200 MB: amber
+        text (WINW - (int)strlen (mem) * FONT_CW - 10, 8, mem, mr, mg, mb);
+
         text (10, 26, status, 230, 230, 120);
         text (10, 42, sub,    180, 200, 180);
         SDL_SetRenderDrawColor (ren, 60, 64, 80, 255);
