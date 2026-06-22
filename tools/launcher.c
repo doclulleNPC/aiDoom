@@ -31,7 +31,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-#include <dirent.h>
+#ifndef _MSC_VER
+#include <dirent.h>	// not shipped by MSVC; unused here (we probe known names)
+#endif
 #include <sys/stat.h>
 #ifdef _MSC_VER
 #include <io.h>
@@ -42,6 +44,8 @@
 #endif
 #define pclose _pclose
 #define popen _popen
+#define strcasecmp _stricmp
+#define strncasecmp _strnicmp
 #else
 #include <unistd.h>
 #endif
@@ -160,6 +164,10 @@ static int     mon_mode   = MON_L4D;     // default: L4D pacing
 static int     opt_noff;			// -nofriendlyfire: player & buddy can't hurt each other
 static int     opt_infight;			// -infight: monster same-species infighting
 static int     dropdown_open;
+
+// Status line shown under the controls (e.g. a launch error).  err -> red.
+static char    g_status[160];
+static int     g_status_err;
 
 // Mouse state for hover/clicks.
 static int     mouse_x, mouse_y, mouse_down;
@@ -282,6 +290,25 @@ static int is_known_iwad(const char* filename)
     return -1;
 }
 
+// Two paths refer to the same on-disk file?  On case-insensitive filesystems
+// (Windows, macOS) "run/doom1.wad" and "run/DOOM1.WAD" are the SAME file, and /
+// and \ are interchangeable -- compare accordingly so the same file probed under
+// different casing isn't listed twice.  On Linux the FS is case-sensitive, so a
+// plain strcmp is correct (distinct-case files really are distinct).
+static int same_path(const char* a, const char* b)
+{
+#if defined(_WIN32) || defined(__APPLE__)
+    for (; *a && *b; a++, b++) {
+        char ca = (*a == '\\') ? '/' : (char)tolower((unsigned char)*a);
+        char cb = (*b == '\\') ? '/' : (char)tolower((unsigned char)*b);
+        if (ca != cb) return 0;
+    }
+    return *a == *b;
+#else
+    return strcmp(a, b) == 0;
+#endif
+}
+
 static void try_add_iwad(const char* dir, const char* filename, int from_steam)
 {
     if (iwad_count >= MAX_IWADS) return;
@@ -294,13 +321,14 @@ static void try_add_iwad(const char* dir, const char* filename, int from_steam)
     if (stat(full, &st) != 0) return;
     if (!(st.st_mode & S_IFREG)) return;       // regular file only
 
-    // De-dupe by exact full path only.  Different copies of the same IWAD
-    // (run/doom2.wad vs ~/.steam/.../DOOM2.WAD) are intentionally kept --
-    // the user may want to know which one aidoom will pick if DOOMWADDIR
-    // isn't set, and Steam copies get tagged "(Steam)" so they're easy
-    // to spot.
+    // De-dupe by file identity (case-/slash-insensitive on Windows/macOS).
+    // Different copies of the same IWAD in DIFFERENT locations (run/doom2.wad
+    // vs ~/.steam/.../DOOM2.WAD) are intentionally kept -- the user may want to
+    // know which one aidoom will pick if DOOMWADDIR isn't set, and Steam copies
+    // get tagged "(Steam)" so they're easy to spot.  The same file probed under
+    // different casing (doom1.wad / DOOM1.WAD) collapses to one entry.
     for (int i=0; i<iwad_count; i++)
-        if (strcmp(iwads[i].path, full) == 0) return;
+        if (same_path(iwads[i].path, full)) return;
 
     iwad_t* e = &iwads[iwad_count];
     int known = is_known_iwad(filename);
@@ -710,6 +738,24 @@ static void do_launch(void)
 #endif
     int has_director = (access(dir_path, F_OK) == 0);
 
+    // AI mode was picked but the director sidecar is missing: refuse to launch
+    // (an AI mode without the director would silently fall back to vanilla
+    // tactics, which is not what the user asked for).  Show why and bail.
+    if (needs_director && !has_director)
+    {
+#ifdef _WIN32
+        const char* exe = "director.exe";
+#else
+        const char* exe = "director";
+#endif
+        snprintf(g_status, sizeof g_status,
+                 "%s not found in run/ -- AI mode needs it (build it, or pick a non-AI mode)",
+                 exe);
+        g_status_err = 1;
+        fprintf(stderr, "[launcher] %s\n", g_status);
+        return;   // do NOT start aidoom
+    }
+
     // Build a DETACHED launch string so system() returns at once (non-blocking).
     char full[1400];
 #ifdef _WIN32
@@ -734,6 +780,9 @@ static void do_launch(void)
 
     fprintf(stderr, "[launcher] %s\n", full);
     system(full);   // returns immediately -- the launcher stays responsive
+    snprintf(g_status, sizeof g_status, "launched aiDoom%s",
+             needs_director ? " + director" : "");
+    g_status_err = 0;
 
     // Log the command so users can see what was launched (exit code is N/A now
     // that we don't wait for it).
@@ -855,6 +904,7 @@ int main(int argc, char** argv)
                                 float px = bx + i * (pill_w + gap);
                                 if (mouse_x >= px && mouse_x <= px + pill_w) {
                                     buddy_mode = i;
+                                    g_status[0] = 0;   // clear stale launch error
                                 }
                             }
                         }
@@ -866,6 +916,7 @@ int main(int argc, char** argv)
                                 float px = bx + i * (pill_w + gap);
                                 if (mouse_x >= px && mouse_x <= px + pill_w) {
                                     mon_mode = i;
+                                    g_status[0] = 0;   // clear stale launch error
                                 }
                             }
                         }
@@ -915,6 +966,12 @@ int main(int argc, char** argv)
 
         draw_iwad_dropdown();
         draw_launch_button();
+
+        // Status line (launch error / confirmation) just above the button.
+        if (g_status[0]) {
+            if (g_status_err) text(PAD, LAUNCH_Y - 16, g_status, COL_BTN_BD);
+            else              text(PAD, LAUNCH_Y - 16, g_status, COL_CHECK);
+        }
 
         SDL_RenderPresent(ren);
     }

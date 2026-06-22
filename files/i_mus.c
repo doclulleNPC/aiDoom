@@ -20,6 +20,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifndef M_PI			// MSVC's <math.h> hides M_PI unless _USE_MATH_DEFINES
+#define M_PI 3.14159265358979323846
+#endif
+
 #include "doomtype.h"
 #include "w_wad.h"
 #include "z_zone.h"
