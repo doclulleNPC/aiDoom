@@ -70,7 +70,7 @@ static fixed_t	dir_exit_x, dir_exit_y;	// level exit location (for exit-proximit
 static boolean	dir_exit_set;		// found an exit linedef on this map?
 static int	dir_exit_found;		// 0 until P_Director_FindExit has run this level
 
-static int     P_Director_ExitProximity (void);	// 0..100, nearer exit = more
+static int     P_Director_ObjProximity (void);	// 0..100, nearer exit/key = more
 static boolean P_Director_Stressed (void);	// player critically low hp/ammo?
 
 // "common" + "special" monster pools (specials lean in at the peak).  DOOM2-only
@@ -353,9 +353,11 @@ static boolean P_Director_SpawnMonsterNear (mobjtype_t mt, fixed_t cx, fixed_t c
 // Default placement: in the dark behind a survivor (the original behaviour).
 static boolean P_Director_SpawnMonsterOf (mobjtype_t mt) { return P_Director_SpawnMonsterNear (mt, 0, 0); }
 
-// ---- exit-aware pressure ---------------------------------------------------
-// More heat the closer the player gets to the level exit, and the exit room is
-// pre-populated so it's a defended objective rather than a free walk-out.
+// ---- objective-aware pressure ----------------------------------------------
+// More heat the closer the player gets to an OBJECTIVE -- the level exit OR a key
+// they still need -- and those rooms get pre-populated so the exit/key is a
+// defended objective rather than a free grab.  Spawns (incl. hordes) can land out
+// of sight in the room toward the objective, not only in the dark behind you.
 
 // Locate the level's exit and remember where it is (midpoint of the first exit
 // linedef).  Specials: 11 S1-Exit, 51 S1-Secret, 52 W1-Exit, 124 W1-Secret.
@@ -376,25 +378,66 @@ static void P_Director_FindExit (void)
     }
 }
 
-// 0..100: how close the nearest survivor is to the exit (100 = on top of it).
-// 0 if there's no exit on this map.  Ramps over DIR_EXIT_FAR..DIR_EXIT_NEAR.
-#define DIR_EXIT_NEAR	(384*FRACUNIT)
-#define DIR_EXIT_FAR	(2048*FRACUNIT)
-static int P_Director_ExitProximity (void)
+// An "objective" the player must reach: the level exit, OR a still-uncollected
+// key (keys are detected live by sprite, so a picked-up key stops counting).
+// Nearest objective to (fx,fy); writes its point to *ox/*oy; 0x7fffffff if none.
+static fixed_t P_Director_NearestObjective (fixed_t fx, fixed_t fy, fixed_t* ox, fixed_t* oy)
+{
+    fixed_t	best = 0x7fffffff;
+    thinker_t*	th;
+    if (dir_exit_set)
+	{ best = P_AproxDistance (fx - dir_exit_x, fy - dir_exit_y); *ox = dir_exit_x; *oy = dir_exit_y; }
+    for (th = thinkercap.next; th != &thinkercap; th = th->next)
+    {
+	mobj_t*	mo;
+	fixed_t	d;
+	if (th->function.acp1 != (actionf_p1)P_MobjThinker) continue;
+	mo = (mobj_t*)th;
+	if (mo->sprite != SPR_BKEY && mo->sprite != SPR_RKEY && mo->sprite != SPR_YKEY
+	 && mo->sprite != SPR_BSKU && mo->sprite != SPR_RSKU && mo->sprite != SPR_YSKU)
+	    continue;					// not a key
+	d = P_AproxDistance (fx - mo->x, fy - mo->y);
+	if (d < best) { best = d; *ox = mo->x; *oy = mo->y; }
+    }
+    return best;
+}
+
+// 0..100: how close the nearest survivor is to the nearest objective (exit/key).
+// 0 if there's no objective on this map.  Ramps over DIR_OBJ_FAR..DIR_OBJ_NEAR.
+#define DIR_OBJ_NEAR	(384*FRACUNIT)
+#define DIR_OBJ_FAR	(2048*FRACUNIT)
+static int P_Director_ObjProximity (void)
 {
     int		i;
-    fixed_t	best = 0x7fffffff;
-    if (!dir_exit_set) return 0;
+    fixed_t	best = 0x7fffffff, ox, oy;
     for (i = 0; i < MAXPLAYERS; i++)
     {
 	if (!playeringame[i] || !players[i].mo || players[i].health <= 0) continue;
-	fixed_t d = P_AproxDistance (players[i].mo->x - dir_exit_x,
-				     players[i].mo->y - dir_exit_y);
+	fixed_t d = P_Director_NearestObjective (players[i].mo->x, players[i].mo->y, &ox, &oy);
 	if (d < best) best = d;
     }
-    if (best >= DIR_EXIT_FAR)  return 0;
-    if (best <= DIR_EXIT_NEAR) return 100;
-    return (int)(100 * (DIR_EXIT_FAR - best) / (DIR_EXIT_FAR - DIR_EXIT_NEAR));
+    if (best >= DIR_OBJ_FAR)  return 0;
+    if (best <= DIR_OBJ_NEAR) return 100;
+    return (int)(100 * (DIR_OBJ_FAR - best) / (DIR_OBJ_FAR - DIR_OBJ_NEAR));
+}
+
+// Choose where the next spawn group centres.  Bias toward the nearest objective
+// (exit/key) so monsters appear out of sight in the room the player is heading to
+// -- more so the nearer the player already is to it -- instead of always "in the
+// dark behind you".  cx==cy==0 means the classic behind-the-player spawn.  The
+// spawner's own P_CheckSight keeps whatever we pick hidden.
+static void P_Director_SpawnCenter (fixed_t* cx, fixed_t* cy)
+{
+    mobj_t*	pl = P_Director_RandomSurvivor ();
+    fixed_t	ox, oy;
+    *cx = *cy = 0;					// default: behind the survivor
+    if (!pl) return;
+    if (P_Director_NearestObjective (pl->x, pl->y, &ox, &oy) == 0x7fffffff)
+	return;						// no exit/key objective on this map
+    // ~40% baseline toward the objective + a proximity ramp (up to +60%): far away
+    // it's a sometimes-thing, right on top of it nearly every spawn defends the room.
+    if ((P_Random () % 100) < 40 + P_Director_ObjProximity () * 6 / 10)
+	{ *cx = ox; *cy = oy; }
 }
 
 // "Don't kick a player who's down": true when a survivor is critically low on
@@ -413,15 +456,13 @@ static boolean P_Director_Stressed (void)
 
 static void P_Director_SpawnMonster (void)
 {
-    mobjtype_t	mt  = P_Director_SafeType (P_Director_PickType ());
-    int		exf = P_Director_ExitProximity ();
+    mobjtype_t	mt = P_Director_SafeType (P_Director_PickType ());
+    fixed_t	cx, cy;
     boolean	ok;
-    // As the player nears the exit, route more spawns INTO the exit room ahead of
-    // them; otherwise spawn in the dark behind them as usual.
-    if (dir_exit_set && (P_Random () % 100) < exf)
-	ok = P_Director_SpawnMonsterNear (mt, dir_exit_x, dir_exit_y);
-    else
-	ok = P_Director_SpawnMonsterOf (mt);
+    // Center the spawn behind the player OR out of sight in the room toward the
+    // nearest objective (exit/key) -- P_Director_SpawnCenter decides.
+    P_Director_SpawnCenter (&cx, &cy);
+    ok = P_Director_SpawnMonsterNear (mt, cx, cy);
     // Only speak when something ACTUALLY entered (else the line wouldn't match the
     // game), and pick the line by what spawned: a tougher type -> "big", else trash.
     if (!ok) return;
@@ -434,8 +475,12 @@ static void P_Director_SpawnMonster (void)
 static void P_Director_SpawnWave (int count)
 {
     mobjtype_t	mt = P_Director_PickType ();
+    fixed_t	cx, cy;
     int		i, spawned = 0;
-    for (i = 0; i < count; i++) if (P_Director_SpawnMonsterOf (mt)) spawned++;
+    // The whole horde shares one centre -- behind the player, or out of sight in
+    // the room toward the exit/key (so hordes don't always come from behind you).
+    P_Director_SpawnCenter (&cx, &cy);
+    for (i = 0; i < count; i++) if (P_Director_SpawnMonsterNear (mt, cx, cy)) spawned++;
     // Only call it a horde (HUD + voice) if one actually materialised -- spawns can
     // all fail (no hidden spot / monster cap), and "Here comes the horde" with no
     // horde is exactly the mismatch we want to avoid.
@@ -556,7 +601,7 @@ void P_Director_Ticker (void)
     runfsm = !dir_llm || (gametic - dir_llmlast > DIR_LLM_FALLBACK);
     if (!runfsm) return;
 
-    int exf      = P_Director_ExitProximity ();	// 0..100, ramps up near the exit
+    int exf      = P_Director_ObjProximity ();	// 0..100, ramps up near an exit/key
     int stressed = P_Director_Stressed ();	// player almost dead / out of ammo
 
     switch (dir_state)
