@@ -28,6 +28,20 @@
 #include <string.h>
 #include <stdarg.h>
 #include <ctype.h>
+#if defined(__GLIBC__)
+#include <malloc.h>		// malloc_trim -- return freed arena pages to the OS
+#endif
+
+// Each round allocates+frees a JSON node tree for the Ollama reply.  glibc keeps
+// those freed pages in its arena instead of returning them, so RSS climbs without
+// bound across rounds even though nothing leaks.  Hand the freed memory back after
+// every round so the director's footprint stays flat.
+static void mem_trim (void)
+{
+#if defined(__GLIBC__)
+    malloc_trim (0);
+#endif
+}
 
 #ifdef _WIN32
   #include <winsock2.h>
@@ -580,6 +594,7 @@ reconnect:
         {
             char s2[160]; snprintf (s2, sizeof s2, "round %d: no live monsters / no buddy yet", round); setsub (s2);
             json_free (state);
+            mem_trim ();
             SDL_Delay ((int)(opt_period * 1000));
             continue;
         }
@@ -609,7 +624,16 @@ reconnect:
         free (body);
         double dt = (SDL_GetTicks () - t0) / 1000.0;
 
-        if (!resp) { logln ("round %d: ollama error (no response)", round); json_free (state); SDL_Delay ((int)(opt_period*1000)); continue; }
+        if (!resp) { logln ("round %d: ollama error (no response)", round); json_free (state); mem_trim (); SDL_Delay ((int)(opt_period*1000)); continue; }
+
+        // A real director reply is a few KB.  If the model returned a huge (HTTP-
+        // capped) blob, parsing it into a node tree is what balloons RAM -- skip it.
+        if (strlen (resp) > 200000)
+        {
+            logln ("round %d: oversized ollama reply (%zu B) -- skipping", round, strlen (resp));
+            free (resp); json_free (state); mem_trim ();
+            SDL_Delay ((int)(opt_period*1000)); continue;
+        }
 
         // outer: {"message":{"content":"<json string>"}, ...}
         json* outer   = json_parse (resp);
@@ -767,6 +791,7 @@ reconnect:
         setsub (s2);
 
         json_free (outer); free (resp); json_free (state);
+        mem_trim ();			// hand this round's freed pages back to the OS
         SDL_Delay ((int)(opt_period * 1000));
     }
 
