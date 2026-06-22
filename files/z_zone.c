@@ -446,6 +446,31 @@ Z_ChangeTag2
 }
 
 
+//
+// Z_ChangeUser
+// Re-point a block's owner back-pointer (the address the zone NULLs out when it
+// purges/frees the block, in Z_Free).  Needed when an array of cached pointers
+// (e.g. w_wad's lumpcache) is realloc'd and MOVES: every block whose owner
+// pointed into the OLD array would otherwise write through freed memory on the
+// next purge -- silent heap corruption surfacing as an unrelated crash later.
+//
+void
+Z_ChangeUser
+( void*		ptr,
+  void**	user )
+{
+    memblock_t*	block;
+
+    block = (memblock_t *) ( (byte *)ptr - sizeof(memblock_t));
+
+    if (block->id != ZONEID)
+	I_Error ("Z_ChangeUser: tried to change a non-zone block");
+
+    block->user = user;
+    *user = ptr;
+}
+
+
 
 //
 // Z_FreeMemory

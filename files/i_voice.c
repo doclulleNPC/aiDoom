@@ -381,8 +381,22 @@ void I_Voice_Init (void)
     // and zero the new slots so W_CacheLumpNum sees them as not-yet-cached.
     if (numlumps > oldnumlumps && lumpcache)
     {
+        void** oldcache = lumpcache;
         lumpcache = (void**)realloc (lumpcache, numlumps * sizeof(*lumpcache));
         memset (lumpcache + oldnumlumps, 0, (numlumps - oldnumlumps) * sizeof(*lumpcache));
+        // CRITICAL: realloc may have MOVED lumpcache.  Every lump cached so far
+        // (R_Init etc. ran before us) has a zone block whose owner back-pointer
+        // still points into the OLD array; on the next purge Z_Free would write
+        // NULL through that freed address and corrupt the heap (later surfacing
+        // as e.g. a NULL drawseg->curline crash in the sprite renderer).  When
+        // the array moved, re-point each live block's owner to the new slot.
+        if (lumpcache != oldcache)
+        {
+            int i;
+            for (i = 0; i < oldnumlumps; i++)
+                if (lumpcache[i])
+                    Z_ChangeUser (lumpcache[i], &lumpcache[i]);
+        }
     }
     int probe = W_CheckNumForName ("DSCT001");
     if (probe < 0)

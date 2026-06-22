@@ -147,6 +147,33 @@ The 1996 source already carried portability workarounds for *its* era. These are
 - **DOS remnants** in `i_sound.c`/`s_sound.c` (comments + dead 8-bit paths) — the
   audio is fully reimplemented in the `i_*` SDL layer; the comments are historical.
 
+## 7. `realloc`-moving an array the zone owns back-pointers into
+
+> **Not strictly a legacy bug.** Vanilla DOOM allocates `lumpcache` exactly once
+> and never moves it, so the stock engine never trips this. The *bug* was
+> introduced by the fork (the `buddy.wad` late-load); what's legacy is the
+> **invariant it violated** — the zone's owner-back-pointer scheme below. It's
+> logged here because that invariant is the reusable lesson and the symptom looks
+> exactly like the age-of-code corruption bugs above (§2/§4).
+
+The zone allocator stores, per block, the **address of the owner's pointer**
+(`memblock_t.user`) and writes `NULL` through it when the block is purged/freed
+(`Z_Free`: `*block->user = 0`). `W_CacheLumpNum` caches every lump with
+`Z_Malloc(..., &lumpcache[lump])`, so each cached block's `user` points *into the
+`lumpcache` array*. (Modern ports sidestep the whole trap: GZDoom's filesystem
+returns RAII `FileData` value objects that own their memory — there is no parallel
+`void** lumpcache` with back-pointers to invalidate, so resizing its record array
+is harmless.)
+
+| Symptom | Root cause | Fix | Files |
+|---|---|---|---|
+| Reproducible crash ~5 s into any level, **only with `buddy.wad` present**, only at `-O2` (vanishes at `/Od` or under a debugger's debug heap) — access violation in `R_DrawSprite`→`R_PointOnSegSide` reading a NULL `drawseg->curline` | `I_Voice_Init` adds `buddy.wad` *after* `R_Init` has cached lumps, then `realloc`s `lumpcache`. The realloc **moves** the array, leaving every already-cached lump's `block->user` dangling into the freed old array; the next zone purge does `*block->user = 0` into freed/reused heap → corruption that surfaces much later as a NULL drawseg | after the realloc, if the array moved, re-point each live block's owner via new `Z_ChangeUser(lumpcache[i], &lumpcache[i])` | `i_voice.c` (`I_Voice_Init`), `z_zone.c`/`.h` (`Z_ChangeUser`) |
+
+Rule of thumb: **any array that zone blocks hold `user` back-pointers into must
+never be `realloc`'d without fixing those back-pointers** (or grow it *before* the
+first `Z_Malloc(..., &arr[i])`). The classic tell is a heisenbug — corruption that
+only reproduces in the optimized build and disappears under the debugger.
+
 ## How to spot the next one
 
 - Compiler warnings `-Wpointer-to-int-cast` / `-Wint-to-pointer-cast` → §1.
@@ -154,3 +181,6 @@ The 1996 source already carried portability workarounds for *its* era. These are
 - `Patch … exceeds LFB`, missing HUD elements, a clamped/banded 3D view → §3.
 - `Z_Malloc: failed …` or visual corruption that scales with resolution → §4.
 - "It built but behaves weird after I edited a header" → §5 (`make clean`).
+- A crash that **only happens in the `-O2`/release build and vanishes under a
+  debugger or at `/Od`** → heap corruption; suspect an OOB write or a stale zone
+  `user` back-pointer (§7). Repro under cdb with `-hd` + `_NO_DEBUG_HEAP=1`.
