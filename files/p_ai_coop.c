@@ -44,7 +44,9 @@ static int	aicoop_layer;		// -aicoop given: AI-driven layer requested
 static int	buddy_react;		// reaction delay (tics) before firing a fresh target (-buddyreact)
 static int	coop_state;		// 0 follow 1 fight 2 heal 3 hold 4 come 5 items
 static int	summon;			// "come": tics left running to the player
-static int	hold;			// "wait/stay": hold position
+static int	hold;			// "wait/stay": hold position (director tactic BUD_HOLD)
+static int	user_hold;		// "stay" issued by the HUMAN: sticky, overrides the
+					// director, cleared only by come/attack (not by SetTactic)
 static int	forceaggro;		// "attack": tics left charging forcetarget
 static mobj_t*	forcetarget;		// the forced attack target
 static int	ai_goto;		// LLM "goto": tics left moving to (ai_gx,ai_gy)
@@ -810,6 +812,7 @@ int P_AICoop_Summon (void)
     if (netgame)		return 0;
     summon = COOP_SUMMON_TICS;
     hold   = 0;
+    user_hold = 0;		// "come" releases a manual stay
     return 1;
 }
 
@@ -819,9 +822,12 @@ const char* P_AICoop_Wait (void)
 	return "[Buddy] (no companion -- launch with -coop)";
     if (netgame)
 	return "[Buddy] (orders unavailable in netplay)";
-    hold = !hold;
-    if (hold) summon = 0;
-    return hold ? "[Buddy] Holding position." : "[Buddy] Moving out.";
+    // Sticky stay: holds position until you order otherwise (come/attack), and the
+    // LLM director can't override it (see P_AICoop_SetTactic).  Toggle to release.
+    user_hold = !user_hold;
+    if (user_hold) { summon = 0; forceaggro = 0; forcetarget = NULL; ai_goto = 0; }
+    return user_hold ? "[Buddy] Holding position -- staying put until you say otherwise."
+		     : "[Buddy] Moving out.";
 }
 
 const char* P_AICoop_Attack (void)
@@ -841,6 +847,7 @@ const char* P_AICoop_Attack (void)
     forcetarget = t;
     forceaggro  = COOP_ATTACK_TICS;
     hold = 0;
+    user_hold = 0;		// "attack" releases a manual stay
     return "[Buddy] Attacking!";
 }
 
@@ -861,6 +868,8 @@ void P_AICoop_SetDirective (int tactic, struct mobj_s* focus, fixed_t x, fixed_t
     static int	ai_last_tactic = -1;
     mobj_t*	mo = AICoop_Mo ();
     if (!mo || netgame)
+	return;
+    if (user_hold)		// human ordered "stay" -- ignore the director until released
 	return;
     if (tics <= 0)
 	tics = 70;				// ~2 s
@@ -1915,8 +1924,10 @@ void P_AICoop_BuildCmd (void)
 	    coop_state = 4; haveaim = 1; movethresh = 24*FRACUNIT; navigate = 1;
 	    tx = ai_gx; ty = ai_gy;
 	}
-	// (wait/stay) ordered: hold position; still face & fire at a monster
-	else if (hold)
+	// (wait/stay) ordered: hold position; still face & fire at a monster.
+	// user_hold = the human's sticky "stay" (overrides the director); hold =
+	// the director's transient BUD_HOLD tactic.
+	else if (user_hold || hold)
 	{
 	    coop_state = 3;
 	    if (tgt) { coop_state = 1; haveaim = 1; fire = 1; aimmon = tgt; tx = tgt->x; ty = tgt->y; }

@@ -111,6 +111,21 @@ static patch_t* HU_Buddy_LoadFace (const char* name, int* ok)
     return (patch_t*) W_CacheLumpNum (l, PU_STATIC);
 }
 
+// Medikit pickup sprite -- shown in the HUD (in place of the mugshot) while the
+// buddy is DOWN, so the player knows there's a revivable body to reach.
+static patch_t* HU_Buddy_Medkit (void)
+{
+    static patch_t* med;
+    static int      tried;
+    if (!tried)
+    {
+	int l = W_CheckNumForName ("MEDIA0");	// MT_MISC11 medikit sprite, frame A
+	if (l >= 0) med = (patch_t*) W_CacheLumpNum (l, PU_STATIC);
+	tried = 1;
+    }
+    return med;
+}
+
 static void HU_Buddy_LoadFaces (void)
 {
     int  i, j, fn = 0, ok = 1;
@@ -292,6 +307,24 @@ static void HU_Buddy_DrawStrip (player_t* bot)
     patch_t* face;
     char     l1[40], l2[40], l3[40];
 
+    // Downed (incapacitated, not dead): replace the mugshot + stats with a
+    // medikit and a REVIVE prompt so the player knows to reach and revive him.
+    if (bot->playerstate == PST_DEAD)
+    {
+	patch_t*    med = HU_Buddy_Medkit ();
+	const char* d1  = "BUDDY DOWN";
+	const char* d2  = "REVIVE: USE";
+	int         dw  = HU_Buddy_TextW (d1);
+	int         w2  = HU_Buddy_TextW (d2);
+	int         dtx;
+	if (w2 > dw) dw = w2;
+	dtx = wb - 4 - dw;
+	HU_Buddy_Text (dtx, 2,  d1);
+	HU_Buddy_Text (dtx, 12, d2);
+	if (med) V_DrawPatch (dtx - SHORT (med->width) - 6, 1, 0, med);
+	return;
+    }
+
     face = HU_Buddy_Face ();
     st   = P_AICoop_State ();
 
@@ -335,7 +368,10 @@ void HU_Buddy_Drawer (void)
     slot = P_AICoop_Slot ();
     if (slot < 0 || !playeringame[slot]) return;
     bot = &players[slot];
-    if (bot->playerstate != PST_LIVE || !bot->mo) return;
+    if (!bot->mo) return;
+    // Draw while alive OR while DOWN (PST_DEAD = incapacitated, revivable) -- the
+    // down view shows a medkit so the player can find him.
+    if (bot->playerstate != PST_LIVE && bot->playerstate != PST_DEAD) return;
     if (menuactive || paused) return;
     {
 	extern gamestate_t wipegamestate;

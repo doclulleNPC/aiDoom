@@ -211,6 +211,16 @@ mline_t thintriangle_guy[] = {
 #undef R
 #define NUMTHINTRIANGLEGUYLINES (sizeof(thintriangle_guy)/sizeof(mline_t))
 
+// A medikit-style "+" cross, drawn at the downed buddy's position so the player
+// can find and revive him (his arrow marker is gone once he's down).
+#define R ((8*PLAYERRADIUS)/7)
+mline_t cross_mark[] = {
+    { { -R, 0 }, { R, 0 } },   // horizontal bar
+    { { 0, -R }, { 0, R } }    // vertical bar
+};
+#undef R
+#define NUMCROSSMARKLINES (sizeof(cross_mark)/sizeof(mline_t))
+
 
 
 
@@ -1261,14 +1271,21 @@ void AM_drawPlayers(void)
 		(player_arrow, NUMPLYRLINES, 0, plr->mo->angle,
 		 WHITE, plr->mo->x, plr->mo->y);
 
-	// AI co-op buddy: mark its position with a yellow arrow.
+	// AI co-op buddy: yellow arrow while alive; a green medkit cross while DOWN
+	// (incapacitated) so the player can still find him to revive.
 	{
 	    int bs = P_AICoop_Slot ();
-	    if (bs >= 0 && playeringame[bs] && players[bs].mo
-		&& players[bs].playerstate == PST_LIVE)
-		AM_drawLineCharacter
-		    (player_arrow, NUMPLYRLINES, 0, players[bs].mo->angle,
-		     YELLOWS, players[bs].mo->x, players[bs].mo->y);
+	    if (bs >= 0 && playeringame[bs] && players[bs].mo)
+	    {
+		if (players[bs].playerstate == PST_LIVE)
+		    AM_drawLineCharacter
+			(player_arrow, NUMPLYRLINES, 0, players[bs].mo->angle,
+			 YELLOWS, players[bs].mo->x, players[bs].mo->y);
+		else if (players[bs].playerstate == PST_DEAD)
+		    AM_drawLineCharacter
+			(cross_mark, NUMCROSSMARKLINES, 0, 0,
+			 GREENS, players[bs].mo->x, players[bs].mo->y);
+	    }
 	}
 	return;
     }
