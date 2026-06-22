@@ -335,6 +335,21 @@ def load_face_lumps():
     return lumps
 
 
+def load_arrow_lumps():
+    """UI compass arrows (tools/arrows/*.png).  Packed RAW (PNG bytes) into aidoom.wad;
+    the engine decodes them via V_CachePNG (light PNG->patch support, v_png.c).  Used by
+    hu_buddy.c to point the player at a downed buddy.  Lump name = filename stem upper
+    (e.g. RARRA0)."""
+    arrows_dir = Path(__file__).resolve().parent / "arrows"
+    lumps = [(f.stem.upper(), f.read_bytes()) for f in sorted(arrows_dir.glob("*.png"))]
+    if not lumps:
+        print(f"WARNING: no *.png in {arrows_dir} -- the buddy-down compass will be MISSING!",
+              file=sys.stderr)
+    else:
+        print(f"  + {len(lumps)} UI arrow PNG lumps ({', '.join(n for n,_ in lumps)})")
+    return lumps
+
+
 def env_file_value(path, *names):
     """Read KEY=VALUE from a dotenv file (e.g. ~/.hermes/.env), trying each name.
     Secrets (the ElevenLabs key) live HERE, never in aidoom.cfg."""
@@ -616,6 +631,7 @@ def main():
         manifest_lines.append(f"{name}\t{persona}\t{voice}\t{phrase}\t{src}\t{len(data)}\n")
 
     lumps += load_face_lumps()		# buddy HUD mugshots -- always included
+    lumps += load_arrow_lumps()		# UI compass arrows -- always included
 
     # Pack the lump<->phrase mapping INTO the WAD as a text lump ("VOICEMAP") so the
     # WAD is self-documenting -- no external file needed to know what each lump says.

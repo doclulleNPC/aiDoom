@@ -112,6 +112,11 @@ V_GetBlock
   int		height,
   byte*		dest );
 
+// Light PNG support for UI graphics: decode a PNG lump and return it as a
+// palette-quantised patch_t (drawable by V_DrawPatch), cached by lump name.
+// Returns NULL if the lump is missing or isn't a PNG.  See v_png.c.
+patch_t* V_CachePNG (const char* name);
+
 
 void
 V_MarkRect

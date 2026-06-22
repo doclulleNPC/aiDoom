@@ -1,7 +1,7 @@
 buddy_voice=wJmFT75XSkFKaBF1R0rX
 director_voice=YOq2y2Up4RgXP2HyXjE5
 model=eleven_turbo_v2_5
-generated=2026-06-22 14:34:17
+generated=2026-06-22 19:04:53
 # columns: lump\tpersona\tvoice\tphrase\tsource\tbytes
 
 DSCT001	buddy	wJmFT75XSkFKaBF1R0rX	Contact!	cached	8583

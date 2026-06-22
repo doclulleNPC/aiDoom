@@ -322,6 +322,24 @@ static void HU_Buddy_DrawStrip (player_t* bot)
 	HU_Buddy_Text (dtx, 2,  d1);
 	HU_Buddy_Text (dtx, 12, d2);
 	if (med) V_DrawPatch (dtx - SHORT (med->width) - 6, 1, 0, med);
+
+	// Compass: a top-centre arrow pointing the human toward the downed buddy so
+	// they can find and revive him.  Screen-relative bearing -> one of 4 cardinal
+	// arrows (RARR* PNGs in aidoom.wad, decoded via V_CachePNG).
+	{
+	    mobj_t* pl = players[consoleplayer].mo;	// the human (not the buddy)
+	    mobj_t* bd = bot->mo;
+	    if (pl && bd)
+	    {
+		// rel angle: 0 ahead, ANG90 to our left, ANG180 behind, ANG270 to our right.
+		angle_t		rel = R_PointToAngle2 (pl->x, pl->y, bd->x, bd->y) - pl->angle;
+		unsigned	q   = (unsigned)(rel + ANG45) >> 30;	// 0..3
+		static const char* arr[4] = { "RARRC0", "RARRA0", "RARRD0", "RARRB0" }; // up,left,down,right
+		patch_t*	a = V_CachePNG (arr[q]);
+		if (a)
+		    V_DrawPatch (wb/2 - SHORT (a->width)/2, 18, 0, a);	// top-centre
+	    }
+	}
 	return;
     }
 
