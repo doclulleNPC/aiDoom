@@ -47,6 +47,8 @@ enum { DIR_BUILDUP, DIR_SUSTAIN, DIR_FADE };
 #define DIR_EMERG_HP		25	// drop an emergency medkit when a survivor is below this
 #define DIR_EMERG_NEAR		(768*FRACUNIT)	// ...and no medkit already within this
 #define DIR_EMERG_COOLDOWN	(20*TICRATE)	// at most one emergency medkit per this
+#define DIR_EMERG_AMMO		30	// drop emergency ammo when total ammo is below this %
+#define DIR_EMERG_AMMO_COOLDOWN	(15*TICRATE)	// at most one emergency ammo drop per this
 #define DIR_LLM_FALLBACK	(15*TICRATE)	// FSM resumes if the LLM hasn't spawned in this
 
 static int	dir_on;			// -director given (rule FSM active)
@@ -58,6 +60,7 @@ static int	dir_spawntic;		// tics until next monster spawn
 static int	dir_recentdmg;		// damage in the recent window (burst), decaying
 static int	dir_relaxstart;		// gametic FADE began
 static int	dir_emergtic;		// gametic of the last emergency medkit
+static int	dir_emergammotic;	// gametic of the last emergency ammo drop
 static int	dir_llmlast;		// gametic of the last LLM spawn/relax command
 
 // "common" + "special" monster pools (specials lean in at the peak).  DOOM2-only
@@ -90,6 +93,7 @@ void P_Director_Reset (void)
     dir_acc = 0; dir_state = DIR_BUILDUP; dir_timer = 0;
     dir_spawntic = 3*TICRATE; dir_recentdmg = 0; dir_relaxstart = 0;
     dir_emergtic = gametic - DIR_EMERG_COOLDOWN;	// allow an emergency medkit immediately
+    dir_emergammotic = gametic - DIR_EMERG_AMMO_COOLDOWN;	// ...and emergency ammo
     dir_llmlast = 0;
 }
 
@@ -309,13 +313,15 @@ static void P_Director_DropNear (mobj_t* sv, mobjtype_t mt)
     }
 }
 
-// Relax reward: a medkit + a box of bullets near a survivor.
+// Relax reward: a medkit + a generous ammo resupply near a survivor.
 static void P_Director_SpawnItems (void)
 {
     mobj_t* sv = P_Director_RandomSurvivor ();
     if (!sv) return;
     P_Director_DropNear (sv, MT_MISC11);	// medikit
-    P_Director_DropNear (sv, MT_MISC23);	// box of bullets
+    P_Director_DropNear (sv, MT_MISC17);	// box of bullets
+    P_Director_DropNear (sv, MT_MISC23);	// box of shells
+    P_Director_DropNear (sv, MT_MISC19);	// box of rockets
 }
 
 // ---- per-tic FSM -----------------------------------------------------------
@@ -350,6 +356,21 @@ void P_Director_Ticker (void)
 	    dir_emergtic = gametic;
 	    break;
 	}
+
+    // (A2) Emergency ammo: when the squad's total ammo runs low, drop a bullets +
+    // shells resupply by a survivor (rate-limited).  Runs in both modes.
+    if (gametic - dir_emergammotic > DIR_EMERG_AMMO_COOLDOWN
+	&& P_Director_AmmoPct () < DIR_EMERG_AMMO)
+    {
+	mobj_t*	sv = P_Director_RandomSurvivor ();
+	if (sv)
+	{
+	    P_Director_DropNear (sv, MT_MISC17);	// box of bullets
+	    P_Director_DropNear (sv, MT_MISC23);	// box of shells
+	    dir_emergammotic = gametic;
+	    P_Director_Announce ("Ammo resupply dropped nearby.");
+	}
+    }
 
     // (B) Under the LLM director the model drives spawns; the rule FSM only runs as a
     // fallback when the LLM has gone quiet.  Pure -director always runs the FSM.
