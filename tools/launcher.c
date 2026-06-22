@@ -55,7 +55,7 @@
 
 // --- Layout (BASE = 320x200 reference, scaled at runtime) ---
 #define WINW 560
-#define WINH 448
+#define WINH 504
 #define PAD 12
 
 // Vertical bands, BASE pixels (we scale 2x for 320->640 feel on a 560px wide
@@ -65,14 +65,16 @@
 #define BUDDY_H   60
 #define MON_Y     200
 #define MON_H     60
-#define OPTS_Y    268			// toggle row (no-friendly-fire / infight)
+#define SKILL_Y   268			// difficulty row (5 pills)
+#define SKILL_H   40
+#define OPTS_Y    314			// toggle row (no-friendly-fire / infight)
 #define CHK_BOX   16			// checkbox square size
 #define OPT_NOFF_X (PAD + 90)		// "No friendly fire" checkbox
 #define OPT_INF_X  (PAD + 300)		// "Monster infight" checkbox
-#define IWAD_Y    300
+#define IWAD_Y    346
 #define IWAD_H    22
 #define IWAD_DD_H 80			// dropdown open height
-#define LAUNCH_Y  400
+#define LAUNCH_Y  456
 #define LAUNCH_H  34
 
 // Colours (RGB).
@@ -163,6 +165,7 @@ static int     buddy_mode = BUDDY_RULE;	// default: buddy on (rule-based)
 static int     mon_mode   = MON_L4D;     // default: L4D pacing
 static int     opt_noff;			// -nofriendlyfire: player & buddy can't hurt each other
 static int     opt_infight;			// -infight: monster same-species infighting
+static int     opt_skill = 3;			// difficulty 0..4 -> -skill 1..5; default 3 = Ultra-Violence
 static int     dropdown_open;
 
 // Status line shown under the controls (e.g. a launch error).  err -> red.
@@ -187,7 +190,7 @@ static void draw_checkbox(float x, float y, int checked, const char* label);
 static int  hit_checkbox(float x, float y, const char* label, int mouse_px, int mouse_py);
 static void draw_mode_row(float y, const char* title,
                           const char* const* options, int n_opts, int sel,
-                          float* hitboxes_out);
+                          float pill_w, float* hitboxes_out);
 static int  pick_mode(float* hitboxes, int n_opts, int mouse_px, int mouse_py);
 static void draw_iwad_dropdown(void);
 static int  hit_iwad_dropdown(int mouse_px, int mouse_py);
@@ -492,13 +495,12 @@ static void draw_banner(void)
 //
 static void draw_mode_row(float y, const char* title,
                           const char* const* options, int n_opts, int sel,
-                          float* hitboxes_out)
+                          float pill_w, float* hitboxes_out)
 {
     // Row label
     text(PAD, y + (BUDDY_H - FONT_CH)/2, title, 220, 220, 220);
 
-    // Three pills, right side
-    const float pill_w = 110;
+    // n_opts pills, right side
     const float pill_h = 26;
     const float gap   = 8;
     float rx = WINW - PAD - pill_w * n_opts - gap * (n_opts - 1);
@@ -699,8 +701,8 @@ static void build_command(char* out, int n, const char* iwad_path)
     if (opt_noff)    off += snprintf(out + off, n - off, " -nofriendlyfire");
     if (opt_infight) off += snprintf(out + off, n - off, " -infight");
 
-    // Always land in a level, never the title screen.
-    off += snprintf(out + off, n - off, " -warp 1 1 -skill 4");
+    // Always land in a level, never the title screen.  Skill 1..5 from the row.
+    off += snprintf(out + off, n - off, " -warp 1 1 -skill %d", opt_skill + 1);
 
     (void)n;
 }
@@ -921,6 +923,20 @@ int main(int argc, char** argv)
                             }
                         }
 
+                        // Skill row (5 narrower pills)
+                        const float spill_w = 64;
+                        float sx = WINW - PAD - spill_w*5 - gap*4;
+                        float sy = SKILL_Y + (BUDDY_H - 26)/2;	// rows centre on BUDDY_H
+                        if (mouse_y >= sy && mouse_y <= sy + 26) {
+                            for (int i=0; i<5; i++) {
+                                float px = sx + i * (spill_w + gap);
+                                if (mouse_x >= px && mouse_x <= px + spill_w) {
+                                    opt_skill = i;
+                                    g_status[0] = 0;
+                                }
+                            }
+                        }
+
                         // Options row: toggle the two checkboxes.
                         if (hit_checkbox(OPT_NOFF_X, OPTS_Y, "No friendly fire", mouse_x, mouse_y))
                             opt_noff = !opt_noff;
@@ -949,13 +965,19 @@ int main(int argc, char** argv)
         {
             static const char* buddy_opts[] = { "Off", "Buddy", "AI Buddy" };
             draw_mode_row(BUDDY_Y, "Buddy",
-                          buddy_opts, 3, buddy_mode, NULL);
+                          buddy_opts, 3, buddy_mode, 110, NULL);
         }
         // Monster row
         {
             static const char* mon_opts[] = { "Vanilla", "L4D", "AI Director" };
             draw_mode_row(MON_Y, "Monster",
-                          mon_opts, 3, mon_mode, NULL);
+                          mon_opts, 3, mon_mode, 110, NULL);
+        }
+        // Skill row (5 pills; default Ultra-Violence)
+        {
+            static const char* skill_opts[] = { "ITYTD", "HNTR", "HMP", "UV", "NM" };
+            draw_mode_row(SKILL_Y, "Skill",
+                          skill_opts, 5, opt_skill, 64, NULL);
         }
         // Options row (toggles)
         {

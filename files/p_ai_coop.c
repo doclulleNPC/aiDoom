@@ -1752,7 +1752,11 @@ static void P_AICoop_Revive (int hp)
     player_t*	bot = &players[coop_slot];
     mobj_t*	mo  = bot->mo;
     if (!mo) return;
-    mo->flags |= (MF_SOLID | MF_SHOOTABLE);
+    // Start SHOOTABLE but NOT SOLID: the reviver is standing on top of the body, so
+    // making it solid now traps the player inside it.  The ticker re-solidifies the
+    // buddy once they've stepped apart (see P_AICoop_BuildCmd).
+    mo->flags |=  MF_SHOOTABLE;
+    mo->flags &= ~MF_SOLID;
     mo->flags &= ~(MF_CORPSE | MF_DROPOFF);
     mo->height = mo->info->height;		// un-squash the corpse
     mo->health = hp;
@@ -1834,6 +1838,15 @@ void P_AICoop_BuildCmd (void)
 
     mo = bot->mo;
     memset (cmd, 0, sizeof(*cmd));
+
+    // After a revive the buddy is left non-solid so the reviver isn't trapped inside
+    // it; re-solidify once they've stepped apart (no human overlapping our box).
+    if (!(mo->flags & MF_SOLID))
+    {
+	mobj_t* h = AICoop_NearestHuman (mo->x, mo->y);
+	if (!h || P_AproxDistance (h->x - mo->x, h->y - mo->y) > mo->radius + h->radius + 8*FRACUNIT)
+	    mo->flags |= MF_SOLID;
+    }
 
     // Progress check.  "stuck" if we tried to move but either barely moved this tic
     // (wedged solid) OR made no NET progress over a ~0.4s window -- the latter

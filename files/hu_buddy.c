@@ -111,20 +111,9 @@ static patch_t* HU_Buddy_LoadFace (const char* name, int* ok)
     return (patch_t*) W_CacheLumpNum (l, PU_STATIC);
 }
 
-// Medikit pickup sprite -- shown in the HUD (in place of the mugshot) while the
-// buddy is DOWN, so the player knows there's a revivable body to reach.
-static patch_t* HU_Buddy_Medkit (void)
-{
-    static patch_t* med;
-    static int      tried;
-    if (!tried)
-    {
-	int l = W_CheckNumForName ("MEDIA0");	// MT_MISC11 medikit sprite, frame A
-	if (l >= 0) med = (patch_t*) W_CacheLumpNum (l, PU_STATIC);
-	tried = 1;
-    }
-    return med;
-}
+// (The down-state HUD shows a compass arrow in the mugshot slot -- see the
+// PST_DEAD block in HU_Buddy_DrawStats.  The old medkit sprite that lived here
+// never rendered, so it was removed.)
 
 static void HU_Buddy_LoadFaces (void)
 {

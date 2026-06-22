@@ -38,7 +38,7 @@
 #define DIR_DECAY		8	// intensity*100 drained per tic (~2.8/s)
 #define DIR_SUSTAIN_TICS	(4*TICRATE)	// hold the peak this long
 #define DIR_MINRELAX_TICS	(30*TICRATE)	// minimum calm/loot time
-#define DIR_MAXMON		40	// don't spawn past this many live monsters
+#define DIR_MAXMON		64	// don't spawn past this many live monsters
 #define DIR_SPAWN_TRIES		16	// candidate spots per spawn attempt
 #define DIR_NEAR		(512*FRACUNIT)	// spawn distance band, min
 #define DIR_FAR			(1280*FRACUNIT)	//  ... max
@@ -69,9 +69,20 @@ static int	dir_intro;		// 1 = speak the level-start line on the next tic
 static fixed_t	dir_exit_x, dir_exit_y;	// level exit location (for exit-proximity pressure)
 static boolean	dir_exit_set;		// found an exit linedef on this map?
 static int	dir_exit_found;		// 0 until P_Director_FindExit has run this level
+static int	dir_seeded;		// 0 until objectives (exit/keys) seeded this level
+static int	dir_guardtic;		// gametic of the last objective-guard spawn
 
 static int     P_Director_ObjProximity (void);	// 0..100, nearer exit/key = more
 static boolean P_Director_Stressed (void);	// player critically low hp/ammo?
+static boolean P_Director_SpawnMonsterNear (mobjtype_t mt, fixed_t cx, fixed_t cy);
+static mobjtype_t P_Director_PickType (void);
+
+// Is `mo` an uncollected key item?  (objective rooms the director defends)
+static boolean P_Director_IsKey (mobj_t* mo)
+{
+    return (mo->sprite == SPR_BKEY || mo->sprite == SPR_RKEY || mo->sprite == SPR_YKEY
+	 || mo->sprite == SPR_BSKU || mo->sprite == SPR_RSKU || mo->sprite == SPR_YSKU);
+}
 
 // "common" + "special" monster pools (specials lean in at the peak).  DOOM2-only
 // monsters (revenant/mancubus/hell knight/chaingunner/...) have NO sprites in a
@@ -141,6 +152,7 @@ void P_Director_Reset (void)
     dir_voicelast = gametic - DIR_VOICE_GAP;	// allow a line immediately
     dir_intro = 1;				// the Director greets you on the first tic
     dir_exit_found = 0; dir_exit_set = false;	// re-locate the exit on the new map
+    dir_seeded = 0; dir_guardtic = 0;		// re-seed objective guards on the new map
 }
 
 // ---- stress feeds ----------------------------------------------------------
@@ -393,9 +405,7 @@ static fixed_t P_Director_NearestObjective (fixed_t fx, fixed_t fy, fixed_t* ox,
 	fixed_t	d;
 	if (th->function.acp1 != (actionf_p1)P_MobjThinker) continue;
 	mo = (mobj_t*)th;
-	if (mo->sprite != SPR_BKEY && mo->sprite != SPR_RKEY && mo->sprite != SPR_YKEY
-	 && mo->sprite != SPR_BSKU && mo->sprite != SPR_RSKU && mo->sprite != SPR_YSKU)
-	    continue;					// not a key
+	if (!P_Director_IsKey (mo)) continue;		// not a key
 	d = P_AproxDistance (fx - mo->x, fy - mo->y);
 	if (d < best) { best = d; *ox = mo->x; *oy = mo->y; }
     }
@@ -536,6 +546,24 @@ static void P_Director_SpawnItems (void)
     P_Director_Voice ("dir:gift", 3, 0);
 }
 
+// Seed the objective rooms (the exit + every uncollected key) with a small
+// out-of-sight guard, so those rooms are defended from the very start of the level.
+static void P_Director_SeedObjectives (void)
+{
+    thinker_t*	th;
+    int		n;
+    if (dir_exit_set)
+	for (n = 0; n < 3; n++) P_Director_SpawnMonsterNear (P_Director_PickType (), dir_exit_x, dir_exit_y);
+    for (th = thinkercap.next; th != &thinkercap; th = th->next)
+    {
+	mobj_t*	mo;
+	if (th->function.acp1 != (actionf_p1)P_MobjThinker) continue;
+	mo = (mobj_t*)th;
+	if (!P_Director_IsKey (mo)) continue;
+	for (n = 0; n < 2; n++) P_Director_SpawnMonsterNear (P_Director_PickType (), mo->x, mo->y);
+    }
+}
+
 // ---- per-tic FSM -----------------------------------------------------------
 
 void P_Director_Ticker (void)
@@ -546,6 +574,20 @@ void P_Director_Ticker (void)
 
     // Locate the level exit once (lines[] is loaded by now) for exit-proximity pressure.
     if (!dir_exit_found) { dir_exit_found = 1; P_Director_FindExit (); }
+    // ...then seed the exit/key rooms with a starting guard (once per level).
+    if (!dir_seeded)     { dir_seeded = 1; P_Director_SeedObjectives (); }
+
+    // Always keep the objectives defended: every ~10 s drop one extra monster at the
+    // nearest objective (exit or a key), out of sight -- so the exit/key rooms are
+    // never a free walk-in.  Skipped when the player is critically low (no piling on).
+    if (gametic - dir_guardtic > 10*TICRATE && !P_Director_Stressed ())
+    {
+	fixed_t ox, oy;
+	mobj_t*	sv = P_Director_RandomSurvivor ();
+	if (sv && P_Director_NearestObjective (sv->x, sv->y, &ox, &oy) != 0x7fffffff
+	    && P_Director_SpawnMonsterNear (P_Director_PickType (), ox, oy))
+	    dir_guardtic = gametic;
+    }
 
     // Director voice: greet the player once on the first in-level tic, then drop
     // occasional menace during long lulls (low intensity, nothing else spoken).
@@ -613,10 +655,10 @@ void P_Director_Ticker (void)
 	else if (--dir_spawntic <= 0)
 	{
 	    // ~1-in-4 spawns is a horde (4-6) -- but never a horde on a stressed player.
-	    if (P_Random () < 64 && !stressed) P_Director_SpawnWave (4 + (P_Random () % 3));
+	    if (P_Random () < 96 && !stressed) P_Director_SpawnWave (5 + (P_Random () % 4));
 	    else                               P_Director_SpawnMonster ();
 	    // Faster trickle when calm (build tension), slower as intensity climbs...
-	    dir_spawntic = 35 + (dir_acc / 100) * 2;	// ~1 s (calm) .. ~3 s (near peak)
+	    dir_spawntic = 24 + (dir_acc / 100) * 2;	// faster trickle (~0.7 s calm .. ~2.4 s)
 	    // ...but ramp the pressure up hard the closer the player is to the exit.
 	    dir_spawntic = dir_spawntic * (100 - exf*3/4) / 100;	// up to ~75% faster at the exit
 	    if (dir_spawntic < 8) dir_spawntic = 8;
@@ -631,9 +673,9 @@ void P_Director_Ticker (void)
 	else if (--dir_spawntic <= 0)
 	{
 	    // At the peak, hordes are the norm (bigger, 5-7) -- unless the player is stressed.
-	    if (P_Random () < 140 && !stressed) P_Director_SpawnWave (5 + (P_Random () % 3));
+	    if (P_Random () < 170 && !stressed) P_Director_SpawnWave (6 + (P_Random () % 4));
 	    else                                P_Director_SpawnMonster ();
-	    dir_spawntic = 2*TICRATE;
+	    dir_spawntic = 49;		// ~1.4 s between peak hordes
 	    dir_spawntic = dir_spawntic * (100 - exf*3/4) / 100;
 	    if (dir_spawntic < 8) dir_spawntic = 8;
 	}
