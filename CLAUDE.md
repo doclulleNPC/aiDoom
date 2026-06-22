@@ -192,6 +192,8 @@ Related gameplay flags worth knowing: `-infight` (same-species infighting),
 There is a large set of design docs at the repo root (one per feature):
 `AGENT_CONTROL.md`, `AIDOOM_PARAMETERS.md`, `BUDDY_*.md`, `GPUMON.md`,
 `Pathfinding.md`, `VISIBILITY_CACHE.md`, `YAPB_ARCHITECTURE.md`, `Collision.md`,
+`HD_TEXTURES.md` (how the `../sdldoom-sdl3` sibling does true-color PNG texture/
+sprite/voxel replacement — a porting reference, not yet implemented here),
 plus `LEGACY_FIXES.md` (the running log of age-of-the-code fixes). Consult the
 matching doc before touching a subsystem.
 
