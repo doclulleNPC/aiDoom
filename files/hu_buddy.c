@@ -266,7 +266,7 @@ static int HU_Buddy_TextW (const char* s)
     return w;
 }
 
-static void HU_Buddy_Text (int x, int y, const char* s)
+static void HU_Buddy_TextT (int x, int y, const char* s, const byte* trans)
 {
     for (; *s; s++)
     {
@@ -276,11 +276,13 @@ static void HU_Buddy_Text (int x, int y, const char* s)
 	{
 	    patch_t* p = hu_font[c - HU_FONTSTART];
 	    if (!p) { x += 4; continue; }
-	    V_DrawPatch (x, y, 0, p);
+	    V_DrawPatchTranslated (x, y, 0, p, trans);	// trans==NULL -> normal colour
 	    x += SHORT (p->width);
 	}
     }
 }
+
+static void HU_Buddy_Text (int x, int y, const char* s) { HU_Buddy_TextT (x, y, s, NULL); }
 
 // Top-right readout: the buddy's mugshot (by health) followed by two right-aligned
 // message-font lines (HP/armor, weapon/ammo).  The mugshot replaces the old "BUDDY"
@@ -350,7 +352,16 @@ static void HU_Buddy_DrawStrip (player_t* bot)
     { int w3 = HU_Buddy_TextW (l3); if (w3 > textw) textw = w3; }
     tx = wb - 4 - textw;
 
-    HU_Buddy_Text (tx, 2,  l1);
+    // l1 line with the HP number coloured by value (>75 green, >25 yellow, else red).
+    {
+	const char* pre = face ? "HP " : "BUDDY  HP ";
+	char        hpn[16]; snprintf (hpn, sizeof hpn, "%d", hp);
+	char        suf[24]; snprintf (suf, sizeof suf, "  AR %d", arm);
+	int         x0 = tx;
+	HU_Buddy_TextT (x0, 2, pre, NULL);                  x0 += HU_Buddy_TextW (pre);
+	HU_Buddy_TextT (x0, 2, hpn, V_HealthTrans (hp));    x0 += HU_Buddy_TextW (hpn);
+	HU_Buddy_TextT (x0, 2, suf, NULL);
+    }
     HU_Buddy_Text (tx, 12, l2);
     HU_Buddy_Text (tx, 22, l3);
 

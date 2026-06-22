@@ -117,6 +117,12 @@ V_GetBlock
 // Returns NULL if the lump is missing or isn't a PNG.  See v_png.c.
 patch_t* V_CachePNG (const char* name);
 
+// Draw a patch with a 256-entry palette translation applied per pixel (NULL = none).
+void V_DrawPatchTranslated (int x, int y, int scrn, patch_t* patch, const byte* trans);
+
+// 256-entry health-colour translation: >75 green, >25 yellow, else red.  v_png.c.
+const byte* V_HealthTrans (int hp);
+
 
 void
 V_MarkRect

@@ -276,6 +276,65 @@ V_DrawPatch
 }
 
 //
+// V_DrawPatchTranslated
+// Like V_DrawPatch, but every source pixel is remapped through `trans[256]`
+// (a palette translation -- e.g. the health green/yellow/red colourise from
+// v_png.c's V_HealthTrans).  trans == NULL falls back to a plain V_DrawPatch.
+//
+void
+V_DrawPatchTranslated
+( int		x,
+  int		y,
+  int		scrn,
+  patch_t*	patch,
+  const byte*	trans )
+{
+    int		count, col;
+    column_t*	column;
+    byte*	desttop;
+    byte*	dest;
+    byte*	source;
+    int		w;
+    int		s = hires;
+    int		i, j;
+
+    if (!trans) { V_DrawPatch (x, y, scrn, patch); return; }
+
+    y -= SHORT(patch->topoffset);
+    x -= SHORT(patch->leftoffset);
+    if (!scrn)
+	V_MarkRect (x, y, SHORT(patch->width), SHORT(patch->height));
+
+    col = 0;
+    desttop = screens[scrn] + (y*s)*SCREENWIDTH + x*s;
+    w = SHORT(patch->width);
+
+    for ( ; col<w ; col++, desttop += s)
+    {
+	column = (column_t *)((byte *)patch + LONG(patch->columnofs[col]));
+	while (column->topdelta != 0xff )
+	{
+	    source = (byte *)column + 3;
+	    dest = desttop + (column->topdelta*s)*SCREENWIDTH;
+	    count = column->length;
+	    while (count--)
+	    {
+		byte px = trans[*source];
+		for (i=0 ; i<s ; i++)
+		{
+		    byte* d = dest + i*SCREENWIDTH;
+		    for (j=0 ; j<s ; j++)
+			d[j] = px;
+		}
+		source++;
+		dest += s*SCREENWIDTH;
+	    }
+	    column = (column_t *)((byte *)column + column->length + 4);
+	}
+    }
+}
+
+//
 // V_DrawPatchScaled
 // Like V_DrawPatch, but magnifies the patch by an extra integer factor `sc`
 // (on top of the global hires scaling).  The top-left stays at the 320x200

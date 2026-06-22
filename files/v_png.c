@@ -61,6 +61,39 @@ static byte VP_Nearest (int r, int g, int b)
     return (byte) best;
 }
 
+// ---- health-colour translation tables (green/yellow/red) -------------------
+// A "translation" is a 256-entry palette remap applied per pixel by
+// V_DrawPatchTranslated.  We build a luminance-preserving colourise for each hue,
+// so any source colour (the gray HUD font OR the red status-bar numbers) becomes
+// the target hue at the same brightness.
+
+static byte	vp_xlat_grn[256], vp_xlat_yel[256], vp_xlat_red[256];
+static boolean	vp_xlat_ready;
+
+static void VP_BuildHealthXlats (void)
+{
+    int i;
+    if (!vp_pal_ready) VP_LoadPalette ();
+    for (i = 0; i < 256; i++)
+    {
+	int r = vp_pal[i][0], g = vp_pal[i][1], b = vp_pal[i][2];
+	int L = (r*77 + g*150 + b*29) >> 8;		// luminance 0..255
+	vp_xlat_grn[i] = VP_Nearest (0, L, 0);
+	vp_xlat_yel[i] = VP_Nearest (L, L, 0);
+	vp_xlat_red[i] = VP_Nearest (L, 0, 0);
+    }
+    vp_xlat_ready = true;
+}
+
+// Translation table for a health value: >75 green, >25 yellow, else red.
+const byte* V_HealthTrans (int hp)
+{
+    if (!vp_xlat_ready) VP_BuildHealthXlats ();
+    if (hp > 75) return vp_xlat_grn;
+    if (hp > 25) return vp_xlat_yel;
+    return vp_xlat_red;
+}
+
 // ---- RGBA -> patch_t --------------------------------------------------------
 
 #define VP_ALPHA_CUT	128		// alpha below this -> transparent

@@ -60,6 +60,10 @@ void STlib_init(void)
     sttminus = (patch_t *) W_CacheLumpName("STTMINUS", PU_STATIC);
 }
 
+// Per-pixel palette translation for the next number drawn (NULL = none).  Set by
+// st_stuff.c around the health widget to colour it green/yellow/red by value.
+const byte* st_num_xlat = NULL;
+
 
 // ?
 void
@@ -132,19 +136,19 @@ STlib_drawNum
 
     // in the special case of 0, you draw 0
     if (!num)
-	V_DrawPatch(x - w, n->y, FG, n->p[ 0 ]);
+	V_DrawPatchTranslated(x - w, n->y, FG, n->p[ 0 ], st_num_xlat);
 
     // draw the new number
     while (num && numdigits--)
     {
 	x -= w;
-	V_DrawPatch(x, n->y, FG, n->p[ num % 10 ]);
+	V_DrawPatchTranslated(x, n->y, FG, n->p[ num % 10 ], st_num_xlat);
 	num /= 10;
     }
 
     // draw a minus sign if necessary
     if (neg)
-	V_DrawPatch(x - 8, n->y, FG, sttminus);
+	V_DrawPatchTranslated(x - 8, n->y, FG, sttminus, st_num_xlat);
 }
 
 

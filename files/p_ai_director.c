@@ -28,6 +28,7 @@
 #include "p_local.h"
 #include "r_state.h"
 #include "info.h"
+#include "w_wad.h"			// W_CheckNumForName -- detect overlaid DOOM2 sprites
 #include "p_ai_director.h"
 #include "i_voice.h"			// I_Director_Say -- the spoken game-master persona
 
@@ -269,7 +270,13 @@ static boolean P_Director_IsSpecial (mobjtype_t mt)
 // pass the type through.  Guards BOTH the rule FSM and the LLM spawn path.
 static mobjtype_t P_Director_SafeType (mobjtype_t mt)
 {
+    static int doom2sprites = -1;	// -1 unknown, 0 absent, 1 present (doom2stuff.wad)
     if (gamemode == commercial) return mt;
+    // If the DOOM2 sprites have been overlaid (e.g. -file doom2stuff.wad), the
+    // DOOM2-exclusive monsters won't crash the renderer -- so allow them.
+    if (doom2sprites < 0)
+	doom2sprites = (W_CheckNumForName ("SKELA1") >= 0);	// revenant sprite frame
+    if (doom2sprites) return mt;
     switch (mt)
     {
       case MT_CHAINGUY: case MT_UNDEAD: case MT_FATSO: case MT_BABY:
