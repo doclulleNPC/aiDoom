@@ -337,6 +337,7 @@ static void save_cfg(void)
 // ----------------------------------------------------------------- UI state
 static int mode=0;            // 0 normal, 1 capture key, 2 edit text
 static int active=-1;         // setting being captured/edited
+static int hover=-1;          // setting whose value the mouse is over (for Backspace-clear)
 static char editbuf[128];
 static char status[160]="";
 
@@ -432,6 +433,7 @@ static void draw(void)
         else if (s->type==T_CHOICE) snprintf(buf,sizeof(buf),"< %s >", s->sval[0]?base_name(s->sval):"auto (detect)");
         else                     snprintf(buf,sizeof(buf),"%s", (mode==2&&active==i)?editbuf:s->sval);
         if (hot) rect(cx+VALX-4, s->y+1, COLW-VALX-LABELX+4, ROWH-4, 50,50,70);
+        else if (hover==i && mode==0) rect(cx+VALX-4, s->y+1, COLW-VALX-LABELX+4, ROWH-4, 40,40,55);  // Backspace clears this
         if (mode==2&&active==i) { // text cursor
             text(cx+VALX, s->y+4, buf, 255,255,160);
             text(cx+VALX + (float)strlen(buf)*FONT_CW, s->y+4, "_", 255,255,160);
@@ -446,6 +448,18 @@ static void draw(void)
 }
 
 static int hit(float mx,float my, SDL_FRect r){ return mx>=r.x&&mx<r.x+r.w&&my>=r.y&&my<r.y+r.h; }
+
+// Index of the setting whose value cell is under (mx,my), or -1.  Mirrors the
+// value-rect test in click(); used to target the mouse-over value for Backspace-clear.
+static int setting_at(float mx,float my)
+{
+    for (int i=0;i<NSET;i++) {
+        float cx = settings[i].col * COLW;
+        SDL_FRect vr={cx+VALX-4,settings[i].y,COLW-VALX,ROWH};
+        if (hit(mx,my,vr)) return i;
+    }
+    return -1;
+}
 
 static void click(float mx,float my)
 {
@@ -542,7 +556,18 @@ int main(int argc, char** argv)
                 }
                 continue;
             }
+            if (e.type==SDL_EVENT_MOUSE_MOTION) { hover = setting_at(e.motion.x,e.motion.y); break; }
             if (e.type==SDL_EVENT_MOUSE_BUTTON_DOWN && e.button.button==SDL_BUTTON_LEFT) { click(e.button.x,e.button.y); break; }
+            // Backspace (or Delete) clears the value the mouse is over: text/choice -> empty,
+            // key bind -> none, int/toggle -> minimum.  A quick "delete value" without editing.
+            if (e.type==SDL_EVENT_KEY_DOWN && (e.key.key==SDLK_BACKSPACE||e.key.key==SDLK_DELETE) && hover>=0 && hover<NSET) {
+                setting_t* s=&settings[hover];
+                if (s->type==T_TEXT||s->type==T_CHOICE) { s->sval[0]=0; if (s->type==T_CHOICE) iwadsel=-1; }
+                else if (s->type==T_KEY) s->ival=0;
+                else s->ival = s->vmin;        // T_INT / T_TOGGLE -> minimum / off
+                snprintf(status,sizeof(status),"Cleared \"%s\"", s->label);
+                break;
+            }
             if (e.type==SDL_EVENT_KEY_DOWN && e.key.key==SDLK_ESCAPE) { run=0; break; }
         }
         draw();

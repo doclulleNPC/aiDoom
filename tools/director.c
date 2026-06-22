@@ -338,7 +338,26 @@ static int send_all (sock_t s, const char* buf, int len)
     return 0;
 }
 
-// read one '\n'-terminated line from the game socket
+// recv_line() outcomes that aren't a byte count.  A recv() timeout
+// (SO_RCVTIMEO) means "no reply yet, but the peer is still connected" -- it must
+// NOT be treated as a disconnect, because the game stops answering during the
+// inter-map intermission yet keeps the TCP connection open.
+#define RECV_EOF      (-1)   // peer closed / hard error -> reconnect
+#define RECV_TIMEOUT  (-2)   // SO_RCVTIMEO elapsed, peer still up -> keep waiting
+
+// True if the last socket error was a timeout / would-block (not a real drop).
+static int sock_would_block (void)
+{
+#ifdef _WIN32
+    int e = WSAGetLastError ();
+    return e == WSAETIMEDOUT || e == WSAEWOULDBLOCK;
+#else
+    return errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR;
+#endif
+}
+
+// read one '\n'-terminated line from the game socket.  Returns the line length
+// (>=0), or RECV_EOF / RECV_TIMEOUT.  out[] is always NUL-terminated.
 static int recv_line (sock_t s, char* out, int cap)
 {
     int n = 0;
@@ -346,7 +365,9 @@ static int recv_line (sock_t s, char* out, int cap)
     {
         char c;
         int r = (int) recv (s, &c, 1, 0);
-        if (r <= 0) return (n > 0) ? n : -1;
+        if (r == 0) { out[n] = '\0'; return RECV_EOF; }                          // peer closed
+        if (r < 0)  { out[n] = '\0'; return sock_would_block () ? RECV_TIMEOUT   // stall, still up
+                                                                : RECV_EOF; }    // reset/error
         if (c == '\n') break;
         out[n++] = c;
     }
@@ -497,17 +518,24 @@ static int worker (void* unused)
 {
     (void) unused;
     char line[8192];
-
-    // 1. connect to the game (retry while it starts up)
+    char hist[4][120];          // rolling cross-round memory (last N rounds)
+    int  nh = 0;
+    int  round = 0;
     sock_t gs = SOCKERR;
-    for (int i = 0; i < 60 && !g_quit; i++)
+
+reconnect:
+    // 1. (re)connect to the game.  Retry forever while it starts up OR while it
+    //    is between maps -- never give up, so the director auto-rejoins the next
+    //    level instead of dying on the first hiccup.
+    gs = SOCKERR;
+    for (int i = 0; !g_quit; i++)
     {
         gs = tcp_connect ("127.0.0.1", opt_gameport, 5);
         if (gs != SOCKERR) break;
         if (i == 0) { setstatus ("waiting for aiDoom ..."); logln ("waiting for aiDoom on 127.0.0.1:%d", opt_gameport); }
         SDL_Delay (500);
     }
-    if (gs == SOCKERR) { setstatus ("FAILED: no game connection"); logln ("could not connect to the game; giving up."); return 1; }
+    if (g_quit) { setstatus ("disconnected"); return 0; }
 
     char st[200];
     snprintf (st, sizeof st, "connected  model=%s  ollama=%s:%d", opt_model, opt_host, opt_oport);
@@ -517,13 +545,23 @@ static int worker (void* unused)
     send_all (gs, "wake\n", 5);
     recv_line (gs, line, sizeof line);     // "ok"
 
-    int  round = 0;
-    char hist[4][120]; int nh = 0;	// rolling cross-round memory (last N rounds)
     while (!g_quit)
     {
         round++;
-        if (send_all (gs, "observe\n", 8) != 0) { logln ("connection closed by game."); break; }
-        if (recv_line (gs, line, sizeof line) <= 0) { logln ("connection closed by game."); break; }
+        if (send_all (gs, "observe\n", 8) != 0) { logln ("game send failed; reconnecting..."); goto dropped; }
+
+        // The game stops answering during the inter-map intermission/finale but
+        // keeps the TCP connection open, so a recv timeout there is NOT a
+        // disconnect -- keep waiting for the reply.  Do NOT resend observe on a
+        // timeout: a second request would desync the request/reply pairing.
+        int rr;
+        do {
+            rr = recv_line (gs, line, sizeof line);
+            if (rr == RECV_TIMEOUT && !g_quit)
+                setsub ("game busy (intermission?) -- waiting...");
+        } while (rr == RECV_TIMEOUT && !g_quit);
+        if (g_quit) break;
+        if (rr <= 0) { logln ("connection closed by game; reconnecting..."); goto dropped; }
 
         json* state = json_parse (line);
         json* mons  = json_get (state, "monsters");
@@ -732,9 +770,20 @@ static int worker (void* unused)
         SDL_Delay ((int)(opt_period * 1000));
     }
 
+    // clean exit: the GUI window was closed (g_quit).
     CLOSESOCK (gs);
     setstatus ("disconnected");
     return 0;
+
+dropped:
+    // The game socket dropped for real (EOF/reset -- game quit or crashed).  Close
+    // it and loop back to reconnect so the director rejoins automatically when the
+    // game returns; only stop if the user is quitting the director itself.
+    CLOSESOCK (gs);
+    if (g_quit) { setstatus ("disconnected"); return 0; }
+    setstatus ("reconnecting...");
+    SDL_Delay (500);
+    goto reconnect;
 }
 
 // ===========================================================================

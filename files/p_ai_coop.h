@@ -47,7 +47,7 @@ boolean P_AICoop_IsBuddy (player_t* p);
 // 4=come, 5=grab).  Exposed for the console / voice system.
 int  P_AICoop_State (void);
 
-// Speak a tagged phrase through i_voice.c (offline OGG via buddy.wad).
+// Speak a tagged phrase through i_voice.c (offline OGG via aidoom.wad).
 // Callers pick the exact tag (e.g. "summon_ok", "state:fighting"); the
 // tag -> lump-name mapping lives in i_voice.c.
 void P_AICoop_VoiceTag (const char* tag);
@@ -61,6 +61,7 @@ const char*	P_AICoop_Attack (void);		// "attack" -- charge nearest monster
 const char*	P_AICoop_StatusReport (void);	// "report" -- HP/armor/weapon/ammo
 const char*	P_AICoop_God (void);		// "buddygod" -- toggle buddy god mode
 const char*	P_AICoop_GiveAll (void);	// "buddyarm" -- buddy all weapons + ammo + armor
+const char*	P_AICoop_Home (void);		// "buddyhome" -- teleport buddy to its map spawn point
 
 // ---------------------------------------------------------------------------
 //  AI (LLM) director layer for the buddy (-aicoop).  The director sets a

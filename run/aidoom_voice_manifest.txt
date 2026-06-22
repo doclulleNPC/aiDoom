@@ -1,0 +1,211 @@
+buddy_voice=wJmFT75XSkFKaBF1R0rX
+director_voice=YOq2y2Up4RgXP2HyXjE5
+model=eleven_turbo_v2_5
+generated=2026-06-22 14:34:17
+# columns: lump\tpersona\tvoice\tphrase\tsource\tbytes
+
+DSCT001	buddy	wJmFT75XSkFKaBF1R0rX	Contact!	cached	8583
+DSCT002	buddy	wJmFT75XSkFKaBF1R0rX	Tango, engaging!	cached	16098
+DSCT003	buddy	wJmFT75XSkFKaBF1R0rX	I see one!	cached	9407
+DSCT004	buddy	wJmFT75XSkFKaBF1R0rX	Got movement!	cached	10250
+DSHR01	buddy	wJmFT75XSkFKaBF1R0rX	I'm hit!	cached	11811
+DSHR02	buddy	wJmFT75XSkFKaBF1R0rX	Taking fire!	cached	11877
+DSHR03	buddy	wJmFT75XSkFKaBF1R0rX	I need health!	cached	15341
+DSCL01	buddy	wJmFT75XSkFKaBF1R0rX	Area clear.	cached	14450
+DSCL02	buddy	wJmFT75XSkFKaBF1R0rX	All quiet.	cached	9543
+DSCL03	buddy	wJmFT75XSkFKaBF1R0rX	Watch our six.	cached	12922
+DSWFOLLOW	buddy	wJmFT75XSkFKaBF1R0rX	Following you.	cached	10013
+DSWFIGHT	buddy	wJmFT75XSkFKaBF1R0rX	Fighting.	cached	9798
+DSWHEAL	buddy	wJmFT75XSkFKaBF1R0rX	Getting health.	cached	12502
+DSWHOLD	buddy	wJmFT75XSkFKaBF1R0rX	Holding position.	cached	11435
+DSWCOME	buddy	wJmFT75XSkFKaBF1R0rX	Coming to you.	cached	11666
+DSWGRAB	buddy	wJmFT75XSkFKaBF1R0rX	Grabbing an item.	cached	13877
+DSSUMONOK	buddy	wJmFT75XSkFKaBF1R0rX	On my way!	cached	11258
+DSWAITHD	buddy	wJmFT75XSkFKaBF1R0rX	Holding position.	cached	11611
+DSWAITMV	buddy	wJmFT75XSkFKaBF1R0rX	Moving out.	cached	10169
+DSATACK	buddy	wJmFT75XSkFKaBF1R0rX	Attacking!	cached	9084
+DSATNONE	buddy	wJmFT75XSkFKaBF1R0rX	No targets around.	cached	15667
+DSSTFISP	buddy	wJmFT75XSkFKaBF1R0rX	Fists.	cached	10170
+DSSTPISP	buddy	wJmFT75XSkFKaBF1R0rX	Pistol.	cached	8489
+DSSTPISA	buddy	wJmFT75XSkFKaBF1R0rX	Pistol. Loaded.	cached	13481
+DSSTSHTP	buddy	wJmFT75XSkFKaBF1R0rX	Shotgun.	cached	9643
+DSSTSHTA	buddy	wJmFT75XSkFKaBF1R0rX	Shotgun. Loaded.	cached	13333
+DSSTCHGP	buddy	wJmFT75XSkFKaBF1R0rX	Chaingun.	cached	10115
+DSSTCHGA	buddy	wJmFT75XSkFKaBF1R0rX	Chaingun. Loaded.	cached	14425
+DSSTRCKP	buddy	wJmFT75XSkFKaBF1R0rX	Rocket launcher.	cached	14345
+DSSTRCKA	buddy	wJmFT75XSkFKaBF1R0rX	Rocket launcher. Loaded.	cached	17525
+DSSTPLSP	buddy	wJmFT75XSkFKaBF1R0rX	Plasma rifle.	cached	12810
+DSSTPLSA	buddy	wJmFT75XSkFKaBF1R0rX	Plasma rifle. Loaded.	cached	18428
+DSSTBFGP	buddy	wJmFT75XSkFKaBF1R0rX	B. F. G.	cached	13628
+DSSTBFGA	buddy	wJmFT75XSkFKaBF1R0rX	B. F. G. Loaded.	cached	14177
+DSSTCSWP	buddy	wJmFT75XSkFKaBF1R0rX	Chainsaw.	cached	12371
+DSSTSSHP	buddy	wJmFT75XSkFKaBF1R0rX	Super shotgun.	cached	13566
+DSSTSSHA	buddy	wJmFT75XSkFKaBF1R0rX	Super shotgun. Loaded.	cached	16981
+DSKL01	buddy	wJmFT75XSkFKaBF1R0rX	Got him!	cached	7695
+DSKL02	buddy	wJmFT75XSkFKaBF1R0rX	Down!	cached	9445
+DSKL03	buddy	wJmFT75XSkFKaBF1R0rX	Scratch one.	cached	11420
+DSKL04	buddy	wJmFT75XSkFKaBF1R0rX	Stay down.	cached	12506
+DSKI01	buddy	wJmFT75XSkFKaBF1R0rX	I pimped that imp!	cached	14492
+DSKI02	buddy	wJmFT75XSkFKaBF1R0rX	Imp? More like wimp.	cached	17217
+DSKI03	buddy	wJmFT75XSkFKaBF1R0rX	Hot-footed that imp.	cached	17436
+DSKZM01	buddy	wJmFT75XSkFKaBF1R0rX	Zombie down.	cached	15741
+DSKSG01	buddy	wJmFT75XSkFKaBF1R0rX	Thanks for the shells!	cached	14729
+DSKCG01	buddy	wJmFT75XSkFKaBF1R0rX	Quit hoggin' the chaingun.	cached	20126
+DSKPK01	buddy	wJmFT75XSkFKaBF1R0rX	Bad dog!	cached	13795
+DSKSC01	buddy	wJmFT75XSkFKaBF1R0rX	I see you, fuzzy.	cached	15300
+DSKSL01	buddy	wJmFT75XSkFKaBF1R0rX	Lost soul, meet floor.	cached	21259
+DSKCD01	buddy	wJmFT75XSkFKaBF1R0rX	Eat dirt, meatball!	cached	15367
+DSKPE01	buddy	wJmFT75XSkFKaBF1R0rX	No more skull spam.	cached	15365
+DSKHK01	buddy	wJmFT75XSkFKaBF1R0rX	Knight, night!	cached	11181
+DSKBN01	buddy	wJmFT75XSkFKaBF1R0rX	Baron? Barely.	cached	16827
+DSKRV01	buddy	wJmFT75XSkFKaBF1R0rX	Rest in pieces, bonehead!	cached	17069
+DSKMC01	buddy	wJmFT75XSkFKaBF1R0rX	Lay off the donuts.	cached	14097
+DSKAR01	buddy	wJmFT75XSkFKaBF1R0rX	Squashed that bug.	cached	16059
+DSKMM01	buddy	wJmFT75XSkFKaBF1R0rX	Big spider, big splat.	cached	14390
+DSKCY01	buddy	wJmFT75XSkFKaBF1R0rX	Tim-ber!	cached	9855
+DSKAV01	buddy	wJmFT75XSkFKaBF1R0rX	Stay dead this time!	cached	19201
+DSKNS01	buddy	wJmFT75XSkFKaBF1R0rX	Wrong game, pal.	cached	13297
+DSKKN01	buddy	wJmFT75XSkFKaBF1R0rX	Door's open!	cached	10815
+DSDG01	buddy	wJmFT75XSkFKaBF1R0rX	Incoming!	cached	10387
+DSDG02	buddy	wJmFT75XSkFKaBF1R0rX	Whoa!	cached	9918
+DSDG03	buddy	wJmFT75XSkFKaBF1R0rX	Not today.	cached	13328
+DSDRY01	buddy	wJmFT75XSkFKaBF1R0rX	I'm dry!	cached	11296
+DSDRY02	buddy	wJmFT75XSkFKaBF1R0rX	Out of ammo!	cached	11714
+DSDRY03	buddy	wJmFT75XSkFKaBF1R0rX	Need a reload!	cached	14525
+DSBR01	buddy	wJmFT75XSkFKaBF1R0rX	Not near that barrel!	cached	16345
+DSBR02	buddy	wJmFT75XSkFKaBF1R0rX	Barrel -- hold up.	cached	11170
+DSBR03	buddy	wJmFT75XSkFKaBF1R0rX	That thing'll blow.	cached	16301
+DSSP01	buddy	wJmFT75XSkFKaBF1R0rX	On a roll!	cached	11127
+DSSP02	buddy	wJmFT75XSkFKaBF1R0rX	Can't stop me!	cached	13546
+DSSP03	buddy	wJmFT75XSkFKaBF1R0rX	They keep coming!	cached	12006
+DSSP04	buddy	wJmFT75XSkFKaBF1R0rX	Damn, I'm good.	cached	14655
+DSGB01	buddy	wJmFT75XSkFKaBF1R0rX	Chunky.	cached	8217
+DSGB02	buddy	wJmFT75XSkFKaBF1R0rX	Boom!	cached	8474
+DSGB03	buddy	wJmFT75XSkFKaBF1R0rX	Cleanup on aisle hell.	cached	16083
+DSCR01	buddy	wJmFT75XSkFKaBF1R0rX	I'm dying here!	cached	12585
+DSCR02	buddy	wJmFT75XSkFKaBF1R0rX	Critical -- cover me!	cached	15002
+DSCR03	buddy	wJmFT75XSkFKaBF1R0rX	Patch me up, now!	cached	12668
+DSFS01	buddy	wJmFT75XSkFKaBF1R0rX	Just my fists now.	cached	15214
+DSFS02	buddy	wJmFT75XSkFKaBF1R0rX	Knuckle up.	cached	10760
+DSTN01	buddy	wJmFT75XSkFKaBF1R0rX	Come get some!	cached	13270
+DSTN02	buddy	wJmFT75XSkFKaBF1R0rX	Is that all?	cached	11220
+DSTN03	buddy	wJmFT75XSkFKaBF1R0rX	I do this for fun.	cached	13179
+DSTN04	buddy	wJmFT75XSkFKaBF1R0rX	Rest in pieces!	cached	10581
+DSBIG01	buddy	wJmFT75XSkFKaBF1R0rX	Big one!	cached	8699
+DSBIG02	buddy	wJmFT75XSkFKaBF1R0rX	Oh, that's a Cyberdemon...	cached	18848
+DSBIG03	buddy	wJmFT75XSkFKaBF1R0rX	We're gonna need more ammo.	cached	19412
+DSFL01	buddy	wJmFT75XSkFKaBF1R0rX	Behind you!	cached	10787
+DSFL02	buddy	wJmFT75XSkFKaBF1R0rX	They're flanking!	cached	12583
+DSFL03	buddy	wJmFT75XSkFKaBF1R0rX	On your six!	cached	11942
+DSIF01	buddy	wJmFT75XSkFKaBF1R0rX	Let 'em fight.	cached	11300
+DSIF02	buddy	wJmFT75XSkFKaBF1R0rX	They're killing each other!	cached	15410
+DSED01	buddy	wJmFT75XSkFKaBF1R0rX	Careful -- nukage.	cached	14994
+DSED02	buddy	wJmFT75XSkFKaBF1R0rX	Watch the edge.	cached	13119
+DSED03	buddy	wJmFT75XSkFKaBF1R0rX	Easy, long drop.	cached	10290
+DSJP01	buddy	wJmFT75XSkFKaBF1R0rX	Hup!	cached	7086
+DSJP02	buddy	wJmFT75XSkFKaBF1R0rX	Up we go.	cached	10417
+DSDO01	buddy	wJmFT75XSkFKaBF1R0rX	Door!	cached	8784
+DSDO02	buddy	wJmFT75XSkFKaBF1R0rX	Opening up.	cached	8959
+DSSK01	buddy	wJmFT75XSkFKaBF1R0rX	I'm stuck!	cached	10238
+DSSK02	buddy	wJmFT75XSkFKaBF1R0rX	Gimme a sec.	cached	12199
+DSSK03	buddy	wJmFT75XSkFKaBF1R0rX	Snagged on something.	cached	16643
+DSLS01	buddy	wJmFT75XSkFKaBF1R0rX	Where'd you go?	cached	11708
+DSLS02	buddy	wJmFT75XSkFKaBF1R0rX	Wait up!	cached	7476
+DSLS03	buddy	wJmFT75XSkFKaBF1R0rX	I lost you!	cached	10523
+DSLK01	buddy	wJmFT75XSkFKaBF1R0rX	Locked. Need a key.	cached	14038
+DSLK02	buddy	wJmFT75XSkFKaBF1R0rX	Can't open this one.	cached	13269
+DSCU01	buddy	wJmFT75XSkFKaBF1R0rX	Crusher!	cached	10009
+DSCU02	buddy	wJmFT75XSkFKaBF1R0rX	Don't get squished.	cached	13255
+DSPH01	buddy	wJmFT75XSkFKaBF1R0rX	You okay?!	cached	11629
+DSPH02	buddy	wJmFT75XSkFKaBF1R0rX	I got you covered!	cached	12423
+DSPH03	buddy	wJmFT75XSkFKaBF1R0rX	Fall back, I'll hold!	cached	13674
+DSPD01	buddy	wJmFT75XSkFKaBF1R0rX	No! ...I'll avenge you.	cached	22134
+DSPD02	buddy	wJmFT75XSkFKaBF1R0rX	Stay down, I got this.	cached	18160
+DSFF01	buddy	wJmFT75XSkFKaBF1R0rX	Hey! Watch it!	cached	11396
+DSFF02	buddy	wJmFT75XSkFKaBF1R0rX	Friendly fire!	cached	11336
+DSFF03	buddy	wJmFT75XSkFKaBF1R0rX	That's MY blood, pal.	cached	13814
+DSFF04	buddy	wJmFT75XSkFKaBF1R0rX	Friendly fire, jackass!	cached	19075
+DSFF05	buddy	wJmFT75XSkFKaBF1R0rX	I'm on YOUR side, genius!	cached	19576
+DSFF06	buddy	wJmFT75XSkFKaBF1R0rX	Shoot them, not me!	cached	13727
+DSNC01	buddy	wJmFT75XSkFKaBF1R0rX	Nice shot!	cached	11532
+DSNC02	buddy	wJmFT75XSkFKaBF1R0rX	Good kill.	cached	11563
+DSPU01	buddy	wJmFT75XSkFKaBF1R0rX	Nice, ammo!	cached	14016
+DSPU02	buddy	wJmFT75XSkFKaBF1R0rX	Health -- sweet.	cached	11280
+DSPU03	buddy	wJmFT75XSkFKaBF1R0rX	Don't mind if I do.	cached	15101
+DSHL01	buddy	wJmFT75XSkFKaBF1R0rX	Patched up.	cached	10516
+DSHL02	buddy	wJmFT75XSkFKaBF1R0rX	Better. Let's go.	cached	13084
+DSBK01	buddy	wJmFT75XSkFKaBF1R0rX	Berserk! Get over here!	cached	16859
+DSBK02	buddy	wJmFT75XSkFKaBF1R0rX	Now I'm untouchable!	cached	17540
+DSGOD01	buddy	wJmFT75XSkFKaBF1R0rX	Invincible!	cached	10371
+DSGOD02	buddy	wJmFT75XSkFKaBF1R0rX	Can't touch me.	cached	12216
+DSARM01	buddy	wJmFT75XSkFKaBF1R0rX	Loaded for bear!	cached	12461
+DSARM02	buddy	wJmFT75XSkFKaBF1R0rX	Now we're talking.	cached	15943
+DSLV01	buddy	wJmFT75XSkFKaBF1R0rX	Fresh hell.	cached	10117
+DSLV02	buddy	wJmFT75XSkFKaBF1R0rX	Here we go again.	cached	13668
+DSLV03	buddy	wJmFT75XSkFKaBF1R0rX	Let's clear it.	cached	12355
+DSWN01	buddy	wJmFT75XSkFKaBF1R0rX	All dead. Nice.	cached	14258
+DSWN02	buddy	wJmFT75XSkFKaBF1R0rX	Find the exit.	cached	11527
+DSWN03	buddy	wJmFT75XSkFKaBF1R0rX	Hail to the king.	cached	15586
+DSSE01	buddy	wJmFT75XSkFKaBF1R0rX	Secret!	cached	10117
+DSSE02	buddy	wJmFT75XSkFKaBF1R0rX	Ooh, hidden stash.	cached	15070
+DSID01	buddy	wJmFT75XSkFKaBF1R0rX	Quiet... too quiet.	cached	14580
+DSID02	buddy	wJmFT75XSkFKaBF1R0rX	Anything?	cached	9525
+DSID03	buddy	wJmFT75XSkFKaBF1R0rX	Still with me?	cached	12437
+DSID04	buddy	wJmFT75XSkFKaBF1R0rX	I hate the waiting.	cached	14712
+DSHELP01	buddy	wJmFT75XSkFKaBF1R0rX	Man down! Help!	cached	12093
+DSHELP02	buddy	wJmFT75XSkFKaBF1R0rX	I'm hit bad -- get over here!	cached	19706
+DSHELP03	buddy	wJmFT75XSkFKaBF1R0rX	Don't leave me!	cached	12035
+DSHELP04	buddy	wJmFT75XSkFKaBF1R0rX	Buddy down! Medic!	cached	15614
+DSHELP05	buddy	wJmFT75XSkFKaBF1R0rX	Help me up, damn it!	cached	13371
+DSREV01	buddy	wJmFT75XSkFKaBF1R0rX	Back in the fight!	cached	10963
+DSREV02	buddy	wJmFT75XSkFKaBF1R0rX	Thanks -- I owe you one.	cached	14780
+DSREV03	buddy	wJmFT75XSkFKaBF1R0rX	Let's finish this.	cached	13350
+DDSTART0	director	YOq2y2Up4RgXP2HyXjE5	Welcome to the arena.	cached	27921
+DDSTART1	director	YOq2y2Up4RgXP2HyXjE5	Let the slaughter begin.	cached	37583
+DDSTART2	director	YOq2y2Up4RgXP2HyXjE5	Show me what you've got.	cached	25853
+DDBUILD0	director	YOq2y2Up4RgXP2HyXjE5	Something stirs in the dark.	cached	38917
+DDBUILD1	director	YOq2y2Up4RgXP2HyXjE5	They know you're here.	cached	22752
+DDBUILD2	director	YOq2y2Up4RgXP2HyXjE5	I'm only getting started.	cached	27744
+DDSPAWN0	director	YOq2y2Up4RgXP2HyXjE5	Reinforcements.	cached	18639
+DDSPAWN1	director	YOq2y2Up4RgXP2HyXjE5	Company.	cached	14111
+DDHORDE0	director	YOq2y2Up4RgXP2HyXjE5	Here comes the horde!	cached	20862
+DDHORDE1	director	YOq2y2Up4RgXP2HyXjE5	Brace yourself.	cached	19248
+DDHORDE2	director	YOq2y2Up4RgXP2HyXjE5	All of them, at once.	cached	25474
+DDPEAK0	director	YOq2y2Up4RgXP2HyXjE5	Now it gets interesting.	cached	31086
+DDPEAK1	director	YOq2y2Up4RgXP2HyXjE5	No mercy.	cached	17546
+DDPEAK2	director	YOq2y2Up4RgXP2HyXjE5	Maximum carnage!	cached	20392
+DDBIG0	director	YOq2y2Up4RgXP2HyXjE5	I saved this one for you.	cached	28844
+DDBIG1	director	YOq2y2Up4RgXP2HyXjE5	Meet your match.	cached	19090
+DDBIG2	director	YOq2y2Up4RgXP2HyXjE5	Try not to die too quickly.	cached	29304
+DDRELAX0	director	YOq2y2Up4RgXP2HyXjE5	Catch your breath. While you can.	cached	35692
+DDRELAX1	director	YOq2y2Up4RgXP2HyXjE5	We are not done.	cached	22526
+DDRELAX2	director	YOq2y2Up4RgXP2HyXjE5	A brief intermission.	cached	23455
+DDGIFT0	director	YOq2y2Up4RgXP2HyXjE5	A gift. Don't get comfortable.	cached	37181
+DDGIFT1	director	YOq2y2Up4RgXP2HyXjE5	You will need that.	cached	22971
+DDGIFT2	director	YOq2y2Up4RgXP2HyXjE5	Consider it charity.	cached	27865
+DDHEAL0	director	YOq2y2Up4RgXP2HyXjE5	You're dying. How dull.	cached	33554
+DDHEAL1	director	YOq2y2Up4RgXP2HyXjE5	Not yet. I'm not finished with you.	cached	38962
+DDHEAL2	director	YOq2y2Up4RgXP2HyXjE5	Patch up. The show goes on.	cached	34716
+DDAMMO0	director	YOq2y2Up4RgXP2HyXjE5	Reload. I insist.	cached	34722
+DDAMMO1	director	YOq2y2Up4RgXP2HyXjE5	Empty already?	cached	21307
+DDAMMO2	director	YOq2y2Up4RgXP2HyXjE5	Here. Make it count.	cached	27403
+DDFLANK0	director	YOq2y2Up4RgXP2HyXjE5	Cut him off.	cached	15930
+DDFLANK1	director	YOq2y2Up4RgXP2HyXjE5	From behind.	cached	17154
+DDAMBSH0	director	YOq2y2Up4RgXP2HyXjE5	Wait for it.	cached	19657
+DDAMBSH1	director	YOq2y2Up4RgXP2HyXjE5	Spring the trap.	cached	19882
+DDFOCUS0	director	YOq2y2Up4RgXP2HyXjE5	Finish the wounded one.	cached	22459
+DDFOCUS1	director	YOq2y2Up4RgXP2HyXjE5	Focus your fire.	cached	34536
+DDFALL0	director	YOq2y2Up4RgXP2HyXjE5	Pull them back. Regroup.	cached	29594
+DDFALL1	director	YOq2y2Up4RgXP2HyXjE5	Retreat. For now.	cached	27749
+DDSPREE0	director	YOq2y2Up4RgXP2HyXjE5	Impressive. For a human.	cached	34989
+DDSPREE1	director	YOq2y2Up4RgXP2HyXjE5	Enjoy it while it lasts.	cached	30146
+DDSPREE2	director	YOq2y2Up4RgXP2HyXjE5	Don't get cocky.	cached	22003
+DDDOWN0	director	YOq2y2Up4RgXP2HyXjE5	Pathetic.	cached	19033
+DDDOWN1	director	YOq2y2Up4RgXP2HyXjE5	Was that all?	cached	17224
+DDDOWN2	director	YOq2y2Up4RgXP2HyXjE5	Get up.	cached	14454
+DDCLEAR0	director	YOq2y2Up4RgXP2HyXjE5	You survived. For now.	cached	29754
+DDCLEAR1	director	YOq2y2Up4RgXP2HyXjE5	Until next time.	cached	21221
+DDCLEAR2	director	YOq2y2Up4RgXP2HyXjE5	The next floor is worse.	cached	26483
+DDIDLE0	director	YOq2y2Up4RgXP2HyXjE5	Hiding won't help.	cached	27419
+DDIDLE1	director	YOq2y2Up4RgXP2HyXjE5	I can wait.	cached	16020
+DDIDLE2	director	YOq2y2Up4RgXP2HyXjE5	Tick. Tock.	cached	14825

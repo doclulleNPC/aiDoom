@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 bake_buddy_voice.py -- pre-render the aiDoom AI co-op buddy's spoken lines
-from ElevenLabs TTS, and pack them into a Doom PWAD (`buddy.wad`) so the
+from ElevenLabs TTS, and pack them into a Doom PWAD (`aidoom.wad`) so the
 engine can play them offline with no network at runtime.
 
 Why a WAD: the engine already has a single-file lump archive loader
@@ -11,9 +11,9 @@ to distribute than 37 loose .ogg files.  See CLAUDE.md / LEGACY_FIXES.md
 ("offline buddy voice via stb_vorbis + dedicated SDL audio stream").
 
 Output:
-    run/buddy.wad              (PWAD with ~130 DS* OGG/Vorbis lumps + a VOICEMAP
+    run/aidoom.wad              (PWAD with ~130 DS* OGG/Vorbis lumps + a VOICEMAP
                                 text lump carrying the lump<->phrase mapping)
-    run/buddy_voice_manifest.txt  (same mapping, as a loose file)
+    run/aidoom_voice_manifest.txt  (same mapping, as a loose file)
 
 Phrases: the original 37 (callouts/state/replies/status) PLUS event callouts
 (kill/dodge/dry/barrel/crit/taunt/bigmon/edge/jump/door/stuck/lost/ff/plhurt/
@@ -32,7 +32,7 @@ Usage:
     export ELEVENLABS_API_KEY=sk_...
     python3 tools/bake_buddy_voice.py                       # full bake
     python3 tools/bake_buddy_voice.py --voice zmclHrhV...   # different voice
-    python3 tools/bake_buddy_voice.py --out run/buddy.wad   # custom path
+    python3 tools/bake_buddy_voice.py --out run/aidoom.wad   # custom path
     python3 tools/bake_buddy_voice.py --dry-run             # print phrases, no API
 
 Idempotent: skips phrases whose OGG already exists in a cache directory,
@@ -55,8 +55,8 @@ from pathlib import Path
 
 # Lump names are exactly 8 ASCII chars (Doom WAD limit); we use the same `DS` prefix
 # as the engine's existing SFX lumps so the i_voice.c loader can range over `ds*`
-# lumps in the buddy.wad namespace without colliding with game-SFX lumps (which
-# live in the IWAD, not in buddy.wad).
+# lumps in the aidoom.wad namespace without colliding with game-SFX lumps (which
+# live in the IWAD, not in aidoom.wad).
 def _lump(name: str) -> str:
     """Truncate/pad to exactly 8 chars (uppercase ASCII) per Doom WAD spec.
     Truncation silently merges lumps -- this raises instead so the bake
@@ -211,10 +211,95 @@ _allnames = [n for n, _ in PHRASES]
 assert len(_allnames) == len(set(_allnames)), "duplicate lump name in PHRASES"
 
 
+# ---------- AI "Director" voice (a separate persona/voice id) ----------------
+# The L4D-style AI Director (p_ai_director.c) gets its own booming game-master
+# voice -- a cold announcer that narrates spawns, phases and item drops, distinct
+# from the buddy's Joker tone.  Lumps use the "DD" prefix (vs the buddy's "DS")
+# and are mapped to "dir:*" tags in files/i_voice.c; they play on a SEPARATE SDL
+# stream so the Director and the buddy can talk without cutting each other off.
+# Voice "UT" (Unreal-Tournament-announcer style) -- passed in by --director-voice
+# or defaulted here; baked with this id regardless of the buddy --voice.
+DIRECTOR_VOICE = "YOq2y2Up4RgXP2HyXjE5"
+
+DIRECTOR = [
+    # -- level start (dir:start)
+    ("DDSTART0", "Welcome to the arena."),
+    ("DDSTART1", "Let the slaughter begin."),
+    ("DDSTART2", "Show me what you've got."),
+    # -- build-up / something stirs (dir:build)
+    ("DDBUILD0", "Something stirs in the dark."),
+    ("DDBUILD1", "They know you're here."),
+    ("DDBUILD2", "I'm only getting started."),
+    # -- single spawn (dir:spawn)
+    ("DDSPAWN0", "Reinforcements."),
+    ("DDSPAWN1", "Company."),
+    # -- horde / wave (dir:horde)
+    ("DDHORDE0", "Here comes the horde!"),
+    ("DDHORDE1", "Brace yourself."),
+    ("DDHORDE2", "All of them, at once."),
+    # -- peak intensity (dir:peak)
+    ("DDPEAK0", "Now it gets interesting."),
+    ("DDPEAK1", "No mercy."),
+    ("DDPEAK2", "Maximum carnage!"),
+    # -- special / big monster leans in (dir:big)
+    ("DDBIG0", "I saved this one for you."),
+    ("DDBIG1", "Meet your match."),
+    ("DDBIG2", "Try not to die too quickly."),
+    # -- relax / fade (dir:relax)
+    ("DDRELAX0", "Catch your breath. While you can."),
+    ("DDRELAX1", "We are not done."),
+    ("DDRELAX2", "A brief intermission."),
+    # -- relax item gift (dir:gift)
+    ("DDGIFT0", "A gift. Don't get comfortable."),
+    ("DDGIFT1", "You will need that."),
+    ("DDGIFT2", "Consider it charity."),
+    # -- emergency medkit (dir:heal)
+    ("DDHEAL0", "You're dying. How dull."),
+    ("DDHEAL1", "Not yet. I'm not finished with you."),
+    ("DDHEAL2", "Patch up. The show goes on."),
+    # -- emergency ammo (dir:ammo)
+    ("DDAMMO0", "Reload. I insist."),
+    ("DDAMMO1", "Empty already?"),
+    ("DDAMMO2", "Here. Make it count."),
+    # -- LLM tactic: flank (dir:flank)
+    ("DDFLANK0", "Cut him off."),
+    ("DDFLANK1", "From behind."),
+    # -- LLM tactic: ambush (dir:ambush)
+    ("DDAMBSH0", "Wait for it."),
+    ("DDAMBSH1", "Spring the trap."),
+    # -- LLM tactic: focus fire (dir:focus)
+    ("DDFOCUS0", "Finish the wounded one."),
+    ("DDFOCUS1", "Focus your fire."),
+    # -- LLM tactic: fall back (dir:fallback)
+    ("DDFALL0", "Pull them back. Regroup."),
+    ("DDFALL1", "Retreat. For now."),
+    # -- player on a spree (dir:spree)
+    ("DDSPREE0", "Impressive. For a human."),
+    ("DDSPREE1", "Enjoy it while it lasts."),
+    ("DDSPREE2", "Don't get cocky."),
+    # -- player near death / downed (dir:down)
+    ("DDDOWN0", "Pathetic."),
+    ("DDDOWN1", "Was that all?"),
+    ("DDDOWN2", "Get up."),
+    # -- level clear (dir:clear)
+    ("DDCLEAR0", "You survived. For now."),
+    ("DDCLEAR1", "Until next time."),
+    ("DDCLEAR2", "The next floor is worse."),
+    # -- long idle (dir:idle)
+    ("DDIDLE0", "Hiding won't help."),
+    ("DDIDLE1", "I can wait."),
+    ("DDIDLE2", "Tick. Tock."),
+]
+for _n, _p in DIRECTOR:
+    _lump(_n)   # enforce the 8-char Doom lump limit at import time
+_dirnames = [n for n, _ in DIRECTOR]
+assert len(_dirnames) == len(set(_dirnames)), "duplicate lump name in DIRECTOR"
+
+
 # ---------- ElevenLabs API ----------
 
 # Buddy voice id ("Joker-HL").  Stored HERE in tools/ -- it's only needed for the
-# offline bake; the game ships pre-baked OGGs (buddy.wad) and never does live TTS.
+# offline bake; the game ships pre-baked OGGs (aidoom.wad) and never does live TTS.
 DEFAULT_VOICE = "wJmFT75XSkFKaBF1R0rX"
 DEFAULT_MODEL = "eleven_turbo_v2_5"
 # ElevenLabs does NOT support ogg_vorbis (their docs say so; we tried).
@@ -238,7 +323,7 @@ def cfg_value(cfg_path, key):
 
 def load_face_lumps():
     """Buddy HUD mugshots (tools/buddyface/BUF*.lmp -- the source of truth).  ALWAYS
-    packed into buddy.wad so a voice re-bake never drops the BUF* faces the HUD needs
+    packed into aidoom.wad so a voice re-bake never drops the BUF* faces the HUD needs
     (hu_buddy.c); you don't have to run bake_buddy_face.py separately."""
     faces_dir = Path(__file__).resolve().parent / "buddyface"
     lumps = [(f.stem.upper(), f.read_bytes()) for f in sorted(faces_dir.glob("BUF*.lmp"))]
@@ -385,15 +470,18 @@ def write_wad(out_path, lumps):
 # ---------- main ----------
 
 def main():
-    ap = argparse.ArgumentParser(description="Bake aiDoom buddy voice into buddy.wad")
+    ap = argparse.ArgumentParser(description="Bake aiDoom buddy voice into aidoom.wad")
     ap.add_argument("--voice", default=None,
                     help="ElevenLabs voice id override (default: DEFAULT_VOICE in this "
                          "tool -- Joker-HL)")
+    ap.add_argument("--director-voice", default=None,
+                    help="ElevenLabs voice id for the AI Director persona "
+                         "(default: DIRECTOR_VOICE in this tool -- 'UT')")
     ap.add_argument("--model", default=DEFAULT_MODEL)
     ap.add_argument("--key",   default=None)
     ap.add_argument("--cfg",   default="aidoom.cfg")
-    ap.add_argument("--out",   default="run/buddy.wad",
-                    help="output PWAD path (default: run/buddy.wad)")
+    ap.add_argument("--out",   default="run/aidoom.wad",
+                    help="output PWAD path (default: run/aidoom.wad)")
     ap.add_argument("--cache", default=".buddy_voice_cache",
                     help="dir for raw OGGs (skips re-download on rerun)")
     ap.add_argument("--force", action="store_true",
@@ -409,7 +497,7 @@ def main():
     args = ap.parse_args()
 
     # Voice id lives in tools/ (DEFAULT_VOICE below) -- it's only used here, offline,
-    # when baking buddy.wad; the game just plays the pre-baked OGGs, never live TTS.
+    # when baking aidoom.wad; the game just plays the pre-baked OGGs, never live TTS.
     # NOT in aidoom.cfg.  --voice can override for a one-off bake.
     args.voice = args.voice or DEFAULT_VOICE
 
@@ -465,7 +553,7 @@ def main():
                         + "".join(manifest_lines))
         lumps.append(("VOICEMAP", manifest_txt.encode("utf-8")))
         write_wad(out_path, lumps)
-        (out_path.parent / "buddy_voice_manifest.txt").write_text(manifest_txt)
+        (out_path.parent / "aidoom_voice_manifest.txt").write_text(manifest_txt)
         total = sum(len(d) for _n, d in lumps)
         print(f"\nbake_buddy_voice: wrote {out_path}  ({len(lumps)} lumps, {total} bytes)")
         return 0
@@ -495,18 +583,24 @@ def main():
         print("ERROR: ffmpeg not found on PATH (needed for MP3->OGG transcode).",
               file=sys.stderr)
         return 2
-    for i, (name, phrase) in enumerate(PHRASES, 1):
+    # Bake the buddy phrases (args.voice) AND the Director phrases (DIRECTOR_VOICE)
+    # in one pass; each entry carries its own voice id.  The cache key includes the
+    # voice, so the two personas never collide even on an identical phrase.
+    director_voice = args.director_voice or DIRECTOR_VOICE
+    ALL = [(n, p, args.voice) for n, p in PHRASES] \
+        + [(n, p, director_voice) for n, p in DIRECTOR]
+    for i, (name, phrase, voice) in enumerate(ALL, 1):
         # Cache key is content-addressed on phrase+voice+model so different
         # voices land in separate files.
-        h = hashlib.sha1(f"{args.voice}|{args.model}|{phrase}".encode()).hexdigest()[:16]
+        h = hashlib.sha1(f"{voice}|{args.model}|{phrase}".encode()).hexdigest()[:16]
         cached = cache_dir / f"{name}_{h}.ogg"
         if cached.exists() and not args.force:
             data = cached.read_bytes()
             src = "cached"
         else:
-            print(f"  [{i:2d}/{len(PHRASES)}] {name}  '{phrase}' ...", end="", flush=True)
+            print(f"  [{i:2d}/{len(ALL)}] {name}  '{phrase}' ...", end="", flush=True)
             try:
-                data = fetch_ogg(phrase, args.voice, args.model, key, ffmpeg,
+                data = fetch_ogg(phrase, voice, args.model, key, ffmpeg,
                                   trim_silence=not args.no_trim)
             except Exception as e:
                 print(f" FAILED: {e}", file=sys.stderr)
@@ -517,21 +611,26 @@ def main():
             # Be polite to the API
             time.sleep(0.3)
         lumps.append((name, data))
-        manifest_lines.append(f"{name}\t{phrase}\t{src}\t{len(data)}\n")
+        # lump <TAB> persona <TAB> voice-id <TAB> phrase <TAB> src <TAB> bytes
+        persona = "director" if name.startswith("DD") else "buddy"
+        manifest_lines.append(f"{name}\t{persona}\t{voice}\t{phrase}\t{src}\t{len(data)}\n")
 
     lumps += load_face_lumps()		# buddy HUD mugshots -- always included
 
     # Pack the lump<->phrase mapping INTO the WAD as a text lump ("VOICEMAP") so the
     # WAD is self-documenting -- no external file needed to know what each lump says.
-    manifest_txt = (f"voice={args.voice}\nmodel={args.model}\n"
-                    f"generated={time.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+    # Columns: lump  persona  voice-id  phrase  source  bytes.
+    manifest_txt = (f"buddy_voice={args.voice}\ndirector_voice={director_voice}\n"
+                    f"model={args.model}\n"
+                    f"generated={time.strftime('%Y-%m-%d %H:%M:%S')}\n"
+                    f"# columns: lump\\tpersona\\tvoice\\tphrase\\tsource\\tbytes\n\n"
                     + "".join(manifest_lines))
     lumps.append(("VOICEMAP", manifest_txt.encode("utf-8")))
 
     write_wad(out_path, lumps)
 
     # ... and a copy next to the WAD for reproducibility/grep.
-    (out_path.parent / "buddy_voice_manifest.txt").write_text(manifest_txt)
+    (out_path.parent / "aidoom_voice_manifest.txt").write_text(manifest_txt)
 
     total = sum(len(d) for _n, d in lumps)
     print(f"\nbake_buddy_voice: wrote {out_path}  ({len(lumps)} lumps, {total} bytes)")

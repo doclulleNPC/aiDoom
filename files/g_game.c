@@ -70,6 +70,8 @@ rcsid[] = "$Id: g_game.c,v 1.8 1997/02/03 22:45:09 b1 Exp $";
 
 #include "g_game.h"
 #include "p_ai_coop.h"		// P_AICoop_Slot (skip consistency check for the buddy)
+#include "p_ai_llm.h"		// P_AI_NetService (service director socket every gamestate)
+#include "p_ai_director.h"	// P_Director_Say (level-clear voice line)
 
 
 #define SAVEGAMESIZE	0x2c000
@@ -825,9 +827,14 @@ void G_Ticker (void)
 	}
     }
     
+    // Keep the LLM/AI director socket serviced in EVERY gamestate (not just
+    // GS_LEVEL via P_Ticker), so the connection survives the inter-map
+    // intermission/finale instead of timing out and dropping.
+    P_AI_NetService ();
+
     // do main actions
-    switch (gamestate) 
-    { 
+    switch (gamestate)
+    {
       case GS_LEVEL: 
 	P_Ticker (); 
 	ST_Ticker (); 
@@ -1101,11 +1108,12 @@ int cpars[32] =
 boolean		secretexit; 
 extern char*	pagename; 
  
-void G_ExitLevel (void) 
-{ 
-    secretexit = false; 
-    gameaction = ga_completed; 
-} 
+void G_ExitLevel (void)
+{
+    secretexit = false;
+    gameaction = ga_completed;
+    P_Director_Say ("dir:clear", 3, 1);		// "you survived. for now." (Director, if active)
+}
 
 // Here's for the german edition.
 void G_SecretExitLevel (void) 
@@ -1115,10 +1123,11 @@ void G_SecretExitLevel (void)
       && (W_CheckNumForName("map31")<0))
 	secretexit = false;
     else
-	secretexit = true; 
-    gameaction = ga_completed; 
-} 
- 
+	secretexit = true;
+    gameaction = ga_completed;
+    P_Director_Say ("dir:clear", 3, 1);
+}
+
 void G_DoCompleted (void) 
 { 
     int             i; 

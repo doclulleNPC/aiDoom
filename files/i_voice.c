@@ -52,10 +52,10 @@
 #include "doomdef.h"
 
 // W_AddFile lives in w_wad.c but isn't in w_wad.h (it's only called from
-// D_DoomMain at startup).  Forward-declare so we can add buddy.wad.
+// D_DoomMain at startup).  Forward-declare so we can add aidoom.wad.
 extern void   W_AddFile (char *filename);
 // w_wad.c internals: lumpcache is malloc'd ONCE in W_InitMultipleFiles, sized to
-// numlumps at that moment.  Adding buddy.wad later grows numlumps but NOT
+// numlumps at that moment.  Adding aidoom.wad later grows numlumps but NOT
 // lumpcache, so we must grow it ourselves (see I_Voice_Init) -- otherwise
 // W_CacheLumpNum on a buddy lump writes past the array and corrupts the heap.
 extern void** lumpcache;
@@ -92,7 +92,7 @@ static int Buddy_CfgGet (char* key, char* out, int n)
     return found;
 }
 // The buddy speaks by *tag* from the playsim, never by lump name directly.
-// This table maps each tag to the 8-char lump name baked into buddy.wad.
+// This table maps each tag to the 8-char lump name baked into aidoom.wad.
 // Adding a new spoken phrase means (1) add an entry to bake_buddy_voice.py's
 // PHRASES list, (2) add a row here.  Keep them in sync.
 
@@ -191,11 +191,32 @@ static const voicemap_t VOICE_MAP[] =
     { "help:0","DSHELP01" },{ "help:1","DSHELP02" },{ "help:2","DSHELP03" },
     { "help:3","DSHELP04" },{ "help:4","DSHELP05" },
     { "revived:0","DSREV01" },{ "revived:1","DSREV02" },{ "revived:2","DSREV03" },
+
+    // ---- AI Director persona (DD* lumps, separate voice; see bake_buddy_voice.py
+    //      DIRECTOR + p_ai_director.c).  Played on the director stream, not the buddy's.
+    { "dir:start:0","DDSTART0" },{ "dir:start:1","DDSTART1" },{ "dir:start:2","DDSTART2" },
+    { "dir:build:0","DDBUILD0" },{ "dir:build:1","DDBUILD1" },{ "dir:build:2","DDBUILD2" },
+    { "dir:spawn:0","DDSPAWN0" },{ "dir:spawn:1","DDSPAWN1" },
+    { "dir:horde:0","DDHORDE0" },{ "dir:horde:1","DDHORDE1" },{ "dir:horde:2","DDHORDE2" },
+    { "dir:peak:0","DDPEAK0" },{ "dir:peak:1","DDPEAK1" },{ "dir:peak:2","DDPEAK2" },
+    { "dir:big:0","DDBIG0" },{ "dir:big:1","DDBIG1" },{ "dir:big:2","DDBIG2" },
+    { "dir:relax:0","DDRELAX0" },{ "dir:relax:1","DDRELAX1" },{ "dir:relax:2","DDRELAX2" },
+    { "dir:gift:0","DDGIFT0" },{ "dir:gift:1","DDGIFT1" },{ "dir:gift:2","DDGIFT2" },
+    { "dir:heal:0","DDHEAL0" },{ "dir:heal:1","DDHEAL1" },{ "dir:heal:2","DDHEAL2" },
+    { "dir:ammo:0","DDAMMO0" },{ "dir:ammo:1","DDAMMO1" },{ "dir:ammo:2","DDAMMO2" },
+    { "dir:flank:0","DDFLANK0" },{ "dir:flank:1","DDFLANK1" },
+    { "dir:ambush:0","DDAMBSH0" },{ "dir:ambush:1","DDAMBSH1" },
+    { "dir:focus:0","DDFOCUS0" },{ "dir:focus:1","DDFOCUS1" },
+    { "dir:fallback:0","DDFALL0" },{ "dir:fallback:1","DDFALL1" },
+    { "dir:spree:0","DDSPREE0" },{ "dir:spree:1","DDSPREE1" },{ "dir:spree:2","DDSPREE2" },
+    { "dir:down:0","DDDOWN0" },{ "dir:down:1","DDDOWN1" },{ "dir:down:2","DDDOWN2" },
+    { "dir:clear:0","DDCLEAR0" },{ "dir:clear:1","DDCLEAR1" },{ "dir:clear:2","DDCLEAR2" },
+    { "dir:idle:0","DDIDLE0" },{ "dir:idle:1","DDIDLE1" },{ "dir:idle:2","DDIDLE2" },
 };
 #define NUM_VOICE_MAP ((int)(sizeof(VOICE_MAP)/sizeof(VOICE_MAP[0])))
 
 
-// ----- lump cache (all ds* lumps from buddy.wad, decoded once on demand) --
+// ----- lump cache (all ds* lumps from aidoom.wad, decoded once on demand) --
 
 typedef struct voicecache_s
 {
@@ -215,6 +236,9 @@ static voicecache_t* cache_head = NULL;
 // ----- the dedicated audio stream ------------------------------------------
 
 static SDL_AudioStream* voice_stream = NULL;
+// Separate stream for the AI Director persona, so the Director (voice-of-god) and
+// the buddy can talk at the same time without clearing each other's queue.
+static SDL_AudioStream* director_stream = NULL;
 
 static void SDLCALL I_VoiceAudioCallback (void* userdata, SDL_AudioStream* stream,
                                           int additional_amount, int total_amount)
@@ -237,7 +261,7 @@ static voicecache_t* find_cache (const char* lumpname)
 
 static voicecache_t* load_lump (const char* lumpname)
 {
-    // Try the WAD first (buddy.wad as added by D_DoomMain).
+    // Try the WAD first (aidoom.wad as added by D_DoomMain).
     // W_CheckNumForName takes char* (legacy API), so copy the const name.
     char namebuf[9];
     strncpy (namebuf, lumpname, 8); namebuf[8] = '\0';
@@ -307,26 +331,29 @@ static short clamp16 (int v)
 // lvol/rvol are 0..127 per-channel gains (Doom's positional volume) so the
 // buddy's voice comes from *its* spot in the world -- distance attenuation +
 // stereo pan computed by the caller (p_ai_coop) relative to the listener.
-void I_Voice_SayByName (const char* lumpname, int lvol, int rvol)
+// Decode `lumpname` and queue it (panned by lvol/rvol, 0..127) on `stream`.
+// `bound` tracks whether this stream's format has been bound yet (each stream
+// binds once on its first line).  Shared by the buddy and Director paths.
+static void play_on_stream (SDL_AudioStream* stream, int* bound,
+                            const char* lumpname, int lvol, int rvol)
 {
-    if (!voice_stream || !lumpname) return; // init failed/skipped or no name
-    if (lvol <= 0 && rvol <= 0)    return;  // inaudible (buddy too far) -> skip
+    if (!stream || !lumpname) return;       // init failed/skipped or no name
+    if (lvol <= 0 && rvol <= 0)    return;  // inaudible (too far) -> skip
 
     voicecache_t* v = find_cache (lumpname);
     if (!v) v = load_lump (lumpname);
     if (!v || !v->pcm) return;              // lump missing or decode failed
 
     // Bind the stream as STEREO once (so we can pan); SDL resamples to the device.
-    static int bound = 0;
-    if (!bound)
+    if (!*bound)
     {
         SDL_AudioSpec spec = make_spec (v->samplerate, 2);
-        if (!SDL_SetAudioStreamFormat (voice_stream, &spec, NULL))
+        if (!SDL_SetAudioStreamFormat (stream, &spec, NULL))
         {
             fprintf (stderr, "I_Voice: SDL_SetAudioStreamFormat: %s\n", SDL_GetError());
             return;
         }
-        bound = 1;
+        *bound = 1;
     }
 
     // Render to a temporary interleaved-stereo buffer with the per-channel gains
@@ -341,8 +368,35 @@ void I_Voice_SayByName (const char* lumpname, int lvol, int rvol)
         out[2*i]   = clamp16 (sl * lvol / 127);
         out[2*i+1] = clamp16 (sr * rvol / 127);
     }
-    SDL_PutAudioStreamData (voice_stream, out, frames * 2 * (int)sizeof(short));
+    SDL_PutAudioStreamData (stream, out, frames * 2 * (int)sizeof(short));
     free (out);
+}
+
+void I_Voice_SayByName (const char* lumpname, int lvol, int rvol)
+{
+    static int bound = 0;
+    play_on_stream (voice_stream, &bound, lumpname, lvol, rvol);
+}
+
+// ----- AI Director persona (own stream, own voice) --------------------------
+
+void I_Director_Say (const char* tag, int lvol, int rvol)
+{
+    static int bound = 0;
+    const char* lumpname = tag_to_lumpname (tag);
+    if (!lumpname) return;                  // unknown tag -> silent
+    play_on_stream (director_stream, &bound, lumpname, lvol, rvol);
+}
+
+int I_Director_Busy (void)
+{
+    if (!director_stream) return 0;
+    return SDL_GetAudioStreamQueued (director_stream) > 0;
+}
+
+void I_Director_Stop (void)
+{
+    if (director_stream) SDL_ClearAudioStream (director_stream);
 }
 
 void I_Voice_Say (const char* tag, int lvol, int rvol)
@@ -367,17 +421,18 @@ void I_Voice_Stop (void)
 
 void I_Voice_Init (void)
 {
-    // Resolve the buddy WAD path: command-line -file takes precedence (via the
-    // existing W_AddFile mechanism in D_DoomMain), else aidoom.cfg `buddy_wad`
-    // entry, else "buddy.wad" in CWD.
+    // Resolve the voice WAD path: command-line -file takes precedence (via the
+    // existing W_AddFile mechanism in D_DoomMain), else aidoom.cfg `aidoom_wad`
+    // (legacy `buddy_wad` still honoured), else "aidoom.wad" in CWD.
     char wadpath[256];
-    if (!Buddy_CfgGet ("buddy_wad", wadpath, sizeof(wadpath)) || !*wadpath)
-        strncpy (wadpath, "buddy.wad", sizeof(wadpath));
+    if ((!Buddy_CfgGet ("aidoom_wad", wadpath, sizeof(wadpath)) || !*wadpath) &&
+        (!Buddy_CfgGet ("buddy_wad",  wadpath, sizeof(wadpath)) || !*wadpath))
+        strncpy (wadpath, "aidoom.wad", sizeof(wadpath));
 
     // Try to add it; detect success via "is any DS* lump now known?".
     int oldnumlumps = numlumps;
     W_AddFile (wadpath);
-    // Grow lumpcache to cover the lumps buddy.wad just added (W_AddFile doesn't),
+    // Grow lumpcache to cover the lumps aidoom.wad just added (W_AddFile doesn't),
     // and zero the new slots so W_CacheLumpNum sees them as not-yet-cached.
     if (numlumps > oldnumlumps && lumpcache)
     {
@@ -421,12 +476,24 @@ void I_Voice_Init (void)
         return;
     }
     SDL_ResumeAudioStreamDevice (voice_stream);
+
+    // Second stream for the AI Director persona (DD* lumps).  Best-effort: if it
+    // fails, only the Director goes silent; the buddy is unaffected.
+    director_stream = SDL_OpenAudioDeviceStream (
+        SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, NULL,
+        I_VoiceAudioCallback, NULL);
+    if (director_stream)
+        SDL_ResumeAudioStreamDevice (director_stream);
+    else
+        fprintf (stderr, "I_Voice: director stream open failed: %s -- director silent\n",
+                 SDL_GetError());
 }
 
 
 void I_Voice_Shutdown (void)
 {
     if (voice_stream) { SDL_DestroyAudioStream (voice_stream); voice_stream = NULL; }
+    if (director_stream) { SDL_DestroyAudioStream (director_stream); director_stream = NULL; }
     while (cache_head)
     {
         voicecache_t* v = cache_head;

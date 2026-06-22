@@ -44,6 +44,7 @@
 #include <fcntl.h>
 #endif
 #include <errno.h>
+#include <signal.h>
 
 #include "doomdef.h"
 #include "doomstat.h"
@@ -695,7 +696,15 @@ static void AI_HandleLine (char* line, int client)
 	    else if (!strcmp(kv,"for")) fortics = atoi(eq);
 	    else if (!strcmp(kv,"after")) after = atoi(eq);
 	}
-	AI_Apply (AI_OrderByName(order_s), ids, tx, ty, focus, fortics, after);
+	{
+	    int ord = AI_OrderByName(order_s);
+	    AI_Apply (ord, ids, tx, ty, focus, fortics, after);
+	    // The Director narrates the tactic it just ordered (ambient, rate-limited).
+	    if      (ord == AIO_FLANK_L || ord == AIO_FLANK_R) P_Director_Say ("dir:flank", 2, 0);
+	    else if (ord == AIO_AMBUSH)                        P_Director_Say ("dir:ambush", 2, 0);
+	    else if (ord == AIO_FOCUS)                         P_Director_Say ("dir:focus", 2, 0);
+	    else if (ord == AIO_FALLBACK)                      P_Director_Say ("dir:fallback", 2, 0);
+	}
 	if (client >= 0) (void)!write (client, "ok\n", 3);
 	return;
     }
@@ -869,6 +878,12 @@ void P_AI_Init (void)
 	return;
     ai_inited = 1;
 
+#ifndef _WIN32
+    // A director that drops mid-write must not kill us with SIGPIPE (exit 141);
+    // the write() to the dead socket should fail with EPIPE instead.
+    signal (SIGPIPE, SIG_IGN);
+#endif
+
     p = M_CheckParm ("-aidirector");
     if (p)
     {
@@ -898,6 +913,21 @@ void P_AI_Reset (void)
     aient_count = 0;
 }
 
+// Service the director TCP socket regardless of gamestate.  Called every
+// G_Ticker so the link survives the inter-map intermission/finale, when
+// P_Ticker -- and thus P_AI_Ticker -- doesn't run.  Without this, `observe`
+// goes unanswered during the tally screen, the external director times out
+// (~5s) and drops the connection, with nothing left for it to reconnect to.
+void P_AI_NetService (void)
+{
+    if (!ai_inited)
+	P_AI_Init ();
+    if (!ai_on || !ai_enabled)
+	return;
+
+    AI_PollSocket ();
+}
+
 void P_AI_Ticker (void)
 {
     int i;
@@ -907,7 +937,8 @@ void P_AI_Ticker (void)
     if (!ai_on || !ai_enabled)
 	return;
 
-    AI_PollSocket ();
+    // Socket is serviced by P_AI_NetService (every G_Ticker, all gamestates);
+    // here we only run the playsim-tied parts (demo planner + directive timers).
     if (ai_demo)
 	AI_DemoDirector ();
 

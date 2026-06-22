@@ -13,7 +13,7 @@ Session.
 - `files/p_ai_coop.c`/`.h` (~1148 Zeilen): Regelbasierter Co-op-Buddy
   (`-aicoop`), deterministisch, BSP-Dijkstra-Pathfinding. Konsolen-Cmds
   `where`/`come`/`wait`/`attack`/`report`.
-- `files/i_voice.c`: Offline-OGG-Sprachausgabe für den Buddy via `buddy.wad`.
+- `files/i_voice.c`: Offline-OGG-Sprachausgabe für den Buddy via `aidoom.wad`.
 - `AGENT_CONTROL.md` §1-13: Director-Protokoll-Spec (Player §1-11, Monster
   §12-13). `MONSTER_AGENT_GUIDE.md`, `doom_agent_api_architecture.md`,
   `doom_agent_api_vizdoom.md`: weitere Director-Doku.
@@ -88,7 +88,7 @@ ist strategisch und kann Latency haben ohne dass die Playsim blockiert
 
 ## 5. Buddy-Mikrofon/Sprach-Coordination
 
-`i_voice.c` existiert schon (offline OGG via `buddy.wad`). Erweiterung:
+`i_voice.c` existiert schon (offline OGG via `aidoom.wad`). Erweiterung:
 
 - **Echtzeit-Sprach-Coordination**: Buddy sagt "flanking left", Player
   versteht (über Hotkey oder Text-Overlay)

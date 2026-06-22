@@ -20,9 +20,14 @@ void	P_AI_Init (void);
 // Clear all directives + the monster id registry (call on level setup).
 void	P_AI_Reset (void);
 
-// Per-gameplay-tic: poll the director socket, age directive timers, run the
-// optional built-in demo director.
+// Per-gameplay-tic (GS_LEVEL only): age directive timers, run the optional
+// built-in demo director.
 void	P_AI_Ticker (void);
+
+// Service the director TCP socket independently of gamestate.  Call once per
+// G_Ticker (every gamestate) so the connection survives the inter-map
+// intermission/finale and `observe` keeps getting answered.
+void	P_AI_NetService (void);
 
 // True if `actor` currently has an active, non-default directive -> A_Chase
 // should defer to A_LLMChase instead of the vanilla logic.

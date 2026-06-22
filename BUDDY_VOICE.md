@@ -3,26 +3,45 @@
 Canonical reference for the AI co-op buddy's spoken voice lines: what the buddy
 can say, when, and **which line wins when several want to play at once**.
 
-The audio is pre-baked (ElevenLabs, Joker-HL voice) into `run/buddy.wad` and
+The audio is pre-baked (ElevenLabs, Joker-HL voice) into `run/aidoom.wad` and
 played offline through a dedicated SDL3 audio stream — see
 `tools/bake_buddy_voice.py` (bake), `files/i_voice.c` (playback + tag→lump map),
 `files/p_ai_coop.c` (when each line fires). Keep this doc in sync when lines or
 the priority tiers change.
 
-## What's in `buddy.wad`
+## What's in `aidoom.wad`
 
-`run/buddy.wad` is a PWAD with **199 lumps**:
+`run/aidoom.wad` is a PWAD with **248 lumps**:
 
 | Kind | Count | Notes |
 |------|------:|-------|
-| `DS*` voice clips (OGG/Vorbis) | 156 | the spoken lines below |
+| `DS*` buddy voice clips (OGG/Vorbis) | 156 | the spoken lines below — ElevenLabs **Joker-HL** |
+| `DD*` AI-Director voice clips (OGG/Vorbis) | 49 | the game-master persona — ElevenLabs **UT** (see below) |
 | `BUF*` HUD face graphics | 42 | the buddy's status-bar face (see `BUDDY_HUD.md`) |
-| `VOICEMAP` | 1 | text lump carrying the lump↔phrase mapping (also dumped to `run/buddy_voice_manifest.txt`) |
+| `VOICEMAP` | 1 | text lump: lump↔phrase map (also `run/aidoom_voice_manifest.txt`; columns lump·persona·voice·phrase·src·bytes) |
 
-All **156 voice clips are wired** — every `DS*` lump has a tag entry in
+All voice clips are **wired** — every `DS*`/`DD*` lump has a tag entry in
 `i_voice.c`'s `VOICE_MAP`, and every map tag resolves to a real lump (verified by
 joining the map against the WAD directory). So there is no dead audio and no
 silent tag.
+
+### Two personas, two streams
+
+`bake_buddy_voice.py` bakes **both** voices in one pass (`PHRASES` = buddy/Joker via
+`DEFAULT_VOICE`, `DIRECTOR` = UT via `DIRECTOR_VOICE`/`--director-voice`). At runtime
+`i_voice.c` opens **two independent SDL streams** so the buddy and the Director can
+speak at the same time without cutting each other off:
+
+- **Buddy** — `DS*` lumps, `I_Voice_Say(tag)`, positional (panned from the buddy's
+  spot in the world), gated by the four-tier priority system below (`p_ai_coop.c`).
+- **AI Director** — `DD*` lumps, `I_Director_Say(tag)` / tags `dir:*`, non-positional
+  "voice of god", driven by `p_ai_director.c::P_Director_Voice` (6 s ambient cooldown;
+  `force=1` for phase changes barges in). Events: level **start**, **build**-up,
+  single **spawn**, **horde**, **peak**, **big**-monster lean-in, **relax**, item
+  **gift**, emergency **heal**/**ammo**, LLM tactics (**flank/ambush/focus/fallback**,
+  via `P_Director_Say` from `p_ai_llm.c`), player **spree**/**down**, level **clear**
+  (`G_ExitLevel`), and **idle** banter. Pressure-aware: no specials/hordes are
+  announced/spawned when the player is critically low on HP/ammo.
 
 > **Lump-name gotcha (CLAUDE.md):** WAD lump names are max 8 bytes. `summon_ok`
 > and `state:following` historically used 9-char literals (`DSSUMONOK` /
@@ -158,7 +177,7 @@ is `MF_COUNTKILL`; overkill → `gib:` (~96/256), else a per-type quip (~64/256)
 ## Adding a new line
 
 1. Add the phrase to `tools/bake_buddy_voice.py` (`PHRASES`/`EVENTS`), lump name
-   ≤ 8 chars, and re-bake `run/buddy.wad`.
+   ≤ 8 chars, and re-bake `run/aidoom.wad`.
 2. Add the `{ "tag", "LUMP" }` row to `VOICE_MAP` in `files/i_voice.c`.
 3. Call it from `files/p_ai_coop.c` at the right tier:
    `AICoop_CalloutP("mytag:", n, VP_…)` (rotated) or `AICoop_SayTagP("mytag", VP_…)`.

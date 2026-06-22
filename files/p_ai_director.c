@@ -29,6 +29,7 @@
 #include "r_state.h"
 #include "info.h"
 #include "p_ai_director.h"
+#include "i_voice.h"			// I_Director_Say -- the spoken game-master persona
 
 // ---- tunables --------------------------------------------------------------
 #define DIR_MAX			10000	// intensity*100 ceiling (= 100.00)
@@ -62,6 +63,15 @@ static int	dir_relaxstart;		// gametic FADE began
 static int	dir_emergtic;		// gametic of the last emergency medkit
 static int	dir_emergammotic;	// gametic of the last emergency ammo drop
 static int	dir_llmlast;		// gametic of the last LLM spawn/relax command
+static int	dir_voicelast;		// gametic of the last spoken director line
+static int	dir_vidx;		// rotates spoken-line variants
+static int	dir_intro;		// 1 = speak the level-start line on the next tic
+static fixed_t	dir_exit_x, dir_exit_y;	// level exit location (for exit-proximity pressure)
+static boolean	dir_exit_set;		// found an exit linedef on this map?
+static int	dir_exit_found;		// 0 until P_Director_FindExit has run this level
+
+static int     P_Director_ExitProximity (void);	// 0..100, nearer exit = more
+static boolean P_Director_Stressed (void);	// player critically low hp/ammo?
 
 // "common" + "special" monster pools (specials lean in at the peak).  DOOM2-only
 // monsters (revenant/mancubus/hell knight/chaingunner/...) have NO sprites in a
@@ -72,6 +82,34 @@ static const mobjtype_t dir_special1[] = { MT_HEAD, MT_BRUISER, MT_SHADOWS, MT_S
 static const mobjtype_t dir_special2[] = { MT_UNDEAD, MT_FATSO, MT_KNIGHT, MT_BABY, MT_CHAINGUY, MT_HEAD }; // DOOM2: revenant, mancubus, hell knight, arachnotron, chaingunner, caco
 
 #define DIR_TRACK	(dir_on || dir_llm)	// intensity is tracked in either mode
+
+// ---- spoken "game-master" lines (DD* lumps via the dir:* tags / I_Director_Say) ---
+// Rate-limited so the announcer stays a voice-of-god, not a chatterbox.  prefix is
+// e.g. "dir:horde"; one of n variants is appended ("dir:horde:2").
+//   force=1: an important event (phase change / item drop) -- barge in over any
+//            line in progress and ignore the cooldown.
+//   force=0: ambient flavour -- only when the director is idle and the gap elapsed.
+#define DIR_VOICE_GAP	(6*TICRATE)	// min gap between ambient lines
+static void P_Director_Voice (const char* prefix, int n, int force)
+{
+    char tag[40];
+    if (!DIR_TRACK) return;			// director not running -> silent
+    if (force)
+	I_Director_Stop ();			// important line preempts whatever's playing
+    else if (I_Director_Busy () || gametic - dir_voicelast < DIR_VOICE_GAP)
+	return;
+    dir_voicelast = gametic;
+    snprintf (tag, sizeof tag, "%s:%d", prefix, (dir_vidx++) % n);
+    I_Director_Say (tag, 127, 127);
+}
+
+// Public entry so other modules can make the Director speak a line: the LLM order
+// handler (tactics) and G_ExitLevel (level clear).  Thin wrapper over the
+// rate-limited internal P_Director_Voice.
+void P_Director_Say (const char* prefix, int n, int force)
+{
+    P_Director_Voice (prefix, n, force);
+}
 
 int  P_Director_Active    (void) { return dir_on; }
 int  P_Director_Intensity (void) { return DIR_TRACK ? dir_acc / 100 : 0; }
@@ -95,6 +133,9 @@ void P_Director_Reset (void)
     dir_emergtic = gametic - DIR_EMERG_COOLDOWN;	// allow an emergency medkit immediately
     dir_emergammotic = gametic - DIR_EMERG_AMMO_COOLDOWN;	// ...and emergency ammo
     dir_llmlast = 0;
+    dir_voicelast = gametic - DIR_VOICE_GAP;	// allow a line immediately
+    dir_intro = 1;				// the Director greets you on the first tic
+    dir_exit_found = 0; dir_exit_set = false;	// re-locate the exit on the new map
 }
 
 // ---- stress feeds ----------------------------------------------------------
@@ -108,6 +149,14 @@ void P_Director_NoteDamage (mobj_t* victim, int damage)
     if (burst > 300) burst = 300;
     dir_acc += damage * (100 + burst);		// 10 HP alone ~ +10.0; in a burst ~ +40.0
     if (dir_acc > DIR_MAX) dir_acc = DIR_MAX;
+
+    // The Director gloats when the human is freshly driven to critical health.
+    if (victim->player == &players[0] && victim->player->health > 0
+	&& victim->player->health < 20)
+    {
+	static int downtic;
+	if (gametic - downtic > 8*TICRATE) { P_Director_Voice ("dir:down", 3, 0); downtic = gametic; }
+    }
 }
 
 void P_Director_NoteKill (mobj_t* victim, mobj_t* killer)
@@ -115,6 +164,14 @@ void P_Director_NoteKill (mobj_t* victim, mobj_t* killer)
     int	r, cq, w, wp;
     if (!DIR_TRACK || !victim || !killer || !killer->player) return;
     if (!(victim->flags & MF_COUNTKILL)) return;
+    // The human (not the buddy) on a kill-streak -> the Director acknowledges it.
+    if (killer->player == &players[0])
+    {
+	static int streak, streaktic;
+	if (gametic - streaktic < 3*TICRATE) streak++; else streak = 1;
+	streaktic = gametic;
+	if (streak >= 6) { P_Director_Voice ("dir:spree", 3, 0); streak = 0; }
+    }
     r  = (int)(P_AproxDistance (victim->x - killer->x, victim->y - killer->y) >> FRACBITS);
     cq = (r < 200) ? 100 : (r < 450) ? 40 : 0;	// close-quarters factor (sniping ~ 0)
     if (!cq) return;
@@ -170,8 +227,14 @@ static mobjtype_t P_Director_PickType (void)
 	      : (int)(sizeof(dir_special1)/sizeof(dir_special1[0]));
     // More high-tier pressure: specials lean in from mid-intensity (was 3/4 peak)
     // and more often (was ~43%).
-    if ((dir_state == DIR_SUSTAIN || dir_acc > DIR_PEAK/2) && P_Random () < 150)
+    // Specials/bosses lean in at high intensity -- but NOT when the player is
+    // critically low on health or ammo (don't drop a Cyberdemon on a dying player).
+    if ((dir_state == DIR_SUSTAIN || dir_acc > DIR_PEAK/2) && P_Random () < 150
+	&& !P_Director_Stressed ())
+    {
+	P_Director_Voice ("dir:big", 3, 0);	// a special leans in (ambient, rate-limited)
 	return spec[P_Random () % nspec];
+    }
     return dir_common[P_Random () % (int)(sizeof(dir_common)/sizeof(dir_common[0]))];
 }
 
@@ -219,9 +282,11 @@ static void P_Director_Announce (const char* msg)
     players[consoleplayer].message = buf;
 }
 
-// Spawn one monster of type `mt` out of sight, in the distance band behind a survivor,
-// and set it charging.  Bails quietly if no valid hidden spot is found.
-static void P_Director_SpawnMonsterOf (mobjtype_t mt)
+// Spawn one monster of type `mt` out of sight, in the distance band around (cx,cy),
+// and set it charging the nearest survivor.  cx==cy==0 -> centre on that survivor
+// (the default "in the dark behind you").  Pass the exit point to populate the room
+// the player is heading for.  Bails quietly if no valid hidden spot is found.
+static void P_Director_SpawnMonsterNear (mobjtype_t mt, fixed_t cx, fixed_t cy)
 {
     mobj_t*	sv;
     int		t;
@@ -231,14 +296,15 @@ static void P_Director_SpawnMonsterOf (mobjtype_t mt)
     if (P_Director_LiveMonsters () >= DIR_MAXMON) return;
     sv = P_Director_RandomSurvivor ();
     if (!sv) return;
+    if (!cx && !cy) { cx = sv->x; cy = sv->y; }		// default: around the survivor
 
     for (t = 0; t < DIR_SPAWN_TRIES; t++)
     {
 	angle_t		ang = (angle_t)(P_Random () << 24);
 	int		fa  = ang >> ANGLETOFINESHIFT;
 	fixed_t		dist = DIR_NEAR + (P_Random () * ((DIR_FAR - DIR_NEAR) >> 8));
-	fixed_t		x = sv->x + FixedMul (dist, finecosine[fa]);
-	fixed_t		y = sv->y + FixedMul (dist, finesine[fa]);
+	fixed_t		x = cx + FixedMul (dist, finecosine[fa]);
+	fixed_t		y = cy + FixedMul (dist, finesine[fa]);
 	mobj_t*		mo;
 	int		i, seen = 0;
 
@@ -269,7 +335,79 @@ static void P_Director_SpawnMonsterOf (mobjtype_t mt)
     }
 }
 
-static void P_Director_SpawnMonster (void) { P_Director_SpawnMonsterOf (P_Director_PickType ()); }
+// Default placement: in the dark behind a survivor (the original behaviour).
+static void P_Director_SpawnMonsterOf (mobjtype_t mt) { P_Director_SpawnMonsterNear (mt, 0, 0); }
+
+// ---- exit-aware pressure ---------------------------------------------------
+// More heat the closer the player gets to the level exit, and the exit room is
+// pre-populated so it's a defended objective rather than a free walk-out.
+
+// Locate the level's exit and remember where it is (midpoint of the first exit
+// linedef).  Specials: 11 S1-Exit, 51 S1-Secret, 52 W1-Exit, 124 W1-Secret.
+static void P_Director_FindExit (void)
+{
+    int i;
+    dir_exit_set = false;
+    for (i = 0; i < numlines; i++)
+    {
+	int sp = lines[i].special;
+	if (sp == 11 || sp == 51 || sp == 52 || sp == 124)
+	{
+	    dir_exit_x = (lines[i].v1->x + lines[i].v2->x) / 2;
+	    dir_exit_y = (lines[i].v1->y + lines[i].v2->y) / 2;
+	    dir_exit_set = true;
+	    return;
+	}
+    }
+}
+
+// 0..100: how close the nearest survivor is to the exit (100 = on top of it).
+// 0 if there's no exit on this map.  Ramps over DIR_EXIT_FAR..DIR_EXIT_NEAR.
+#define DIR_EXIT_NEAR	(384*FRACUNIT)
+#define DIR_EXIT_FAR	(2048*FRACUNIT)
+static int P_Director_ExitProximity (void)
+{
+    int		i;
+    fixed_t	best = 0x7fffffff;
+    if (!dir_exit_set) return 0;
+    for (i = 0; i < MAXPLAYERS; i++)
+    {
+	if (!playeringame[i] || !players[i].mo || players[i].health <= 0) continue;
+	fixed_t d = P_AproxDistance (players[i].mo->x - dir_exit_x,
+				     players[i].mo->y - dir_exit_y);
+	if (d < best) best = d;
+    }
+    if (best >= DIR_EXIT_FAR)  return 0;
+    if (best <= DIR_EXIT_NEAR) return 100;
+    return (int)(100 * (DIR_EXIT_FAR - best) / (DIR_EXIT_FAR - DIR_EXIT_NEAR));
+}
+
+// "Don't kick a player who's down": true when a survivor is critically low on
+// health OR the squad's ammo is nearly out.  Used to suppress hordes and
+// special/boss spawns so the pressure eases instead of becoming a death spiral.
+static boolean P_Director_Stressed (void)
+{
+    int i;
+    if (P_Director_AmmoPct () < DIR_EMERG_AMMO) return true;
+    for (i = 0; i < MAXPLAYERS; i++)
+	if (playeringame[i] && players[i].mo && players[i].health > 0
+	    && players[i].health < DIR_EMERG_HP)
+	    return true;
+    return false;
+}
+
+static void P_Director_SpawnMonster (void)
+{
+    mobjtype_t	mt  = P_Director_PickType ();
+    int		exf = P_Director_ExitProximity ();
+    // As the player nears the exit, route more spawns INTO the exit room ahead of
+    // them; otherwise spawn in the dark behind them as usual.
+    if (dir_exit_set && (P_Random () % 100) < exf)
+	P_Director_SpawnMonsterNear (mt, dir_exit_x, dir_exit_y);
+    else
+	P_Director_SpawnMonsterOf (mt);
+    P_Director_Voice ("dir:spawn", 2, 0);	// occasional "reinforcements" (rate-limited)
+}
 
 // (E) Spawn a horde -- a burst of `count` monsters of one type at once -- and (F)
 // announce it.  Used occasionally during build-up/peak for real pressure.
@@ -279,6 +417,7 @@ static void P_Director_SpawnWave (int count)
     int		i;
     for (i = 0; i < count; i++) P_Director_SpawnMonsterOf (mt);
     P_Director_Announce ("A horde is closing in!");	// after, so it wins the HUD line
+    P_Director_Voice ("dir:horde", 3, 1);		// the Director relishes it
 }
 
 // Is a medkit/stimpack already lying within `range` of (x,y)?  (emergency-medkit guard)
@@ -322,6 +461,9 @@ static void P_Director_SpawnItems (void)
     P_Director_DropNear (sv, MT_MISC17);	// box of bullets
     P_Director_DropNear (sv, MT_MISC23);	// box of shells
     P_Director_DropNear (sv, MT_MISC19);	// box of rockets
+    // Ambient (force=0): at the normal FADE transition the "relax" line is spoken
+    // just before this, so leave it playing; "gift" only speaks on other drop paths.
+    P_Director_Voice ("dir:gift", 3, 0);
 }
 
 // ---- per-tic FSM -----------------------------------------------------------
@@ -331,6 +473,16 @@ void P_Director_Ticker (void)
     int	floor, i, runfsm;
 
     if (!DIR_TRACK || gamestate != GS_LEVEL || paused) return;
+
+    // Locate the level exit once (lines[] is loaded by now) for exit-proximity pressure.
+    if (!dir_exit_found) { dir_exit_found = 1; P_Director_FindExit (); }
+
+    // Director voice: greet the player once on the first in-level tic, then drop
+    // occasional menace during long lulls (low intensity, nothing else spoken).
+    if (dir_intro)
+	{ dir_intro = 0; P_Director_Voice ("dir:start", 3, 1); }
+    else if (dir_acc < DIR_RELAX && gametic - dir_voicelast > 25*TICRATE)
+	P_Director_Voice ("dir:idle", 3, 0);
 
     // burst window + intensity decay
     if (dir_recentdmg > 0) dir_recentdmg -= (dir_recentdmg >> 4) + 1;	// fades over ~1-2 s
@@ -354,6 +506,7 @@ void P_Director_Ticker (void)
 	    if (P_Director_MedkitNear (p->mo->x, p->mo->y, DIR_EMERG_NEAR)) continue;
 	    P_Director_DropNear (p->mo, MT_MISC11);	// medikit within reach
 	    dir_emergtic = gametic;
+	    P_Director_Voice ("dir:heal", 3, 1);	// "you're dying. how dull."
 	    break;
 	}
 
@@ -369,6 +522,7 @@ void P_Director_Ticker (void)
 	    P_Director_DropNear (sv, MT_MISC23);	// box of shells
 	    dir_emergammotic = gametic;
 	    P_Director_Announce ("Ammo resupply dropped nearby.");
+	    P_Director_Voice ("dir:ammo", 3, 1);	// "reload. I insist."
 	}
     }
 
@@ -377,37 +531,52 @@ void P_Director_Ticker (void)
     runfsm = !dir_llm || (gametic - dir_llmlast > DIR_LLM_FALLBACK);
     if (!runfsm) return;
 
+    int exf      = P_Director_ExitProximity ();	// 0..100, ramps up near the exit
+    int stressed = P_Director_Stressed ();	// player almost dead / out of ammo
+
     switch (dir_state)
     {
       case DIR_BUILDUP:
 	if (dir_acc >= DIR_PEAK)
-	    { dir_state = DIR_SUSTAIN; dir_timer = DIR_SUSTAIN_TICS; }
+	    { dir_state = DIR_SUSTAIN; dir_timer = DIR_SUSTAIN_TICS;
+	      P_Director_Voice ("dir:peak", 3, 1); }		// "now it gets interesting"
 	else if (--dir_spawntic <= 0)
 	{
-	    // ~1-in-4 spawns is a horde (4-6 at once) instead of a single trickle.
-	    if (P_Random () < 64) P_Director_SpawnWave (4 + (P_Random () % 3));
-	    else                  P_Director_SpawnMonster ();
-	    // Faster trickle when calm (build tension), slower as intensity climbs.
+	    // ~1-in-4 spawns is a horde (4-6) -- but never a horde on a stressed player.
+	    if (P_Random () < 64 && !stressed) P_Director_SpawnWave (4 + (P_Random () % 3));
+	    else                               P_Director_SpawnMonster ();
+	    // Faster trickle when calm (build tension), slower as intensity climbs...
 	    dir_spawntic = 35 + (dir_acc / 100) * 2;	// ~1 s (calm) .. ~3 s (near peak)
+	    // ...but ramp the pressure up hard the closer the player is to the exit.
+	    dir_spawntic = dir_spawntic * (100 - exf*3/4) / 100;	// up to ~75% faster at the exit
+	    if (dir_spawntic < 8) dir_spawntic = 8;
 	}
 	break;
 
       case DIR_SUSTAIN:
 	if (--dir_timer <= 0)
-	    { dir_state = DIR_FADE; dir_relaxstart = gametic; P_Director_SpawnItems (); }
+	    { dir_state = DIR_FADE; dir_relaxstart = gametic;
+	      P_Director_Voice ("dir:relax", 3, 1);		// "catch your breath..." (before the gift line)
+	      P_Director_SpawnItems (); }
 	else if (--dir_spawntic <= 0)
 	{
-	    // At the peak, hordes are the norm (bigger, 5-7).
-	    if (P_Random () < 140) P_Director_SpawnWave (5 + (P_Random () % 3));
-	    else                   P_Director_SpawnMonster ();
+	    // At the peak, hordes are the norm (bigger, 5-7) -- unless the player is stressed.
+	    if (P_Random () < 140 && !stressed) P_Director_SpawnWave (5 + (P_Random () % 3));
+	    else                                P_Director_SpawnMonster ();
 	    dir_spawntic = 2*TICRATE;
+	    dir_spawntic = dir_spawntic * (100 - exf*3/4) / 100;
+	    if (dir_spawntic < 8) dir_spawntic = 8;
 	}
 	break;
 
       case DIR_FADE:
 	// No spawns -- let them breathe and loot until calm + the min relax elapses.
-	if (dir_acc < DIR_RELAX && gametic - dir_relaxstart > DIR_MINRELAX_TICS)
-	    { dir_state = DIR_BUILDUP; dir_spawntic = TICRATE; }
+	// Near the exit the lull is much shorter, so the way out stays contested.
+	{
+	    int relaxneed = DIR_MINRELAX_TICS * (100 - exf*3/4) / 100;
+	    if (dir_acc < DIR_RELAX && gametic - dir_relaxstart > relaxneed)
+		{ dir_state = DIR_BUILDUP; dir_spawntic = TICRATE; }
+	}
 	break;
     }
 }

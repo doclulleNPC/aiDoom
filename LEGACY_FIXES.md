@@ -108,7 +108,7 @@ hi-res.
 |---|---|---|---|
 | `Z_Malloc: failed on allocation of 1024040 bytes` → crash at map-end stats screen | the screen wipe transposes a `SCREENWIDTH*SCREENHEIGHT` buffer (~1 MB at 1280×800, ~2.3 MB at 1920×1200) on top of level data, overflowing the **6 MB** zone heap | bump the zone to **32 MB** (`mb_used`) | `i_system.c` |
 | status-bar background buffer | `screens[4]` sized for 320×32 | `SCREENWIDTH*ST_HEIGHT*hires`, reallocated in `ST_SetRes` | `st_stuff.c` |
-| AI-buddy **voice crash a few minutes into a game** | `lumpcache[]` is `malloc`'d **once** in `W_InitMultipleFiles`, sized to `numlumps` at that moment — the 1996 engine only ever `W_AddFile`s *before* that point. Adding `buddy.wad` at **runtime** (`I_Voice_Init`) grows `numlumps` but **not** `lumpcache`, so `W_CacheLumpNum` on a buddy lump writes past the array → heap corruption (latent → crash later) | grow `lumpcache` (`realloc` + zero the new slots) right after the runtime `W_AddFile` | `i_voice.c` |
+| AI-buddy **voice crash a few minutes into a game** | `lumpcache[]` is `malloc`'d **once** in `W_InitMultipleFiles`, sized to `numlumps` at that moment — the 1996 engine only ever `W_AddFile`s *before* that point. Adding `aidoom.wad` at **runtime** (`I_Voice_Init`) grows `numlumps` but **not** `lumpcache`, so `W_CacheLumpNum` on a buddy lump writes past the array → heap corruption (latent → crash later) | grow `lumpcache` (`realloc` + zero the new slots) right after the runtime `W_AddFile` | `i_voice.c` |
 | **HOM / non-continuous edges** on busy hi-res views | `MAXSEGS` (solid-seg clip list) was **32** — far below the worst case (≈viewwidth/2); a complex/hi-res view overruns `solidsegs[]` and corrupts memory. Plus `drawsegs[]` was a fixed `MAXDRAWSEGS` array that **silently dropped** wall segments once full → missing-wall HOM | `MAXSEGS = MAXWIDTH/2 + 8`; make `drawsegs` grow on demand (`realloc`; `MAXDRAWSEGS` = initial cap) | `r_bsp.c`, `r_bsp.h`, `r_segs.c`, `r_plane.c` |
 
 ---
@@ -151,7 +151,7 @@ The 1996 source already carried portability workarounds for *its* era. These are
 
 > **Not strictly a legacy bug.** Vanilla DOOM allocates `lumpcache` exactly once
 > and never moves it, so the stock engine never trips this. The *bug* was
-> introduced by the fork (the `buddy.wad` late-load); what's legacy is the
+> introduced by the fork (the `aidoom.wad` late-load); what's legacy is the
 > **invariant it violated** — the zone's owner-back-pointer scheme below. It's
 > logged here because that invariant is the reusable lesson and the symptom looks
 > exactly like the age-of-code corruption bugs above (§2/§4).
@@ -167,12 +167,27 @@ is harmless.)
 
 | Symptom | Root cause | Fix | Files |
 |---|---|---|---|
-| Reproducible crash ~5 s into any level, **only with `buddy.wad` present**, only at `-O2` (vanishes at `/Od` or under a debugger's debug heap) — access violation in `R_DrawSprite`→`R_PointOnSegSide` reading a NULL `drawseg->curline` | `I_Voice_Init` adds `buddy.wad` *after* `R_Init` has cached lumps, then `realloc`s `lumpcache`. The realloc **moves** the array, leaving every already-cached lump's `block->user` dangling into the freed old array; the next zone purge does `*block->user = 0` into freed/reused heap → corruption that surfaces much later as a NULL drawseg | after the realloc, if the array moved, re-point each live block's owner via new `Z_ChangeUser(lumpcache[i], &lumpcache[i])` | `i_voice.c` (`I_Voice_Init`), `z_zone.c`/`.h` (`Z_ChangeUser`) |
+| Reproducible crash ~5 s into any level, **only with `aidoom.wad` present**, only at `-O2` (vanishes at `/Od` or under a debugger's debug heap) — access violation in `R_DrawSprite`→`R_PointOnSegSide` reading a NULL `drawseg->curline` | `I_Voice_Init` adds `aidoom.wad` *after* `R_Init` has cached lumps, then `realloc`s `lumpcache`. The realloc **moves** the array, leaving every already-cached lump's `block->user` dangling into the freed old array; the next zone purge does `*block->user = 0` into freed/reused heap → corruption that surfaces much later as a NULL drawseg | after the realloc, if the array moved, re-point each live block's owner via new `Z_ChangeUser(lumpcache[i], &lumpcache[i])` | `i_voice.c` (`I_Voice_Init`), `z_zone.c`/`.h` (`Z_ChangeUser`) |
 
 Rule of thumb: **any array that zone blocks hold `user` back-pointers into must
 never be `realloc`'d without fixing those back-pointers** (or grow it *before* the
 first `Z_Malloc(..., &arr[i])`). The classic tell is a heisenbug — corruption that
 only reproduces in the optimized build and disappears under the debugger.
+
+## 8. AI Director TCP link dropped on every map change (and SIGPIPE on disconnect)
+
+Not age-of-the-code, but the same "two halves conspire" shape, logged here for the
+AI Director transport.
+
+| Symptom | Root cause | Fix | Files |
+|---|---|---|---|
+| The external `tools/director.c` client disconnects on every level transition and never reconnects | The engine only services the director socket in `GS_LEVEL` (via `P_Ticker`→`P_AI_Ticker`); during the inter-map `GS_INTERMISSION` it stops answering `observe`, so the director's 5 s `SO_RCVTIMEO` elapses and its worker `break`s out **with no outer reconnect loop** | (engine) service the socket in **every** gamestate via a new `P_AI_NetService()` called from `G_Ticker`; (client) `recv_line` distinguishes `RECV_TIMEOUT` from `RECV_EOF` and the worker is wrapped in a `reconnect:` loop that retries forever | `p_ai_llm.c`/`.h`, `g_game.c`, `tools/director.c` |
+| Game dies with exit 141 when the director client drops mid-protocol | a `write()` to the closed socket raises `SIGPIPE` (default action = terminate) | `signal(SIGPIPE, SIG_IGN)` in `P_AI_Init` (non-Windows) so the write fails with `EPIPE` instead | `p_ai_llm.c` |
+
+Rule of thumb: **a long-lived socket peer must tolerate the other side going quiet
+(distinguish a timeout from an EOF) and must reconnect; never let a transient stall
+end the session permanently. And always `SIG_IGN` SIGPIPE in anything that writes to
+a socket the peer may have closed.**
 
 ## How to spot the next one
 

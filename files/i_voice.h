@@ -4,7 +4,7 @@
 // DESCRIPTION:
 //   System interface for the AI co-op buddy's spoken voice lines (offline).
 //
-//   The buddy's lines are pre-rendered into a Doom PWAD (buddy.wad, ~37 OGG
+//   The buddy's lines are pre-rendered into a Doom PWAD (aidoom.wad, ~37 OGG
 //   lumps named DSCONTAC1 / DSHURT01 / DSSTPISTP / ...).  At startup
 //   I_Voice_Init() locates the WAD via W_AddFile() and indexes every
 //   DS*-prefixed lump.  When the buddy wants to speak, the playsim calls
@@ -25,7 +25,7 @@
 
 
 // Speak the lump with the given 8-char name (case-insensitive).  The lump is
-// loaded from the buddy.wad PWAD added by D_DoomMain.  Returns silently if the
+// loaded from the aidoom.wad PWAD added by D_DoomMain.  Returns silently if the
 // lump is unknown, the WAD isn't loaded, or voice init failed.  Voice init
 // failures are non-fatal -- the buddy stays silent rather than crashing.
 // lvol/rvol are 0..127 per-channel gains (Doom positional volume): the caller
@@ -49,8 +49,18 @@ int  I_Voice_Busy (void);
 // the current line out.  No-op if voice init failed.
 void I_Voice_Stop (void);
 
+// ----- AI "Director" persona -----------------------------------------------
+// A second voice (different ElevenLabs id, "DD*" lumps, played on its OWN audio
+// stream) for the L4D-style AI Director: it narrates spawns, intensity phases
+// and item drops.  Separate stream => the Director and the buddy can speak
+// simultaneously without cutting each other off.  Tag form is "dir:<event>:<n>"
+// (see VOICE_MAP / p_ai_director.c).  Unknown tags / failed init are no-ops.
+void I_Director_Say (const char* tag, int lvol, int rvol);
+int  I_Director_Busy (void);
+void I_Director_Stop (void);
+
 // Init / shutdown -- called from D_DoomMain around the I_Init*/I_Shutdown*
-// pair.  Loads the buddy WAD (cwd-relative "buddy.wad" by default, or from
+// pair.  Loads the buddy WAD (cwd-relative "aidoom.wad" by default, or from
 // the "buddy_wad" entry in aidoom.cfg).  Opens the dedicated audio stream.
 // Both are best-effort: any failure is logged but never fatal.
 void I_Voice_Init (void);

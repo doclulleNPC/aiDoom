@@ -235,6 +235,12 @@ void P_AICoop_UnArchiveTrail (void)
 
 static boolean P_AICoop_VerifySpawn_warned = false;	// one-shot per process
 
+// Where the buddy spawned on the current map (captured in VerifySpawn), so the
+// "buddyhome" console command can teleport it back there if it gets stuck/lost.
+static fixed_t	coop_home_x, coop_home_y;
+static angle_t	coop_home_angle;
+static boolean	coop_home_set;
+
 void P_AICoop_VerifySpawn (void)
 {
     mobj_t*	buddy_mo;
@@ -259,7 +265,12 @@ void P_AICoop_VerifySpawn (void)
     // we reset it to a sentinel in P_AICoop_ResetSlot, so type==2 here is
     // authoritative for "this map had a P2_Start thing".
     if (buddy_mo != NULL && playerstarts[coop_slot].type == 2)
+    {
+	// Remember the spawn point for "buddyhome".
+	coop_home_x = buddy_mo->x; coop_home_y = buddy_mo->y;
+	coop_home_angle = buddy_mo->angle; coop_home_set = true;
 	return;				// all good, buddy spawned
+    }
 
     // Map has no Player_2_Start.  Disable for this level (and all subsequent
     // levels until the user fixes the WAD or removes -coop), and tell them.
@@ -328,9 +339,9 @@ static mobj_t* AICoop_NearestHuman (fixed_t x, fixed_t y)
 
 // ----------------------------------------------------------------- voice
 // The buddy speaks through i_voice.c, which plays an offline-baked OGG from
-// buddy.wad via a dedicated SDL3 audio stream.  We pass a "tag" (e.g.
+// aidoom.wad via a dedicated SDL3 audio stream.  We pass a "tag" (e.g.
 // "contact:0", "state:fighting") and i_voice maps it to the right lump.
-// All best-effort: if buddy.wad isn't present or the lump is missing, the
+// All best-effort: if aidoom.wad isn't present or the lump is missing, the
 // call is a silent no-op and the deterministic playsim is unaffected.
 #include "i_voice.h"
 
@@ -441,7 +452,7 @@ static void AICoop_SayTagP (const char* tag, int prio)
     AICoop_SayTag (tag);
 }
 
-// Speak a tagged phrase through i_voice.c (offline OGG via buddy.wad).
+// Speak a tagged phrase through i_voice.c (offline OGG via aidoom.wad).
 // The "[Buddy] ..." console text is unaffected -- this is just the audio.
 // Callers pick the exact tag (e.g. "summon_ok", "state:fighting"); the
 // tag -> lump-name mapping lives in i_voice.c.  This is the console-command
@@ -971,6 +982,23 @@ const char* P_AICoop_GiveAll (void)
     bot->armorpoints = 200; bot->armortype = 2;
     AICoop_Callout ("arm:", 2);
     return "[Buddy] Locked and loaded.";
+}
+
+// Console "buddyhome"/"buddytp": teleport the buddy back to where it spawned on
+// this map -- a rescue for when it gets stuck on geometry or lost far behind you.
+const char* P_AICoop_Home (void)
+{
+    mobj_t* mo = AICoop_Mo ();
+    if (!mo)            return "[Buddy] (no companion -- launch with -aicoop)";
+    if (!coop_home_set) return "[Buddy] no spawn point recorded for this level.";
+    // Telefrag-move to the spawn point, restore facing, kill momentum and clear
+    // any forced/sticky state so the bot re-evaluates cleanly next tic.
+    P_TeleportMove (mo, coop_home_x, coop_home_y);
+    mo->angle = coop_home_angle;
+    mo->momx = mo->momy = mo->momz = 0;
+    forcetarget = NULL; forceaggro = 0; user_hold = 0;
+    P_AICoop_VoiceTag ("summon_ok");		// "On my way!"
+    return "[Buddy] Teleporting back to start.";
 }
 
 
@@ -1813,7 +1841,7 @@ void P_AICoop_BuildCmd (void)
     tgt  = AICoop_FindTarget (mo);
     heal = (bot->health < COOP_HEAL_HP) ? AICoop_FindHealth (mo) : NULL;
 
-    // Voice: automatic callouts (rate-limited; tags -> OGG lumps in buddy.wad).
+    // Voice: automatic callouts (rate-limited; tags -> OGG lumps in aidoom.wad).
         {
     	static mobj_t*	lasttgt;
     	static int	lasthp = 100, lastplhp = 100, lastlevel = -1, lastdry = 0, lastfist = 0;

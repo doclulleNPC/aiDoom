@@ -24,11 +24,11 @@ config.status
 # IWADs are copyrighted id Software data -- bring your own, never commit them.
 *.wad
 *.WAD
-# Exception: run/buddy.wad is OUR voice asset (pre-rendered OGG phrases in a
+# Exception: run/aidoom.wad is OUR voice asset (pre-rendered OGG phrases in a
 # Doom PWAD), not a game IWAD.  It must be in the repo so the engine can
 # play the buddy voice offline without anyone re-running the ElevenLabs
 # baker.  Listed AFTER the general *.wad rule so it takes precedence.
-!run/buddy.wad
+!run/aidoom.wad
 doom.cfg
 .doomrc
 doomsav*.dsg
@@ -77,6 +77,8 @@ hand.png
 # runtime artifacts
 buddy_say.txt
 run/buddy_say.txt
+# regenerable ElevenLabs voice bake cache (don't delete -- avoids re-running paid TTS)
+.buddy_voice_cache/
 tools/aidoom_config.exe
 run/aidoom_config.exe
 tools/gpumon_sdl

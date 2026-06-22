@@ -66,7 +66,7 @@ User-zu-Buddy-Kommunikation:
 
 ### 4. Voice-Ausgabe (Datei: `files/i_voice.c`, `files/p_ai_coop.c`)
 
-156 vorgebackene Sprachzeilen (OGG/Vorbis in `run/buddy.wad`, Joker-HL-Stimme),
+156 vorgebackene Sprachzeilen (OGG/Vorbis in `run/aidoom.wad`, Joker-HL-Stimme),
 abgespielt über einen eigenen SDL3-Audio-Stream. `P_AICoop_VoiceTag(tag)` /
 `AICoop_Callout(prefix, n)` lösen einen Tag (z.B. `state:fighting`, `kill:0`)
 über `VOICE_MAP` in `i_voice.c` zum 8-Zeichen-Lumpnamen auf.

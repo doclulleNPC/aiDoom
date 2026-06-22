@@ -26,6 +26,11 @@ void P_Director_Reset (void);
 // No-op unless -director was given.
 void P_Director_Ticker (void);
 
+// Speak a Director voice line (DD* lumps / dir:* tags) -- prefix e.g. "dir:flank",
+// n variants, force=1 barges in / ignores the cooldown.  No-op unless the director
+// is active.  For external hooks (LLM tactics in p_ai_llm.c, level clear in g_game.c).
+void P_Director_Say (const char* prefix, int n, int force);
+
 // Stress feeds (from P_DamageMobj): a player took `damage`; a monster died to
 // `killer`.  No-op unless -director is active.
 void P_Director_NoteDamage (struct mobj_s* victim, int damage);
