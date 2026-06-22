@@ -38,7 +38,8 @@
 #endif
 
 // Misc. other strings.
-#define SAVEGAMENAME	"doomsav"
+// Savegames live in run/ID0/ alongside the WADs (doomsav0.dsg .. doomsav5.dsg).
+#define SAVEGAMENAME	"ID0/doomsav"
 
 
 //

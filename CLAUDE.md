@@ -74,8 +74,12 @@ in `i_video.c`; the Windows `.exe` icon comes from `files/aidoom.rc`. Regenerate
 the header from the `.ico` with ImageMagick if the icon art changes.
 
 Output binary is `aidoom` (`-iwad <wad>` / auto-detected IWAD; **bring your own**
-IWAD). To launch with the LLM AI Director, use `run/start_aidoom.sh`
-(Linux/macOS) or `run/start_aidoom.bat` (Windows) — see `run/README.md`.
+IWAD). **Game WADs + savegames live in `run/ID0/`** — the engine/launcher/tools
+search there first, so bare names (`-iwad DOOM.WAD`, `-file doom2stuff.wad`)
+resolve without a path (`d_main.c` IWAD dirs + `w_wad.c` `W_AddFile` ID0/ fallback;
+savegames via `SAVEGAMENAME` in `dstrings.h`). To launch, use the **`run/launcher`
+GUI** (the old `start_*` scripts are obsolete, kept as a backup in `tools/scripts/`)
+— see `run/README.md`.
 
 ### 64-bit portability (LP64) caveats
 

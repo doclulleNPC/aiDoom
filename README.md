@@ -100,13 +100,14 @@ aiDoom needs a DOOM **IWAD** (`doom1.wad`, `doom.wad`, `doom2.wad`, `tnt.wad`,
 `plutonia.wad`, Freedoom, …) — **bring your own**; IWADs are copyrighted id Software
 data and are not distributed here. The shareware `doom1.wad` is freely available.
 
-The engine looks for one in this order:
+Put your WADs in **`run/ID0/`** (the engine, launcher and tools search it first, so
+bare names resolve without a path). Savegames are written there too. The engine
+looks for an IWAD in this order:
 
-1. **`-iwad <file>`** on the command line
-2. the **`iwad`** value in `aidoom.cfg` (set it in the config app — see below)
-3. an **`iwads/`** subfolder of the working directory
-4. the working directory itself (and `$DOOMWADDIR`)
-5. a **Steam** install (Ultimate Doom / Doom 2 / Final Doom, Linux & Windows paths)
+1. **`-iwad <file>`** on the command line (also tried under `ID0/`)
+2. the **`iwad`** value in `aidoom.cfg` (set it in the config/launcher app)
+3. **`ID0/`** → an **`iwads/`** subfolder → the working directory (and `$DOOMWADDIR`)
+4. a **Steam** install (Ultimate Doom / Doom 2 / Final Doom, Linux & Windows paths)
 
 ```bat
 aidoom.exe -warp 1 1 -skill 4
@@ -123,13 +124,15 @@ On Linux/macOS it's the same flags, `./aidoom` (the binary `build.sh` puts in `r
 
 ### LLM-driven monsters (Ollama)
 
-With a local [Ollama](https://ollama.com) running, the `run\start_aidoom.bat` launcher
-waits for Ollama, then starts the game with the AI director and connects the client:
+With a local [Ollama](https://ollama.com) running, use the **`run/launcher`** GUI
+(pick IWAD / buddy / monster / skill → Launch) — it starts the game with the AI
+director and the native director client. The old `start_*` scripts are obsolete
+and kept as a backup in **`tools/scripts/`**:
 
-```bat
-run\start_aidoom.bat                       REM default model mistral:7b-instruct
-run\start_aidoom.bat -Skill 4 -NoFriendlyFire
-run\start_aidoom.bat -NoDirector           REM just the game
+```sh
+run/launcher                               # preferred: GUI launcher
+tools/scripts/start_aidoom.sh              # backup: scripted launch (default mistral:7b-instruct)
+tools/scripts/start_aidoom.sh --offline    # just the game, no LLM
 ```
 
 On Linux/macOS use `run/start_aidoom.sh` (same idea — waits for Ollama, then starts

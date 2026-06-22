@@ -1,21 +1,27 @@
-# aiDoom launchers (`run/`)
+# aiDoom run folder (`run/`)
 
-Double-click / one-command launchers that bring up **aiDoom + the LLM "AI
-Director"** together: they wait for an Ollama server, (optionally) warm the
-model, start the game with its `-aidirector` TCP server, then run the native
-`director` (SDL3, no Python) that drives the monsters' tactics.
+**The `launcher` GUI is the way to start aiDoom.** Run `run/launcher` (or
+`launcher.exe`): pick the IWAD, the Buddy mode (off / `-coop` / `-aicoop`), the
+Monster mode (vanilla / L4D / `-aidirector`), and the Skill, then hit **Launch** —
+it starts the game with the right flags and auto-starts the native `director`
+sidecar when an AI mode is chosen.
 
-> Keep this README in sync when the launchers or the native `director` change.
+> **Game WADs live in `run/ID0/`** (DOOM.WAD, doom2.wad, aidoom.wad,
+> doom2stuff.wad, heretic.wad, …). The engine, launcher and tools search there
+> automatically, so bare names (`-iwad DOOM.WAD`, `-file doom2stuff.wad`) resolve
+> without a path. **Savegames** are written to `run/ID0/` too.
+
+> The old one-shot **`start_*` shell/PowerShell scripts are obsolete** (the
+> launcher replaces them) and have been moved to **`tools/scripts/`** as a backup
+> — they still run from there if you want a scripted/headless launch.
+
+> Keep this README in sync when the launcher or the native `director` change.
 
 ## Contents
 
 | File | Platform | Purpose |
 |------|----------|---------|
-| `start_aidoom.sh`  | Linux / macOS | Main launcher (bash). |
-| `start_buddy.sh`   | Linux / macOS | Offline launcher: **no LLM/AI director**, just the rule-based co-op buddy (`-coop`). Extra args pass through (`./start_buddy.sh -warp 1 1 -skill 4`). |
-| `start_buddy.bat`  | Windows | Offline buddy launcher (double-click). Same as `start_buddy.sh`: `aidoom.exe -coop` — no Ollama, no PowerShell. Args pass through. |
-| `start_aidoom.bat` | Windows | Double-click shim → calls the PowerShell script. |
-| `start_aidoom.ps1` | Windows | Main launcher (PowerShell). |
+| `ID0/` | all | **Game WADs + savegames** (IWADs, aidoom.wad, doom2stuff.wad, doomsav*.dsg). |
 | `director` / `director.exe` | Linux / Windows | **Native SDL3 AI director** (C) — the no-Python LLM monster director: a small window showing live status + a scrolling log, talks to Ollama + the game. Used by the launchers for `--director`. Build: `tools/build_director.sh` (Linux) / `tools/build_director_win.sh` (Windows). |
 | (`../tools/buddy_voice.py`) | all | AI co-op **buddy voice**: tails `buddy_say.txt` (written here by `-aicoop`) and speaks lines via ElevenLabs (Joker-HL). Run from here: `python3 ../tools/buddy_voice.py`. Needs `ELEVENLABS_API_KEY` (env or `elevenlabs_api_key` in `aidoom.cfg`) + ffplay/mpg123. |
 | `gpumon` / `gpumon.exe` | Linux / Windows | GPU monitor as a small **SDL window** (bars for load/VRAM/temp/power). On error it stops and shows a **Reconnect** button (no auto-retry). Build: Linux `tools/build_gpumon.sh`; Windows via CMake or `build_all_win.bat`. See **`../GPUMON.md`**. |
@@ -50,10 +56,10 @@ model, start the game with its `-aidirector` TCP server, then run the native
     stages everything into `run/`): `cmake -B build && cmake --build build`.
     (The legacy `tools/build_*_win.sh` are MinGW cross-builds needing a MinGW SDL3
     package; the MSVC path above is preferred on Windows.)
-- A DOOM **IWAD**. The engine finds one via `-iwad <file>` → the `iwad` key in
-  `aidoom.cfg` → an `iwads/` subfolder → `run/` (the binary's folder) → a Steam
-  install. Pick which to use in the config app, or drop a `.wad` in `run/iwads/`.
-  **Bring your own** — IWADs are not shipped.
+- A DOOM **IWAD**, placed in **`run/ID0/`**. The engine finds one via `-iwad <file>`
+  → the `iwad` key in `aidoom.cfg` → **`run/ID0/`** → `iwads/` → `run/` → `$DOOMWADDIR`
+  → a Steam install. Bare names resolve under `ID0/` automatically. Pick which to use
+  in the launcher/config app. **Bring your own** — IWADs are not shipped.
 - An **Ollama** server reachable over HTTP, with the chosen model pulled
   (`ollama pull mistral:7b-instruct`). For a *remote* server it must listen on the
   network (`OLLAMA_HOST=0.0.0.0 ollama serve`), not just localhost.
@@ -61,15 +67,25 @@ model, start the game with its `-aidirector` TCP server, then run the native
   `tools/build_director.sh` (Linux) / `tools/build_director_win.sh` (MinGW). No
   Python required.
 
-## Usage — Linux / macOS
+## Usage — the launcher (preferred)
 
 ```sh
 cd run
-./start_aidoom.sh                                   # FULL LLM: AI buddy (-aicoop) + director (default)
-./start_aidoom.sh --buddy                           # rule-based buddy instead of the AI buddy
-./start_aidoom.sh --offline                         # plain aidoom, no LLM/Ollama
-./start_aidoom.sh --model qwen3:8b --skill 4 --friendlyfire
-./start_aidoom.sh --ollama http://localhost:11434   # override the server
+./launcher          # pick IWAD / buddy / monster / skill, then Launch
+```
+
+## Usage — backup scripts (Linux / macOS)
+
+The `start_*` scripts now live in **`tools/scripts/`** (the launcher replaces them).
+Run them from there if you want a scripted launch — they still work:
+
+```sh
+cd run
+../tools/scripts/start_aidoom.sh                    # FULL LLM: AI buddy (-aicoop) + director (default)
+../tools/scripts/start_aidoom.sh --buddy                           # rule-based buddy instead of the AI buddy
+../tools/scripts/start_aidoom.sh --offline                         # plain aidoom, no LLM/Ollama
+../tools/scripts/start_aidoom.sh --model qwen3:8b --skill 4 --friendlyfire
+../tools/scripts/start_aidoom.sh --ollama http://localhost:11434   # override the server
 ```
 
 Flags (unrecognized args are passed straight through to `aidoom`):
@@ -92,10 +108,11 @@ directs the enemy squad *and* the ally buddy from the same observation.
 
 ## Usage — Windows
 
-Double-click **`start_aidoom.bat`**, or run the PowerShell script with params:
+Prefer **`launcher.exe`**. The backup scripts now live in **`tools\scripts\`**:
+double-click **`tools\scripts\start_aidoom.bat`**, or run the PowerShell script:
 
 ```powershell
-.\start_aidoom.ps1                  # FULL LLM: AI buddy (-aicoop) + director (default)
+tools\scripts\start_aidoom.ps1      # FULL LLM: AI buddy (-aicoop) + director (default)
 .\start_aidoom.ps1 -RuleCoop        # rule-based buddy instead of the AI buddy
 .\start_aidoom.ps1 -NoDirector      # just the game, no LLM director
 .\start_aidoom.ps1 -Model qwen2.5-coder:1.5b -Skill 4 -FriendlyFire
