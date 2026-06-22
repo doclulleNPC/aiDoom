@@ -179,6 +179,102 @@ static unsigned int	mevtick;	// sequencer's current absolute tick
 static int		mid_division;	// SMF time division (PPQN or SMPTE)
 static double		mid_spt;	// samples per tick (from current tempo)
 
+// ---- SMF (.mid) parser: flatten all tracks into the tick-sorted mevbuf -------
+
+static unsigned int be16 (const byte* p) { return (p[0] << 8) | p[1]; }
+static unsigned int be32 (const byte* p) { return (p[0]<<24)|(p[1]<<16)|(p[2]<<8)|p[3]; }
+
+static unsigned int ReadVarLen (const byte** pp, const byte* end)
+{
+    unsigned int v = 0; byte b;
+    do { if (*pp >= end) break; b = *(*pp)++; v = (v << 7) | (b & 0x7f); } while (b & 0x80);
+    return v;
+}
+
+static int mev_cmp (const void* a, const void* b)
+{
+    const midev_t* x = a; const midev_t* y = b;
+    if (x->tick != y->tick) return (x->tick < y->tick) ? -1 : 1;
+    return (x->seq < y->seq) ? -1 : (x->seq > y->seq) ? 1 : 0;	// stable tie-break
+}
+
+static void MidEmit (unsigned int tick, int type, int ch, int d1, int d2)
+{
+    midev_t* e = &mevbuf[mevcount++];
+    e->tick = tick; e->seq = (unsigned)mevcount; e->type = (byte)type;
+    e->ch = (byte)ch; e->d1 = (byte)d1; e->d2 = d2;
+}
+
+// Parse a Standard MIDI File into mevbuf (all tracks merged, tick-sorted).
+// Returns true on success; sets seqkind=1 + percussion channel.
+static boolean MidiRegister (const byte* data, int length)
+{
+    unsigned int hlen, ntracks, division, maxend = 0;
+    const byte* p; int t, cap;
+
+    if (length < 14 || memcmp (data, "MThd", 4)) return false;
+    hlen     = be32 (data + 4);
+    ntracks  = be16 (data + 10);
+    division = be16 (data + 12);
+    if ((division & 0x8000) || division == 0) division = 480;	// SMPTE unsupported -> assume PPQN
+    mid_division = (int)division;
+
+    cap = length / 2 + 16;					// <= 1 event per 2 bytes
+    if (mevbuf) Z_Free (mevbuf);
+    mevbuf = Z_Malloc (cap * sizeof(midev_t), PU_STATIC, 0);
+    mevcount = 0;
+    p = data + 8 + hlen;
+
+    for (t = 0; t < (int)ntracks && p + 8 <= data + length; t++)
+    {
+	unsigned int tlen, abst = 0; const byte* tp; const byte* tend; byte run = 0;
+	if (memcmp (p, "MTrk", 4)) break;
+	tlen = be32 (p + 4);
+	tp = p + 8; tend = tp + tlen;
+	if (tend > data + length) tend = data + length;
+	p = tend;
+
+	while (tp < tend && mevcount < cap - 2)
+	{
+	    byte st; int ch;
+	    abst += ReadVarLen (&tp, tend);
+	    if (tp >= tend) break;
+	    st = *tp;
+	    if (st & 0x80) { tp++; run = (st < 0xF0) ? st : 0; } else st = run;	// running status
+	    ch = st & 0x0f;
+	    switch (st & 0xf0)
+	    {
+	      case 0x80: { int n = *tp++ & 0x7f; tp++;			// note off
+			   MidEmit (abst, MEV_NOTEOFF, ch, n, 0); break; }
+	      case 0x90: { int n = *tp++ & 0x7f, vel = *tp++ & 0x7f;	// note on (vel 0 = off)
+			   MidEmit (abst, vel ? MEV_NOTEON : MEV_NOTEOFF, ch, n, vel); break; }
+	      case 0xA0: tp += 2; break;				// poly aftertouch
+	      case 0xB0: { int cc = *tp++ & 0x7f, val = *tp++ & 0x7f;	// controller
+			   if (cc == 7)  MidEmit (abst, MEV_VOLUME, ch, val, 0);	// channel volume
+			   else if (cc == 120 || cc == 123) MidEmit (abst, MEV_CHANOFF, ch, 0, 0);
+			   break; }
+	      case 0xC0: MidEmit (abst, MEV_PROGRAM, ch, *tp++ & 0x7f, 0); break;	// program
+	      case 0xD0: tp += 1; break;				// channel pressure
+	      case 0xE0: tp += 2; break;				// pitch bend
+	      case 0xF0:
+		if (st == 0xFF) { int mt = *tp++; unsigned int ml = ReadVarLen (&tp, tend);
+		    if (mt == 0x51 && ml == 3)
+			MidEmit (abst, MEV_TEMPO, 0, 0, (tp[0]<<16)|(tp[1]<<8)|tp[2]);
+		    tp += ml; }
+		else { unsigned int sl = ReadVarLen (&tp, tend); tp += sl; }	// sysex
+		break;
+	      default: tp = (byte*)tend; break;				// malformed -> end track
+	    }
+	}
+	if (abst > maxend) maxend = abst;
+    }
+
+    MidEmit (maxend, MEV_END, 0, 0, 0);			// true song length (for looping)
+    qsort (mevbuf, mevcount, sizeof(midev_t), mev_cmp);
+    seqkind = 1; perc_chan = 9;				// MIDI: percussion = channel 10
+    return mevcount > 1;
+}
+
 static double NoteInc (int note)
 {
     // MIDI note -> Hz -> phase increment (cycles per sample).
@@ -332,18 +428,56 @@ static void Sequence (void)
     }
 }
 
+// MIDI counterpart of Sequence(): emit every event at the current tick, then set
+// the delay (samples) to the next event.  Same voice engine as MUS.
+static void MidiSequence (void)
+{
+    for (;;)
+    {
+	midev_t* e;
+	if (mevpos >= mevcount) { finished = 1; return; }
+	e = &mevbuf[mevpos];
+	if (e->tick > mevtick)			// wait until the next event
+	{
+	    delaysamples += (double)(e->tick - mevtick) * mid_spt;
+	    mevtick = e->tick;
+	    return;
+	}
+	mevpos++;
+	switch (e->type)
+	{
+	  case MEV_NOTEON:  StartNote (e->ch, e->d1, e->d2); break;
+	  case MEV_NOTEOFF: StopNote  (e->ch, e->d1); break;
+	  case MEV_PROGRAM: instr_ch[e->ch] = e->d1; break;
+	  case MEV_VOLUME:  vol_ch[e->ch]  = e->d1 / 127.0f; break;
+	  case MEV_CHANOFF: AllNotesOff (); break;
+	  case MEV_TEMPO:   if (mid_division > 0)
+				mid_spt = (double)e->d2 / 1e6 * MUSRATE / mid_division;
+			    break;
+	  case MEV_END:     finished = 1; return;
+	}
+    }
+}
+
 boolean MUS_Register (const void* data, int length)
 {
     const byte*	p = data;
 
-    if (!have_genmidi || length < 16 || memcmp (p, "MUS\x1a", 4))
-	return false;
+    if (!have_genmidi || length < 16) return false;
 
-    // header: id[4] scoreLen[2] scoreStart[2] channels[2] ...
-    scorestart = p[6] | (p[7] << 8);
-    score = p;
-    scorelen = length;
-    return true;
+    if (!memcmp (p, "MUS\x1a", 4))		// native DOOM MUS lump
+    {
+	// header: id[4] scoreLen[2] scoreStart[2] channels[2] ...
+	scorestart = p[6] | (p[7] << 8);
+	score = p;
+	scorelen = length;
+	seqkind = 0; perc_chan = 15;
+	return true;
+    }
+    if (!memcmp (p, "MThd", 4))			// raw Standard MIDI File
+	return MidiRegister (p, length);
+
+    return false;				// unknown -> "no music"
 }
 
 void MUS_Start (int loop)
@@ -352,6 +486,10 @@ void MUS_Start (int loop)
     AllNotesOff ();
     for (i = 0; i < 16; i++) { instr_ch[i] = 0; vol_ch[i] = 1.0f; }
     scorepos = scorestart;
+    // MIDI: rewind the event list + reset tempo (default 120 BPM = 500000 us/quarter).
+    mevpos = 0; mevtick = 0;
+    if (mid_division > 0)
+	mid_spt = 500000.0 / 1e6 * MUSRATE / mid_division;
     delaysamples = 0;
     finished = 0;
     looping = loop;
@@ -371,12 +509,12 @@ void MUS_Render (short* out, int frames)
     {
 	float	mix = 0.0f;
 
-	// advance the sequencer for this sample
+	// advance the sequencer for this sample (MUS or MIDI front-end)
 	while (delaysamples <= 0.0 && !finished)
-	    Sequence ();
+	    seqkind ? MidiSequence () : Sequence ();
 	if (finished)
 	{
-	    if (looping && score) { MUS_Start (1); }
+	    if (looping && (score || mevbuf)) { MUS_Start (1); }
 	    else { out[f*2] = out[f*2+1] = 0; continue; }
 	}
 	delaysamples -= 1.0;

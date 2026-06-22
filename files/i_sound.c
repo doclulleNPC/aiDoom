@@ -695,8 +695,8 @@ int I_RegisterSong(void* data, int length)
 {
     mus_kind = 0;
     if (!mus_geninit) { MUS_Init (); mus_geninit = 1; }	// load GENMIDI once
-    if (MUS_Register (data, length)) { mus_kind = 2; return 2; }
-    return 0;	// not MUS (raw MIDI / GENMIDI missing) -> silently no music
+    if (MUS_Register (data, length)) { mus_kind = 2; return 2; }	// MUS or raw MIDI
+    return 0;	// unrecognised lump (or GENMIDI missing) -> silently no music
 }
 
 void I_PlaySong(int handle, int looping)
