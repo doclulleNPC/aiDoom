@@ -68,6 +68,13 @@ static fixed_t	crumbx[CRUMB_MAX], crumby[CRUMB_MAX];
 static int	crumb_n;		// crumbs held (crumb[0]=oldest .. crumb[n-1]=newest≈player)
 static int	trail_active;		// currently following the breadcrumb trail
 
+// (A) Per-line "is this an openable door?" list, rebuilt fresh each map (cleared
+// first) in P_AICoop_ResetSlot.  Lets the buddy tell a real door from a non-door
+// "yellow" line (a ledge/step) so it only taps USE at actual doors instead of
+// grinding plain geometry.  Indexed by line number (== ld - lines).
+static boolean*	coop_doorline;
+static int	coop_doorline_n;
+
 static void AICoop_CrumbAdd (fixed_t x, fixed_t y)
 {
     if (crumb_n > 0 &&
@@ -201,6 +208,20 @@ void P_AICoop_ResetSlot (void)
 
     crumb_n = 0; trail_active = 0;	// drop the previous map's breadcrumb trail
     summon = 0; summon_stay = 0;	// drop any come/leash order from the previous map
+
+    // (A) Rebuild the openable-door list for THIS map (cleared first).  lines[] is
+    // already loaded here (P_LoadLineDefs runs before P_AICoop_ResetSlot).  Mark
+    // unlocked manual (DR/D1) doors -- the ones the buddy can actually open with USE.
+    {
+	int i;
+	coop_doorline   = (boolean*) realloc (coop_doorline, (size_t)numlines * sizeof(boolean));
+	coop_doorline_n = coop_doorline ? numlines : 0;
+	for (i = 0; i < coop_doorline_n; i++)
+	{
+	    int sp = lines[i].special;
+	    coop_doorline[i] = (sp == 1 || sp == 31 || sp == 117 || sp == 118);
+	}
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1052,6 +1073,36 @@ static boolean PF_IsDoorSpecial (int sp)	// push (DR) doors with no key
     return (sp == 1 || sp == 31 || sp == 117 || sp == 118);
 }
 
+// (A) Is linedef `ld` an openable door, per the map-start door list?
+static boolean AICoop_LineIsDoor (line_t* ld)
+{
+    int i = (int)(ld - lines);
+    return (coop_doorline && i >= 0 && i < coop_doorline_n) ? coop_doorline[i] : false;
+}
+
+// (A) Is an openable door right in front of the buddy (within USE reach, roughly
+// in the facing direction)?  Used to gate the stuck-handler's USE tap so it only
+// opens REAL doors -- not "yellow" non-door lines (ledges/steps), which it should
+// jump or sidestep instead of grinding USE on.
+static boolean AICoop_DoorInFront (mobj_t* mo)
+{
+    int		i, fa = mo->angle >> ANGLETOFINESHIFT;
+    fixed_t	fwx = finecosine[fa], fwy = finesine[fa];
+    for (i = 0; i < coop_doorline_n; i++)
+    {
+	line_t*	ld;
+	fixed_t	mx, my, dx, dy;
+	if (!coop_doorline[i]) continue;
+	ld = &lines[i];
+	mx = (ld->v1->x + ld->v2->x) >> 1;
+	my = (ld->v1->y + ld->v2->y) >> 1;
+	dx = mx - mo->x; dy = my - mo->y;
+	if (P_AproxDistance (dx, dy) > 96*FRACUNIT) continue;		// not adjacent
+	if (FixedMul (dx, fwx) + FixedMul (dy, fwy) > 0) return true;	// in the forward arc
+    }
+    return false;
+}
+
 // If a CLOSED push-door (unlocked DR) lies ahead toward the goal, hand back the
 // midpoint of its line in (*ox,*oy).  The BSP waypoints are sub-sector centroids,
 // which can sit behind the corridor wall beside a doorway -- so the buddy never
@@ -1074,7 +1125,7 @@ static boolean AICoop_FindDoorAhead (mobj_t* mo, fixed_t gx, fixed_t gy,
 	angle_t		todoor;
 
 	if (!ld->backsector || !ld->frontsector)	continue;	// not two-sided
-	if (!PF_IsDoorSpecial (ld->special))		continue;	// not an openable door
+	if (!AICoop_LineIsDoor (ld))			continue;	// not an openable door (map-start list)
 	fs = ld->frontsector; bs = ld->backsector;
 	opening = (fs->ceilingheight < bs->ceilingheight ? fs->ceilingheight : bs->ceilingheight)
 		- (fs->floorheight   > bs->floorheight   ? fs->floorheight   : bs->floorheight);
@@ -2299,7 +2350,9 @@ void P_AICoop_BuildCmd (void)
 	// are walking through (no longer stuck), so no second tap fires.
 	// (B) Low ledge it can't step up?  Jump it -- the player can (disabled in netgame).
 	if (!netgame && AICoop_JumpableStep (mo, stx, sty)) { cmd->buttons |= BT_JUMP; AICoop_Callout ("jump:", 2); }
-	if (doorwait == 0) { cmd->buttons |= BT_USE; doorwait = 45; AICoop_Callout ("door:", 2); }
+	// Only tap USE if a REAL door is in front (map-start door list) -- otherwise the
+	// wedge is a non-door "yellow" line/ledge, so don't grind USE on it (jump/wiggle).
+	if (doorwait == 0 && AICoop_DoorInFront (mo)) { cmd->buttons |= BT_USE; doorwait = 45; AICoop_Callout ("door:", 2); }
 	// Sideways wiggle to slip past a barrel / convex corner (non-door wedge).
 	cmd->sidemove += ((wig++ / 24) & 1) ? COOP_RUN : -COOP_RUN;
 	// Announce ONCE per wedge (rising edge) -- this used to fire every tic, so the

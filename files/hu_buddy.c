@@ -307,38 +307,36 @@ static void HU_Buddy_DrawStrip (player_t* bot)
     patch_t* face;
     char     l1[40], l2[40], l3[40];
 
-    // Downed (incapacitated, not dead): replace the mugshot + stats with a
-    // medikit and a REVIVE prompt so the player knows to reach and revive him.
+    // Downed (incapacitated, not dead): replace the mugshot + stats with a REVIVE
+    // prompt and -- in the mugshot slot -- a COMPASS arrow pointing the human toward
+    // the downed buddy, so he can be found and revived.
     if (bot->playerstate == PST_DEAD)
     {
-	patch_t*    med = HU_Buddy_Medkit ();
 	const char* d1  = "BUDDY DOWN";
 	const char* d2  = "REVIVE: USE";
 	int         dw  = HU_Buddy_TextW (d1);
 	int         w2  = HU_Buddy_TextW (d2);
 	int         dtx;
+	mobj_t*     pl  = players[consoleplayer].mo;	// the human (not the buddy)
+	mobj_t*     bd  = bot->mo;
 	if (w2 > dw) dw = w2;
 	dtx = wb - 4 - dw;
 	HU_Buddy_Text (dtx, 2,  d1);
 	HU_Buddy_Text (dtx, 12, d2);
-	if (med) V_DrawPatch (dtx - SHORT (med->width) - 6, 1, 0, med);
 
-	// Compass: a top-centre arrow pointing the human toward the downed buddy so
-	// they can find and revive him.  Screen-relative bearing -> one of 4 cardinal
-	// arrows (RARR* PNGs in aidoom.wad, decoded via V_CachePNG).
+	// (C) Compass in the mugshot slot: screen-relative bearing -> one of 8
+	// direction arrows (RARR* PNGs in aidoom.wad, decoded via V_CachePNG).
+	if (pl && bd)
 	{
-	    mobj_t* pl = players[consoleplayer].mo;	// the human (not the buddy)
-	    mobj_t* bd = bot->mo;
-	    if (pl && bd)
-	    {
-		// rel angle: 0 ahead, ANG90 to our left, ANG180 behind, ANG270 to our right.
-		angle_t		rel = R_PointToAngle2 (pl->x, pl->y, bd->x, bd->y) - pl->angle;
-		unsigned	q   = (unsigned)(rel + ANG45) >> 30;	// 0..3
-		static const char* arr[4] = { "RARRC0", "RARRA0", "RARRD0", "RARRB0" }; // up,left,down,right
-		patch_t*	a = V_CachePNG (arr[q]);
-		if (a)
-		    V_DrawPatch (wb/2 - SHORT (a->width)/2, 18, 0, a);	// top-centre
-	    }
+	    // rel: 0 ahead, ANG90 left, ANG180 behind, ANG270 right.  Octant 0..7.
+	    angle_t  rel = R_PointToAngle2 (pl->x, pl->y, bd->x, bd->y) - pl->angle;
+	    unsigned oct = ((unsigned)(rel + ANG45/2) >> 29) & 7;
+	    // index by octant: ahead(N), ahead-left(NW), left(W), behind-left(SW),
+	    // behind(S), behind-right(SE), right(E), ahead-right(NE).
+	    static const char* arr[8] =
+		{ "RARRC0","RARRB0","RARRA0","RARRH0","RARRG0","RARRF0","RARRE0","RARRD0" };
+	    patch_t* a = V_CachePNG (arr[oct]);
+	    if (a) V_DrawPatch (dtx - SHORT (a->width) - 6, 1, 0, a);	// mugshot slot
 	}
 	return;
     }
