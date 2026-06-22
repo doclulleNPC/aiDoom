@@ -29,6 +29,11 @@ void	P_AI_Ticker (void);
 // intermission/finale and `observe` keeps getting answered.
 void	P_AI_NetService (void);
 
+// Rule-based coordinated monster tactics (flank + focus-fire) for the offline L4D
+// director -- no LLM.  Assigns orders into the directive side-table (executed by
+// A_LLMChase); call per-tic from the rule director.  Deterministic / tic-locked.
+void	P_AI_RuleTactics (void);
+
 // True if `actor` currently has an active, non-default directive -> A_Chase
 // should defer to A_LLMChase instead of the vanilla logic.
 int	P_AI_Active (mobj_t* actor);

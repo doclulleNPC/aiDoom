@@ -868,6 +868,53 @@ static void AI_DemoDirector (void)
 }
 
 // ---------------------------------------------------------------------------
+// Rule-based coordinated tactics for the offline L4D director (-director, no LLM):
+// flank + focus-fire, assigned by heuristics into the SAME directive side-table the
+// LLM uses and executed by A_LLMChase.  Deterministic (P_Random / geometry), so it
+// stays tic-locked.  Called from the director ticker in pure -director mode.
+// ---------------------------------------------------------------------------
+void P_AI_RuleTactics (void)
+{
+    static int	replan;
+    mobj_t*	pl;
+    int		i, seers[AI_MAX], nseers = 0, k, side = 0;
+
+    if (!ai_inited) P_AI_Init ();
+    ai_on = 1; ai_enabled = 1;		// arm the directive executor (A_LLMChase)
+
+    if (gametic < replan) return;
+    replan = gametic + 35;		// re-plan ~1/s
+
+    pl = players[consoleplayer].mo;
+    if (!pl || pl->health <= 0) return;
+
+    AI_BuildRegistry ();			// rebuild ids (keeps still-live directives)
+
+    // the coordinatable group = monsters that can currently see the player.
+    for (i = 0; i < aient_count; i++)
+    {
+	mobj_t* m = aient[i].mo;
+	if (!m || m->health <= 0)        continue;
+	if (!(m->flags & MF_COUNTKILL))  continue;
+	if (P_CheckSight (m, pl))         seers[nseers++] = i;
+    }
+    if (nseers < 3) return;		// too few to bother -> leave them on vanilla A_Chase
+
+    // ~1/3 flank (alternating L/R for a pincer), the rest focus-fire the player.
+    for (k = 0; k < nseers; k++)
+    {
+	int idx = seers[k];
+	int order;
+	if ((k % 3) == 0) { order = side ? AIO_FLANK_R : AIO_FLANK_L; side ^= 1; }
+	else                order = AIO_FOCUS;
+	aient[idx].order      = order;
+	aient[idx].focus_id   = 0;	// FOCUS targets the player
+	aient[idx].for_tics   = 105;	// ~3 s, then auto-expires back to vanilla
+	aient[idx].after_tics = 0;
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Lifecycle
 // ---------------------------------------------------------------------------
 void P_AI_Init (void)

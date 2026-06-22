@@ -30,6 +30,7 @@
 #include "info.h"
 #include "w_wad.h"			// W_CheckNumForName -- detect overlaid DOOM2 sprites
 #include "p_ai_director.h"
+#include "p_ai_llm.h"			// P_AI_RuleTactics -- rule-based flank/focus orders
 #include "i_voice.h"			// I_Director_Say -- the spoken game-master persona
 
 // ---- tunables --------------------------------------------------------------
@@ -701,6 +702,12 @@ void P_Director_Ticker (void)
     // fallback when the LLM has gone quiet.  Pure -director always runs the FSM.
     runfsm = !dir_llm || (gametic - dir_llmlast > DIR_LLM_FALLBACK);
     if (!runfsm) return;
+
+    // Rule-based coordinated monster tactics (flank + focus-fire) -- the offline L4D
+    // director's answer to the LLM's squad orders.  Only in pure -director mode; when
+    // an LLM is present it issues tactics itself.
+    if (dir_on && !dir_llm)
+	P_AI_RuleTactics ();
 
     int exf      = P_Director_ObjProximity ();	// 0..100, ramps up near an exit/key
     int stressed = P_Director_Stressed ();	// player almost dead / out of ammo
