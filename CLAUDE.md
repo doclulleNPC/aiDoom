@@ -22,7 +22,20 @@ SDL 1.x and won't link SDL3. Use one of:
   (pkg-config) and **copies the `aidoom` binary into `run/`** (so the launcher
   finds it there). Requires the SDL3 dev package.
 - **Windows:** `nmake /f files\Makefile.msvc` (VS 2019 + SDL3 SDK) → `aidoom.exe`
-  + `SDL3.dll`, with the exe icon from `files/aidoom.rc`.
+  + `SDL3.dll`, with the exe icon from `files/aidoom.rc`. Or
+  **`build_all_win.bat`** (repo root) which finds VS via `vswhere`, sets up the
+  **x86** env, and builds the game **plus** the `tools/` apps (`aidoom_config`,
+  `gpumon`, `launcher`), copying every exe + `SDL3.dll` into `run/`.
+- **Any platform (CMake):** `cmake -B build && cmake --build build` —
+  `CMakeLists.txt` builds the game and the `aidoom_config`/`gpumon` tools, finds
+  SDL3 via `find_package` (a sibling `../SDL3` SDK on Windows, else a system
+  install), and stages all binaries + `SDL3.dll` into `run/`.
+
+The game and the **`tools/`** apps (`launcher`, `aidoom_config`, `gpumon_sdl`,
+`director`) are **separate SDL3 programs**, each with its own `tools/Makefile.msvc`
+target and `tools/build_*_{win,}.sh` script. They share `run/aidoom.cfg` and are
+staged into `run/`; see `run/README.md` for what each one does and how the
+launchers wire the game to the AI director.
 
 `build.sh` is just this (and a `cp` to `run/`):
 
@@ -110,15 +123,67 @@ suite** — verification is done by running the game.
 
 ## Architecture
 
-### LLM "AI Director" for monsters (flag-gated)
+### The AI / "Director" systems (all flag-gated, off by default)
 
-`files/p_ai_llm.c`/`.h` lets an external director (LLM/script) drive monster
-*tactics* via a TCP line protocol, or a built-in `-aidemo` director. Off unless
-`-aidirector [port]` or `-aidemo` is passed — vanilla AI otherwise. Hooks:
-`A_Chase` (`p_enemy.c`) diverts to `A_LLMChase` for directed monsters,
-`P_Ticker` calls `P_AI_Ticker`, `P_SetupLevel` calls `P_AI_Reset`. Directives are
-kept in a side-table keyed by `mobj_t*` (no struct/savegame change). Full design
-and protocol: **`AGENT_CONTROL.md` §12–13** (player control is §1–11).
+A no-argument launch is **vanilla 1993 DOOM**. Four independent, opt-in systems
+add modern AI — keep them clearly distinct:
+
+- **LLM "AI Director"** (`files/p_ai_llm.c`/`.h`, `-aidirector [port]` or the
+  built-in scripted `-aidemo`) — an external director (an LLM, a script, or the
+  demo) drives monster *tactics* (flank, fall back, focus-fire, …) over a TCP
+  line protocol. Hooks: `A_Chase` (`p_enemy.c`) diverts to `A_LLMChase` for
+  directed monsters, `P_Ticker` calls `P_AI_Ticker`, `P_SetupLevel` calls
+  `P_AI_Reset`. Directives live in a side-table keyed by `mobj_t*` (no
+  struct/savegame change). Protocol + design: **`AGENT_CONTROL.md` §12–13**
+  (player control is §1–11). The ready-to-run client is the native SDL3
+  `tools/director.c` (talks to Ollama; no Python).
+- **L4D-style rule director** (`files/p_ai_director.c`/`.h`, `-director`) —
+  *offline/rule-based*, no LLM. Tracks per-tic player STRESS (damage bursts,
+  close kills, low ammo) and runs a build-up → peak → relax spawn cycle: spawns
+  monsters out of sight behind the player while building tension, drops items
+  during relax. The LLM variant reads the same intensity in its `observe`.
+- **AI co-op companion / "buddy"** (`files/p_ai_coop.c`/`.h`, `-aicoop`) — a
+  second marine (player 2) filled by a small built-in bot each tic: acquires the
+  nearest visible monster and fires, seeks health when hurt, else follows you.
+  A real co-op player (weapons/damage/pickups/reborn all work). Has its own HUD
+  (`hu_buddy.c`, top-of-screen strip, config `show_buddy_hud`) and an optional
+  spoken voice (see below). Design docs: **`BUDDY_HUD.md`**, **`BUDDY_PORTING.md`**.
+- **Pack-hunt monster AI** (`p_enemy.c`, config `monster_pack 1`) — monsters
+  acquire the player on spawn (even with no LoS) and steer toward nearby allies,
+  so they gather and assault in groups.
+
+Related gameplay flags worth knowing: `-infight` (same-species infighting),
+`-nofriendlyfire`/`-noff` (player ↔ buddy don't hurt each other), plus free-look
+(mouse pitch, `r_main.c`/`p_user.c`) and jump (`g_game.c`/`p_user.c`).
+
+### Other major subsystems added by the fork
+
+- **Quake-style console** (`files/c_console.c`/`.h`) — toggle with **F12** or
+  **`` ` ``** (backquote); scrollback + input line over a dimmed view. Note the
+  drawer is split: `C_Responder` handles input and `C_Printf`/`C_GetLine` own the
+  text, but the actual pixels are drawn by the **SDL overlay in `i_video.c`**
+  (`C_Drawer` is a legacy no-op). Commands: `help clear echo quit god noclip give
+  map`/`warp`.
+- **MUS music playback** (`files/i_mus.c`/`.h`) — a from-scratch MUS sequencer +
+  2-operator FM synth driven by the IWAD's `GENMIDI` patches (OPL/Adlib-style, no
+  ZMusic/external dep). `MUS_Render` mixes into the same SDL audio path as SFX and
+  the OGG music in `i_sound.c`. Output is 11025 Hz stereo S16.
+- **AI buddy voice** — `-aicoop` writes spoken lines to `run/buddy_say.txt`;
+  `tools/buddy_voice.py` tails it and speaks via ElevenLabs (needs
+  `ELEVENLABS_API_KEY`). The buddy's pre-baked voice clips live in the
+  `run/buddy.wad` PWAD, generated by `tools/bake_buddy_voice.py` (mind the 8-byte
+  lump-name rule, below). Design: **`BUDDY_VOICE.md`**.
+- **Multiplayer netcode client** (`files/d_netcl.c`/`.h`) — a clean-room
+  reimplementation of the Chocolate/Crispy-Doom network protocol (connection state
+  machine + reliable layer + GAMEDATA tic windows). Transport-side **only**;
+  splicing it into `D_DoomLoop` is unfinished. Separate from the original
+  peer-to-peer `d_net.c`.
+
+There is a large set of design docs at the repo root (one per feature):
+`AGENT_CONTROL.md`, `AIDOOM_PARAMETERS.md`, `BUDDY_*.md`, `GPUMON.md`,
+`Pathfinding.md`, `VISIBILITY_CACHE.md`, `YAPB_ARCHITECTURE.md`, `Collision.md`,
+plus `LEGACY_FIXES.md` (the running log of age-of-the-code fixes). Consult the
+matching doc before touching a subsystem.
 
 ### Variable internal resolution (hi-res renderer + Video menu)
 
@@ -176,7 +241,8 @@ portable game code that calls into them through the `I_*` interface.
 - **Platform layer (`i_*`)** — the SDL implementation of the abstract `I_*` API.
   `i_video.c` (SDL_Surface framebuffer at the current resolution, `xlatekey`
   keymap, mouse grab, and `V_SetRes` runtime resolution switching — see below),
-  `i_sound.c` (SDL_audio callback mixer, software channel mixing),
+  `i_sound.c` (SDL_audio callback mixer — software SFX channels + OGG music +
+  the `i_mus.c` FM synth), `i_mus.c` (MUS music player),
   `i_system.c` (timing, zone base alloc, exit), `i_net.c` (sockets), `i_main.c`
   (`main()` → sets `myargc`/`myargv` → `D_DoomMain()`). To port or change OS/SDL
   behavior, you almost always touch only these files.
@@ -209,11 +275,12 @@ portable game code that calls into them through the `I_*` interface.
 
 - **UI & misc** — `m_menu` (in-game menus), `m_misc` (config file, screenshots),
   `m_cheat` (cheat-code FSM), `m_argv` (`M_CheckParm`), `m_random` (the fixed
-  RNG table), `hu_*` (heads-up text/messages), `st_*` (status bar), `am_map`
-  (automap), `wi_stuff` (intermission), `f_finale`/`f_wipe` (end screens, screen
-  melt), `s_sound` (sound/music driver, calls into `i_sound`), `v_video` (screen
-  buffer / patch drawing primitives), `info.c`/`tables.c` (huge generated data:
-  actor state machine and the finesine/tangent lookup tables).
+  RNG table), `hu_*` (heads-up text/messages, incl. `hu_buddy` for the co-op
+  companion HUD), `st_*` (status bar), `am_map` (automap), `wi_stuff`
+  (intermission), `f_finale`/`f_wipe` (end screens, screen melt), `c_console`
+  (developer console), `s_sound` (sound/music driver, calls into `i_sound`),
+  `v_video` (screen buffer / patch drawing primitives), `info.c`/`tables.c` (huge
+  generated data: actor state machine and the finesine/tangent lookup tables).
 
 ## Conventions specific to this codebase
 
