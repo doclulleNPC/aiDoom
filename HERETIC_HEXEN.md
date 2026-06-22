@@ -26,36 +26,58 @@ behave** — that's half 2.
 
 ## 2. Behaviour — the C port (large, staged; NOT done)
 
-To actually *spawn and fight* a Heretic gargoyle or fire the Elven Wand, the engine
-needs that actor's data + code, the DOOM way:
+### Reference: crispy-doom's C source (NOT gzdoom ZScript)
 
-- **`SPR_*`** sprite enum entries + the `sprnames[]` strings for the new sprite
-  names (e.g. Heretic `IMPX`, `MUMM`, `WIZD`, weapon `WAND`/`CrBow`…).
-- **`states[]`** — the animation/behaviour frame table (sprite, frame, tics, action,
-  next state) for every actor.
-- **`mobjinfo[]`** — the actor definition (health, speed, radius, sounds, the state
-  ids above, flags).
-- **`sfx_*`** enum + `S_sfx[]` rows pointing at the copied sound lump names.
-- **Action functions** (`A_*`) for behaviours DOOM doesn't have (e.g. Heretic's
-  staff/wand/firemace, the gargoyle, the disciple's homing, weapon "tomed" modes).
+`../crispy-doom/src/heretic/` and `…/src/hexen/` contain the **complete Heretic &
+Hexen game code in C**, same Chocolate/Doom lineage as this engine:
 
-This is the content of Heretic's/Hexen's own `info.c` + `p_*` action code — hundreds
-of states and dozens of actors **per game**, i.e. a multi-week port, not a single
-drop-in file. Doing it blindly would produce thousands of lines that don't build.
+- `heretic/info.c` (~5.6k lines): `state_t states[]` + `mobjinfo_t mobjinfo[]` —
+  the exact frame tables and actor definitions, in the SAME `{SPR_x, frame, tics,
+  A_action, nextstate, ...}` form aiDoom's `info.c` uses.
+- `heretic/p_enemy.c` (~2.7k), `p_pspr.c`, `p_inter.c`: the `A_*` action functions
+  (monster AI + weapons).
+- `hexen/` ditto (info.c ~13.7k — much bigger; Hexen also brings ACS/polyobjects).
 
-### Reference
-gzDoom defines these as ZScript under
-`../gzdoom-g4.14.2/wadsrc/static/zscript/actors/heretic/` (and `…/hexen/`) —
-`mummy.zs`, `wizard.zs`, `clink.zs`, `weaponcrossbow.zs`, `weaponblaster.zs`, … —
-which give the exact stats/states/sounds/behaviour to translate into the DOOM-style
-tables above. (crispy-doom has no Heretic/Hexen; crispy-heretic/-hexen are separate.)
+So the behaviour is **already C we can adapt**, not something to invent. That's the
+right source.
 
-### Suggested staging (one vertical slice at a time, each builds + runs)
-1. Sound table rows for the copied lumps + load `*_assets.wad`.
-2. One simple **monster** end-to-end (Heretic gargoyle / mummy): `SPR_*`, `states[]`,
-   `mobjinfo[]`, reuse DOOM action funcs where possible; let the director spawn it.
-3. One **weapon** (Elven Wand) with its fire/raise/lower states.
-4. Iterate outward (more monsters, the tomed weapon modes, Hexen's mana/inventory).
+### The real integration hurdles (why it's still a port, not a copy)
+
+Heretic/Hexen are separate games whose tables can't just be dropped in:
+
+1. **Enum collisions.** Heretic has its own `SPR_*`, `S_*` (states), `MT_*` (mobj
+   types), `sfx_*` — all colliding with DOOM's. To coexist in one binary they must be
+   **namespaced** (e.g. append Heretic entries with new values: `MT_H_MUMMY`,
+   `S_H_MUMMY_*`, `SPR_H_MUMM`, `sfx_h_*`) and the copied sprite lumps likewise can't
+   clash with DOOM sprite names of the same 4-letter code.
+2. **Action-function signature.** Heretic uses one unified
+   `void A_Foo(mobj_t*, player_t*, pspdef_t*)` for ALL actions; DOOM uses
+   `A_Chase(mobj_t*)` / `A_FireFoo(player_t*, pspdef_t*)`. The ported funcs need a
+   shim/dispatch to aiDoom's `actionf_t`.
+3. **`mobj_t` extras.** Heretic adds `special1/2` (and Hexen more); aiDoom's `mobj_t`
+   lacks them — the monster AI uses them, so add the fields (or a side-table).
+4. **Engine deltas.** Heretic's `A_Chase`, `P_DamageMobj`, ambient sounds, flend/
+   terrain, etc. differ subtly from DOOM's — port the few the chosen actors touch.
+
+### Architecture choice (decide before coding)
+
+- **(A) Additive "Heretic monsters in DOOM"** *(recommended, matches aiDoom)* — append
+  a handful of Heretic actors to DOOM's tables with namespaced enums + ported action
+  funcs in a new `files/heretic.c`; load `heretic_assets.wad`; the director spawns
+  them alongside DOOM monsters (like doom2stuff). Per-actor manual adaptation, but
+  each slice builds + runs and you get the variety immediately.
+- **(B) Full Heretic game-mode** — select Heretic's whole `info.c`/`p_*` instead of
+  DOOM's at startup when `heretic.wad` is the IWAD (what chocolate-heretic does as a
+  separate binary). Cleanest/most complete, but a much bigger dual-mode refactor.
+
+### Suggested first slice (approach A, grounded in crispy's code)
+1. Add namespaced sound rows (`sfx_h_*`) for the copied lumps; load `heretic_assets.wad`.
+2. One monster end-to-end — the **Mummy** (`MT_MUMMY`, states `S_MUMMY_*`, funcs
+   `A_Look`/`A_Chase`/`A_FaceTarget`/`A_MummyAttack` from crispy `heretic/info.c` +
+   `p_enemy.c`): copy its states/mobjinfo with `_H_` enums, shim the action sigs,
+   add `special1/2` to `mobj_t`, let the director spawn it.
+3. One weapon (Elven Wand) from `heretic/p_pspr.c`.
+4. Iterate outward; then tackle Hexen (bigger) the same way.
 
 New engine files would land as `files/heretic.c` / `files/hexen.c` (compiled by
 `build.sh`'s `*.c` glob), each a self-contained block of the above tables — added
