@@ -8,7 +8,7 @@ Yes, but it's narrower than it looks, and there's a fallback gotcha.
 
 | Aspect | With LLM | Without (rule `-director`) |
 |---|---|---|
-| **Monster tactics** | Squad orders — flank / ambush / focus-fire / fall-back — issued over TCP (`p_ai_llm.c`: `act order=…`); `A_Chase` diverts to `A_LLMChase` for directed monsters. | **None.** The rule director only *spawns/paces*; monsters use vanilla `A_Chase` (or pack-hunt with `monster_pack 1`). |
+| **Monster tactics** | Squad orders — flank / ambush / focus-fire / fall-back — issued over TCP (`p_ai_llm.c`: `act order=…`); `A_Chase` diverts to `A_LLMChase` for directed monsters. | **Same order set, rule-assigned** (`P_AI_RuleTactics`): flank / focus / ambush / fall-back by geometry + LOS. The LLM *replaces* this when actively issuing orders. |
 | **Spawn policy** | The model decides what / when / how many from the live state (`spawn type=… count=…`, `director relax`). | Fixed stress→spawn FSM curves (BUILDUP→SUSTAIN→FADE). |
 | **Buddy orders** | LLM gives the buddy high-level orders (engage/defend/regroup/goto/…). | Buddy runs purely on its built-in bot. |
 | **Director voice** | `dir:flank/ambush/focus/fallback` lines fire (from tactics). | Only phase/spawn/relax/item lines fire. |
@@ -28,11 +28,31 @@ suppressed only while the LLM is **actively** issuing commands
   (rule FSM only, no tactics). If the `director` sidecar window isn't showing live
   "round N … orders=K", the tactical layer isn't firing.
 
-## 2. Can we build coordinated monster tactics for L4D mode WITHOUT the LLM?
+## 2. Rule-based coordinated tactics — DONE (`P_AI_RuleTactics`)
 
-**Yes — and most of it already exists.** The tactical *execution* layer is completely
-LLM-agnostic; the LLM only *decides which monster gets which order*. Replace that one
-decision step with C heuristics and you have rule-based squad tactics.
+**Implemented and at parity with the LLM's `act` order set.** The tactical *execution*
+layer (`A_LLMChase`, the `aient[]` side-table) is LLM-agnostic; the LLM only *decides
+which monster gets which order*. `P_AI_RuleTactics` (`p_ai_llm.c`) now makes those same
+decisions by C heuristics every ~1 s:
+
+- **focus-fire** (`AIO_FOCUS`) — any monster with LOS to the player presses the attack.
+- **flank** (`AIO_FLANK_L/R`) — when ≥4 are visible, ~⅓ peel off (alternating L/R) for a
+  pincer (skips point-blank ones).
+- **ambush** (`AIO_AMBUSH`) — a hidden monster already camped on the player's *nearest
+  objective* (exit/key, passed in from the director) lies in wait there.
+- **fall-back** (`AIO_FALLBACK`) — a badly-wounded monster (≤¼ HP) with LOS kites/retreats
+  instead of suiciding.
+
+Orders auto-expire (`for_tics`) back to vanilla; unassigned monsters stay on `A_Chase`.
+It's **deterministic** (geometry only — demo/netplay-safe), unlike the LLM path. Called
+from the director ticker whenever the rule layer is in charge (pure `-director`, or the
+LLM has gone quiet), and **the LLM replaces it** while actively issuing orders (`runfsm`
+false → the ticker returns before the rule call, so they never fight).
+
+### How it was built (kept for reference)
+The tactical *execution* layer is completely LLM-agnostic; the LLM only *decides which
+monster gets which order*. Replacing that one decision step with C heuristics gave
+rule-based squad tactics.
 
 ### What's already there (shared, reusable)
 - **Order verbs** (`p_ai_llm.c`): `AIO_FLANK_L/R`, `AIO_AMBUSH`, `AIO_FOCUS`,
@@ -64,8 +84,13 @@ new. Effort: ~moderate (the heuristic pass; the hard part — execution — is d
 essentially porting the LLM's "decide orders" step into deterministic C, which also keeps
 demos/netplay in sync (the LLM path is non-deterministic and stays outside the tic lock).
 
-### Recommended first slice
-Flank + focus-fire only, gated behind `-director` (or a `monster_tactics 1` config):
-group monsters that can see the player, send ~⅓ to flank left/right and the rest to
-focus the player; re-plan every 35 tics. Build on `monster_pack`'s ally-awareness for
-the grouping. Add ambush/fall-back once that feels good.
+### Remaining LLM functions vs the rule director (parity status)
+- **Monster tactics (`act`)** — ✅ at parity (`P_AI_RuleTactics`, above).
+- **Spawning (`spawn type/count`)** — ✅ the rule FSM spawns richly (buildup/sustain,
+  hordes, behind-player, objective seeding/guards, exit pressure).
+- **Items (`spawn item`)** — ✅ rule FSM drops (emergency medkit/ammo, relax gifts).
+- **Pacing (`director relax`)** — ✅ rule FSM (BUILDUP→SUSTAIN→FADE).
+- **Buddy orders (`buddy order=…`)** — ⚠️ the buddy runs on its own autonomous bot in
+  both modes (engage/defend/follow/heal), so it's *functionally* covered, but the rule
+  director does not yet *issue* explicit buddy directives the way the LLM can. Lowest-
+  value gap (the bot already self-manages); a small follow-up if desired.

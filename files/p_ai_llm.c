@@ -67,6 +67,7 @@
 
 extern boolean	P_SetMobjState (mobj_t* mobj, statenum_t state);
 extern boolean	P_CheckSight (mobj_t* t1, mobj_t* t2);
+extern fixed_t	P_AproxDistance (fixed_t dx, fixed_t dy);
 
 // ---- engine internals we reuse (defined in p_enemy.c, no public header) ----
 extern void	P_NewChaseDir (mobj_t* actor);
@@ -869,15 +870,23 @@ static void AI_DemoDirector (void)
 
 // ---------------------------------------------------------------------------
 // Rule-based coordinated tactics for the offline L4D director (-director, no LLM):
-// flank + focus-fire, assigned by heuristics into the SAME directive side-table the
-// LLM uses and executed by A_LLMChase.  Deterministic (P_Random / geometry), so it
-// stays tic-locked.  Called from the director ticker in pure -director mode.
+// the full squad-order set the LLM uses (flank / focus-fire / ambush / fall-back),
+// assigned by heuristics into the SAME directive side-table and executed by
+// A_LLMChase.  Deterministic (geometry), so it stays tic-locked.  (objx,objy) =
+// the nearest objective the player is heading for (haveobj=0 if none); used for
+// ambushes.  Called from the director ticker whenever the rule layer is in charge.
 // ---------------------------------------------------------------------------
-void P_AI_RuleTactics (void)
+#define TAC_MELEE	(64*FRACUNIT)		// ~melee reach
+#define TAC_FLANK_MIN	(256*FRACUNIT)		// don't peel point-blank monsters off to flank
+#define TAC_AMBUSH_NEAR	(1024*FRACUNIT)		// camp an objective only if already this close to it
+
+void P_AI_RuleTactics (fixed_t objx, fixed_t objy, int haveobj)
 {
     static int	replan;
+    static char	los[AI_MAX];
     mobj_t*	pl;
-    int		i, seers[AI_MAX], nseers = 0, k, side = 0;
+    int		i, nseers = 0, flanked = 0, flank_budget, side = 0;
+    int		did_flank = 0, did_ambush = 0;
 
     if (!ai_inited) P_AI_Init ();
     ai_on = 1; ai_enabled = 1;		// arm the directive executor (A_LLMChase)
@@ -890,28 +899,63 @@ void P_AI_RuleTactics (void)
 
     AI_BuildRegistry ();			// rebuild ids (keeps still-live directives)
 
-    // the coordinatable group = monsters that can currently see the player.
+    // Pass 1: line-of-sight to the player (cached) -> size the visible group.
     for (i = 0; i < aient_count; i++)
     {
 	mobj_t* m = aient[i].mo;
-	if (!m || m->health <= 0)        continue;
-	if (!(m->flags & MF_COUNTKILL))  continue;
-	if (P_CheckSight (m, pl))         seers[nseers++] = i;
+	los[i] = (m && m->health > 0 && (m->flags & MF_COUNTKILL)
+		  && P_CheckSight (m, pl)) ? 1 : 0;
+	if (los[i]) nseers++;
     }
-    if (nseers < 3) return;		// too few to bother -> leave them on vanilla A_Chase
+    flank_budget = nseers / 3;		// ~1/3 of the visible group flanks (pincer)
 
-    // ~1/3 flank (alternating L/R for a pincer), the rest focus-fire the player.
-    for (k = 0; k < nseers; k++)
+    // Pass 2: assign each monster an order (or clear it back to vanilla A_Chase).
+    for (i = 0; i < aient_count; i++)
     {
-	int idx = seers[k];
-	int order;
-	if ((k % 3) == 0) { order = side ? AIO_FLANK_R : AIO_FLANK_L; side ^= 1; }
-	else                order = AIO_FOCUS;
-	aient[idx].order      = order;
-	aient[idx].focus_id   = 0;	// FOCUS targets the player
-	aient[idx].for_tics   = 105;	// ~3 s, then auto-expires back to vanilla
-	aient[idx].after_tics = 0;
+	mobj_t*	m = aient[i].mo;
+	int	order = AIO_NONE;
+	fixed_t	d;
+	int	wounded;
+
+	if (!m || m->health <= 0 || !(m->flags & MF_COUNTKILL))
+	    { aient[i].order = AIO_NONE; aient[i].for_tics = 0; continue; }
+
+	d       = P_AproxDistance (m->x - pl->x, m->y - pl->y);
+	wounded = (m->info->spawnhealth > 0 && m->health * 4 <= m->info->spawnhealth);
+
+	if (los[i])
+	{
+	    if (wounded && d > TAC_MELEE*2)
+		order = AIO_FALLBACK;				// hurt & not cornered -> kite/retreat
+	    else if (nseers >= 4 && flanked < flank_budget && d > TAC_FLANK_MIN)
+		{ order = side ? AIO_FLANK_R : AIO_FLANK_L; side ^= 1; flanked++; did_flank = 1; }
+	    else
+		order = AIO_FOCUS;				// commit: press the player
+	}
+	else if (haveobj)
+	{
+	    // No LOS but already camped on the player's objective -> lie in wait there.
+	    fixed_t mo_obj = P_AproxDistance (m->x - objx, m->y - objy);
+	    fixed_t pl_obj = P_AproxDistance (pl->x - objx, pl->y - objy);
+	    if (mo_obj < pl_obj && mo_obj < TAC_AMBUSH_NEAR)
+		{ order = AIO_AMBUSH; did_ambush = 1; }
+	}
+
+	if (order != AIO_NONE)
+	{
+	    aient[i].order      = order;
+	    aient[i].focus_id   = 0;		// FOCUS -> the player
+	    aient[i].tx = objx; aient[i].ty = objy;	// AMBUSH point (others ignore it)
+	    aient[i].for_tics   = 105;		// ~3 s, then auto-expires
+	    aient[i].after_tics = 0;
+	}
+	else
+	    { aient[i].order = AIO_NONE; aient[i].for_tics = 0; }	// -> vanilla A_Chase
     }
+
+    // Narrate the tactic (rate-limited; mirrors the LLM act handler's lines).
+    if      (did_flank)  P_Director_Say ("dir:flank",  2, 0);
+    else if (did_ambush) P_Director_Say ("dir:ambush", 2, 0);
 }
 
 // ---------------------------------------------------------------------------

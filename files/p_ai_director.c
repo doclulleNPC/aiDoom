@@ -703,14 +703,21 @@ void P_Director_Ticker (void)
     runfsm = !dir_llm || (gametic - dir_llmlast > DIR_LLM_FALLBACK);
     if (!runfsm) return;
 
-    // Rule-based coordinated monster tactics (flank + focus-fire).  We only reach here
-    // when the rule layer is in charge -- pure -director, OR an LLM director has gone
-    // quiet (disconnected / killed / between commands) for DIR_LLM_FALLBACK.  So this
-    // also serves as the LLM's TACTICAL FALLBACK: tactics keep going instead of
-    // dropping to vanilla A_Chase whenever the model isn't talking.  When the LLM is
-    // actively issuing orders runfsm is false and we returned above, so it never
-    // fights the model.
-    P_AI_RuleTactics ();
+    // Rule-based coordinated monster tactics (flank / focus / ambush / fall-back) --
+    // full parity with the LLM's `act` orders.  We only reach here when the rule layer
+    // is in charge -- pure -director, OR an LLM director has gone quiet (disconnected /
+    // killed / between commands) for DIR_LLM_FALLBACK.  So this also serves as the
+    // LLM's TACTICAL FALLBACK: tactics keep going instead of dropping to vanilla
+    // A_Chase whenever the model isn't talking.  When the LLM is actively issuing
+    // orders runfsm is false and we returned above, so it never fights the model.
+    {
+	mobj_t*	plmo = (consoleplayer >= 0 && playeringame[consoleplayer])
+			? players[consoleplayer].mo : NULL;
+	fixed_t	ox = 0, oy = 0; int haveobj = 0;
+	if (plmo && P_Director_NearestObjective (plmo->x, plmo->y, &ox, &oy) != 0x7fffffff)
+	    haveobj = 1;
+	P_AI_RuleTactics (ox, oy, haveobj);
+    }
 
     int exf      = P_Director_ObjProximity ();	// 0..100, ramps up near an exit/key
     int stressed = P_Director_Stressed ();	// player almost dead / out of ammo
