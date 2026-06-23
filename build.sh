@@ -74,7 +74,7 @@ else
 fi
 
 echo "[build] compiling aidoom $fork (SDL3 $(pkg-config --modversion sdl3)) ..."
-( cd "$src" && gcc -O2 -g -fcommon -fno-strict-aliasing -std=gnu11 \
+( cd "$src" && gcc -O2 -g -fcommon -rdynamic -fno-strict-aliasing -std=gnu11 \
     -Wno-implicit-int -Wno-implicit-function-declaration \
     -Wno-int-conversion -Wno-return-mismatch \
     -DSDL_MAIN_HANDLED $(pkg-config --cflags sdl3) \
