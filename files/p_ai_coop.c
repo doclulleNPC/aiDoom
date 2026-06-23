@@ -1052,6 +1052,27 @@ static boolean PF_IsDoorSpecial (int sp)	// push (DR) doors with no key
     return (sp == 1 || sp == 31 || sp == 117 || sp == 118);
 }
 
+// Is an openable (unlocked DR) door right in front of the buddy, within USE reach?
+// Gates the stuck-handler's USE tap so it only opens REAL doors instead of grinding
+// USE on whatever plain wall/ledge it happens to be wedged against.
+static boolean AICoop_DoorInFront (mobj_t* mo)
+{
+    int		i, fa = mo->angle >> ANGLETOFINESHIFT;
+    fixed_t	fwx = finecosine[fa], fwy = finesine[fa];
+    for (i = 0; i < numlines; i++)
+    {
+	line_t*	ld = &lines[i];
+	fixed_t	mx, my, dx, dy;
+	if (!PF_IsDoorSpecial (ld->special)) continue;			// not an openable door
+	mx = (ld->v1->x + ld->v2->x) >> 1;
+	my = (ld->v1->y + ld->v2->y) >> 1;
+	dx = mx - mo->x; dy = my - mo->y;
+	if (P_AproxDistance (dx, dy) > 96*FRACUNIT) continue;		// not adjacent
+	if (FixedMul (dx, fwx) + FixedMul (dy, fwy) > 0) return true;	// in the forward arc
+    }
+    return false;
+}
+
 // If a CLOSED push-door (unlocked DR) lies ahead toward the goal, hand back the
 // midpoint of its line in (*ox,*oy).  The BSP waypoints are sub-sector centroids,
 // which can sit behind the corridor wall beside a doorway -- so the buddy never
@@ -2311,7 +2332,9 @@ void P_AICoop_BuildCmd (void)
 	// are walking through (no longer stuck), so no second tap fires.
 	// (B) Low ledge it can't step up?  Jump it -- the player can (disabled in netgame).
 	if (!netgame && AICoop_JumpableStep (mo, stx, sty)) { cmd->buttons |= BT_JUMP; AICoop_Callout ("jump:", 2); }
-	if (doorwait == 0) { cmd->buttons |= BT_USE; doorwait = 45; AICoop_Callout ("door:", 2); }
+	// Only tap USE when a REAL door is in front -- otherwise the wedge is a plain
+	// wall/ledge and we'd just spam USE on it (jump/wiggle handles those instead).
+	if (doorwait == 0 && AICoop_DoorInFront (mo)) { cmd->buttons |= BT_USE; doorwait = 45; AICoop_Callout ("door:", 2); }
 	// Sideways wiggle to slip past a barrel / convex corner (non-door wedge).
 	cmd->sidemove += ((wig++ / 24) & 1) ? COOP_RUN : -COOP_RUN;
 	// Announce ONCE per wedge (rising edge) -- this used to fire every tic, so the
