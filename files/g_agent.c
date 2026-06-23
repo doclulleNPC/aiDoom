@@ -187,7 +187,8 @@ static void Agent_Observe (void)
 	if (th->function.acp1 != (actionf_p1)P_MobjThinker) continue;
 	m = (mobj_t*)th;
 	if (m == mo) continue;
-	if (!(m->flags & (MF_COUNTKILL|MF_SPECIAL)) && m->type != MT_BARREL) continue;
+	if (!(m->flags & (MF_COUNTKILL|MF_SPECIAL))) continue;	// monsters + pickups only (no barrels)
+	if (m->health <= 0) continue;				// skip corpses
 	d = P_AproxDistance (m->x - mo->x, m->y - mo->y);
 	if (d > AGENT_SIGHT) continue;
 	relangle = (int)(((R_PointToAngle2 (mo->x, mo->y, m->x, m->y) - mo->angle)) / (ANG45/45));
@@ -310,7 +311,7 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
     mobj_t*	mo = p->mo;
     mobj_t*	tgt;
     angle_t	want;
-    int		rem, turn, moving = 0;
+    int		rem, turn, chase = 0, los = 0;
 
     memset (cmd, 0, sizeof(*cmd));
     Agent_Poll ();
@@ -323,15 +324,32 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
     if (!tgt && in_attack) tgt = Agent_NearestMonster (mo);
 
     want = mo->angle;
-    if (tgt)               want = R_PointToAngle2 (mo->x, mo->y, tgt->x, tgt->y);
+    if (tgt)
+    {
+	// Only shoot if we can actually SEE the target -- never fire blind at a thing
+	// behind a wall.  When it's out of sight, CLOSE IN (path toward it) until we do.
+	los = P_CheckSight (mo, tgt);
+	if (los)
+	    want = R_PointToAngle2 (mo->x, mo->y, tgt->x, tgt->y);	// line up + fire
+	else
+	{
+	    fixed_t wx, wy;
+	    if (P_AICoop_NextWaypoint (mo, tgt->x, tgt->y, &wx, &wy))
+		want = R_PointToAngle2 (mo->x, mo->y, wx, wy);
+	    else
+		want = R_PointToAngle2 (mo->x, mo->y, tgt->x, tgt->y);
+	    chase = 1;							// move to get a clear shot
+	}
+    }
     else if (in_have_face) want = in_face;
     else if (in_have_goal)
     {
 	fixed_t wx, wy;
 	if (P_AICoop_NextWaypoint (mo, in_gx, in_gy, &wx, &wy))
-	    { want = R_PointToAngle2 (mo->x, mo->y, wx, wy); moving = 1; }
+	    want = R_PointToAngle2 (mo->x, mo->y, wx, wy);
+	chase = 1;
 	if (P_AproxDistance (mo->x - in_gx, mo->y - in_gy) < AGENT_REACH)
-	    { in_have_goal = 0; moving = 0; }		// arrived
+	    { in_have_goal = 0; chase = 0; }			// arrived
     }
 
     rem  = (short)((want - mo->angle) >> 16);
@@ -342,12 +360,11 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
 
     if (in_have_face && abs(rem) < 600) in_have_face = 0;	// face reached
 
-    // fire when roughly on target (auto-aim does the rest)
-    if (tgt && abs(rem) < AGENT_FACING)        cmd->buttons |= BT_ATTACK;
-    else if (in_attack && !tgt)                cmd->buttons |= BT_ATTACK;	// blind fire if asked
+    // Fire ONLY at a target we can SEE and are lined up on (auto-aim does the vertical).
+    if (tgt && los && abs(rem) < AGENT_FACING) cmd->buttons |= BT_ATTACK;
 
-    // advance toward the goal once we're roughly facing the waypoint
-    if (moving && abs(rem) < (ANG45>>16))      cmd->forwardmove = AGENT_FORWARD;
+    // Advance toward the goal / out-of-sight target once roughly facing the way.
+    if (chase && abs(rem) < (ANG45>>16))       cmd->forwardmove = AGENT_FORWARD;
 
     if (in_use)         { cmd->buttons |= BT_USE; in_use = 0; }
     if (in_weapon >= 0) { cmd->buttons |= BT_CHANGE | ((in_weapon << BT_WEAPONSHIFT) & BT_WEAPONMASK);
