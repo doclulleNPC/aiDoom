@@ -17,7 +17,12 @@ void Heretic_Init (void);
 // else they'd render as a blank (0-frame) sprite.
 int  Heretic_Available (void);
 
-// Spawn a Heretic mummy at (x,y) on the floor; NULL if unavailable.
-struct mobj_s* Heretic_SpawnMummy (fixed_t x, fixed_t y);
+// Map a name ("mummy"/"clink"/"imp"/...) to a Heretic mobjtype, or -1 if unknown
+// (empty/NULL -> mummy).
+int  Heretic_TypeByName (const char* name);
+
+// Spawn a Heretic monster (mobjtype from Heretic_TypeByName) at (x,y) on the floor;
+// NULL if unavailable or type<0.
+struct mobj_s* Heretic_Spawn (int type, fixed_t x, fixed_t y);
 
 #endif

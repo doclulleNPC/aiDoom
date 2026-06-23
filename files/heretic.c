@@ -13,9 +13,13 @@
 //
 //-----------------------------------------------------------------------------
 
+#include <string.h>
+
 #include "doomdef.h"
 #include "info.h"
 #include "m_random.h"
+#include "m_fixed.h"
+#include "tables.h"		// finecosine/finesine, ANGLETOFINESHIFT (imp charge)
 #include "sounds.h"
 #include "w_wad.h"
 #include "p_mobj.h"
@@ -37,6 +41,8 @@ extern boolean	P_CheckMeleeRange (mobj_t*);
 extern void	P_DamageMobj (mobj_t* target, mobj_t* inflictor, mobj_t* source, int damage);
 extern void	S_StartSound (void* origin, int sfx_id);
 extern mobj_t*	P_SpawnMobj (fixed_t x, fixed_t y, fixed_t z, mobjtype_t type);
+extern boolean	P_SetMobjState (mobj_t* mobj, statenum_t state);
+extern fixed_t	P_AproxDistance (fixed_t dx, fixed_t dy);
 
 // ---------------------------------------------------------------------------
 // Action functions (crispy heretic/p_enemy.c, adapted to DOOM's 1-arg signature).
@@ -49,6 +55,58 @@ void A_MummyAttack (mobj_t* actor)
     S_StartSound (actor, actor->info->attacksound);
     if (P_CheckMeleeRange (actor))
 	P_DamageMobj (actor->target, actor, actor, ((P_Random () & 7) + 1) * 2);
+}
+
+// Sabreclaw (clink): melee, (P_Random()%7)+3 = 3..9.
+void A_ClinkAttack (mobj_t* actor)
+{
+    if (!actor->target)
+	return;
+    S_StartSound (actor, actor->info->attacksound);
+    if (P_CheckMeleeRange (actor))
+	P_DamageMobj (actor->target, actor, actor, (P_Random () % 7) + 3);
+}
+
+// Gargoyle (imp): melee, 5 + (P_Random()&7) = 5..12.
+void A_ImpMeAttack (mobj_t* actor)
+{
+    if (!actor->target)
+	return;
+    S_StartSound (actor, actor->info->attacksound);
+    if (P_CheckMeleeRange (actor))
+	P_DamageMobj (actor->target, actor, actor, 5 + (P_Random () & 7));
+}
+
+// Gargoyle dive-bomb: ~25 % of the time launch a skull-fly charge at the target (DOOM's
+// MF_SKULLFLY handling damages on contact and reverts to spawnstate on impact); else
+// just keep flying.
+void A_ImpMsAttack (mobj_t* actor)
+{
+    mobj_t*	dest;
+    angle_t	an;
+    int		dist;
+
+    if (!actor->target || P_Random () > 64)
+    {
+	P_SetMobjState (actor, actor->info->seestate);
+	return;
+    }
+    dest = actor->target;
+    actor->flags |= MF_SKULLFLY;
+    S_StartSound (actor, actor->info->attacksound);
+    A_FaceTarget (actor);
+    an = actor->angle >> ANGLETOFINESHIFT;
+    actor->momx = FixedMul (12*FRACUNIT, finecosine[an]);
+    actor->momy = FixedMul (12*FRACUNIT, finesine[an]);
+    dist = P_AproxDistance (dest->x - actor->x, dest->y - actor->y) / (12*FRACUNIT);
+    if (dist < 1) dist = 1;
+    actor->momz = (dest->z + (dest->height>>1) - actor->z) / dist;
+}
+
+// Gargoyle death: drop the float so the corpse falls, and stop blocking.
+void A_ImpDeath (mobj_t* actor)
+{
+    actor->flags &= ~(MF_SOLID | MF_FLOAT | MF_NOGRAVITY);
 }
 
 // ---------------------------------------------------------------------------
@@ -115,6 +173,74 @@ void Heretic_Init (void)
     m->activesound  = sfx_bgact;
     m->flags        = MF_SOLID | MF_SHOOTABLE | MF_COUNTKILL;
     m->raisestate   = S_NULL;
+
+    // ---- Sabreclaw (clink): pure melee, no blood ----
+    ST (S_HCLK_LOOK1, SPR_HCLK,  0, 10, (actionf_p1)A_Look,        S_HCLK_LOOK2);
+    ST (S_HCLK_LOOK2, SPR_HCLK,  1, 10, (actionf_p1)A_Look,        S_HCLK_LOOK1);
+    ST (S_HCLK_WALK1, SPR_HCLK,  0,  3, (actionf_p1)A_Chase,       S_HCLK_WALK2);
+    ST (S_HCLK_WALK2, SPR_HCLK,  1,  3, (actionf_p1)A_Chase,       S_HCLK_WALK3);
+    ST (S_HCLK_WALK3, SPR_HCLK,  2,  3, (actionf_p1)A_Chase,       S_HCLK_WALK4);
+    ST (S_HCLK_WALK4, SPR_HCLK,  3,  3, (actionf_p1)A_Chase,       S_HCLK_WALK1);
+    ST (S_HCLK_ATK1,  SPR_HCLK,  4,  5, (actionf_p1)A_FaceTarget,  S_HCLK_ATK2);
+    ST (S_HCLK_ATK2,  SPR_HCLK,  5,  4, (actionf_p1)A_FaceTarget,  S_HCLK_ATK3);
+    ST (S_HCLK_ATK3,  SPR_HCLK,  6,  7, (actionf_p1)A_ClinkAttack, S_HCLK_WALK1);
+    ST (S_HCLK_PAIN1, SPR_HCLK,  7,  3, NULL,                      S_HCLK_PAIN2);
+    ST (S_HCLK_PAIN2, SPR_HCLK,  7,  3, (actionf_p1)A_Pain,        S_HCLK_WALK1);
+    ST (S_HCLK_DIE1,  SPR_HCLK,  8,  6, NULL,                      S_HCLK_DIE2);
+    ST (S_HCLK_DIE2,  SPR_HCLK,  9,  6, NULL,                      S_HCLK_DIE3);
+    ST (S_HCLK_DIE3,  SPR_HCLK, 10,  5, (actionf_p1)A_Scream,      S_HCLK_DIE4);
+    ST (S_HCLK_DIE4,  SPR_HCLK, 11,  5, (actionf_p1)A_Fall,        S_HCLK_DIE5);
+    ST (S_HCLK_DIE5,  SPR_HCLK, 12,  5, NULL,                      S_HCLK_DIE6);
+    ST (S_HCLK_DIE6,  SPR_HCLK, 13,  5, NULL,                      S_HCLK_DIE7);
+    ST (S_HCLK_DIE7,  SPR_HCLK, 14, -1, NULL,                      S_NULL);
+
+    m = &mobjinfo[MT_HCLINK];
+    m->doomednum = -1;        m->spawnstate  = S_HCLK_LOOK1; m->spawnhealth = 150;
+    m->seestate  = S_HCLK_WALK1; m->seesound  = sfx_sgtsit;  m->reactiontime = 8;
+    m->attacksound = sfx_sgtatk; m->painstate = S_HCLK_PAIN1; m->painchance = 32;
+    m->painsound = sfx_dmpain; m->meleestate = S_HCLK_ATK1;  m->missilestate = S_NULL;
+    m->deathstate = S_HCLK_DIE1; m->xdeathstate = S_NULL;    m->deathsound = sfx_sgtdth;
+    m->speed = 14; m->radius = 20*FRACUNIT; m->height = 64*FRACUNIT; m->mass = 75;
+    m->damage = 0; m->activesound = sfx_dmact;
+    m->flags = MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL|MF_NOBLOOD; m->raisestate = S_NULL;
+
+    // ---- Gargoyle (imp): flies; melee + skull-fly dive ----
+    ST (S_HIMP_LOOK1,  SPR_HIMP, 0, 10, (actionf_p1)A_Look,        S_HIMP_LOOK2);
+    ST (S_HIMP_LOOK2,  SPR_HIMP, 1, 10, (actionf_p1)A_Look,        S_HIMP_LOOK3);
+    ST (S_HIMP_LOOK3,  SPR_HIMP, 2, 10, (actionf_p1)A_Look,        S_HIMP_LOOK4);
+    ST (S_HIMP_LOOK4,  SPR_HIMP, 1, 10, (actionf_p1)A_Look,        S_HIMP_LOOK1);
+    ST (S_HIMP_FLY1,   SPR_HIMP, 0,  3, (actionf_p1)A_Chase,       S_HIMP_FLY2);
+    ST (S_HIMP_FLY2,   SPR_HIMP, 0,  3, (actionf_p1)A_Chase,       S_HIMP_FLY3);
+    ST (S_HIMP_FLY3,   SPR_HIMP, 1,  3, (actionf_p1)A_Chase,       S_HIMP_FLY4);
+    ST (S_HIMP_FLY4,   SPR_HIMP, 1,  3, (actionf_p1)A_Chase,       S_HIMP_FLY5);
+    ST (S_HIMP_FLY5,   SPR_HIMP, 2,  3, (actionf_p1)A_Chase,       S_HIMP_FLY6);
+    ST (S_HIMP_FLY6,   SPR_HIMP, 2,  3, (actionf_p1)A_Chase,       S_HIMP_FLY7);
+    ST (S_HIMP_FLY7,   SPR_HIMP, 1,  3, (actionf_p1)A_Chase,       S_HIMP_FLY8);
+    ST (S_HIMP_FLY8,   SPR_HIMP, 1,  3, (actionf_p1)A_Chase,       S_HIMP_FLY1);
+    ST (S_HIMP_MEATK1, SPR_HIMP, 3,  6, (actionf_p1)A_FaceTarget,  S_HIMP_MEATK2);
+    ST (S_HIMP_MEATK2, SPR_HIMP, 4,  6, (actionf_p1)A_FaceTarget,  S_HIMP_MEATK3);
+    ST (S_HIMP_MEATK3, SPR_HIMP, 5,  6, (actionf_p1)A_ImpMeAttack, S_HIMP_FLY1);
+    ST (S_HIMP_MSATK1, SPR_HIMP, 0, 10, (actionf_p1)A_FaceTarget,  S_HIMP_MSATK2);
+    ST (S_HIMP_MSATK2, SPR_HIMP, 1,  6, (actionf_p1)A_ImpMsAttack, S_HIMP_MSATK3);
+    ST (S_HIMP_MSATK3, SPR_HIMP, 2,  6, NULL,                      S_HIMP_MSATK4);
+    ST (S_HIMP_MSATK4, SPR_HIMP, 1,  6, NULL,                      S_HIMP_MSATK5);
+    ST (S_HIMP_MSATK5, SPR_HIMP, 0,  6, NULL,                      S_HIMP_MSATK6);
+    ST (S_HIMP_MSATK6, SPR_HIMP, 1,  6, NULL,                      S_HIMP_MSATK3);
+    ST (S_HIMP_PAIN1,  SPR_HIMP, 6,  3, NULL,                      S_HIMP_PAIN2);
+    ST (S_HIMP_PAIN2,  SPR_HIMP, 6,  3, (actionf_p1)A_Pain,        S_HIMP_FLY1);
+    ST (S_HIMP_DIE1,   SPR_HIMP, 6,  4, (actionf_p1)A_ImpDeath,    S_HIMP_DIE2);
+    ST (S_HIMP_DIE2,   SPR_HIMP, 7,  5, (actionf_p1)A_Scream,      S_HIMP_DIE3);
+    ST (S_HIMP_DIE3,   SPR_HIMP, 7, -1, NULL,                      S_NULL);
+
+    m = &mobjinfo[MT_HIMP];
+    m->doomednum = -1;        m->spawnstate  = S_HIMP_LOOK1; m->spawnhealth = 40;
+    m->seestate  = S_HIMP_FLY1; m->seesound   = sfx_sgtsit;  m->reactiontime = 8;
+    m->attacksound = sfx_sklatk; m->painstate = S_HIMP_PAIN1; m->painchance = 200;
+    m->painsound = sfx_dmpain; m->meleestate = S_HIMP_MEATK1; m->missilestate = S_HIMP_MSATK1;
+    m->deathstate = S_HIMP_DIE1; m->xdeathstate = S_NULL;    m->deathsound = sfx_skldth;
+    m->speed = 10; m->radius = 16*FRACUNIT; m->height = 36*FRACUNIT; m->mass = 50;
+    m->damage = 0; m->activesound = sfx_dmact;
+    m->flags = MF_SOLID|MF_SHOOTABLE|MF_FLOAT|MF_NOGRAVITY|MF_COUNTKILL; m->raisestate = S_NULL;
 }
 
 // hereticstuff.wad sprites loaded?  (the mummy's first frame lump)
@@ -123,9 +249,18 @@ int Heretic_Available (void)
     return W_CheckNumForName ("HMUMA1") >= 0;
 }
 
-mobj_t* Heretic_SpawnMummy (fixed_t x, fixed_t y)
+// Map a name to a Heretic mobjtype, or -1 if unknown (default "" -> mummy).
+int Heretic_TypeByName (const char* name)
 {
-    if (!Heretic_Available ())
+    if (!name || !name[0] || !strcmp (name, "mummy"))           return MT_HMUMMY;
+    if (!strcmp (name, "clink") || !strcmp (name, "sabreclaw")) return MT_HCLINK;
+    if (!strcmp (name, "imp")   || !strcmp (name, "gargoyle"))  return MT_HIMP;
+    return -1;
+}
+
+mobj_t* Heretic_Spawn (int type, fixed_t x, fixed_t y)
+{
+    if (!Heretic_Available () || type < 0)
 	return NULL;
-    return P_SpawnMobj (x, y, ONFLOORZ, MT_HMUMMY);
+    return P_SpawnMobj (x, y, ONFLOORZ, (mobjtype_t)type);
 }

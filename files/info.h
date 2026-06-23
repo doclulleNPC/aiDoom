@@ -169,6 +169,8 @@ typedef enum
     SPR_TLP2,
     // --- Heretic (additive; sprites come from hereticstuff.wad, renamed H*) ---
     SPR_HMUM,		// mummy / golem
+    SPR_HCLK,		// sabreclaw (clink)
+    SPR_HIMP,		// gargoyle (imp)
     NUMSPRITES
 
 } spritenum_t;
@@ -1149,6 +1151,22 @@ typedef enum
     S_HMUM_PAIN1, S_HMUM_PAIN2,
     S_HMUM_DIE1,  S_HMUM_DIE2,  S_HMUM_DIE3,  S_HMUM_DIE4,
     S_HMUM_DIE5,  S_HMUM_DIE6,  S_HMUM_DIE7,  S_HMUM_DIE8,
+    // Heretic sabreclaw (clink)
+    S_HCLK_LOOK1, S_HCLK_LOOK2,
+    S_HCLK_WALK1, S_HCLK_WALK2, S_HCLK_WALK3, S_HCLK_WALK4,
+    S_HCLK_ATK1,  S_HCLK_ATK2,  S_HCLK_ATK3,
+    S_HCLK_PAIN1, S_HCLK_PAIN2,
+    S_HCLK_DIE1,  S_HCLK_DIE2,  S_HCLK_DIE3,  S_HCLK_DIE4,
+    S_HCLK_DIE5,  S_HCLK_DIE6,  S_HCLK_DIE7,
+    // Heretic gargoyle (imp) -- flies, melee + skull-fly charge
+    S_HIMP_LOOK1, S_HIMP_LOOK2, S_HIMP_LOOK3, S_HIMP_LOOK4,
+    S_HIMP_FLY1,  S_HIMP_FLY2,  S_HIMP_FLY3,  S_HIMP_FLY4,
+    S_HIMP_FLY5,  S_HIMP_FLY6,  S_HIMP_FLY7,  S_HIMP_FLY8,
+    S_HIMP_MEATK1,S_HIMP_MEATK2,S_HIMP_MEATK3,
+    S_HIMP_MSATK1,S_HIMP_MSATK2,S_HIMP_MSATK3,
+    S_HIMP_MSATK4,S_HIMP_MSATK5,S_HIMP_MSATK6,
+    S_HIMP_PAIN1, S_HIMP_PAIN2,
+    S_HIMP_DIE1,  S_HIMP_DIE2,  S_HIMP_DIE3,
     NUMSTATES
 } statenum_t;
 
@@ -1309,6 +1327,8 @@ typedef enum {
     MT_MISC86,
     // --- Heretic monsters (additive; mobjinfo filled by Heretic_Init) ---
     MT_HMUMMY,		// Heretic mummy / golem
+    MT_HCLINK,		// Heretic sabreclaw
+    MT_HIMP,		// Heretic gargoyle
     NUMMOBJTYPES
 
 } mobjtype_t;

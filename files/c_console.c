@@ -337,22 +337,25 @@ static void C_Execute (char* line)
     }
     else if (!strcmp(cmd, "heretic"))
     {
-	// spawn a Heretic mummy in front of the player (needs hereticstuff.wad)
+	// spawn a Heretic monster in front of the player: heretic [mummy|clink|imp]
+	int type = Heretic_TypeByName (args);
 	if (!Heretic_Available ())
 	    C_Printf ("heretic: hereticstuff.wad not loaded (no H* sprites)");
+	else if (type < 0)
+	    C_Printf ("heretic: unknown monster '%s' (mummy|clink|imp)", args);
 	else if (pl->mo)
 	{
 	    int		fa = pl->mo->angle >> ANGLETOFINESHIFT;
 	    fixed_t	x  = pl->mo->x + FixedMul (160*FRACUNIT, finecosine[fa]);
 	    fixed_t	y  = pl->mo->y + FixedMul (160*FRACUNIT, finesine[fa]);
-	    mobj_t*	mum = Heretic_SpawnMummy (x, y);
-	    if (mum)
+	    mobj_t*	hm = Heretic_Spawn (type, x, y);
+	    if (hm)
 	    {
-		mum->target = pl->mo;
-		P_SetMobjState (mum, mum->info->seestate);	// wake it
-		C_Printf ("spawned a Heretic mummy");
+		hm->target = pl->mo;
+		P_SetMobjState (hm, hm->info->seestate);	// wake it
+		C_Printf ("spawned Heretic monster");
 	    }
-	    else C_Printf ("heretic: couldn't place the mummy");
+	    else C_Printf ("heretic: couldn't place it");
 	}
     }
     else if (!strcmp(cmd, "health") || !strcmp(cmd, "hp"))

@@ -52,7 +52,9 @@ char *sprnames[NUMSPRITES] = {
     "COL3","COL4","CAND","CBRA","COL6","TRE1","TRE2","ELEC","CEYE","FSKU",
     "COL5","TBLU","TGRN","TRED","SMBT","SMGT","SMRT","HDB1","HDB2","HDB3",
     "HDB4","HDB5","HDB6","POB1","POB2","BRS1","TLMP","TLP2",
-    "HMUM"		// Heretic mummy (SPR_HMUM) -- lumps from hereticstuff.wad
+    "HMUM",		// Heretic mummy (SPR_HMUM) -- lumps from hereticstuff.wad
+    "HCLK",		// Heretic sabreclaw
+    "HIMP"		// Heretic gargoyle
 };
 
 
