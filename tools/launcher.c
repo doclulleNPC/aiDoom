@@ -131,6 +131,10 @@
 #define COL_BANNER    COL_BANNER_R,COL_BANNER_G,COL_BANNER_B
 #define COL_TEXT      COL_TEXT_R,  COL_TEXT_G,  COL_TEXT_B
 #define COL_DIM       COL_DIM_R,   COL_DIM_G,   COL_DIM_B
+#define COL_GRAY_R    72		// disabled control (dimmer than COL_DIM)
+#define COL_GRAY_G    72
+#define COL_GRAY_B    78
+#define COL_GRAY      COL_GRAY_R,  COL_GRAY_G,  COL_GRAY_B
 #define COL_BOX_BG    COL_BOX_BG_R,COL_BOX_BG_G,COL_BOX_BG_B
 #define COL_BOX_BD    COL_BOX_BD_R,COL_BOX_BD_G,COL_BOX_BD_B
 #define COL_CHECK     COL_CHECK_R, COL_CHECK_G, COL_CHECK_B
@@ -654,6 +658,14 @@ static int hit_checkbox(float x, float y, const char* label, int mouse_px, int m
            mouse_py >= y && mouse_py <= y + CHK_BOX;
 }
 
+// A greyed-out, non-interactive checkbox -- shown when the backing PWAD is missing.
+static void draw_checkbox_disabled(float x, float y, const char* label)
+{
+    rect(x, y, CHK_BOX, CHK_BOX, COL_BOX_BG);
+    draw_rect_outline(x, y, CHK_BOX, CHK_BOX, COL_GRAY);
+    text(x + CHK_BOX + 6, y + (CHK_BOX - FONT_CH)/2, label, COL_GRAY);
+}
+
 // ----------------------------------------------------------------- launch button
 static void draw_launch_button(void)
 {
@@ -974,10 +986,13 @@ int main(int argc, char** argv)
                         if (hit_checkbox(OPT_INF_X, OPTS_Y, "Monster infight", mouse_x, mouse_y))
                             opt_infight = !opt_infight;
 
-                        // Monsters row: toggle the extra-monster WAD checkboxes.
-                        if (hit_checkbox(MON_FD_X, MONSTERS_Y, "FreeDoom", mouse_x, mouse_y))
+                        // Monsters row: toggle the extra-monster WAD checkboxes
+                        // (ignored when greyed out -- the PWAD isn't present).
+                        if (wad_present("freedoom2stuff.wad") &&
+                            hit_checkbox(MON_FD_X, MONSTERS_Y, "FreeDoom", mouse_x, mouse_y))
                             opt_freedoom = !opt_freedoom;
-                        if (hit_checkbox(MON_HER_X, MONSTERS_Y, "Heretic", mouse_x, mouse_y))
+                        if (wad_present("hereticstuff.wad") &&
+                            hit_checkbox(MON_HER_X, MONSTERS_Y, "Heretic", mouse_x, mouse_y))
                             opt_heretic = !opt_heretic;
                     }
                 }
@@ -1023,8 +1038,14 @@ int main(int argc, char** argv)
             draw_checkbox(OPT_INF_X,  OPTS_Y, opt_infight, "Monster infight");
 
             text(PAD, MONSTERS_Y + (CHK_BOX - FONT_CH)/2, "Monsters", COL_DIM);
-            draw_checkbox(MON_FD_X,  MONSTERS_Y, opt_freedoom, "FreeDoom");
-            draw_checkbox(MON_HER_X, MONSTERS_Y, opt_heretic,  "Heretic");
+            if (wad_present("freedoom2stuff.wad"))
+                draw_checkbox(MON_FD_X, MONSTERS_Y, opt_freedoom, "FreeDoom");
+            else
+                draw_checkbox_disabled(MON_FD_X, MONSTERS_Y, "FreeDoom");
+            if (wad_present("hereticstuff.wad"))
+                draw_checkbox(MON_HER_X, MONSTERS_Y, opt_heretic, "Heretic");
+            else
+                draw_checkbox_disabled(MON_HER_X, MONSTERS_Y, "Heretic");
         }
 
         draw_iwad_dropdown();
