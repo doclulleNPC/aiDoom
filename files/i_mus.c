@@ -2,17 +2,17 @@
 //-----------------------------------------------------------------------------
 //
 // DESCRIPTION:
-//	From-scratch MUS/MIDI player: a sequencer feeding a small 2-operator FM
-//	synth that is configured from the IWAD's GENMIDI instrument patches.
-//	This reproduces the Adlib/OPL *style* of the original music (per-channel
-//	FM instruments, note envelopes) without emulating the OPL chip cycle for
-//	cycle, and without ZMusic or any external library.
+//	MUS/MIDI player: a sequencer that drives the cycle-accurate Nuked-OPL3
+//	emulator (files/opl3.c, via files/i_opl.c) from the IWAD's GENMIDI
+//	instrument patches -- i.e. the *real* Adlib/OPL2 sound of the original
+//	DOOM music, no ZMusic / external library.  (This replaced an earlier
+//	from-scratch 2-operator FM approximation that only mimicked the style.)
 //
-//	Two front-ends share the one voice engine: the native DOOM MUS lump
-//	sequencer (Sequence) and a Standard MIDI File sequencer (MidiSeq) that
-//	flattens every SMF track into one tempo-aware event list (ParseMidi).
-//	Raw .mid/.smf music thus plays via the same FM voices as MUS, instead of
-//	being skipped.
+//	Two front-ends share the one OPL backend: the native DOOM MUS lump
+//	sequencer (Sequence) and a Standard MIDI File sequencer (MidiSequence)
+//	that flattens every SMF track into one tempo-aware event list. Each fires
+//	note/program/volume/pitch events at OPL_Music_*; MUS_Render lets the
+//	emulator generate the samples between events.
 //
 //-----------------------------------------------------------------------------
 
@@ -29,77 +29,18 @@
 #include "z_zone.h"
 
 #include "i_mus.h"
+#include "i_opl.h"		// Nuked-OPL3 music backend (replaces the FM-approx synth)
 
 #define MUSRATE		11025		// must match i_sound.c SAMPLERATE
 #define MUS_TICRATE	140		// MUS delays are measured in 140 Hz ticks
-#define SINBITS		12
-#define SINLEN		(1 << SINBITS)	// 4096-entry sine table
-#define SINMASK		(SINLEN - 1)
-#define MAXVOICES	24		// simultaneous notes
 
-// OPL frequency multiplier table (MULT nibble -> x0.5 .. x15).
-static const float multtab[16] =
-{ 0.5f,1,2,3,4,5,6,7,8,9,10,10,12,12,15,15 };
-
-static float	sintab[SINLEN];
-
-// ---- GENMIDI -------------------------------------------------------------
-
-// One FM operator's patch fields, extracted from a GENMIDI voice.
-typedef struct {
-    float	mult;		// frequency multiplier
-    float	level;		// output attenuation -> linear gain (0..1)
-    float	atk, dec, rel;	// envelope increments per sample
-    float	sus;		// sustain level (0..1)
-} gmop_t;
-
-typedef struct {
-    gmop_t	mod, car;	// modulator + carrier
-    float	fb;		// modulator self-feedback (0..1)
-    int		additive;	// 1 = both operators sound (AM), 0 = FM
-    int		fixed;		// fixed-pitch instrument (percussion)
-    int		fixednote;	// note to use when fixed
-} gminstr_t;
-
-static gminstr_t	instruments[175];
 static boolean		have_genmidi;
 
-// Map a 4-bit OPL rate (0=slow .. 15=fast) to a linear envelope increment
-// per sample.  Approximate: time ~ 6s / 2^rate.
-static float Rate (int r)
-{
-    float secs;
-    if (r <= 0) return 0.0f;		// never changes
-    secs = 6.0f / (float)(1 << r);
-    if (secs < 0.001f) secs = 0.001f;
-    return 1.0f / (secs * MUSRATE);
-}
-
-// Total-level / attenuation field (0..63, 0.75 dB steps) -> linear gain.
-static float Atten (int tl)
-{
-    return (float)pow (10.0, -(tl & 0x3f) * 0.0375);	// 0.75 dB per step
-}
-
-static void LoadOp (gmop_t* op, const byte* v)
-{
-    // v[0]=char(mult in low nibble) v[1]=atk/dec v[2]=sus/rel v[5]=level
-    op->mult = multtab[v[0] & 0x0f];
-    op->level = Atten (v[5]);
-    op->atk = Rate ((v[1] >> 4) & 0x0f);
-    op->dec = Rate (v[1] & 0x0f);
-    op->sus = (float)(15 - ((v[2] >> 4) & 0x0f)) / 15.0f;	// SL: 0=loud
-    op->rel = Rate (v[2] & 0x0f);
-    if (op->rel <= 0.0f) op->rel = Rate (7);			// avoid stuck notes
-}
-
+// Load the IWAD's GENMIDI patches and hand them to the OPL3 music backend (i_opl.c).
 boolean MUS_Init (void)
 {
     const byte*	lump;
-    int		i, ln;
-
-    for (i = 0; i < SINLEN; i++)
-	sintab[i] = (float)sin (2.0 * M_PI * i / SINLEN);
+    int		ln;
 
     ln = W_CheckNumForName ("GENMIDI");
     if (ln < 0)
@@ -108,42 +49,13 @@ boolean MUS_Init (void)
     if (memcmp (lump, "#OPL_II#", 8))
 	return false;
 
-    for (i = 0; i < 175; i++)
-    {
-	const byte*	e = lump + 8 + i*36;
-	gminstr_t*	in = &instruments[i];
-	unsigned short	flags = e[0] | (e[1] << 8);
-	const byte*	v1 = e + 4;		// first voice (16 bytes)
-
-	LoadOp (&in->mod, v1 + 0);
-	LoadOp (&in->car, v1 + 7);
-	in->fb = (float)((v1[6] >> 1) & 7) / 7.0f;
-	in->additive = (v1[6] & 1);
-	in->fixed = (flags & 1) != 0;
-	in->fixednote = e[3];
-    }
-    have_genmidi = true;
-    return true;
+    OPL_Music_Init (MUSRATE);
+    OPL_Music_SetGenmidi (lump, W_LumpLength (ln));
+    have_genmidi = OPL_Music_Ready ();
+    return have_genmidi;
 }
 
 // ---- MUS sequencer + voices ----------------------------------------------
-
-typedef struct {
-    int		active;
-    int		release;	// in release phase
-    int		chan, note;
-    float	vel;		// 0..1 (note velocity * channel volume snapshot)
-    gminstr_t*	in;
-    double	mphase, cphase;	// 0..1 phase accumulators
-    double	minc, cinc;	// phase increment per sample
-    float	menv, cenv;	// current envelope gains
-    int		mstate, cstate;	// 0 attack,1 decay,2 sustain,3 release
-    float	lastmod;	// for feedback
-    int		age;
-} voice_t;
-
-static voice_t		voices[MAXVOICES];
-static int		voiceage;
 
 static const byte*	score;		// MUS event stream
 static int		scorelen;
@@ -275,91 +187,19 @@ static boolean MidiRegister (const byte* data, int length)
     return mevcount > 1;
 }
 
-static double NoteInc (int note)
-{
-    // MIDI note -> Hz -> phase increment (cycles per sample).
-    double hz = 440.0 * pow (2.0, (note - 69) / 12.0);
-    return hz / MUSRATE;
-}
-
 static void StartNote (int ch, int note, int vol)
 {
-    voice_t*	v = NULL;
-    int		i, oldest = 0x7fffffff, oi = 0;
-    gminstr_t*	in;
-    int		prog;
-
-    if (ch == perc_chan)		// percussion: instrument by note
-	prog = 128 + note - 35;
-    else
-	prog = instr_ch[ch];
-    if (prog < 0 || prog > 174)
-	prog = 0;
-    in = &instruments[prog];
-
-    for (i = 0; i < MAXVOICES; i++)
-    {
-	if (!voices[i].active) { v = &voices[i]; break; }
-	if (voices[i].age < oldest) { oldest = voices[i].age; oi = i; }
-    }
-    if (!v) v = &voices[oi];		// steal oldest
-
-    v->active = 1; v->release = 0;
-    v->chan = ch; v->note = note;
-    v->in = in;
-    v->vel = (vol / 127.0f) * vol_ch[ch];
-    v->mphase = v->cphase = 0.0;
-    {
-	int n = in->fixed ? in->fixednote : note;
-	v->cinc = NoteInc (n) * in->car.mult;
-	v->minc = NoteInc (n) * in->mod.mult;
-    }
-    v->menv = v->cenv = 0.0f;
-    v->mstate = v->cstate = 0;		// attack
-    v->lastmod = 0.0f;
-    v->age = ++voiceage;
+    OPL_Music_NoteOn (ch, note, vol);	// OPL3 backend (program/volume tracked per channel)
 }
 
 static void StopNote (int ch, int note)
 {
-    int	i;
-    for (i = 0; i < MAXVOICES; i++)
-	if (voices[i].active && !voices[i].release
-	    && voices[i].chan == ch && voices[i].note == note)
-	{
-	    voices[i].release = 1;
-	    voices[i].mstate = voices[i].cstate = 3;	// release
-	}
+    OPL_Music_NoteOff (ch, note);
 }
 
 static void AllNotesOff (void)
 {
-    int i;
-    for (i = 0; i < MAXVOICES; i++)
-	voices[i].active = 0;
-}
-
-// Advance one operator's envelope one sample; returns its gain.
-static float EnvStep (int* state, float* env, const gmop_t* op)
-{
-    switch (*state)
-    {
-      case 0:	// attack
-	*env += op->atk > 0 ? op->atk : 1.0f;
-	if (*env >= 1.0f) { *env = 1.0f; *state = 1; }
-	break;
-      case 1:	// decay
-	*env -= op->dec;
-	if (*env <= op->sus) { *env = op->sus; *state = 2; }
-	break;
-      case 2:	// sustain
-	break;
-      case 3:	// release
-	*env -= op->rel;
-	if (*env < 0.0f) *env = 0.0f;
-	break;
-    }
-    return *env;
+    OPL_Music_AllNotesOff ();
 }
 
 // Read MUS events up to (and including) the next delay; sets delaysamples.
@@ -390,8 +230,8 @@ static void Sequence (void)
 		StartNote (ch, note, vol);
 	    }
 	    break;
-	  case 2:	// pitch wheel (ignored)
-	    scorepos++;
+	  case 2:	// pitch wheel (MUS byte 0..255, centre 128 -> OPL 0..127, centre 64)
+	    OPL_Music_PitchBend (ch, (score[scorepos++] & 0xff) >> 1);
 	    break;
 	  case 3:	// system event
 	    data = score[scorepos++] & 0x7f;
@@ -402,9 +242,9 @@ static void Sequence (void)
 		int ctrl = score[scorepos++] & 0x7f;
 		int val  = score[scorepos++] & 0x7f;
 		if (ctrl == 0)			// program change
-		    instr_ch[ch] = val;
+		    { instr_ch[ch] = val; OPL_Music_Program (ch, val); }
 		else if (ctrl == 3)		// channel volume
-		    vol_ch[ch] = val / 127.0f;
+		    { vol_ch[ch] = val / 127.0f; OPL_Music_ChannelVolume (ch, val); }
 	    }
 	    break;
 	  case 6:	// score end
@@ -448,8 +288,8 @@ static void MidiSequence (void)
 	{
 	  case MEV_NOTEON:  StartNote (e->ch, e->d1, e->d2); break;
 	  case MEV_NOTEOFF: StopNote  (e->ch, e->d1); break;
-	  case MEV_PROGRAM: instr_ch[e->ch] = e->d1; break;
-	  case MEV_VOLUME:  vol_ch[e->ch]  = e->d1 / 127.0f; break;
+	  case MEV_PROGRAM: instr_ch[e->ch] = e->d1; OPL_Music_Program (e->ch, e->d1); break;
+	  case MEV_VOLUME:  vol_ch[e->ch]  = e->d1 / 127.0f; OPL_Music_ChannelVolume (e->ch, e->d1); break;
 	  case MEV_CHANOFF: AllNotesOff (); break;
 	  case MEV_TEMPO:   if (mid_division > 0)
 				mid_spt = (double)e->d2 / 1e6 * MUSRATE / mid_division;
@@ -483,7 +323,8 @@ boolean MUS_Register (const void* data, int length)
 void MUS_Start (int loop)
 {
     int i;
-    AllNotesOff ();
+    OPL_Music_Reset ();				// silence + reset OPL channel state
+    OPL_Music_SetPercChannel (perc_chan);	// MUS = 15, MIDI = 9
     for (i = 0; i < 16; i++) { instr_ch[i] = 0; vol_ch[i] = 1.0f; }
     scorepos = scorestart;
     // MIDI: rewind the event list + reset tempo (default 120 BPM = 500000 us/quarter).
@@ -501,61 +342,41 @@ void MUS_Stop (void)
     finished = 1;
 }
 
+// Advance the sequencer event-by-event and let the OPL3 emulator (i_opl.c) render the
+// samples between events.  Chunked render: each pass emits up to the next timed event,
+// so register writes land on the right sample, then OPL_Music_Render fills that span.
 void MUS_Render (short* out, int frames)
 {
-    int	f, i;
+    int	done = 0;
+    int	restarts = 0;
 
-    for (f = 0; f < frames; f++)
+    if (!have_genmidi) { memset (out, 0, frames * 2 * sizeof(short)); return; }
+
+    while (done < frames)
     {
-	float	mix = 0.0f;
+	int chunk;
 
-	// advance the sequencer for this sample (MUS or MIDI front-end)
+	// fire every event due now; sets delaysamples to the gap before the next one
 	while (delaysamples <= 0.0 && !finished)
 	    seqkind ? MidiSequence () : Sequence ();
+
 	if (finished)
 	{
-	    if (looping && (score || mevbuf)) { MUS_Start (1); }
-	    else { out[f*2] = out[f*2+1] = 0; continue; }
-	}
-	delaysamples -= 1.0;
-
-	// synthesize all active voices
-	for (i = 0; i < MAXVOICES; i++)
-	{
-	    voice_t*	v = &voices[i];
-	    float	m, c, cg, mg;
-
-	    if (!v->active) continue;
-
-	    mg = EnvStep (&v->mstate, &v->menv, &v->in->mod);
-	    cg = EnvStep (&v->cstate, &v->cenv, &v->in->car);
-
-	    // modulator (with a little self-feedback)
-	    v->mphase += v->minc;
-	    if (v->mphase >= 1.0) v->mphase -= 1.0;
-	    m = sintab[(int)(v->mphase*SINLEN + v->lastmod*v->in->fb*SINLEN) & SINMASK]
-		* mg * v->in->mod.level;
-	    v->lastmod = m;
-
-	    // carrier: FM (phase-modulated by m) or additive
-	    v->cphase += v->cinc;
-	    if (v->cphase >= 1.0) v->cphase -= 1.0;
-	    if (v->in->additive)
-		c = sintab[(int)(v->cphase*SINLEN) & SINMASK] * cg * v->in->car.level + m;
+	    if (looping && (score || mevbuf) && ++restarts <= 2)
+		MUS_Start (1);				// loop (guard against empty-song spin)
 	    else
-		c = sintab[(int)(v->cphase*SINLEN + m*2.0f*SINLEN) & SINMASK]
-		    * cg * v->in->car.level;
-
-	    mix += c * v->vel;
-
-	    // retire fully-released voices
-	    if (v->release && v->cenv <= 0.0f)
-		v->active = 0;
+	    {
+		memset (out + done*2, 0, (frames-done) * 2 * sizeof(short));
+		return;
+	    }
+	    continue;
 	}
 
-	mix *= 0.35f;				// headroom for many voices
-	if (mix >  1.0f) mix =  1.0f;
-	if (mix < -1.0f) mix = -1.0f;
-	out[f*2] = out[f*2+1] = (short)(mix * 30000.0f);
+	chunk = frames - done;
+	if (delaysamples > 0.0 && delaysamples < chunk) chunk = (int)delaysamples;
+	if (chunk < 1) chunk = 1;			// always make progress
+	OPL_Music_Render (out + done*2, chunk);
+	done	     += chunk;
+	delaysamples -= chunk;
     }
 }
