@@ -96,6 +96,10 @@ static boolean P_Director_IsKey (mobj_t* mo)
 static const mobjtype_t dir_common[]   = { MT_POSSESSED, MT_SHOTGUY, MT_TROOP, MT_SERGEANT };
 static const mobjtype_t dir_special1[] = { MT_HEAD, MT_BRUISER, MT_SHADOWS, MT_SKULL };           // DOOM1-safe: caco, baron, spectre, lost soul
 static const mobjtype_t dir_special2[] = { MT_UNDEAD, MT_FATSO, MT_KNIGHT, MT_BABY, MT_CHAINGUY, MT_HEAD }; // DOOM2: revenant, mancubus, hell knight, arachnotron, chaingunner, caco
+// "Miniboss" pool for the level-exit guard -- a real threat must hold the way out
+// (general rule: defend the level end).  DOOM2 minibosses when their art is overlaid,
+// else a baron.  SafeType() resolves each to the doom2 / freedoom / DOOM1 actor.
+static const mobjtype_t dir_guards[]   = { MT_UNDEAD, MT_VILE, MT_FATSO, MT_KNIGHT, MT_BRUISER }; // revenant, arch-vile, mancubus, hell knight, baron
 
 #define DIR_TRACK	(dir_on || dir_llm)	// intensity is tracked in either mode
 
@@ -271,6 +275,15 @@ static mobjtype_t P_Director_PickType (void)
 	&& !P_Director_Stressed ())
 	return spec[P_Random () % nspec];
     return dir_common[P_Random () % (int)(sizeof(dir_common)/sizeof(dir_common[0]))];
+}
+
+// A tough miniboss to hold an objective room (the level exit).  DOOM2 miniboss when its
+// art is overlaid, else a baron -- so the way out is NEVER guarded by mere trash.
+static mobjtype_t P_Director_PickGuard (void)
+{
+    if (P_Director_Doom2Available ())
+	return dir_guards[P_Random () % (int)(sizeof(dir_guards)/sizeof(dir_guards[0]))];
+    return MT_BRUISER;		// DOOM1: the baron is the toughest reliable stand-in
 }
 
 // Is `mt` one of the "special" (tougher) monster types?  -> the Director's "big"
@@ -670,7 +683,10 @@ static void P_Director_SeedObjectives (void)
     thinker_t*	th;
     int		n;
     if (dir_exit_set)
-	for (n = 0; n < 3; n++) P_Director_SpawnGuard (P_Director_PickType (), dir_exit_x, dir_exit_y);
+    {
+	P_Director_SpawnGuard (P_Director_PickGuard (), dir_exit_x, dir_exit_y);	// a real miniboss holds the exit
+	for (n = 0; n < 2; n++) P_Director_SpawnGuard (P_Director_PickType (), dir_exit_x, dir_exit_y);	// + escorts
+    }
     for (th = thinkercap.next; th != &thinkercap; th = th->next)
     {
 	mobj_t*	mo;
