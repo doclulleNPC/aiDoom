@@ -164,6 +164,7 @@ static json* js_parse_val (const char** ps)
         json* tail = NULL;
         while (*s && *s != close)
         {
+            const char* loop0 = s;	// guard: bail if an iteration makes no progress
             char* key = NULL;
             if (obj)
             {
@@ -180,6 +181,10 @@ static json* js_parse_val (const char** ps)
             if (tail) tail->next = ch; else j->child = ch;
             tail = ch;
             if (*s == ',') s = js_skip (s + 1);
+            // Malformed input (e.g. a value strtod can't consume) could leave s
+            // unmoved -> the loop would spin forever calloc'ing children and balloon
+            // RAM to GBs.  If nothing was consumed this iteration, stop.
+            if (s == loop0) break;
         }
         if (*s == close) s++;
     }
@@ -191,7 +196,11 @@ static json* js_parse_val (const char** ps)
     else if (!strncmp (s, "true", 4))  { j->t = JBOOL; j->num = 1; s += 4; }
     else if (!strncmp (s, "false", 5)) { j->t = JBOOL; j->num = 0; s += 5; }
     else if (!strncmp (s, "null", 4))  { j->t = JNULL; s += 4; }
-    else { j->t = JNUM; j->num = strtod (s, (char**)&s); }
+    else {
+        const char* s0 = s;
+        j->t = JNUM; j->num = strtod (s, (char**)&s);
+        if (s == s0 && *s) s++;	// garbage strtod can't consume -> skip 1 char, always advance
+    }
     *ps = s;
     return j;
 }
