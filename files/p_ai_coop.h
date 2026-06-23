@@ -87,6 +87,10 @@ int  P_AICoop_AIMode (void);
 // True if the AI companion (rule -coop OR AI -aicoop) is active.
 int  P_AICoop_Active (void);
 
+// Invalidate the buddy's cached nav graph (rebuild next pathfind) -- call when map
+// passability changes mid-level, e.g. a locked door the player just unlocked.
+void P_AICoop_NavDirty (void);
+
 // Apply a director tactic to the buddy for `tics` (<=0 -> ~2 s default).  `focus`
 // is the monster to engage (NULL = nearest); x,y the BUD_GOTO point.
 void P_AICoop_SetDirective (int tactic, struct mobj_s* focus, fixed_t x, fixed_t y, int tics);

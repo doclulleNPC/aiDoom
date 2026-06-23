@@ -1349,6 +1349,16 @@ static void PF_Build (mobj_t* ref)
     free (segss);
 }
 
+// Force the navigation graph to rebuild on the next pathfind.  The graph bakes in each
+// door's passability at build time, so when the map's passability changes mid-level --
+// notably a locked door the player just unlocked (EV_VerticalDoor demotes its special) --
+// the buddy's cached route is stale.  Calling this invalidates it so the route picks up
+// the now-openable door immediately, instead of only after an A* dead-end + rebuild.
+void P_AICoop_NavDirty (void)
+{
+    pf_level = -1;
+}
+
 // Cost of crossing seg `sg` from sub-sector u to its neighbour v; -1 = blocked.
 static int PF_EdgeWeight (seg_t* sg, int u, int v)
 {
