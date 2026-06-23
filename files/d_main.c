@@ -76,6 +76,7 @@ static int access(char *file, int mode)
 #include "i_video.h"
 
 #include "g_game.h"
+#include "heretic.h"		// Heretic_Init -- additive Heretic monsters
 
 #include "hu_stuff.h"
 #include "wi_stuff.h"
@@ -1297,6 +1298,8 @@ printf("added\n");
 
     printf ("\nP_Init: Init Playloop state.\n");
     P_Init ();
+
+    Heretic_Init ();		// fill the appended Heretic monster states/mobjinfo
 
     printf ("I_Init: Setting up machine state.\n");
     I_Init ();

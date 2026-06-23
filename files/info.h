@@ -167,6 +167,8 @@ typedef enum
     SPR_BRS1,
     SPR_TLMP,
     SPR_TLP2,
+    // --- Heretic (additive; sprites come from hereticstuff.wad, renamed H*) ---
+    SPR_HMUM,		// mummy / golem
     NUMSPRITES
 
 } spritenum_t;
@@ -1140,6 +1142,13 @@ typedef enum
     S_TECH2LAMP2,
     S_TECH2LAMP3,
     S_TECH2LAMP4,
+    // --- Heretic mummy (filled at runtime by Heretic_Init in heretic.c) ---
+    S_HMUM_LOOK1, S_HMUM_LOOK2,
+    S_HMUM_WALK1, S_HMUM_WALK2, S_HMUM_WALK3, S_HMUM_WALK4,
+    S_HMUM_ATK1,  S_HMUM_ATK2,  S_HMUM_ATK3,
+    S_HMUM_PAIN1, S_HMUM_PAIN2,
+    S_HMUM_DIE1,  S_HMUM_DIE2,  S_HMUM_DIE3,  S_HMUM_DIE4,
+    S_HMUM_DIE5,  S_HMUM_DIE6,  S_HMUM_DIE7,  S_HMUM_DIE8,
     NUMSTATES
 } statenum_t;
 
@@ -1298,6 +1307,8 @@ typedef enum {
     MT_MISC84,
     MT_MISC85,
     MT_MISC86,
+    // --- Heretic monsters (additive; mobjinfo filled by Heretic_Init) ---
+    MT_HMUMMY,		// Heretic mummy / golem
     NUMMOBJTYPES
 
 } mobjtype_t;
