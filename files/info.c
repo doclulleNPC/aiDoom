@@ -56,7 +56,9 @@ char *sprnames[NUMSPRITES] = {
     "HCLK",		// Heretic sabreclaw
     "HIMP",		// Heretic gargoyle
     "HKNI",		// Heretic undead warrior (knight)
-    "HKAX"		// Heretic knight's thrown axe
+    "HKAX",		// Heretic knight's thrown axe
+    "FSKE","FFAT","FVIL","FBSP","FCPO","FBO2","FPAI","FSSW","FKEE",	// Freedoom monsters
+    "FFAB","FFBX","FMAN","FFIR","FAPL","FAPB"				// Freedoom projectiles
 };
 
 

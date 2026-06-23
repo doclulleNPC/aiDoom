@@ -77,6 +77,7 @@ static int access(char *file, int mode)
 
 #include "g_game.h"
 #include "heretic.h"		// Heretic_Init -- additive Heretic monsters
+#include "freedoom.h"		// Freedoom_Init -- cloned DOOM2 monsters (free art)
 
 #include "hu_stuff.h"
 #include "wi_stuff.h"
@@ -1300,6 +1301,7 @@ printf("added\n");
     P_Init ();
 
     Heretic_Init ();		// fill the appended Heretic monster states/mobjinfo
+    Freedoom_Init ();		// clone the DOOM2 monsters into the MT_FD_* slots
 
     printf ("I_Init: Setting up machine state.\n");
     I_Init ();

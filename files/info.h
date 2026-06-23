@@ -173,6 +173,23 @@ typedef enum
     SPR_HIMP,		// gargoyle (imp)
     SPR_HKNI,		// undead warrior (knight)
     SPR_HKAX,		// knight's thrown axe
+    // Freedoom DOOM2-exclusive monsters (renamed sprites from freedoom2stuff.wad, so
+    // they never collide with / override DOOM or doom2stuff).  See files/freedoom.c.
+    SPR_FSKE,		// revenant      (doom2 SKEL)
+    SPR_FFAT,		// mancubus      (FATT)
+    SPR_FVIL,		// arch-vile     (VILE)
+    SPR_FBSP,		// arachnotron   (BSPI)
+    SPR_FCPO,		// chaingunner   (CPOS)
+    SPR_FBO2,		// hell knight   (BOS2)
+    SPR_FPAI,		// pain elemental(PAIN)
+    SPR_FSSW,		// wolfenstein SS(SSWV)
+    SPR_FKEE,		// commander keen(KEEN)
+    SPR_FFAB,		// revenant tracer flight  (FATB)
+    SPR_FFBX,		// revenant tracer explode (FBXP)
+    SPR_FMAN,		// mancubus fireball       (MANF)
+    SPR_FFIR,		// arch-vile fire          (FIRE)
+    SPR_FAPL,		// arachnotron plasma      (APLS)
+    SPR_FAPB,		// arachnotron plasma blast(APBX)
     NUMSPRITES
 
 } spritenum_t;
@@ -1178,6 +1195,11 @@ typedef enum
     // knight's thrown axe projectile: spin (3) + explode (3)
     S_HKAX1, S_HKAX2, S_HKAX3,
     S_HKAXX1, S_HKAXX2, S_HKAXX3,
+    // Freedoom: a reserved block of state slots that freedoom.c fills at runtime by
+    // CLONING each DOOM2 monster's state graph (with the sprite remapped).  512 covers
+    // ~9 monsters + 4 projectiles (~340 states) with headroom.  See files/freedoom.c.
+    S_FD_FIRST,
+    S_FD_LAST = S_FD_FIRST + 511,
     NUMSTATES
 } statenum_t;
 
@@ -1342,6 +1364,21 @@ typedef enum {
     MT_HIMP,		// Heretic gargoyle
     MT_HKNIGHT,		// Heretic undead warrior (knight)
     MT_HKNIGHTAXE,	// Heretic knight's thrown axe (projectile)
+    // Freedoom DOOM2-exclusive monsters -- runtime clones of the DOOM2 actors with
+    // renamed sprites (files/freedoom.c).  Projectiles first (monsters reference them).
+    MT_FD_TRACER,	// revenant homing missile
+    MT_FD_FATSHOT,	// mancubus fireball
+    MT_FD_FIRE,		// arch-vile fire
+    MT_FD_ARACHPLAZ,	// arachnotron plasma
+    MT_FD_UNDEAD,	// revenant
+    MT_FD_FATSO,	// mancubus
+    MT_FD_VILE,		// arch-vile
+    MT_FD_BABY,		// arachnotron
+    MT_FD_CHAINGUY,	// chaingunner
+    MT_FD_KNIGHT,	// hell knight
+    MT_FD_PAIN,		// pain elemental
+    MT_FD_WOLFSS,	// wolfenstein SS
+    MT_FD_KEEN,		// commander keen
     NUMMOBJTYPES
 
 } mobjtype_t;

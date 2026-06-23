@@ -32,6 +32,7 @@
 
 #include "tables.h"		// finecosine, ANGLETOFINESHIFT
 #include "heretic.h"		// Heretic_SpawnMummy (console spawn)
+#include "freedoom.h"		// Freedoom monsters (console spawn)
 #include "info.h"		// mobjtype_t, MT_*
 #include "d_items.h"		// weaponinfo (give <weapon> -> its ammo)
 #include "m_fixed.h"		// FixedMul
@@ -233,6 +234,12 @@ static int C_MobjByName (const char* s)
     {
 	int h = Heretic_TypeByName (s);
 	if (h >= 0) return h;
+    }
+    // Freedoom DOOM2 monsters (revenant/mancubus/...) -- when freedoom2stuff is loaded.
+    if (s[0] && Freedoom_Available ())
+    {
+	int f = Freedoom_TypeByName (s);
+	if (f >= 0) return f;
     }
     return -1;
 }
