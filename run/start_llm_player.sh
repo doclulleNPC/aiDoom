@@ -1,36 +1,56 @@
 #!/bin/sh
-# start_llm_player.sh -- FULL LLM mode: an Ollama LLM drives the marine (-aiplayer) while
-# the rule director (-director) spawns monsters L4D-style.  Launches the game (you watch
-# the window) and the llm_player.py brain that feeds it intents.
+# start_llm_player.sh -- FULL LLM mode: an Ollama LLM drives EVERYTHING --
+#   * the MARINE   via -aiplayer  + llm_player.py        (player socket, port 31700)
+#   * the BUDDY + MONSTERS + pacing via -aidirector -aicoop + the `director` sidecar
+#                                                          (director socket, port 31666)
+# Launches the game (you watch the window) and both LLM clients, and starts the
+# director sidecar if it's present.  Both clients talk to the same Ollama server.
 #
 #   ./start_llm_player.sh [IWAD] [E M]      e.g.  ./start_llm_player.sh DOOM.WAD 1 1
 #
-# Env: AIPLAYER_PORT (31700), OLLAMA_URL (http://192.168.2.114:11434), OLLAMA_MODEL,
-#      DECISION_SECS.  Add -aidirector + the director sidecar yourself for LLM monsters.
+# Env: PLAYER_PORT (31700), DIRECTOR_PORT (31666), OLLAMA_URL/OLLAMA_MODEL (player brain),
+#      DECISION_SECS.  The director sidecar reads its Ollama host/model from run/aidoom.cfg
+#      (or its own defaults: 192.168.2.114 / mistral:7b-instruct).
 cd "$(dirname "$0")" || exit 1
 
 IWAD="${1:-DOOM.WAD}"
 EP="${2:-1}"
 MAP="${3:-1}"
-PORT="${AIPLAYER_PORT:-31700}"
-export AIPLAYER_PORT="$PORT"
+PPORT="${PLAYER_PORT:-31700}"
+DPORT="${DIRECTOR_PORT:-31666}"
+export AIPLAYER_PORT="$PPORT"
 
-if [ ! -x ./aidoom ]; then echo "aidoom not found in run/ -- build it first (./build.sh)"; exit 1; fi
+[ -x ./aidoom ] || { echo "aidoom not found in run/ -- build it first (./build.sh)"; exit 1; }
 
-echo "=== aiDoom FULL LLM mode ==="
-echo "  marine: LLM via -aiplayer $PORT   monsters: -director   map: E${EP}M${MAP}"
-echo "  ollama: ${OLLAMA_URL:-http://192.168.2.114:11434}  (override with OLLAMA_URL/OLLAMA_MODEL)"
+# director sidecar (LLM monsters + buddy).  Optional: without it the engine still runs
+# its built-in rule director (FSM) for monsters, but the LLM won't drive them or the buddy.
+DIRBIN=./director; [ -x ./director.exe ] && DIRBIN=./director.exe
+HAVE_DIR=0; [ -x "$DIRBIN" ] && HAVE_DIR=1
 
-# Game in the background so this script can run the brain; you watch the game window.
-./aidoom -iwad "$IWAD" -warp "$EP" "$MAP" -skill 3 -aiplayer "$PORT" -director &
+echo "=== aiDoom FULL LLM mode (E${EP}M${MAP}) ==="
+echo "  marine : -aiplayer $PPORT  + llm_player.py   (ollama ${OLLAMA_URL:-http://192.168.2.114:11434})"
+if [ "$HAVE_DIR" = 1 ]; then
+  echo "  buddy + monsters : -aidirector $DPORT -aicoop + $DIRBIN"
+else
+  echo "  buddy + monsters : $DIRBIN missing -> built-in rule director only (no LLM monsters/buddy)"
+fi
+
+# The game: marine socket + (LLM) director socket + an AI buddy to command.
+./aidoom -iwad "$IWAD" -warp "$EP" "$MAP" -skill 3 \
+         -aiplayer "$PPORT" -aidirector "$DPORT" -aicoop &
 GAME=$!
 
-# Give the engine a moment to open the agent socket, then drive it.
+# Let the engine open both sockets, then attach the two LLM brains.
 sleep 2
+PIDS=""
+if [ "$HAVE_DIR" = 1 ]; then
+  "$DIRBIN" --port "$DPORT" >/dev/null 2>&1 &
+  PIDS="$PIDS $!"
+fi
 python3 ./llm_player.py &
-BRAIN=$!
+PIDS="$PIDS $!"
 
-# When the game exits, stop the brain (and vice-versa).
+# When the game window closes, stop the brains (and vice-versa).
 wait "$GAME"
-kill "$BRAIN" 2>/dev/null
+kill $PIDS 2>/dev/null
 echo "=== LLM mode ended ==="
