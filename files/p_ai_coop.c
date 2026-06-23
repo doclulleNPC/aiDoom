@@ -97,6 +97,7 @@ static void AICoop_CrumbAdd (fixed_t x, fixed_t y)
 #define COOP_NEAR	(256*FRACUNIT)	// follow distance to the human
 #define YIELD_DIST	(48*FRACUNIT)	// human this close -> step out of the way
 #define COOP_KEEP	(192*FRACUNIT)	// advance toward a monster until this close
+#define COOP_STANDOFF	(512*FRACUNIT)	// default fight distance: hold here, don't charge into melee
 #define COOP_RUN	0x32		// forwardmove "run" magnitude
 #define COOP_HEAL_HP	50		// seek a med-pack below this health
 #define COOP_SAFE_HP	40		// below this HP the buddy routes home the low-danger way
@@ -2077,7 +2078,9 @@ void P_AICoop_BuildCmd (void)
 	{
 	    coop_state = 1; haveaim = 1; fire = 1; aimmon = tgt;
 	    tx = tgt->x; ty = tgt->y;
-	    movethresh = stayclose ? COOP_KEEP*2 : COOP_KEEP;	// hurt -> hang back, but still shoot
+	    // Default: fight from a standoff -- approach only to firing range and HOLD,
+	    // don't charge into melee.  Hang back further when hurt.
+	    movethresh = stayclose ? COOP_STANDOFF*3/2 : COOP_STANDOFF;
 	}
 	// idle: collect a nearby item, but ONLY while still near the human (don't
 	// wander off / linger for an item while the player walks away), and not one
