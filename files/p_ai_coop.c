@@ -2045,6 +2045,7 @@ void P_AICoop_BuildCmd (void)
 	    coop_state = 1; haveaim = 1; fire = 1; aimmon = tgt;
 	    movethresh = stayclose ? COOP_KEEP*2 : COOP_KEEP;
 	    tx = tgt->x; ty = tgt->y;
+	    avoiddamage = 1;		// don't charge into nukage/lava chasing a monster
 	}
 	// idle: collect a nearby item, but ONLY while still near the human (don't
 	// wander off / linger for an item while the player walks away), and not one
@@ -2264,8 +2265,22 @@ void P_AICoop_BuildCmd (void)
     else
 	bot->lookdir = 0;
 
+    static int	nukagetics;		// consecutive tics stuck in a damaging floor
     if (AICoop_DamagingFloor (mo->x, mo->y) && pl)
     {
+	// TRAPPED: stuck in the hazard too long (e.g. the savegame's sealed nukage room
+	// with no way out) -> teleport back to the spawn point instead of slowly dying.
+	if (++nukagetics > 4*TICRATE && coop_home_set
+	    && !AICoop_DamagingFloor (coop_home_x, coop_home_y))
+	{
+	    P_TeleportMove (mo, coop_home_x, coop_home_y);
+	    mo->angle = coop_home_angle;
+	    mo->momx = mo->momy = mo->momz = 0;
+	    nukagetics = 0;
+	    cmd->angleturn = 0;
+	    AICoop_Callout ("stuck:", 3);
+	    return;
+	}
 	// Standing in nukage/lava -- get OUT.  Bolt to the nearest human (on safe
 	// ground) and never freeze here (the avoidance below would set triedmove=0
 	// and the buddy would just stand in the hazard and die).
@@ -2280,6 +2295,7 @@ void P_AICoop_BuildCmd (void)
     }
     else
     {
+	nukagetics = 0;			// out of the hazard -> reset the trapped timer
 	triedmove = (movethresh >= 0 && dist > movethresh);
 
 	// "Close enough, hold" uses straight-line distance -- but if the human is right
