@@ -1081,6 +1081,26 @@ static boolean AICoop_LineIsDoor (line_t* ld)
     return (coop_doorline && i >= 0 && i < coop_doorline_n) ? coop_doorline[i] : false;
 }
 
+// (B) The human just opened a LOCKED door.  Let the AI buddy in on it: mark this door
+// line openable (locked specials aren't in the map-start list) AND share the matching
+// key with the buddy, so it can open the door itself and follow through afterwards.
+void P_AICoop_PlayerUnlockedDoor (line_t* line, mobj_t* opener)
+{
+    int	card = -1, i, b;
+    switch (line->special)
+    {
+      case 26: case 32: card = it_bluecard;   break;
+      case 27: case 34: card = it_yellowcard; break;
+      case 28: case 33: card = it_redcard;    break;
+      default: return;					// not a locked door
+    }
+    if (coop_doorline)					// recognise this line as a door
+	{ i = (int)(line - lines); if (i >= 0 && i < coop_doorline_n) coop_doorline[i] = true; }
+    for (b = 0; b < MAXPLAYERS; b++)			// hand the key to the other survivor(s)
+	if (playeringame[b] && (!opener || &players[b] != opener->player))
+	    players[b].cards[card] = true;
+}
+
 // (A) Is an openable door right in front of the buddy (within USE reach, roughly
 // in the facing direction)?  Used to gate the stuck-handler's USE tap so it only
 // opens REAL doors -- not "yellow" non-door lines (ledges/steps), which it should
@@ -2178,6 +2198,13 @@ void P_AICoop_BuildCmd (void)
 		&& AICoop_CanReach (mo, ddx, ddy, true))
 	    {
 		stx = ddx; sty = ddy;		// doorway in reach -> head right at it + Use
+		// PROACTIVELY tap Use the moment we're within reach of the shut door,
+		// instead of waiting to physically wedge against it (the stuck-handler
+		// USE misses on wide doors / when the BSP waypoint sits past the door,
+		// so the buddy never opened it to follow the player on `come`).
+		if (doorwait == 0
+		    && P_AproxDistance (ddx - mo->x, ddy - mo->y) < mo->radius + 64*FRACUNIT)
+		    { cmd->buttons |= BT_USE; doorwait = 45; AICoop_Callout ("door:", 2); }
 	    }
 	    else if (AICoop_CanReach (mo, goalx, goaly, true))
 	    {
