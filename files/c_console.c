@@ -36,6 +36,9 @@
 #include "info.h"		// mobjtype_t, MT_*
 #include "d_items.h"		// weaponinfo (give <weapon> -> its ammo)
 #include "m_fixed.h"		// FixedMul
+#include "w_wad.h"		// W_CheckNumForName (listmaps)
+#include "sounds.h"		// S_sfx / NUMSFX (playsound)
+#include "s_sound.h"		// S_StartSound (playsound)
 
 #include "c_console.h"
 #include "p_ai_coop.h"		// companion commands (where/come/wait/attack/report)
@@ -61,6 +64,7 @@ extern void		P_MobjThinker (mobj_t* mobj);
 #define CON_LINES	256		// scrollback ring size
 #define CON_LINEW	128
 #define CON_INPUTW	128
+#define CON_WRAP	72		// word-wrap stored output near this column (console fits ~72)
 #define LINE_STEP	9		// BASE pixels per text row (full-size font)
 
 static char	con_text[CON_LINES][CON_LINEW];
@@ -84,6 +88,28 @@ int C_Active (void) { return con_open; }
 
 
 // ---------------------------------------------------------------- output
+// Store one logical line in the scrollback, word-wrapping it across as many
+// con_text[] entries as needed so long output doesn't run off the right edge.
+static void C_StoreLine (const char* s)
+{
+    do {
+	int n = 0, brk, len;
+	while (s[n] && n < CON_WRAP) n++;
+	if (s[n])			// more follows -> prefer a break at the last space
+	{
+	    for (brk = n; brk > 0 && s[brk] != ' '; brk--) ;
+	    if (brk > 0) n = brk;	// else no space in range: hard-break at CON_WRAP
+	}
+	len = n < CON_LINEW-1 ? n : CON_LINEW-1;
+	memcpy (con_text[con_head], s, len);
+	con_text[con_head][len] = '\0';
+	con_head = (con_head + 1) % CON_LINES;
+	if (con_count < CON_LINES) con_count++;
+	s += n;
+	while (*s == ' ') s++;		// swallow the break space(s)
+    } while (*s);
+}
+
 void C_Printf (const char* fmt, ...)
 {
     char	buf[1024];
@@ -102,10 +128,7 @@ void C_Printf (const char* fmt, ...)
 	{
 	    int	last = *p == '\0';
 	    *p = '\0';
-	    strncpy (con_text[con_head], start, CON_LINEW-1);
-	    con_text[con_head][CON_LINEW-1] = '\0';
-	    con_head = (con_head + 1) % CON_LINES;
-	    if (con_count < CON_LINES) con_count++;
+	    C_StoreLine (start);	// wraps long lines into multiple rows
 	    start = p + 1;
 	    if (last) break;
 	}
@@ -400,7 +423,7 @@ static void C_Execute (char* line)
 	    { gameskill = sk-1; C_Printf ("skill = %d (applies to new maps)", sk); }
 	else C_Printf ("usage: skill <1-5>");
     }
-    else if (!strcmp(cmd, "spawn") || !strcmp(cmd, "summon"))
+    else if (!strcmp(cmd, "spawn") || !strcmp(cmd, "summon") || !strcmp(cmd, "summonfoe"))
     {
 	int t = C_MobjByName (args);
 	if (t < 0)
@@ -470,6 +493,129 @@ static void C_Execute (char* line)
 	    ST_Start ();					// re-init the status bar (widgets)
 	    C_Printf ("resurrected");
 	}
+    }
+    else if (!strcmp(cmd, "take"))
+    {
+	int w, k, i;
+	for (i = 0 ; args[i] ; i++) args[i] = tolower(args[i]);
+	if (!*args)
+	    C_Printf ("usage: take all|weapons|ammo|keys|armor|<weapon>|<key>");
+	else if (!strcmp(args,"all"))
+	    { for(i=0;i<NUMWEAPONS;i++)pl->weaponowned[i]=false; for(i=0;i<NUMAMMO;i++)pl->ammo[i]=0;
+	      for(i=0;i<NUMCARDS;i++)pl->cards[i]=false; pl->armorpoints=0;
+	      pl->weaponowned[wp_fist]=true; pl->pendingweapon=wp_fist; C_Printf("took everything."); }
+	else if (!strcmp(args,"weapons"))
+	    { for(i=1;i<NUMWEAPONS;i++)pl->weaponowned[i]=false; pl->pendingweapon=wp_fist; C_Printf("took weapons."); }
+	else if (!strcmp(args,"ammo"))    { for(i=0;i<NUMAMMO;i++)pl->ammo[i]=0; C_Printf("took ammo."); }
+	else if (!strcmp(args,"keys") || !strcmp(args,"cards")) { for(i=0;i<NUMCARDS;i++)pl->cards[i]=false; C_Printf("took keys."); }
+	else if (!strcmp(args,"armor") || !strcmp(args,"armour")) { pl->armorpoints=0; pl->armortype=0; C_Printf("took armor."); }
+	else if ((w = C_WeaponByName(args)) >= 0)
+	    { pl->weaponowned[w]=false; if(pl->readyweapon==w)pl->pendingweapon=wp_fist; C_Printf("took %s.", args); }
+	else if ((k = C_CardByName(args)) >= 0) { pl->cards[k]=false; C_Printf("took %s.", args); }
+	else C_Printf ("take: unknown '%s'", args);
+    }
+    else if (!strcmp(cmd, "fly"))
+    {
+	pl->cheats ^= CF_FLY;
+	if (!(pl->cheats & CF_FLY) && pl->mo) pl->mo->flags &= ~MF_NOGRAVITY;
+	C_Printf ("fly %s", (pl->cheats & CF_FLY)
+		  ? "ON (move forward while looking up/down to climb/dive; jump to rise)" : "off");
+    }
+    else if (!strcmp(cmd, "nextmap"))
+    {
+	extern void G_ExitLevel (void);
+	if (inlevel) { G_ExitLevel (); C_Printf ("exiting to the next map..."); }
+	else C_Printf ("nextmap: not in a level");
+    }
+    else if (!strcmp(cmd, "teleport") || !strcmp(cmd, "moveto"))
+    {
+	extern boolean P_TeleportMove (mobj_t*, fixed_t, fixed_t);
+	int tx, ty;
+	if (inlevel && pl->mo && sscanf (args, "%d %d", &tx, &ty) == 2)
+	{
+	    if (P_TeleportMove (pl->mo, tx*FRACUNIT, ty*FRACUNIT)) C_Printf ("teleported to %d, %d", tx, ty);
+	    else C_Printf ("teleport: blocked at %d, %d", tx, ty);
+	}
+	else C_Printf ("usage: teleport <x> <y>   (you are at %d, %d)",
+		       pl->mo ? pl->mo->x>>16 : 0, pl->mo ? pl->mo->y>>16 : 0);
+    }
+    else if (!strcmp(cmd, "linetarget"))
+    {
+	extern mobj_t* linetarget;
+	extern fixed_t P_AimLineAttack (mobj_t*, angle_t, fixed_t);
+	if (inlevel && pl->mo)
+	{
+	    P_AimLineAttack (pl->mo, pl->mo->angle, 16*64*FRACUNIT);
+	    if (linetarget)
+		C_Printf ("linetarget: mobjtype %d, health %d, at %d,%d",
+			  linetarget->type, linetarget->health, linetarget->x>>16, linetarget->y>>16);
+	    else C_Printf ("linetarget: nothing in your crosshair");
+	}
+    }
+    else if (!strcmp(cmd, "countitems"))
+    {
+	int items = 0; thinker_t* th;
+	for (th = thinkercap.next ; th != &thinkercap ; th = th->next)
+	{
+	    if (th->function.acp1 != (actionf_p1)P_MobjThinker) continue;
+	    if (((mobj_t*)th)->flags & MF_COUNTITEM) items++;
+	}
+	C_Printf ("items remaining in this map: %d", items);
+    }
+    else if (!strcmp(cmd, "playsound"))
+    {
+	int i, found = -1;
+	for (i = 1 ; i < NUMSFX ; i++)
+	    if (S_sfx[i].name && !strcasecmp (S_sfx[i].name, args)) { found = i; break; }
+	if (found >= 0) { S_StartSound (NULL, found); C_Printf ("played %s", args); }
+	else C_Printf ("playsound: no sound named '%s' (try e.g. pistol, dsdoor, dspodth)", args);
+    }
+    else if (!strcmp(cmd, "mapinfo"))
+    {
+	extern int numlines, numsectors;
+	int mon = 0, items = 0; thinker_t* th;
+	for (th = thinkercap.next ; th != &thinkercap ; th = th->next)
+	{
+	    mobj_t* m;
+	    if (th->function.acp1 != (actionf_p1)P_MobjThinker) continue;
+	    m = (mobj_t*)th;
+	    if ((m->flags & MF_COUNTKILL) && m->health > 0) mon++;
+	    if (m->flags & MF_COUNTITEM) items++;
+	}
+	if (gamemode == commercial) C_Printf ("MAP%02d", gamemap);
+	else                        C_Printf ("E%dM%d", gameepisode, gamemap);
+	C_Printf ("  lines=%d sectors=%d  live monsters=%d items=%d",
+		  numlines, numsectors, mon, items);
+    }
+    else if (!strcmp(cmd, "mapchecksum"))
+    {
+	extern int numlines, numsectors, numvertexes;
+	unsigned h = (unsigned)(gameepisode*100 + gamemap);
+	h = h*131u + (unsigned)numlines; h = h*131u + (unsigned)numsectors; h = h*131u + (unsigned)numvertexes;
+	C_Printf ("mapchecksum E%dM%d: %08x", gameepisode, gamemap, h);
+    }
+    else if (!strcmp(cmd, "listmaps"))
+    {
+	char nm[16], line[200]; int e, m, cnt = 0;
+	line[0] = 0;
+	if (gamemode == commercial)
+	    for (m = 1 ; m <= 32 ; m++)
+	    { snprintf(nm,sizeof nm,"MAP%02d",m); if (W_CheckNumForName(nm)>=0)
+	      { char b[8]; snprintf(b,sizeof b,"%d ",m); strncat(line,b,sizeof line-strlen(line)-1); cnt++; } }
+	else
+	    for (e = 1 ; e <= 4 ; e++) for (m = 1 ; m <= 9 ; m++)
+	    { snprintf(nm,sizeof nm,"E%dM%d",e,m); if (W_CheckNumForName(nm)>=0)
+	      { char b[8]; snprintf(b,sizeof b,"E%dM%d ",e,m); strncat(line,b,sizeof line-strlen(line)-1); cnt++; } }
+	C_Printf ("%d maps: %s", cnt, line);
+    }
+    else if (!strcmp(cmd, "dumpspawnables"))
+    {
+	C_Printf ("DOOM: imp demon spectre baron zombie shotgunner lostsoul barrel cacodemon");
+	if (gamemode == commercial || Freedoom_Available ())
+	    C_Printf ("DOOM2: revenant mancubus archvile arachnotron chaingunner hellknight painelemental ss keen");
+	if (Heretic_Available ())
+	    C_Printf ("Heretic: mummy clink gargoyle knight");
+	C_Printf ("spawn with: summon | summonfriend | summonfoe <name>");
     }
     else if (!strcmp(cmd, "where") || !strcmp(cmd, "buddy") || !strcmp(cmd, "comp"))
     {

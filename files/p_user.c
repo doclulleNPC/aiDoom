@@ -176,8 +176,18 @@ void P_MovePlayer (player_t* player)
     //  if not onground.
     onground = (player->mo->z <= player->mo->floorz);
 
+    // Fly cheat (console `fly`): float, thrust freely in the air, climb/descend by
+    // looking up/down while moving forward, and jump to rise.
+    if (player->cheats & CF_FLY)
+    {
+	player->mo->flags |= MF_NOGRAVITY;
+	onground = true;					// allow thrust off the ground
+	player->mo->momz = FixedMul (P_PlayerLookSlope (player->mo), cmd->forwardmove * 2048);
+	if (cmd->buttons & BT_JUMP) player->mo->momz = 8*FRACUNIT;
+    }
+
     // MOD: jump -- an upward impulse while on the ground, with an "oof" grunt.
-    if ((cmd->buttons & BT_JUMP) && onground)
+    if ((cmd->buttons & BT_JUMP) && onground && !(player->cheats & CF_FLY))
     {
 	player->mo->momz = JUMPVELOCITY;
 	S_StartSound (player->mo, sfx_oof);
