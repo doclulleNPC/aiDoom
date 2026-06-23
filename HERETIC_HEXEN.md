@@ -24,7 +24,30 @@ python3 tools/extract_game_assets.py --src ID0/freedoom2.wad --out ID0/freedoom2
 Result is a palette-correct WAD of the graphics/sounds. **This does not make them
 behave** — that's half 2.
 
-## 2. Behaviour — the C port (large, staged; NOT done)
+## 2. Behaviour — the C port (foundation + first monster DONE; rest staged)
+
+### Status
+- **Infrastructure DONE** (`files/heretic.c` + `heretic.h`): Heretic monsters are
+  appended to the engine's `states[]`/`mobjinfo[]` at runtime via `Heretic_Init()`
+  (called from `D_DoomMain` after `P_Init`), so info.c's giant generated initializers
+  stay untouched. Enum slots (`SPR_HMUM`, `S_HMUM_*`, `MT_HMUMMY`) live at the end of
+  `spritenum_t`/`statenum_t`/`mobjtype_t`; `"HMUM"` added to `sprnames[]`. Sprites come
+  from `hereticstuff.wad` (renamed `H*`). Safe without the wad (0-frame sprite, gated spawn).
+- **Mummy DONE**: ported from crispy `heretic/info.c` + `p_enemy.c` (`A_MummyAttack` =
+  HITDICE melee), with A_Look/Chase/FaceTarget/Pain/Scream/Fall. Spawn via the `heretic`
+  console command. Verified: boots with/without the wad; spawns, renders, fights, dies.
+
+### Remaining (each monster = the same pattern; weapons are a bigger stage)
+- More monsters: gargoyle (imp), sabreclaw (clink), undead warrior (knight), weredragon
+  (beast), disciple (wizard) [melee/simple first], then ranged/boss (ophidian, iron lich,
+  maulotaur, d'sparil) which need their projectile actors + custom A_* (homing, etc.).
+- Authentic Heretic **sounds** (currently DOOM SFX are reused): extend `sfxenum_t` +
+  `S_sfx[]` with `sfx_h_*` rows for the lumps `extract_heretic_monsters.py` copied.
+- **Weapons** (staff/gauntlets/wand/crossbow/dragonclaw/hellstaff/phoenix/firemace +
+  tomed modes) from `heretic/p_pspr.c` — a separate, larger stage.
+- Director wiring so it spawns the Heretic monsters alongside DOOM ones.
+
+### Original plan (kept for reference)
 
 ### Reference: crispy-doom's C source (NOT gzdoom ZScript)
 
