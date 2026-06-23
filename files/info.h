@@ -171,6 +171,8 @@ typedef enum
     SPR_HMUM,		// mummy / golem
     SPR_HCLK,		// sabreclaw (clink)
     SPR_HIMP,		// gargoyle (imp)
+    SPR_HKNI,		// undead warrior (knight)
+    SPR_HKAX,		// knight's thrown axe
     NUMSPRITES
 
 } spritenum_t;
@@ -1167,6 +1169,15 @@ typedef enum
     S_HIMP_MSATK4,S_HIMP_MSATK5,S_HIMP_MSATK6,
     S_HIMP_PAIN1, S_HIMP_PAIN2,
     S_HIMP_DIE1,  S_HIMP_DIE2,  S_HIMP_DIE3,
+    // undead warrior (knight): STND, WALK, ATK (melee or throw axe), PAIN, DIE
+    S_HKNI_STND1, S_HKNI_STND2,
+    S_HKNI_WALK1, S_HKNI_WALK2, S_HKNI_WALK3, S_HKNI_WALK4,
+    S_HKNI_ATK1,  S_HKNI_ATK2,  S_HKNI_ATK3,  S_HKNI_ATK4, S_HKNI_ATK5, S_HKNI_ATK6,
+    S_HKNI_PAIN1, S_HKNI_PAIN2,
+    S_HKNI_DIE1,  S_HKNI_DIE2,  S_HKNI_DIE3,  S_HKNI_DIE4, S_HKNI_DIE5, S_HKNI_DIE6, S_HKNI_DIE7,
+    // knight's thrown axe projectile: spin (3) + explode (3)
+    S_HKAX1, S_HKAX2, S_HKAX3,
+    S_HKAXX1, S_HKAXX2, S_HKAXX3,
     NUMSTATES
 } statenum_t;
 
@@ -1329,6 +1340,8 @@ typedef enum {
     MT_HMUMMY,		// Heretic mummy / golem
     MT_HCLINK,		// Heretic sabreclaw
     MT_HIMP,		// Heretic gargoyle
+    MT_HKNIGHT,		// Heretic undead warrior (knight)
+    MT_HKNIGHTAXE,	// Heretic knight's thrown axe (projectile)
     NUMMOBJTYPES
 
 } mobjtype_t;

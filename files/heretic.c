@@ -44,6 +44,7 @@ extern mobj_t*	P_SpawnMobj (fixed_t x, fixed_t y, fixed_t z, mobjtype_t type);
 extern boolean	P_SetMobjState (mobj_t* mobj, statenum_t state);
 extern fixed_t	P_AproxDistance (fixed_t dx, fixed_t dy);
 extern mobj_t*	P_SpawnMonsterChecked (fixed_t x, fixed_t y, mobjtype_t type);
+extern mobj_t*	P_SpawnMissile (mobj_t* source, mobj_t* dest, mobjtype_t type);
 
 // ---------------------------------------------------------------------------
 // Action functions (crispy heretic/p_enemy.c, adapted to DOOM's 1-arg signature).
@@ -108,6 +109,26 @@ void A_ImpMsAttack (mobj_t* actor)
 void A_ImpDeath (mobj_t* actor)
 {
     actor->flags &= ~(MF_SOLID | MF_FLOAT | MF_NOGRAVITY);
+}
+
+// Undead warrior (knight): melee HITDICE(3) = 3..24, else hurl a spinning axe.
+void A_KnightAttack (mobj_t* actor)
+{
+    if (!actor->target)
+	return;
+    if (P_CheckMeleeRange (actor))
+    {
+	P_DamageMobj (actor->target, actor, actor, ((P_Random () & 7) + 1) * 3);
+	return;
+    }
+    S_StartSound (actor, actor->info->attacksound);
+    P_SpawnMissile (actor, actor->target, MT_HKNIGHTAXE);	// throw the axe
+}
+
+// Looping whoosh while the thrown axe spins through the air.
+void A_ContMobjSound (mobj_t* actor)
+{
+    S_StartSound (actor, sfx_firsht);
 }
 
 // ---------------------------------------------------------------------------
@@ -242,6 +263,57 @@ void Heretic_Init (void)
     m->speed = 10; m->radius = 16*FRACUNIT; m->height = 36*FRACUNIT; m->mass = 50;
     m->damage = 0; m->activesound = sfx_dmact;
     m->flags = MF_SOLID|MF_SHOOTABLE|MF_FLOAT|MF_NOGRAVITY|MF_COUNTKILL; m->raisestate = S_NULL;
+
+    // ---- Undead warrior (knight): melee + thrown spinning axe ----
+    ST (S_HKNI_STND1, SPR_HKNI,  0, 10, (actionf_p1)A_Look,        S_HKNI_STND2);
+    ST (S_HKNI_STND2, SPR_HKNI,  1, 10, (actionf_p1)A_Look,        S_HKNI_STND1);
+    ST (S_HKNI_WALK1, SPR_HKNI,  0,  4, (actionf_p1)A_Chase,       S_HKNI_WALK2);
+    ST (S_HKNI_WALK2, SPR_HKNI,  1,  4, (actionf_p1)A_Chase,       S_HKNI_WALK3);
+    ST (S_HKNI_WALK3, SPR_HKNI,  2,  4, (actionf_p1)A_Chase,       S_HKNI_WALK4);
+    ST (S_HKNI_WALK4, SPR_HKNI,  3,  4, (actionf_p1)A_Chase,       S_HKNI_WALK1);
+    ST (S_HKNI_ATK1,  SPR_HKNI,  4, 10, (actionf_p1)A_FaceTarget,  S_HKNI_ATK2);
+    ST (S_HKNI_ATK2,  SPR_HKNI,  5,  8, (actionf_p1)A_FaceTarget,  S_HKNI_ATK3);
+    ST (S_HKNI_ATK3,  SPR_HKNI,  6,  8, (actionf_p1)A_KnightAttack,S_HKNI_ATK4);
+    ST (S_HKNI_ATK4,  SPR_HKNI,  4, 10, (actionf_p1)A_FaceTarget,  S_HKNI_ATK5);
+    ST (S_HKNI_ATK5,  SPR_HKNI,  5,  8, (actionf_p1)A_FaceTarget,  S_HKNI_ATK6);
+    ST (S_HKNI_ATK6,  SPR_HKNI,  6,  8, (actionf_p1)A_KnightAttack,S_HKNI_WALK1);
+    ST (S_HKNI_PAIN1, SPR_HKNI,  7,  3, NULL,                      S_HKNI_PAIN2);
+    ST (S_HKNI_PAIN2, SPR_HKNI,  7,  3, (actionf_p1)A_Pain,        S_HKNI_WALK1);
+    ST (S_HKNI_DIE1,  SPR_HKNI,  8,  6, NULL,                      S_HKNI_DIE2);
+    ST (S_HKNI_DIE2,  SPR_HKNI,  9,  6, (actionf_p1)A_Scream,      S_HKNI_DIE3);
+    ST (S_HKNI_DIE3,  SPR_HKNI, 10,  6, NULL,                      S_HKNI_DIE4);
+    ST (S_HKNI_DIE4,  SPR_HKNI, 11,  6, (actionf_p1)A_Fall,        S_HKNI_DIE5);
+    ST (S_HKNI_DIE5,  SPR_HKNI, 12,  6, NULL,                      S_HKNI_DIE6);
+    ST (S_HKNI_DIE6,  SPR_HKNI, 13,  6, NULL,                      S_HKNI_DIE7);
+    ST (S_HKNI_DIE7,  SPR_HKNI, 14, -1, NULL,                      S_NULL);
+
+    // thrown axe projectile (sprites full-bright: frame|32768); spin loops, then explode
+    ST (S_HKAX1,  SPR_HKAX, 32768, 3, (actionf_p1)A_ContMobjSound, S_HKAX2);
+    ST (S_HKAX2,  SPR_HKAX, 32769, 3, NULL,                        S_HKAX3);
+    ST (S_HKAX3,  SPR_HKAX, 32770, 3, NULL,                        S_HKAX1);
+    ST (S_HKAXX1, SPR_HKAX, 32771, 6, NULL,                        S_HKAXX2);
+    ST (S_HKAXX2, SPR_HKAX, 32772, 6, NULL,                        S_HKAXX3);
+    ST (S_HKAXX3, SPR_HKAX, 32773, 6, NULL,                        S_NULL);
+
+    m = &mobjinfo[MT_HKNIGHT];
+    m->doomednum = -1;        m->spawnstate  = S_HKNI_STND1; m->spawnhealth = 200;
+    m->seestate  = S_HKNI_WALK1; m->seesound  = sfx_kntsit;  m->reactiontime = 8;
+    m->attacksound = sfx_firsht; m->painstate = S_HKNI_PAIN1; m->painchance = 100;
+    m->painsound = sfx_dmpain; m->meleestate = S_HKNI_ATK1;  m->missilestate = S_HKNI_ATK1;
+    m->deathstate = S_HKNI_DIE1; m->xdeathstate = S_NULL;    m->deathsound = sfx_kntdth;
+    m->speed = 12; m->radius = 24*FRACUNIT; m->height = 78*FRACUNIT; m->mass = 150;
+    m->damage = 0; m->activesound = sfx_dmact;
+    m->flags = MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL; m->raisestate = S_NULL;
+
+    m = &mobjinfo[MT_HKNIGHTAXE];
+    m->doomednum = -1;        m->spawnstate  = S_HKAX1;      m->spawnhealth = 1000;
+    m->seestate  = S_NULL;       m->seesound  = sfx_None;    m->reactiontime = 8;
+    m->attacksound = sfx_None;   m->painstate = S_NULL;      m->painchance = 0;
+    m->painsound = sfx_None;     m->meleestate = S_NULL;     m->missilestate = S_NULL;
+    m->deathstate = S_HKAXX1;    m->xdeathstate = S_NULL;    m->deathsound = sfx_firxpl;
+    m->speed = 9*FRACUNIT; m->radius = 10*FRACUNIT; m->height = 8*FRACUNIT; m->mass = 100;
+    m->damage = 2; m->activesound = sfx_None;
+    m->flags = MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY; m->raisestate = S_NULL;
 }
 
 // hereticstuff.wad sprites loaded?  (the mummy's first frame lump)
@@ -256,6 +328,7 @@ int Heretic_TypeByName (const char* name)
     if (!name || !name[0] || !strcmp (name, "mummy"))           return MT_HMUMMY;
     if (!strcmp (name, "clink") || !strcmp (name, "sabreclaw")) return MT_HCLINK;
     if (!strcmp (name, "imp")   || !strcmp (name, "gargoyle"))  return MT_HIMP;
+    if (!strcmp (name, "knight")|| !strcmp (name, "undead"))    return MT_HKNIGHT;
     return -1;
 }
 

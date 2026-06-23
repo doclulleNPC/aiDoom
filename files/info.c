@@ -54,7 +54,9 @@ char *sprnames[NUMSPRITES] = {
     "HDB4","HDB5","HDB6","POB1","POB2","BRS1","TLMP","TLP2",
     "HMUM",		// Heretic mummy (SPR_HMUM) -- lumps from hereticstuff.wad
     "HCLK",		// Heretic sabreclaw
-    "HIMP"		// Heretic gargoyle
+    "HIMP",		// Heretic gargoyle
+    "HKNI",		// Heretic undead warrior (knight)
+    "HKAX"		// Heretic knight's thrown axe
 };
 
 
