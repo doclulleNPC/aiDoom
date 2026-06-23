@@ -55,7 +55,7 @@
 
 // --- Layout (BASE = 320x200 reference, scaled at runtime) ---
 #define WINW 560
-#define WINH 504
+#define WINH 440
 #define PAD 12
 
 // Vertical bands, BASE pixels (we scale 2x for 320->640 feel on a 560px wide
@@ -63,22 +63,22 @@
 #define BANNER_H  80
 // The four AI rows are evenly spaced by their VISUAL centres (Δ64): mode rows centre
 // their content at Y+BUDDY_H/2 (=+30), the Options checkboxes at Y+CHK_BOX/2 (=+8).
-// -> centres 120 / 184 / 248 / 312, so the gaps Buddy-Monster-Skill-Options are equal
-// (previously 90/68/46 with Skill's 60px box even overlapping the Options row).
+// Buddy/Monster/Skill are tightly grouped (centres 120/152/184, Δ32); Options sits
+// a row-gap below (centre 248) as a visual separator from the toggle checkboxes.
 #define BUDDY_Y   90
 #define BUDDY_H   60
-#define MON_Y     154
+#define MON_Y     122
 #define MON_H     60
-#define SKILL_Y   218			// difficulty row (5 pills)
+#define SKILL_Y   154			// difficulty row (5 pills)
 #define SKILL_H   40
-#define OPTS_Y    304			// toggle row (no-friendly-fire / infight); centre 312
+#define OPTS_Y    240			// toggle row; centre 248 (Skill-Options gap kept as a separator)
 #define CHK_BOX   16			// checkbox square size
 #define OPT_NOFF_X (PAD + 90)		// "No friendly fire" checkbox
 #define OPT_INF_X  (PAD + 300)		// "Monster infight" checkbox
-#define IWAD_Y    346
+#define IWAD_Y    282
 #define IWAD_H    22
 #define IWAD_DD_H 80			// dropdown open height
-#define LAUNCH_Y  456
+#define LAUNCH_Y  392
 #define LAUNCH_H  34
 
 // Colours (RGB).
