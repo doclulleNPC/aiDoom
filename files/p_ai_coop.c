@@ -1588,16 +1588,28 @@ static boolean AICoop_JumpableStep (mobj_t* mo, fixed_t gx, fixed_t gy)
 
 // (D) A live explosive barrel within blast range of the buddy?  If so it holds fire --
 // its own shot could detonate a point-blank barrel and gib it (cf. the rocket/BFG guard).
-static boolean AICoop_BarrelNear (mobj_t* mo)
+// A barrel close enough that OUR shot at `tgt` could detonate it and catch us in the
+// blast.  Only counts barrels our shot could actually hit: within blast range, roughly
+// in the firing direction toward the target, AND in line of sight -- a barrel behind a
+// wall (or behind us) is harmless and must not stop the buddy shooting the monster.
+static boolean AICoop_BarrelNear (mobj_t* mo, mobj_t* tgt)
 {
-    thinker_t* th;
+    thinker_t*	th;
+    angle_t	at = tgt ? R_PointToAngle2 (mo->x, mo->y, tgt->x, tgt->y) : 0;
     for (th = thinkercap.next; th != &thinkercap; th = th->next)
     {
 	mobj_t* m;
 	if (th->function.acp1 != (actionf_p1)P_MobjThinker) continue;
 	m = (mobj_t*)th;
 	if (m->type != MT_BARREL || m->health <= 0) continue;
-	if (P_AproxDistance (m->x - mo->x, m->y - mo->y) < COOP_BLAST_SAFE) return true;
+	if (P_AproxDistance (m->x - mo->x, m->y - mo->y) >= COOP_BLAST_SAFE) continue;
+	if (tgt)
+	{
+	    angle_t d = R_PointToAngle2 (mo->x, mo->y, m->x, m->y) - at;
+	    if (d > ANG90 && d < ANG270) continue;	// >90 deg off the firing line -> won't hit it
+	}
+	if (!P_CheckSight (mo, m)) continue;		// behind a wall -> our shot can't reach it
+	return true;
     }
     return false;
 }
@@ -2194,7 +2206,7 @@ void P_AICoop_BuildCmd (void)
 	    }
 	    else if (linetarget && abs(rem) < COOP_FACING && react_timer == 0 && !splash_close)
 	    {
-		if (AICoop_BarrelNear (mo))			// (D) don't detonate a barrel on ourselves
+		if (AICoop_BarrelNear (mo, aimmon))		// (D) don't detonate a barrel on ourselves
 		    AICoop_Callout ("barrel:", 3);
 		else
 		{
