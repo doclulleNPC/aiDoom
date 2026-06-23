@@ -241,10 +241,26 @@ static int P_Director_LiveMonsters (void)
     return n;
 }
 
+// DOOM2-tier monsters can be used if we're in DOOM2, OR a DOOM1 game has the DOOM2
+// sprites overlaid -- doom2stuff.wad (SKEL...) or freedoom2stuff.wad (FSKE..., the
+// renamed Freedoom clones).  SafeType() maps each type to whatever art exists.
+//
+// Probe the renderer's sprite table (numframes), NOT a lump name: doom2/freedoom store
+// the revenant's first frame as a cross-frame MIRROR lump ("SKELA1D1", not "SKELA1"),
+// so the old W_CheckNumForName("SKELA1") wrongly failed and every DOOM2 monster got
+// downgraded to a baron.  numframes>0 is naming-agnostic.
+static boolean P_Director_Doom2Available (void)
+{
+    if (gamemode == commercial) return true;
+    return sprites && (sprites[SPR_SKEL].numframes > 0		// doom2stuff overlay
+		    || sprites[SPR_FSKE].numframes > 0);	// freedoom2stuff overlay
+}
+
 static mobjtype_t P_Director_PickType (void)
 {
-    const mobjtype_t* spec = (gamemode == commercial) ? dir_special2 : dir_special1;
-    int nspec = (gamemode == commercial)
+    boolean		doom2 = P_Director_Doom2Available ();
+    const mobjtype_t*	spec  = doom2 ? dir_special2 : dir_special1;
+    int nspec = doom2
 	      ? (int)(sizeof(dir_special2)/sizeof(dir_special2[0]))
 	      : (int)(sizeof(dir_special1)/sizeof(dir_special1[0]));
     // More high-tier pressure: specials lean in from mid-intensity (was 3/4 peak)
@@ -253,7 +269,7 @@ static mobjtype_t P_Director_PickType (void)
     // critically low on health or ammo (don't drop a Cyberdemon on a dying player).
     if ((dir_state == DIR_SUSTAIN || dir_acc > DIR_PEAK/2) && P_Random () < 150
 	&& !P_Director_Stressed ())
-	return spec[P_Random () % nspec];	// dir:big is spoken on a SUCCESSFUL spawn, not here
+	return spec[P_Random () % nspec];
     return dir_common[P_Random () % (int)(sizeof(dir_common)/sizeof(dir_common[0]))];
 }
 
@@ -266,6 +282,7 @@ static boolean P_Director_IsSpecial (mobjtype_t mt)
 	if (dir_special1[i] == mt) return true;
     for (i = 0; i < (int)(sizeof(dir_special2)/sizeof(dir_special2[0])); i++)
 	if (dir_special2[i] == mt) return true;
+    if (mt >= MT_FD_UNDEAD && mt <= MT_FD_KEEN) return true;	// Freedoom clones
     return false;
 }
 
@@ -274,14 +291,26 @@ static boolean P_Director_IsSpecial (mobjtype_t mt)
 // pass the type through.  Guards BOTH the rule FSM and the LLM spawn path.
 static mobjtype_t P_Director_SafeType (mobjtype_t mt)
 {
-    static int doom2sprites = -1;	// -1 unknown, 0 absent, 1 present (doom2stuff.wad)
-    if (gamemode == commercial) return mt;
-    // If the DOOM2 sprites have been overlaid (e.g. -file doom2stuff.wad), the
-    // DOOM2-exclusive monsters won't crash the renderer -- so allow them.
-    if (doom2sprites < 0)
-	doom2sprites = (W_CheckNumForName ("SKELA1") >= 0);	// revenant sprite frame
-    if (doom2sprites) return mt;
-    switch (mt)
+    // numframes>0, not a lump name -- see P_Director_Doom2Available (the mirror-lump trap).
+    if (gamemode == commercial) return mt;		// native DOOM2 IWAD
+    if (sprites && sprites[SPR_SKEL].numframes > 0) return mt;	// doom2stuff -> real types
+
+    if (sprites && sprites[SPR_FSKE].numframes > 0)
+	switch (mt)	// only Freedoom art present -> map to the cloned MT_FD_* actor
+	{
+	  case MT_UNDEAD:   return MT_FD_UNDEAD;
+	  case MT_FATSO:    return MT_FD_FATSO;
+	  case MT_VILE:     return MT_FD_VILE;
+	  case MT_BABY:     return MT_FD_BABY;
+	  case MT_CHAINGUY: return MT_FD_CHAINGUY;
+	  case MT_KNIGHT:   return MT_FD_KNIGHT;
+	  case MT_PAIN:     return MT_FD_PAIN;
+	  case MT_WOLFSS:   return MT_FD_WOLFSS;
+	  case MT_KEEN:     return MT_FD_KEEN;
+	  default:          return mt;
+	}
+
+    switch (mt)		// no DOOM2 art at all -> a tough DOOM1 stand-in
     {
       case MT_CHAINGUY: case MT_UNDEAD: case MT_FATSO: case MT_BABY:
       case MT_PAIN:     case MT_KNIGHT: case MT_VILE:  case MT_WOLFSS: case MT_KEEN:
@@ -306,6 +335,13 @@ static const char* P_Director_MonName (mobjtype_t mt)
       case MT_VILE:     return "Arch-Vile";
       case MT_SPIDER:   return "Spider Mastermind";
       case MT_CYBORG:   return "Cyberdemon";
+      // Freedoom clones read out the same names (SafeType may map to these).
+      case MT_FD_UNDEAD:   return "Revenant";
+      case MT_FD_FATSO:    return "Mancubus";
+      case MT_FD_KNIGHT:   return "Hell Knight";
+      case MT_FD_BABY:     return "Arachnotron";
+      case MT_FD_CHAINGUY: return "Chaingunner";
+      case MT_FD_VILE:     return "Arch-Vile";
       default:          return NULL;
     }
 }
