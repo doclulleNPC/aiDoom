@@ -1138,40 +1138,45 @@ static boolean AICoop_ChaseTry (mobj_t* mo, int d8)
 // Pick (and commit to) a compass heading toward (gx,gy), Doom-monster style.
 // Returns the heading as a BAM angle.  Keeps the last heading while it stays
 // walkable so the buddy commits to a leg instead of dithering at a corner.
-angle_t AICoop_ChaseDir (mobj_t* mo, fixed_t gx, fixed_t gy)
+// The committed-heading state lives in the CALLER (a chasedir_t), so the buddy and the
+// -aiplayer marine each keep their own and don't clobber each other's heading (which made
+// the marine zig-zag/backtrack).  Pass NULL to use a shared internal default.
+angle_t AICoop_ChaseDir (mobj_t* mo, fixed_t gx, fixed_t gy, chasedir_t* st)
 {
-    static int		dir = -1, count;
-    static int		flip;
+    static chasedir_t	shared = { -1, 0, 0 };
     fixed_t		dx = gx - mo->x, dy = gy - mo->y;
     int			wx = (dx > 10*FRACUNIT) ? 0 : (dx < -10*FRACUNIT) ? 4 : -1;	// E / W
     int			wy = (dy > 10*FRACUNIT) ? 2 : (dy < -10*FRACUNIT) ? 6 : -1;	// N / S
-    int			turn = (dir >= 0) ? ((dir + 4) & 7) : -1;			// reverse of current
-    int			cand[4], nc = 0, i, s;
+    int			turn, cand[4], nc = 0, i, s;
+
+    if (!st) st = &shared;
+    turn = (st->dir >= 0) ? ((st->dir + 4) & 7) : -1;			// reverse of current
 
     // keep the committed heading while it's still walkable
-    if (dir >= 0 && count > 0 && AICoop_ChaseTry (mo, dir)) { count--; return (angle_t)dir * ANG45; }
+    if (st->dir >= 0 && st->count > 0 && AICoop_ChaseTry (mo, st->dir))
+	{ st->count--; return (angle_t)st->dir * ANG45; }
 
     if (wx >= 0 && wy >= 0)					// diagonal toward goal
 	cand[nc++] = (wy == 2) ? (wx == 0 ? 1 : 3) : (wx == 0 ? 7 : 5);
     if (abs (dx) >= abs (dy)) { if (wx >= 0) cand[nc++] = wx; if (wy >= 0) cand[nc++] = wy; }
     else                      { if (wy >= 0) cand[nc++] = wy; if (wx >= 0) cand[nc++] = wx; }
-    if (dir >= 0) cand[nc++] = dir;				// then continue current
+    if (st->dir >= 0) cand[nc++] = st->dir;			// then continue current
 
     for (i = 0; i < nc; i++)
 	if (cand[i] != turn && AICoop_ChaseTry (mo, cand[i]))
-	    { dir = cand[i]; count = 8; return (angle_t)dir * ANG45; }
+	    { st->dir = cand[i]; st->count = 8; return (angle_t)st->dir * ANG45; }
 
-    flip ^= 1;							// scan all 8, alternating sweep side
+    st->flip ^= 1;						// scan all 8, alternating sweep side
     for (s = 0; s < 8; s++)
     {
-	int d = flip ? s : (7 - s);
+	int d = st->flip ? s : (7 - s);
 	if (d != turn && AICoop_ChaseTry (mo, d))
-	    { dir = d; count = 8; return (angle_t)dir * ANG45; }
+	    { st->dir = d; st->count = 8; return (angle_t)st->dir * ANG45; }
     }
     if (turn >= 0 && AICoop_ChaseTry (mo, turn))			// last resort: turn around
-	{ dir = turn; count = 4; return (angle_t)dir * ANG45; }
+	{ st->dir = turn; st->count = 4; return (angle_t)st->dir * ANG45; }
 
-    dir = -1;							// boxed in -- head straight at goal
+    st->dir = -1;						// boxed in -- head straight at goal
     return R_PointToAngle2 (mo->x, mo->y, gx, gy);
 }
 
@@ -2192,7 +2197,7 @@ void P_AICoop_BuildCmd (void)
 		// style -- trial-walk the 8 compass headings toward the waypoint and commit
 		// to the best one.  This walks us up to the doorway, where the branch above
 		// then takes over and Use opens it.
-		angle_t	cd = AICoop_ChaseDir (mo, goalx, goaly);
+		angle_t	cd = AICoop_ChaseDir (mo, goalx, goaly, NULL);
 		angle_t	a  = cd >> ANGLETOFINESHIFT;
 		stx = mo->x + FixedMul (96*FRACUNIT, finecosine[a]);
 		sty = mo->y + FixedMul (96*FRACUNIT, finesine[a]);
@@ -2390,9 +2395,13 @@ void P_AICoop_BuildCmd (void)
 	if (doorwait == 0 && AICoop_DoorInFront (mo)) { cmd->buttons |= BT_USE; doorwait = 45; AICoop_Callout ("door:", 2); }
 	// Sideways wiggle to slip past a barrel / convex corner (non-door wedge).
 	cmd->sidemove += ((wig++ / 24) & 1) ? COOP_RUN : -COOP_RUN;
-	// Announce ONCE per wedge (rising edge) -- this used to fire every tic, so the
-	// buddy complained about being stuck constantly and starved every other line.
-	if (!wasstuck) AICoop_Callout ("stuck:", 3);
+	// Announce on the rising edge, but also rate-limit to ~once per 25 s -- on tight
+	// geometry the buddy wedges repeatedly and would otherwise complain constantly.
+	{
+	    static int laststuckvoice = -100000;
+	    if (!wasstuck && gametic - laststuckvoice > 25*TICRATE)
+		{ AICoop_Callout ("stuck:", 3); laststuckvoice = gametic; }
+	}
 	wasstuck = true;
     }
     else wasstuck = false;

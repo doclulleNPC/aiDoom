@@ -116,9 +116,11 @@ static boolean Agent_UseAhead (mobj_t* mo)
 }
 
 #define AGENT_TURN	1400		// max angleturn/tic (~7.7 deg)
-#define AGENT_FACING	1200		// |turn remaining| under which we open fire
+#define AGENT_FACING	900		// |turn remaining| under which we open fire (~5 deg,
+					//  ~the auto-aim cone, so a shot actually connects)
 #define AGENT_FORWARD	50		// run-speed forwardmove
 #define AGENT_SIGHT	(2048*FRACUNIT)	// monster auto-aim acquisition range
+#define AGENT_FIRE_RANGE (1024*FRACUNIT)// don't open fire past this -- close in first
 #define AGENT_REACH	(64*FRACUNIT)	// goal considered reached within this
 #define AGENT_MAXTHINGS	24		// observe + target registry size
 
@@ -389,9 +391,14 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
     mobj_t*	tgt;
     angle_t	want;
     int		rem, turn, chase = 0, los = 0;
+    fixed_t	td = 0;			// distance to the current target
 
     memset (cmd, 0, sizeof(*cmd));
     Agent_Poll ();
+    // The level-end intermission (and finale) screens wait for a key -- pulse fire to
+    // advance them, else the LLM marine stalls on the tally screen forever.
+    if (gamestate != GS_LEVEL)
+	{ if ((gametic & 15) == 0) cmd->buttons = BT_ATTACK; return; }
     Agent_FindExit ();
     if (agent_demo) Agent_Brain ();
     if (!mo || p->playerstate != PST_LIVE) return;
@@ -407,11 +414,15 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
 	int	havegoal = 0;
 	if (tgt)
 	{
-	    // Only shoot if we can actually SEE the target -- never fire blind through a
-	    // wall.  Out of sight -> close in (move) until we have a clear shot.
+	    // Shoot only at a target we can SEE *and* that's in effective range -- never
+	    // fire blind through a wall, and don't waste shots at long range where they
+	    // miss.  Out of sight OR too far -> close in until we have a clean shot.
 	    los = P_CheckSight (mo, tgt);
-	    if (los) want = R_PointToAngle2 (mo->x, mo->y, tgt->x, tgt->y);	// aim + fire, hold
-	    else     { gx = tgt->x; gy = tgt->y; havegoal = 1; }
+	    td  = P_AproxDistance (tgt->x - mo->x, tgt->y - mo->y);
+	    if (los && td < AGENT_FIRE_RANGE)
+		want = R_PointToAngle2 (mo->x, mo->y, tgt->x, tgt->y);	// aim + fire, hold
+	    else
+		{ gx = tgt->x; gy = tgt->y; havegoal = 1; }		// close in
 	}
 	else if (in_have_face) want = in_face;
 	else if (in_have_goal)
@@ -428,10 +439,11 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
 	    // A* portal route gives the coarse next waypoint; AICoop_ChaseDir does the LOCAL
 	    // corner-rounding to it (DOOM P_NewChaseDir movement) so the marine threads walls
 	    // and doorways instead of walking straight into a corner and sticking.
+	    static chasedir_t agent_chase = { -1, 0, 0 };
 	    fixed_t wx, wy, nx, ny;
 	    if (P_AICoop_NextWaypoint (mo, gx, gy, &wx, &wy)) { nx = wx; ny = wy; }
 	    else                                              { nx = gx; ny = gy; }
-	    want  = AICoop_ChaseDir (mo, nx, ny);
+	    want  = AICoop_ChaseDir (mo, nx, ny, &agent_chase);	// marine's OWN heading state
 	    chase = 1;
 	}
     }
@@ -444,9 +456,10 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
 
     if (in_have_face && abs(rem) < 600) in_have_face = 0;	// face reached
 
-    // Fire ONLY at a target we can SEE and are lined up on (auto-aim does the vertical),
-    // and NEVER when the AI buddy is in the line of fire (friendly: hold and reposition).
-    if (tgt && los && abs(rem) < AGENT_FACING && !Agent_BuddyInLine (mo, tgt))
+    // Fire ONLY at a target we can SEE, in range, and tightly lined up on (auto-aim does
+    // the vertical), and NEVER with the AI buddy in the line of fire (hold + reposition).
+    if (tgt && los && td < AGENT_FIRE_RANGE && abs(rem) < AGENT_FACING
+	&& !Agent_BuddyInLine (mo, tgt))
 	cmd->buttons |= BT_ATTACK;
 
     // Advance toward the goal / out-of-sight target once roughly facing the way.

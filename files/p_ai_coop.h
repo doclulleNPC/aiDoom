@@ -104,8 +104,10 @@ int  P_AICoop_NavRoute (fixed_t* xs, fixed_t* ys, int maxpts);
 // navigate around corners instead of the vanilla straight 8-dir chase.
 boolean P_AICoop_NextWaypoint (struct mobj_s* mo, fixed_t dx, fixed_t dy, fixed_t* wx, fixed_t* wy);
 // Best walkable 8-dir heading toward (gx,gy) -- DOOM P_NewChaseDir-style corner-rounding.
-// NOTE: keeps a single shared committed-heading state; one navigating caller at a time.
-angle_t AICoop_ChaseDir (struct mobj_s* mo, fixed_t gx, fixed_t gy);
+// `st` holds the per-mover committed-heading state (so the buddy and the -aiplayer marine
+// don't clobber each other); pass NULL for a shared internal default.
+typedef struct { int dir, count, flip; } chasedir_t;
+angle_t AICoop_ChaseDir (struct mobj_s* mo, fixed_t gx, fixed_t gy, chasedir_t* st);
 
 // Savegame persistence for the breadcrumb trail.  Written/read AFTER the savegame
 // consistency marker (g_game.c), so older saves without the block still load.
