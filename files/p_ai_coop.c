@@ -2108,6 +2108,26 @@ void P_AICoop_BuildCmd (void)
 	// navigate on but aim its door-aware corner-rounding (FindDoorAhead + ChaseDir)
 	// at the human instead of the oscillating BSP waypoint, so it rounds corners and
 	// Uses shut doors on the way instead of grinding one wall.
+	// No crumb is DIRECTLY reachable (the buddy is a corner off the trail).  Head for
+	// the NEAREST crumb -- still a verified-walkable spot on the human's real path and
+	// far closer than the human -- with the door-aware corner-rounding, so it walks
+	// ONTO the trail, then the direct-reach replay above takes over.
+	if (!used && crumb_n > 0)
+	{
+	    int i, best = -1; fixed_t bestd = 0x7fffffff;
+	    for (i = crumb_n-1; i >= 0; i--)
+	    {
+		fixed_t d = P_AproxDistance (crumbx[i] - mo->x, crumby[i] - mo->y);
+		if (d < bestd) { bestd = d; best = i; }
+	    }
+	    if (best >= 0)
+	    {
+		tx = crumbx[best]; ty = crumby[best];
+		navigate = 1; chase_player = 1; movethresh = 24*FRACUNIT;
+		used = 1;
+	    }
+	}
+	// Truly no trail at all (e.g. a save from before any crumbs) -> beeline the human.
 	if (!used)
 	{
 	    tx = pl->x; ty = pl->y;
