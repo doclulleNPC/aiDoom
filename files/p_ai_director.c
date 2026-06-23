@@ -611,6 +611,48 @@ static void P_Director_SeedObjectives (void)
     }
 }
 
+// Within `r` of the exit or any uncollected key?  Those rooms are the "guard zones":
+// monsters there are left idle to ambush the player; everything else is woken to hunt.
+#define DIR_GUARD_RADIUS	(512*FRACUNIT)
+static boolean P_Director_NearAnyObjective (fixed_t x, fixed_t y, fixed_t r)
+{
+    thinker_t*	th;
+    if (dir_exit_set && P_AproxDistance (x - dir_exit_x, y - dir_exit_y) < r)
+	return true;
+    for (th = thinkercap.next; th != &thinkercap; th = th->next)
+    {
+	mobj_t*	mo;
+	if (th->function.acp1 != (actionf_p1)P_MobjThinker) continue;
+	mo = (mobj_t*)th;
+	if (!P_Director_IsKey (mo)) continue;
+	if (P_AproxDistance (x - mo->x, y - mo->y) < r) return true;
+    }
+    return false;
+}
+
+// Wake every monster that ISN'T an objective guard: give it the player as target and
+// drop it into its chase state, so the level hunts you instead of standing around like
+// vanilla.  Monsters near the exit/keys (and the seeded guards) are left idle so they
+// stay and ambush -- A_Look wakes them when the player walks in.
+static void P_Director_WakeMonsters (void)
+{
+    thinker_t*	th;
+    mobj_t*	pl = (consoleplayer >= 0 && playeringame[consoleplayer])
+		     ? players[consoleplayer].mo : NULL;
+    if (!pl || pl->health <= 0) return;
+    for (th = thinkercap.next; th != &thinkercap; th = th->next)
+    {
+	mobj_t*	m;
+	if (th->function.acp1 != (actionf_p1)P_MobjThinker) continue;
+	m = (mobj_t*)th;
+	if (!(m->flags & MF_COUNTKILL) || m->health <= 0) continue;
+	if (m->target) continue;					// already awake
+	if (P_Director_NearAnyObjective (m->x, m->y, DIR_GUARD_RADIUS)) continue;	// guard -> stay idle
+	m->target = pl;
+	if (m->info->seestate) P_SetMobjState (m, m->info->seestate);
+    }
+}
+
 // ---- per-tic FSM -----------------------------------------------------------
 
 void P_Director_Ticker (void)
@@ -703,20 +745,15 @@ void P_Director_Ticker (void)
     runfsm = !dir_llm || (gametic - dir_llmlast > DIR_LLM_FALLBACK);
     if (!runfsm) return;
 
-    // Rule-based coordinated monster tactics (flank / focus / ambush / fall-back) --
-    // full parity with the LLM's `act` orders.  We only reach here when the rule layer
-    // is in charge -- pure -director, OR an LLM director has gone quiet (disconnected /
-    // killed / between commands) for DIR_LLM_FALLBACK.  So this also serves as the
-    // LLM's TACTICAL FALLBACK: tactics keep going instead of dropping to vanilla
-    // A_Chase whenever the model isn't talking.  When the LLM is actively issuing
-    // orders runfsm is false and we returned above, so it never fights the model.
+    // Rule layer in charge (pure -director, OR an LLM director gone quiet): wake the
+    // level so monsters hunt the player -- except the objective guards near exit/keys,
+    // which stay idle and ambush -- then run coordinated tactics (flank/focus/fallback)
+    // on the awake hunters.  These also serve as the LLM's fallback; when the LLM is
+    // actively issuing orders runfsm is false and we returned above, so no conflict.
     {
-	mobj_t*	plmo = (consoleplayer >= 0 && playeringame[consoleplayer])
-			? players[consoleplayer].mo : NULL;
-	fixed_t	ox = 0, oy = 0; int haveobj = 0;
-	if (plmo && P_Director_NearestObjective (plmo->x, plmo->y, &ox, &oy) != 0x7fffffff)
-	    haveobj = 1;
-	P_AI_RuleTactics (ox, oy, haveobj);
+	static int wake_tic;
+	if (gametic - wake_tic > 35) { wake_tic = gametic; P_Director_WakeMonsters (); }
+	P_AI_RuleTactics ();
     }
 
     int exf      = P_Director_ObjProximity ();	// 0..100, ramps up near an exit/key

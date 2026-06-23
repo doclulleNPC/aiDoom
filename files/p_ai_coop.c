@@ -2069,21 +2069,15 @@ void P_AICoop_BuildCmd (void)
 	}
 	// fight the nearest monster.  ALWAYS engage a target we can see -- the buddy
 	// has ranged weapons, so it should shoot whatever is in LOS.  "Less kamikaze"
-	// (hurt / come-leash) only changes MOVEMENT: it keeps firing but HOLDS near the
-	// player instead of charging the monster, rather than refusing to shoot.
+	// (hurt / come-leash) only changes MOVEMENT: it keeps extra distance from the
+	// monster (no charge).  We always position relative to the MONSTER, never walk
+	// onto the player -- crowding the player puts it in our line of fire and the
+	// friendly-fire guard then makes us hold fire (looks like "buddy won't shoot").
 	else if (tgt)
 	{
 	    coop_state = 1; haveaim = 1; fire = 1; aimmon = tgt;
-	    if (stayclose && pl)
-	    {
-		tx = pl->x; ty = pl->y;			// shoot, but stay by the player
-		movethresh = COOP_NEAR; navigate = 1;
-	    }
-	    else
-	    {
-		tx = tgt->x; ty = tgt->y;		// close to engagement range
-		movethresh = COOP_KEEP;
-	    }
+	    tx = tgt->x; ty = tgt->y;
+	    movethresh = stayclose ? COOP_KEEP*2 : COOP_KEEP;	// hurt -> hang back, but still shoot
 	}
 	// idle: collect a nearby item, but ONLY while still near the human (don't
 	// wander off / linger for an item while the player walks away), and not one

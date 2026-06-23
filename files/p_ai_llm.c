@@ -870,23 +870,21 @@ static void AI_DemoDirector (void)
 
 // ---------------------------------------------------------------------------
 // Rule-based coordinated tactics for the offline L4D director (-director, no LLM):
-// the full squad-order set the LLM uses (flank / focus-fire / ambush / fall-back),
+// flank / focus-fire / fall-back for the AWAKE monsters that are hunting the player,
 // assigned by heuristics into the SAME directive side-table and executed by
-// A_LLMChase.  Deterministic (geometry), so it stays tic-locked.  (objx,objy) =
-// the nearest objective the player is heading for (haveobj=0 if none); used for
-// ambushes.  Called from the director ticker whenever the rule layer is in charge.
+// A_LLMChase.  Only touches monsters that already have a target -- idle objective
+// guards (no target) are left alone to wait/ambush.  Deterministic (geometry).
+// Called from the director ticker whenever the rule layer is in charge.
 // ---------------------------------------------------------------------------
 #define TAC_MELEE	(64*FRACUNIT)		// ~melee reach
 #define TAC_FLANK_MIN	(256*FRACUNIT)		// don't peel point-blank monsters off to flank
-#define TAC_AMBUSH_NEAR	(1024*FRACUNIT)		// camp an objective only if already this close to it
 
-void P_AI_RuleTactics (fixed_t objx, fixed_t objy, int haveobj)
+void P_AI_RuleTactics (void)
 {
     static int	replan;
     static char	los[AI_MAX];
     mobj_t*	pl;
-    int		i, nseers = 0, flanked = 0, flank_budget, side = 0;
-    int		did_flank = 0, did_ambush = 0;
+    int		i, nseers = 0, flanked = 0, flank_budget, side = 0, did_flank = 0;
 
     if (!ai_inited) P_AI_Init ();
     ai_on = 1; ai_enabled = 1;		// arm the directive executor (A_LLMChase)
@@ -899,17 +897,18 @@ void P_AI_RuleTactics (fixed_t objx, fixed_t objy, int haveobj)
 
     AI_BuildRegistry ();			// rebuild ids (keeps still-live directives)
 
-    // Pass 1: line-of-sight to the player (cached) -> size the visible group.
+    // Pass 1: AWAKE monsters (have a target) with LOS to the player = the visible group.
+    // Idle guards have no target -> los[i]=0 -> never directed, they keep waiting.
     for (i = 0; i < aient_count; i++)
     {
 	mobj_t* m = aient[i].mo;
-	los[i] = (m && m->health > 0 && (m->flags & MF_COUNTKILL)
+	los[i] = (m && m->health > 0 && (m->flags & MF_COUNTKILL) && m->target
 		  && P_CheckSight (m, pl)) ? 1 : 0;
 	if (los[i]) nseers++;
     }
     flank_budget = nseers / 3;		// ~1/3 of the visible group flanks (pincer)
 
-    // Pass 2: assign each monster an order (or clear it back to vanilla A_Chase).
+    // Pass 2: order the awake hunters; leave idle guards / out-of-sight monsters alone.
     for (i = 0; i < aient_count; i++)
     {
 	mobj_t*	m = aient[i].mo;
@@ -917,14 +916,13 @@ void P_AI_RuleTactics (fixed_t objx, fixed_t objy, int haveobj)
 	fixed_t	d;
 	int	wounded;
 
-	if (!m || m->health <= 0 || !(m->flags & MF_COUNTKILL))
-	    { aient[i].order = AIO_NONE; aient[i].for_tics = 0; continue; }
-
-	d       = P_AproxDistance (m->x - pl->x, m->y - pl->y);
-	wounded = (m->info->spawnhealth > 0 && m->health * 4 <= m->info->spawnhealth);
+	if (!m || m->health <= 0 || !(m->flags & MF_COUNTKILL) || !m->target)
+	    { aient[i].order = AIO_NONE; aient[i].for_tics = 0; continue; }	// idle guard / dead
 
 	if (los[i])
 	{
+	    d       = P_AproxDistance (m->x - pl->x, m->y - pl->y);
+	    wounded = (m->info->spawnhealth > 0 && m->health * 4 <= m->info->spawnhealth);
 	    if (wounded && d > TAC_MELEE*2)
 		order = AIO_FALLBACK;				// hurt & not cornered -> kite/retreat
 	    else if (nseers >= 4 && flanked < flank_budget && d > TAC_FLANK_MIN)
@@ -932,30 +930,19 @@ void P_AI_RuleTactics (fixed_t objx, fixed_t objy, int haveobj)
 	    else
 		order = AIO_FOCUS;				// commit: press the player
 	}
-	else if (haveobj)
-	{
-	    // No LOS but already camped on the player's objective -> lie in wait there.
-	    fixed_t mo_obj = P_AproxDistance (m->x - objx, m->y - objy);
-	    fixed_t pl_obj = P_AproxDistance (pl->x - objx, pl->y - objy);
-	    if (mo_obj < pl_obj && mo_obj < TAC_AMBUSH_NEAR)
-		{ order = AIO_AMBUSH; did_ambush = 1; }
-	}
 
 	if (order != AIO_NONE)
 	{
 	    aient[i].order      = order;
 	    aient[i].focus_id   = 0;		// FOCUS -> the player
-	    aient[i].tx = objx; aient[i].ty = objy;	// AMBUSH point (others ignore it)
 	    aient[i].for_tics   = 105;		// ~3 s, then auto-expires
 	    aient[i].after_tics = 0;
 	}
 	else
-	    { aient[i].order = AIO_NONE; aient[i].for_tics = 0; }	// -> vanilla A_Chase
+	    { aient[i].order = AIO_NONE; aient[i].for_tics = 0; }	// awake but no LOS -> vanilla chase
     }
 
-    // Narrate the tactic (rate-limited; mirrors the LLM act handler's lines).
-    if      (did_flank)  P_Director_Say ("dir:flank",  2, 0);
-    else if (did_ambush) P_Director_Say ("dir:ambush", 2, 0);
+    if (did_flank) P_Director_Say ("dir:flank", 2, 0);	// narrate (rate-limited)
 }
 
 // ---------------------------------------------------------------------------
