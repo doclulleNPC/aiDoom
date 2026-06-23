@@ -765,6 +765,17 @@ static void build_command(char* out, int n, const char* iwad_path)
 // is active.  Best-effort: if the director binary isn't in run/, we warn and
 // launch aidoom alone.
 //
+// Is a director sidecar already running?  (so a second launch doesn't start a
+// duplicate -- one director can serve whichever game is listening on port 31666).
+static int director_running(void)
+{
+#ifdef _WIN32
+    return system("tasklist /FI \"IMAGENAME eq director.exe\" 2>NUL | find /I \"director.exe\" >NUL") == 0;
+#else
+    return system("pgrep -x director >/dev/null 2>&1") == 0;
+#endif
+}
+
 static void do_launch(void)
 {
     if (iwad_count == 0) return;
@@ -801,12 +812,16 @@ static void do_launch(void)
         return;   // do NOT start aidoom
     }
 
+    // Only start a director if one isn't already running (avoid a duplicate sidecar).
+    int reuse_director  = needs_director && has_director && director_running();
+    int start_director  = needs_director && has_director && !reuse_director;
+
     // Build a DETACHED launch string so system() returns at once (non-blocking).
     char full[1400];
 #ifdef _WIN32
     // cmd.exe: `start` detaches each process into its own session.  /B = no new
     // console for the director; the game gets its own window.
-    if (needs_director && has_director)
+    if (start_director)
         snprintf(full, sizeof full,
                  "start \"aiDoom Director\" /B \"%s\" --port 31666 & start \"aiDoom\" %s",
                  dir_path, cmd);
@@ -815,7 +830,7 @@ static void do_launch(void)
 #else
     // POSIX: background both in subshells; tee the game's stderr to a log so a
     // fatal I_Error survives the window vanishing.
-    if (needs_director && has_director)
+    if (start_director)
         snprintf(full, sizeof full,
                  "( \"%s\" --port 31666 >/dev/null 2>&1 & ) ; ( %s >aidoom_stderr.log 2>&1 & )",
                  dir_path, cmd);
@@ -826,7 +841,8 @@ static void do_launch(void)
     fprintf(stderr, "[launcher] %s\n", full);
     system(full);   // returns immediately -- the launcher stays responsive
     snprintf(g_status, sizeof g_status, "launched aiDoom%s",
-             needs_director ? " + director" : "");
+             start_director ? " + director"
+             : reuse_director ? " (director already running)" : "");
     g_status_err = 0;
 
     // Log the command so users can see what was launched (exit code is N/A now
