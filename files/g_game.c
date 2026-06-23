@@ -69,6 +69,7 @@ rcsid[] = "$Id: g_game.c,v 1.8 1997/02/03 22:45:09 b1 Exp $";
 
 
 #include "g_game.h"
+#include "g_agent.h"		// G_AgentActive/BuildTiccmd -- full agent/LLM player control
 #include "p_ai_coop.h"		// P_AICoop_Slot (skip consistency check for the buddy)
 #include "p_ai_llm.h"		// P_AI_NetService (service director socket every gamestate)
 #include "p_ai_director.h"	// P_Director_Say (level-clear voice line)
@@ -262,8 +263,12 @@ void G_BuildTiccmd (ticcmd_t* cmd)
     ticcmd_t*	base;
 
     base = I_BaseTiccmd ();		// empty, or external driver
-    memcpy (cmd,base,sizeof(*cmd)); 
-	
+    memcpy (cmd,base,sizeof(*cmd));
+
+    // Full agent / LLM control: an external brain (or the built-in demo) drives the
+    // player's ticcmd instead of the keyboard/mouse (see files/g_agent.c).
+    if (G_AgentActive ()) { G_AgentBuildTiccmd (cmd); return; }
+
     cmd->consistancy = 
 	consistancy[consoleplayer][maketic%BACKUPTICS]; 
 

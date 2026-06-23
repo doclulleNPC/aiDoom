@@ -158,3 +158,13 @@ cd run && ./aidoom -warp 1 1 -skill 4 -aidirector 31666 &
 
 See `../AGENT_CONTROL.md` (§12–13) and `../MONSTER_AGENT_GUIDE.md` for the
 director protocol and order vocabulary.
+
+## Full LLM player mode (-aiplayer)
+
+`./start_llm_player.sh [IWAD] [E M]` runs aiDoom with the **marine driven by an LLM**:
+the engine's agent (`files/g_agent.c`, `-aiplayer <port>`) exposes an `observe` JSON
+state + accepts high-level intents over a TCP socket; `llm_player.py` is the brain
+(observe -> Ollama -> one command), and a C reflex controller turns each intent into
+per-tic ticcmds (aim/step/fire). Monsters spawn via `-director`. Env: `OLLAMA_URL`,
+`OLLAMA_MODEL` (default llama3.1:8b), `AIPLAYER_PORT` (31700), `DECISION_SECS`.
+`-aiplayer demo` uses a built-in scripted brain (no LLM) to prove the hook.

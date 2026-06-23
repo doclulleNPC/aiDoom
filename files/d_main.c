@@ -78,6 +78,7 @@ static int access(char *file, int mode)
 #include "g_game.h"
 #include "heretic.h"		// Heretic_Init -- additive Heretic monsters
 #include "freedoom.h"		// Freedoom_Init -- cloned DOOM2 monsters (free art)
+#include "g_agent.h"		// G_AgentInit -- full agent/LLM player control (-aiplayer)
 
 #include "hu_stuff.h"
 #include "wi_stuff.h"
@@ -1331,6 +1332,7 @@ printf("added\n");
     // D_CheckNetGame (which sets playeringame[]) and before the first level.
     P_AICoop_Init ();
     P_Director_Init ();		// L4D-style rule-based spawn director (-director)
+    G_AgentInit ();		// full agent/LLM control of the player (-aiplayer)
 
     printf ("S_Init: Setting up sound.\n");
     S_Init (snd_SfxVolume /* *8 */, snd_MusicVolume /* *8*/ );
