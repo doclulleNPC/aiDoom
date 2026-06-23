@@ -100,6 +100,9 @@ static const mobjtype_t dir_special2[] = { MT_UNDEAD, MT_FATSO, MT_KNIGHT, MT_BA
 // (general rule: defend the level end).  DOOM2 minibosses when their art is overlaid,
 // else a baron.  SafeType() resolves each to the doom2 / freedoom / DOOM1 actor.
 static const mobjtype_t dir_guards[]   = { MT_UNDEAD, MT_VILE, MT_FATSO, MT_KNIGHT, MT_BRUISER }; // revenant, arch-vile, mancubus, hell knight, baron
+// Heretic monsters (hereticstuff.wad overlaid) mixed into the spawn pools so the
+// director uses them too -- a melee trash tier + the Knight as a ranged miniboss.
+static const mobjtype_t dir_heretic[]  = { MT_HMUMMY, MT_HCLINK, MT_HIMP };	// golem, sabreclaw, gargoyle
 
 #define DIR_TRACK	(dir_on || dir_llm)	// intensity is tracked in either mode
 
@@ -260,6 +263,12 @@ static boolean P_Director_Doom2Available (void)
 		    || sprites[SPR_FSKE].numframes > 0);	// freedoom2stuff overlay
 }
 
+// Heretic monsters loaded (hereticstuff.wad overlaid)?  Probe the mummy/golem sprite.
+static boolean P_Director_HereticAvailable (void)
+{
+    return sprites && sprites[SPR_HMUM].numframes > 0;
+}
+
 static mobjtype_t P_Director_PickType (void)
 {
     boolean		doom2 = P_Director_Doom2Available ();
@@ -273,14 +282,23 @@ static mobjtype_t P_Director_PickType (void)
     // critically low on health or ammo (don't drop a Cyberdemon on a dying player).
     if ((dir_state == DIR_SUSTAIN || dir_acc > DIR_PEAK/2) && P_Random () < 150
 	&& !P_Director_Stressed ())
+    {
+	if (P_Director_HereticAvailable () && (P_Random () % 100) < 25)
+	    return MT_HKNIGHT;					// Heretic ranged miniboss
 	return spec[P_Random () % nspec];
+    }
+    if (P_Director_HereticAvailable () && (P_Random () % 100) < 35)	// ~35% Heretic trash
+	return dir_heretic[P_Random () % (int)(sizeof(dir_heretic)/sizeof(dir_heretic[0]))];
     return dir_common[P_Random () % (int)(sizeof(dir_common)/sizeof(dir_common[0]))];
 }
 
 // A tough miniboss to hold an objective room (the level exit).  DOOM2 miniboss when its
-// art is overlaid, else a baron -- so the way out is NEVER guarded by mere trash.
+// art is overlaid, a Heretic knight if that's loaded, else a baron -- so the way out is
+// NEVER guarded by mere trash.
 static mobjtype_t P_Director_PickGuard (void)
 {
+    if (P_Director_HereticAvailable () && (P_Random () % 100) < 30)
+	return MT_HKNIGHT;					// Heretic undead warrior holds it
     if (P_Director_Doom2Available ())
 	return dir_guards[P_Random () % (int)(sizeof(dir_guards)/sizeof(dir_guards[0]))];
     return MT_BRUISER;		// DOOM1: the baron is the toughest reliable stand-in
@@ -296,6 +314,7 @@ static boolean P_Director_IsSpecial (mobjtype_t mt)
     for (i = 0; i < (int)(sizeof(dir_special2)/sizeof(dir_special2[0])); i++)
 	if (dir_special2[i] == mt) return true;
     if (mt >= MT_FD_UNDEAD && mt <= MT_FD_KEEN) return true;	// Freedoom clones
+    if (mt == MT_HKNIGHT) return true;				// Heretic miniboss
     return false;
 }
 
@@ -355,6 +374,11 @@ static const char* P_Director_MonName (mobjtype_t mt)
       case MT_FD_BABY:     return "Arachnotron";
       case MT_FD_CHAINGUY: return "Chaingunner";
       case MT_FD_VILE:     return "Arch-Vile";
+      // Heretic monsters (hereticstuff.wad)
+      case MT_HKNIGHT:  return "Undead Warrior";
+      case MT_HMUMMY:   return "Golem";
+      case MT_HIMP:     return "Gargoyle";
+      case MT_HCLINK:   return "Sabreclaw";
       default:          return NULL;
     }
 }
