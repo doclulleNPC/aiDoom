@@ -66,6 +66,7 @@ extern int*		texturetranslation;
 extern int		firstspritelump;
 extern int		lastspritelump;
 extern int		numspritelumps;
+extern int*		spritelumps;	// sprite index -> lump number (merged namespaces)
 
 
 

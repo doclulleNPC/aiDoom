@@ -147,6 +147,7 @@ int		numpatches;
 int		firstspritelump;
 int		lastspritelump;
 int		numspritelumps;
+int*		spritelumps;	// sprite index -> lump number (merged across all S_*..S_END)
 
 int		numtextures;
 texture_t**	textures;
@@ -643,27 +644,50 @@ void R_InitFlats (void)
 //
 void R_InitSpriteLumps (void)
 {
-    int		i;
+    int		i, l, in_ns;
     patch_t	*patch;
-	
-    firstspritelump = W_GetNumForName ("S_START") + 1;
-    lastspritelump = W_GetNumForName ("S_END") - 1;
-    
-    numspritelumps = lastspritelump - firstspritelump + 1;
-    spritewidth = Z_Malloc (numspritelumps*4, PU_STATIC, 0);
-    spriteoffset = Z_Malloc (numspritelumps*4, PU_STATIC, 0);
-    spritetopoffset = Z_Malloc (numspritelumps*4, PU_STATIC, 0);
-	
-    for (i=0 ; i< numspritelumps ; i++)
-    {
-	if (!(i&63))
-	    printf (".");
 
-	patch = W_CacheLumpNum (firstspritelump+i, PU_CACHE);
-	spritewidth[i] = SHORT(patch->width)<<FRACBITS;
-	spriteoffset[i] = SHORT(patch->leftoffset)<<FRACBITS;
-	spritetopoffset[i] = SHORT(patch->topoffset)<<FRACBITS;
+    // MERGE sprite namespaces: collect lumps inside EVERY S_START..S_END (and Boom's
+    // SS_*) region, not just the last one.  Without this, a sprite PWAD's own marker
+    // pair becomes the active range and SHADOWS all the IWAD sprites -- which is why
+    // add-on sprite WADs had to embed a full copy of the IWAD sprites (the doom2stuff /
+    // hereticstuff "superset" hack).  With the merge they can carry only their own
+    // sprites.  spritelumps[i] maps a sprite index -> its lump number (no longer a
+    // contiguous range), so all sprite indexing goes through it.
+    #define IS_S_START(n) (!strncasecmp((n),"S_START",8) || !strncasecmp((n),"SS_START",8))
+    #define IS_S_END(n)   (!strncasecmp((n),"S_END",8)   || !strncasecmp((n),"SS_END",8))
+
+    numspritelumps = 0; in_ns = 0;
+    for (l = 0; l < numlumps; l++)
+    {
+	if (IS_S_START(lumpinfo[l].name)) { in_ns = 1; continue; }
+	if (IS_S_END  (lumpinfo[l].name)) { in_ns = 0; continue; }
+	if (in_ns) numspritelumps++;
     }
+
+    spritelumps     = Z_Malloc (numspritelumps*sizeof(int), PU_STATIC, 0);
+    spritewidth     = Z_Malloc (numspritelumps*4, PU_STATIC, 0);
+    spriteoffset    = Z_Malloc (numspritelumps*4, PU_STATIC, 0);
+    spritetopoffset = Z_Malloc (numspritelumps*4, PU_STATIC, 0);
+
+    i = 0; in_ns = 0;
+    for (l = 0; l < numlumps; l++)
+    {
+	if (IS_S_START(lumpinfo[l].name)) { in_ns = 1; continue; }
+	if (IS_S_END  (lumpinfo[l].name)) { in_ns = 0; continue; }
+	if (!in_ns) continue;
+	if (!(i&63)) printf (".");
+	spritelumps[i] = l;
+	patch = W_CacheLumpNum (l, PU_CACHE);
+	spritewidth[i]     = SHORT(patch->width)<<FRACBITS;
+	spriteoffset[i]    = SHORT(patch->leftoffset)<<FRACBITS;
+	spritetopoffset[i] = SHORT(patch->topoffset)<<FRACBITS;
+	i++;
+    }
+    firstspritelump = numspritelumps ? spritelumps[0] : 0;	// legacy; indexing uses spritelumps[]
+    lastspritelump  = numspritelumps ? spritelumps[numspritelumps-1] : 0;
+    #undef IS_S_START
+    #undef IS_S_END
 }
 
 
@@ -877,7 +901,7 @@ void R_PrecacheLevel (void)
 	    sf = &sprites[i].spriteframes[j];
 	    for (k=0 ; k<8 ; k++)
 	    {
-		lump = firstspritelump + sf->lump[k];
+		lump = spritelumps[sf->lump[k]];
 		spritememory += lumpinfo[lump].size;
 		W_CacheLumpNum(lump , PU_CACHE);
 	    }

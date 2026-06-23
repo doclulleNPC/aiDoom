@@ -133,7 +133,7 @@ R_InstallSpriteLump
 	sprtemp[frame].rotate = false;
 	for (r=0 ; r<8 ; r++)
 	{
-	    sprtemp[frame].lump[r] = lump - firstspritelump;
+	    sprtemp[frame].lump[r] = lump;	// `lump` is the merged sprite INDEX now
 	    sprtemp[frame].flip[r] = (byte)flipped;
 	}
 	return;
@@ -153,7 +153,7 @@ R_InstallSpriteLump
 		 "has two lumps mapped to it",
 		 spritename, 'A'+frame, '1'+rotation);
 		
-    sprtemp[frame].lump[rotation] = lump - firstspritelump;
+    sprtemp[frame].lump[rotation] = lump;	// `lump` is the merged sprite INDEX now
     sprtemp[frame].flip[rotation] = (byte)flipped;
 }
 
@@ -203,41 +203,42 @@ void R_InitSpriteDefs (char** namelist)
 		
   sprites = Z_Malloc(numsprites *sizeof(*sprites), PU_STATIC, NULL);
 
-  start = firstspritelump-1;
-  end = lastspritelump+1;
+  (void)start; (void)end; (void)patched;
 
-  // scan all the lump names for each of the names,
-  // noting the highest frame letter.
+  // scan the MERGED sprite list (spritelumps[idx] -> lump) for each sprite name,
+  // noting the highest frame letter.  R_InstallSpriteLump now takes the sprite INDEX
+  // (idx), not a lump number, since sprite lumps are no longer one contiguous range.
   // Just compare 4 characters as ints
   for (i=0 ; i<numsprites ; i++)
   {
+    int		idx;
     spritename = namelist[i];
     memset (sprtemp,-1, sizeof(sprtemp));
-	
+
     maxframe = - 1;
     intname = *(int *)namelist[i];
 
-    // scan the lumps,
-    //  filling in the frames for whatever is found
-    for (l=start+1 ; l<end ; l++)
+    // scan the lumps, filling in the frames for whatever is found
+    for (idx=0 ; idx<numspritelumps ; idx++)
     {
+      l = spritelumps[idx];
       if (*(int *)lumpinfo[l].name == intname)
       {
+        // Override support: a later WAD's sprite of the same name wins -- skip any
+        // lump that a later one (in another merged region) replaces, so we don't get
+        // "two lumps mapped to it".
+        if (W_GetNumForName (lumpinfo[l].name) != l)
+          continue;
+
         frame = lumpinfo[l].name[4] - 'A';
         rotation = lumpinfo[l].name[5] - '0';
-
-        if (modifiedgame)
-          patched = W_GetNumForName (lumpinfo[l].name);
-        else
-          patched = l;
-
-        R_InstallSpriteLump (patched, frame, rotation, false);
+        R_InstallSpriteLump (idx, frame, rotation, false);
 
         if (lumpinfo[l].name[6])
         {
           frame = lumpinfo[l].name[6] - 'A';
           rotation = lumpinfo[l].name[7] - '0';
-          R_InstallSpriteLump (l, frame, rotation, true);
+          R_InstallSpriteLump (idx, frame, rotation, true);
         }
       }
 	  }
@@ -408,7 +409,7 @@ R_DrawVisSprite
     patch_t*		patch;
 	
 	
-    patch = W_CacheLumpNum (vis->patch+firstspritelump, PU_CACHE);
+    patch = W_CacheLumpNum (spritelumps[vis->patch], PU_CACHE);
 
     dc_colormap = vis->colormap;
     

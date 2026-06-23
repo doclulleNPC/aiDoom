@@ -144,12 +144,12 @@ def main():
 
     hdata, hent = read_wad(sp)
     bdata, bent = read_wad(sb)
-    xl = build_xlat(pal(hdata, hent), pal(bdata, bent))   # heretic -> doom palette
-    bn = [n for n, _, _ in bent]
+    xl = build_xlat(pal(hdata, hent), pal(bdata, bent))   # heretic -> doom palette (base = target palette)
 
-    # base = the whole DOOM2 S_START..S_END (so the range stays a superset)
-    bs0, bs1 = bn.index("S_START"), bn.index("S_END")
-    out = [(bent[i][0], bdata[bent[i][1]: bent[i][1]+bent[i][2]]) for i in range(bs0, bs1)]  # incl S_START, excl S_END
+    # HERETIC-ONLY: the engine now MERGES sprite namespaces (R_InitSpriteLumps), so this
+    # WAD carries ONLY its own renamed Heretic sprites in its S_START..S_END -- they get
+    # ADDED to the IWAD's sprites instead of shadowing them.  No DOOM base copy needed.
+    out = [("S_START", b"")]
 
     # + heretic monster sprites: every lump whose 4-char code is in SPRITE_RENAME,
     #   palette-converted and renamed (FOO + suffix -> NEWCODE + suffix).
@@ -174,8 +174,7 @@ def main():
     op.parent.mkdir(parents=True, exist_ok=True)
     write_wad(op, out)
     total = sum(len(d) for _n, d in out)
-    print(f"extract_heretic_monsters: wrote {op}")
-    print(f"  base sprites (DOOM2 namespace): {bs1-bs0}")
+    print(f"extract_heretic_monsters: wrote {op} (HERETIC-ONLY; engine merges namespaces)")
     print(f"  heretic monster sprites (converted+renamed): {n_spr}")
     print(f"  heretic monster sounds: {n_snd}")
     print(f"  total: {len(out)} lumps, {total/1024/1024:.1f} MB")
