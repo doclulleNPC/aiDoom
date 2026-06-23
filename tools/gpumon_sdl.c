@@ -220,7 +220,13 @@ static int fetch_thread(void* unused)
             // WSL System32 path -- so it works whether the SSH lands in cmd/PowerShell
             // or a WSL shell where nvidia-smi.exe is at /mnt/c/Windows/System32.
             snprintf(cmd, sizeof(cmd),
-                "ssh -o BatchMode=yes -o ConnectTimeout=5 -p %d %s@%s "
+                // ConnectTimeout bounds the initial connect; ServerAliveInterval/
+                // CountMax give a SESSION timeout -- if the link drops mid-query ssh
+                // gives up in ~6 s and exits (EOF), so the worker never blocks forever
+                // in fgets (the reason the window couldn't be closed when the GPU box
+                // went away).
+                "ssh -o BatchMode=yes -o ConnectTimeout=5 "
+                "-o ServerAliveInterval=3 -o ServerAliveCountMax=2 -p %d %s@%s "
                 "\"nvidia-smi %s || nvidia-smi.exe %s || /mnt/c/Windows/System32/nvidia-smi.exe %s\" 2>&1",
                 sshport, user, host, smiargs, smiargs, smiargs);
 
@@ -347,8 +353,12 @@ int main(int argc, char** argv)
     }
 
     SDL_SetAtomicInt(&g_running, 0);
-    SDL_WaitThread(th, NULL);
-    SDL_DestroyMutex(g_lock);
+    // Do NOT block the close on the worker: if the remote GPU box vanished it may be
+    // stuck in ssh/fgets for a few seconds, and SDL_WaitThread would hang the quit
+    // (the bug -- the window wouldn't close).  Detach it and tear down now; process
+    // exit kills the worker and closes its ssh pipe.  (Skip DestroyMutex to avoid
+    // racing the detached worker; the OS reclaims it.)
+    SDL_DetachThread(th);
     SDL_DestroyRenderer(ren); SDL_DestroyWindow(win); SDL_Quit();
     return 0;
 }
