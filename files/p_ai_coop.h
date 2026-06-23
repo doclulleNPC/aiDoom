@@ -97,10 +97,6 @@ int  P_AICoop_NavRoute (fixed_t* xs, fixed_t* ys, int maxpts);
 // navigate around corners instead of the vanilla straight 8-dir chase.
 boolean P_AICoop_NextWaypoint (struct mobj_s* mo, fixed_t dx, fixed_t dy, fixed_t* wx, fixed_t* wy);
 
-// (B) The human opened a LOCKED door -> share the key with the buddy + mark the door
-// openable, so the buddy can open it and follow through.  Call from EV_VerticalDoor.
-void P_AICoop_PlayerUnlockedDoor (struct line_s* line, struct mobj_s* opener);
-
 // Savegame persistence for the breadcrumb trail.  Written/read AFTER the savegame
 // consistency marker (g_game.c), so older saves without the block still load.
 void P_AICoop_ArchiveTrail (void);

@@ -68,13 +68,6 @@ static fixed_t	crumbx[CRUMB_MAX], crumby[CRUMB_MAX];
 static int	crumb_n;		// crumbs held (crumb[0]=oldest .. crumb[n-1]=newest≈player)
 static int	trail_active;		// currently following the breadcrumb trail
 
-// (A) Per-line "is this an openable door?" list, rebuilt fresh each map (cleared
-// first) in P_AICoop_ResetSlot.  Lets the buddy tell a real door from a non-door
-// "yellow" line (a ledge/step) so it only taps USE at actual doors instead of
-// grinding plain geometry.  Indexed by line number (== ld - lines).
-static boolean*	coop_doorline;
-static int	coop_doorline_n;
-
 static void AICoop_CrumbAdd (fixed_t x, fixed_t y)
 {
     if (crumb_n > 0 &&
@@ -97,7 +90,6 @@ static void AICoop_CrumbAdd (fixed_t x, fixed_t y)
 #define COOP_NEAR	(256*FRACUNIT)	// follow distance to the human
 #define YIELD_DIST	(48*FRACUNIT)	// human this close -> step out of the way
 #define COOP_KEEP	(192*FRACUNIT)	// advance toward a monster until this close
-#define COOP_STANDOFF	(512*FRACUNIT)	// default fight distance: hold here, don't charge into melee
 #define COOP_RUN	0x32		// forwardmove "run" magnitude
 #define COOP_HEAL_HP	50		// seek a med-pack below this health
 #define COOP_SAFE_HP	40		// below this HP the buddy routes home the low-danger way
@@ -209,20 +201,6 @@ void P_AICoop_ResetSlot (void)
 
     crumb_n = 0; trail_active = 0;	// drop the previous map's breadcrumb trail
     summon = 0; summon_stay = 0;	// drop any come/leash order from the previous map
-
-    // (A) Rebuild the openable-door list for THIS map (cleared first).  lines[] is
-    // already loaded here (P_LoadLineDefs runs before P_AICoop_ResetSlot).  Mark
-    // unlocked manual (DR/D1) doors -- the ones the buddy can actually open with USE.
-    {
-	int i;
-	coop_doorline   = (boolean*) realloc (coop_doorline, (size_t)numlines * sizeof(boolean));
-	coop_doorline_n = coop_doorline ? numlines : 0;
-	for (i = 0; i < coop_doorline_n; i++)
-	{
-	    int sp = lines[i].special;
-	    coop_doorline[i] = (sp == 1 || sp == 31 || sp == 117 || sp == 118);
-	}
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1074,56 +1052,6 @@ static boolean PF_IsDoorSpecial (int sp)	// push (DR) doors with no key
     return (sp == 1 || sp == 31 || sp == 117 || sp == 118);
 }
 
-// (A) Is linedef `ld` an openable door, per the map-start door list?
-static boolean AICoop_LineIsDoor (line_t* ld)
-{
-    int i = (int)(ld - lines);
-    return (coop_doorline && i >= 0 && i < coop_doorline_n) ? coop_doorline[i] : false;
-}
-
-// (B) The human just opened a LOCKED door.  Let the AI buddy in on it: mark this door
-// line openable (locked specials aren't in the map-start list) AND share the matching
-// key with the buddy, so it can open the door itself and follow through afterwards.
-void P_AICoop_PlayerUnlockedDoor (line_t* line, mobj_t* opener)
-{
-    int	card = -1, i, b;
-    switch (line->special)
-    {
-      case 26: case 32: card = it_bluecard;   break;
-      case 27: case 34: card = it_yellowcard; break;
-      case 28: case 33: card = it_redcard;    break;
-      default: return;					// not a locked door
-    }
-    if (coop_doorline)					// recognise this line as a door
-	{ i = (int)(line - lines); if (i >= 0 && i < coop_doorline_n) coop_doorline[i] = true; }
-    for (b = 0; b < MAXPLAYERS; b++)			// hand the key to the other survivor(s)
-	if (playeringame[b] && (!opener || &players[b] != opener->player))
-	    players[b].cards[card] = true;
-}
-
-// (A) Is an openable door right in front of the buddy (within USE reach, roughly
-// in the facing direction)?  Used to gate the stuck-handler's USE tap so it only
-// opens REAL doors -- not "yellow" non-door lines (ledges/steps), which it should
-// jump or sidestep instead of grinding USE on.
-static boolean AICoop_DoorInFront (mobj_t* mo)
-{
-    int		i, fa = mo->angle >> ANGLETOFINESHIFT;
-    fixed_t	fwx = finecosine[fa], fwy = finesine[fa];
-    for (i = 0; i < coop_doorline_n; i++)
-    {
-	line_t*	ld;
-	fixed_t	mx, my, dx, dy;
-	if (!coop_doorline[i]) continue;
-	ld = &lines[i];
-	mx = (ld->v1->x + ld->v2->x) >> 1;
-	my = (ld->v1->y + ld->v2->y) >> 1;
-	dx = mx - mo->x; dy = my - mo->y;
-	if (P_AproxDistance (dx, dy) > 96*FRACUNIT) continue;		// not adjacent
-	if (FixedMul (dx, fwx) + FixedMul (dy, fwy) > 0) return true;	// in the forward arc
-    }
-    return false;
-}
-
 // If a CLOSED push-door (unlocked DR) lies ahead toward the goal, hand back the
 // midpoint of its line in (*ox,*oy).  The BSP waypoints are sub-sector centroids,
 // which can sit behind the corridor wall beside a doorway -- so the buddy never
@@ -1146,7 +1074,7 @@ static boolean AICoop_FindDoorAhead (mobj_t* mo, fixed_t gx, fixed_t gy,
 	angle_t		todoor;
 
 	if (!ld->backsector || !ld->frontsector)	continue;	// not two-sided
-	if (!AICoop_LineIsDoor (ld))			continue;	// not an openable door (map-start list)
+	if (!PF_IsDoorSpecial (ld->special))		continue;	// not an openable door
 	fs = ld->frontsector; bs = ld->backsector;
 	opening = (fs->ceilingheight < bs->ceilingheight ? fs->ceilingheight : bs->ceilingheight)
 		- (fs->floorheight   > bs->floorheight   ? fs->floorheight   : bs->floorheight);
@@ -1773,11 +1701,7 @@ static void P_AICoop_Revive (int hp)
     player_t*	bot = &players[coop_slot];
     mobj_t*	mo  = bot->mo;
     if (!mo) return;
-    // Start SHOOTABLE but NOT SOLID: the reviver is standing on top of the body, so
-    // making it solid now traps the player inside it.  The ticker re-solidifies the
-    // buddy once they've stepped apart (see P_AICoop_BuildCmd).
-    mo->flags |=  MF_SHOOTABLE;
-    mo->flags &= ~MF_SOLID;
+    mo->flags |= (MF_SOLID | MF_SHOOTABLE);
     mo->flags &= ~(MF_CORPSE | MF_DROPOFF);
     mo->height = mo->info->height;		// un-squash the corpse
     mo->health = hp;
@@ -1859,15 +1783,6 @@ void P_AICoop_BuildCmd (void)
 
     mo = bot->mo;
     memset (cmd, 0, sizeof(*cmd));
-
-    // After a revive the buddy is left non-solid so the reviver isn't trapped inside
-    // it; re-solidify once they've stepped apart (no human overlapping our box).
-    if (!(mo->flags & MF_SOLID))
-    {
-	mobj_t* h = AICoop_NearestHuman (mo->x, mo->y);
-	if (!h || P_AproxDistance (h->x - mo->x, h->y - mo->y) > mo->radius + h->radius + 8*FRACUNIT)
-	    mo->flags |= MF_SOLID;
-    }
 
     // Progress check.  "stuck" if we tried to move but either barely moved this tic
     // (wedged solid) OR made no NET progress over a ~0.4s window -- the latter
@@ -2088,19 +2003,15 @@ void P_AICoop_BuildCmd (void)
 	    coop_state = 2; haveaim = 1; movethresh = 16*FRACUNIT;
 	    tx = heal->x; ty = heal->y;
 	}
-	// fight the nearest monster.  ALWAYS engage a target we can see -- the buddy
-	// has ranged weapons, so it should shoot whatever is in LOS.  "Less kamikaze"
-	// (hurt / come-leash) only changes MOVEMENT: it keeps extra distance from the
-	// monster (no charge).  We always position relative to the MONSTER, never walk
-	// onto the player -- crowding the player puts it in our line of fire and the
-	// friendly-fire guard then makes us hold fire (looks like "buddy won't shoot").
-	else if (tgt)
+	// fight the nearest monster -- but while staying close (hurt / come-leash) only
+	// engage threats near us or near the player, and keep extra distance (no charge).
+	else if (tgt && (!stayclose
+			 || P_AproxDistance (tgt->x - mo->x, tgt->y - mo->y) < COOP_ENGAGE_NEAR
+			 || (pl && P_AproxDistance (tgt->x - pl->x, tgt->y - pl->y) < COOP_LEASH)))
 	{
 	    coop_state = 1; haveaim = 1; fire = 1; aimmon = tgt;
+	    movethresh = stayclose ? COOP_KEEP*2 : COOP_KEEP;
 	    tx = tgt->x; ty = tgt->y;
-	    // Default: fight from a standoff -- approach only to firing range and HOLD,
-	    // don't charge into melee.  Hang back further when hurt.
-	    movethresh = stayclose ? COOP_STANDOFF*3/2 : COOP_STANDOFF;
 	}
 	// idle: collect a nearby item, but ONLY while still near the human (don't
 	// wander off / linger for an item while the player walks away), and not one
@@ -2198,13 +2109,6 @@ void P_AICoop_BuildCmd (void)
 		&& AICoop_CanReach (mo, ddx, ddy, true))
 	    {
 		stx = ddx; sty = ddy;		// doorway in reach -> head right at it + Use
-		// PROACTIVELY tap Use the moment we're within reach of the shut door,
-		// instead of waiting to physically wedge against it (the stuck-handler
-		// USE misses on wide doors / when the BSP waypoint sits past the door,
-		// so the buddy never opened it to follow the player on `come`).
-		if (doorwait == 0
-		    && P_AproxDistance (ddx - mo->x, ddy - mo->y) < mo->radius + 64*FRACUNIT)
-		    { cmd->buttons |= BT_USE; doorwait = 45; AICoop_Callout ("door:", 2); }
 	    }
 	    else if (AICoop_CanReach (mo, goalx, goaly, true))
 	    {
@@ -2299,20 +2203,7 @@ void P_AICoop_BuildCmd (void)
 		}
 	    }
 	    else if (!linetarget && dist < 768*FRACUNIT)
-	    {
-		// No autoaim lock.  At point-blank nothing can really be "in the way" (the
-		// monster is right here) and the close-range slope probe often just misses
-		// -- so FIRE anyway if we face it and it's not a splash suicide, rather than
-		// backing off.  Backing off a point-blank monster made the buddy refuse to
-		// shoot AND look "stuck" oscillating in place against it.  (A human directly
-		// in line would have locked as linetarget->player above, so reaching here
-		// means none is on the bearing -- safe to fire.)
-		if (dist < COOP_KEEP && abs(rem) < COOP_FACING && react_timer == 0
-		    && !splash_close && !AICoop_BarrelNear (mo))
-		    cmd->buttons |= BT_ATTACK;
-		else
-		    backoff = true;			// farther out: open the angle
-	    }
+		backoff = true;
 	}
 
 	// Damage-progress watchdog: remember the target's health, and while we're
@@ -2408,16 +2299,12 @@ void P_AICoop_BuildCmd (void)
 	// are walking through (no longer stuck), so no second tap fires.
 	// (B) Low ledge it can't step up?  Jump it -- the player can (disabled in netgame).
 	if (!netgame && AICoop_JumpableStep (mo, stx, sty)) { cmd->buttons |= BT_JUMP; AICoop_Callout ("jump:", 2); }
-	// Only tap USE if a REAL door is in front (map-start door list) -- otherwise the
-	// wedge is a non-door "yellow" line/ledge, so don't grind USE on it (jump/wiggle).
-	if (doorwait == 0 && AICoop_DoorInFront (mo)) { cmd->buttons |= BT_USE; doorwait = 45; AICoop_Callout ("door:", 2); }
+	if (doorwait == 0) { cmd->buttons |= BT_USE; doorwait = 45; AICoop_Callout ("door:", 2); }
 	// Sideways wiggle to slip past a barrel / convex corner (non-door wedge).
 	cmd->sidemove += ((wig++ / 24) & 1) ? COOP_RUN : -COOP_RUN;
-	// Announce ONCE per wedge (rising edge), and ONLY while actually navigating
-	// somewhere (follow/come/goto).  While fighting (navigate==0) the buddy holds
-	// and jockeys in place near a monster -- that reads as "no progress" but isn't
-	// being wedged, so it must not cry "stuck" (the spurious spam the player heard).
-	if (!wasstuck && navigate) AICoop_Callout ("stuck:", 3);
+	// Announce ONCE per wedge (rising edge) -- this used to fire every tic, so the
+	// buddy complained about being stuck constantly and starved every other line.
+	if (!wasstuck) AICoop_Callout ("stuck:", 3);
 	wasstuck = true;
     }
     else wasstuck = false;

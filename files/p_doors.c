@@ -38,7 +38,6 @@ rcsid[] = "$Id: p_doors.c,v 1.4 1997/02/03 16:47:53 b1 Exp $";
 // Data.
 #include "dstrings.h"
 #include "sounds.h"
-#include "p_ai_coop.h"		// (B) share an unlocked door with the AI buddy
 
 #if 0
 //
@@ -409,9 +408,6 @@ EV_VerticalDoor
 	}
 	break;
     }
-
-    // (B) lock cleared -> let the AI buddy in on this door (share key + mark openable)
-    P_AICoop_PlayerUnlockedDoor (line, thing);
 
     // if the sector has an active thinker, use it
     sec = sides[ line->sidenum[side^1]] .sector;
