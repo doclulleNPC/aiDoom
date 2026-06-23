@@ -250,9 +250,12 @@ void Heretic_Init (void)
     ST (S_HIMP_MSATK6, SPR_HIMP, 1,  6, NULL,                      S_HIMP_MSATK3);
     ST (S_HIMP_PAIN1,  SPR_HIMP, 6,  3, NULL,                      S_HIMP_PAIN2);
     ST (S_HIMP_PAIN2,  SPR_HIMP, 6,  3, (actionf_p1)A_Pain,        S_HIMP_FLY1);
-    ST (S_HIMP_DIE1,   SPR_HIMP, 6,  4, (actionf_p1)A_ImpDeath,    S_HIMP_DIE2);
-    ST (S_HIMP_DIE2,   SPR_HIMP, 7,  5, (actionf_p1)A_Scream,      S_HIMP_DIE3);
-    ST (S_HIMP_DIE3,   SPR_HIMP, 7, -1, NULL,                      S_NULL);
+    ST (S_HIMP_DIE1,   SPR_HIMP,  6,  4, (actionf_p1)A_ImpDeath,   S_HIMP_DIE2);
+    ST (S_HIMP_DIE2,   SPR_HIMP,  7,  5, (actionf_p1)A_Scream,     S_HIMP_DIE3);
+    ST (S_HIMP_DIE3,   SPR_HIMP,  8,  6, (actionf_p1)A_Fall,       S_HIMP_DIE4);	// crash frames
+    ST (S_HIMP_DIE4,   SPR_HIMP,  9,  5, NULL,                     S_HIMP_DIE5);
+    ST (S_HIMP_DIE5,   SPR_HIMP, 10,  5, NULL,                     S_HIMP_DIE6);
+    ST (S_HIMP_DIE6,   SPR_HIMP, 11, -1, NULL,                     S_NULL);
 
     m = &mobjinfo[MT_HIMP];
     m->doomednum = -1;        m->spawnstate  = S_HIMP_LOOK1; m->spawnhealth = 40;

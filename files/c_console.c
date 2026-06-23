@@ -422,6 +422,55 @@ static void C_Execute (char* line)
 	    }
 	}
     }
+    else if (!strcmp(cmd, "summonfriend"))
+    {
+	// like summon, but the monster is FRIENDLY: it hunts other monsters, not you.
+	int t = C_MobjByName (args);
+	if (t < 0)
+	    C_Printf ("usage: summonfriend <imp|demon|baron|mummy|clink|gargoyle|...>");
+	else if (pl->mo)
+	{
+	    unsigned	an = pl->mo->angle >> ANGLETOFINESHIFT;
+	    fixed_t	x  = pl->mo->x + FixedMul (96*FRACUNIT, finecosine[an]);
+	    fixed_t	y  = pl->mo->y + FixedMul (96*FRACUNIT, finesine[an]);
+	    mobj_t*	m  = P_SpawnMonsterChecked (x, y, (mobjtype_t)t);
+	    if (!m)
+		C_Printf ("summonfriend: no room in front (wall / low ceiling)");
+	    else
+	    {
+		m->flags |= MF_FRIEND;		// left at spawnstate: A_Look picks the nearest enemy
+		C_Printf ("summoned friendly %s", args);
+	    }
+	}
+    }
+    else if (!strcmp(cmd, "resurrect") || !strcmp(cmd, "revive"))
+    {
+	// Revive the player in place if dead (the death-screen "respawn" without the reload).
+	if (!inlevel || !pl->mo || (pl->playerstate != PST_DEAD && pl->health > 0))
+	    C_Printf ("resurrect: you're not dead");
+	else
+	{
+	    extern mobjinfo_t mobjinfo[];
+	    extern void P_SetupPsprites (player_t*);
+	    extern void ST_Start (void);
+	    mobj_t* mo = pl->mo;
+	    pl->playerstate    = PST_LIVE;
+	    pl->health         = 100;
+	    mo->health         = 100;
+	    mo->flags          = mobjinfo[MT_PLAYER].flags;	// restore SOLID|SHOOTABLE, drop CORPSE
+	    mo->height         = mobjinfo[MT_PLAYER].height;	// un-squash the corpse
+	    P_SetMobjState (mo, S_PLAY);
+	    pl->viewheight     = 41*FRACUNIT;			// VIEWHEIGHT
+	    pl->deltaviewheight = 0;
+	    pl->damagecount    = pl->bonuscount = 0;
+	    pl->attacker       = NULL;
+	    if (pl->readyweapon < 0 || pl->readyweapon >= NUMWEAPONS)
+		pl->readyweapon = wp_pistol;			// guard a corrupt weapon
+	    P_SetupPsprites (pl);				// bring the weapon back up
+	    ST_Start ();					// re-init the status bar (widgets)
+	    C_Printf ("resurrected");
+	}
+    }
     else if (!strcmp(cmd, "where") || !strcmp(cmd, "buddy") || !strcmp(cmd, "comp"))
     {
 	const char* r = P_AICoop_Report ();

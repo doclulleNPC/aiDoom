@@ -1185,7 +1185,8 @@ typedef enum
     S_HIMP_MSATK1,S_HIMP_MSATK2,S_HIMP_MSATK3,
     S_HIMP_MSATK4,S_HIMP_MSATK5,S_HIMP_MSATK6,
     S_HIMP_PAIN1, S_HIMP_PAIN2,
-    S_HIMP_DIE1,  S_HIMP_DIE2,  S_HIMP_DIE3,
+    S_HIMP_DIE1,  S_HIMP_DIE2,			// fall (frames 6,7)
+    S_HIMP_DIE3,  S_HIMP_DIE4,  S_HIMP_DIE5, S_HIMP_DIE6,	// crash (frames 8..11)
     // undead warrior (knight): STND, WALK, ATK (melee or throw axe), PAIN, DIE
     S_HKNI_STND1, S_HKNI_STND2,
     S_HKNI_WALK1, S_HKNI_WALK2, S_HKNI_WALK3, S_HKNI_WALK4,

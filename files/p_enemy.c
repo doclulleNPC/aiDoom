@@ -495,11 +495,42 @@ void P_NewChaseDir (mobj_t*	actor)
 // If allaround is false, only look 180 degrees in front.
 // Returns true if a player is targeted.
 //
+// aiDoom: nearest live enemy monster to a FRIENDLY monster (summonfriend) -- a real
+// COUNTKILL monster, shootable, alive, and not itself friendly.  NULL if none.
+static mobj_t* P_FriendNearestEnemy (mobj_t* actor)
+{
+    thinker_t*	th;
+    mobj_t*	best = NULL;
+    fixed_t	bestd = 0x7fffffff;
+    for (th = thinkercap.next; th != &thinkercap; th = th->next)
+    {
+	mobj_t*	mo;
+	fixed_t	d;
+	if (th->function.acp1 != (actionf_p1)P_MobjThinker) continue;
+	mo = (mobj_t*)th;
+	if (mo == actor || mo->health <= 0)		continue;
+	if (!(mo->flags & MF_COUNTKILL))		continue;	// real monster only
+	if (mo->flags & MF_FRIEND)			continue;	// not another ally
+	if (!(mo->flags & MF_SHOOTABLE))		continue;
+	d = P_AproxDistance (mo->x - actor->x, mo->y - actor->y);
+	if (d < bestd) { bestd = d; best = mo; }
+    }
+    return best;
+}
+
 boolean
 P_LookForPlayers
 ( mobj_t*	actor,
   boolean	allaround )
 {
+    // A friendly monster hunts the nearest enemy monster instead of a player.
+    if (actor->flags & MF_FRIEND)
+    {
+	mobj_t* e = P_FriendNearestEnemy (actor);
+	if (e) { actor->target = e; return true; }
+	return false;
+    }
+
     int		c;
     int		stop;
     player_t*	player;

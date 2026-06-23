@@ -198,7 +198,11 @@ typedef enum
     //  use a translation table for player colormaps
     MF_TRANSLATION  	= 0xc000000,
     // Hmm ???.
-    MF_TRANSSHIFT	= 26
+    MF_TRANSSHIFT	= 26,
+
+    // aiDoom: a "friendly" monster (summonfriend) -- it hunts other monsters instead of
+    // the player, and the player's auto-aim/buddy treat it as an ally.
+    MF_FRIEND		= 0x10000000
 
 } mobjflag_t;
 
