@@ -159,12 +159,21 @@ cd run && ./aidoom -warp 1 1 -skill 4 -aidirector 31666 &
 See `../AGENT_CONTROL.md` (§12–13) and `../MONSTER_AGENT_GUIDE.md` for the
 director protocol and order vocabulary.
 
-## Full LLM player mode (-aiplayer)
+## Full LLM mode (marine + buddy + monsters)
 
-`./start_llm_player.sh [IWAD] [E M]` runs aiDoom with the **marine driven by an LLM**:
-the engine's agent (`files/g_agent.c`, `-aiplayer <port>`) exposes an `observe` JSON
-state + accepts high-level intents over a TCP socket; `llm_player.py` is the brain
-(observe -> Ollama -> one command), and a C reflex controller turns each intent into
-per-tic ticcmds (aim/step/fire). Monsters spawn via `-director`. Env: `OLLAMA_URL`,
-`OLLAMA_MODEL` (default llama3.1:8b), `AIPLAYER_PORT` (31700), `DECISION_SECS`.
-`-aiplayer demo` uses a built-in scripted brain (no LLM) to prove the hook.
+`./start_llm_player.sh [IWAD] [E M]` runs aiDoom **fully LLM-driven** -- the LLM controls
+the marine, the AI buddy AND the monsters:
+
+- **marine** -- `-aiplayer <port>` (`files/g_agent.c`) exposes an `observe` JSON state and
+  accepts high-level intents (`goto`/`target`/`attack`/`use`/`weapon`/`face`/`stop`) over a
+  TCP socket; `llm_player.py` is the brain (observe -> Ollama -> one command), and a C
+  reflex controller turns each intent into per-tic ticcmds (aim/step/fire, line-of-sight
+  gated). `-aiplayer demo` = built-in scripted brain (no LLM), to prove the hook.
+- **buddy + monsters + pacing** -- `-aidirector <port> -aicoop` + the `director` sidecar
+  (`run/director`): one Ollama brain that already issues monster tactics, buddy orders and
+  L4D spawn pacing. The script starts it if present; without it the engine uses its
+  built-in rule director (no LLM monsters/buddy).
+
+Two independent sockets (player 31700, director 31666), each with its own client; both
+talk to Ollama. Env: `PLAYER_PORT`, `DIRECTOR_PORT`, `OLLAMA_URL`, `OLLAMA_MODEL` (player
+brain, default `llama3.1:8b`), `DECISION_SECS`.
