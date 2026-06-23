@@ -1,265 +1,233 @@
-# Buddy-AI Verhalten & Portierungs-Anleitung
+# Buddy-AI: Verhalten & Portierung
 
-Zusammenfassung wie der aidoom-Co-op-Buddy aktuell funktioniert und wie man
-ihn auf andere Projekte portiert.
+Vollständige Beschreibung, wie der aiDoom-Co-op-Buddy aktuell funktioniert
+(`files/p_ai_coop.c`), plus Portierungs-Hinweise. Stand: nach dem Revert auf das
+„weniger-Kamikaze-wenn-verletzt"-Verhalten (+ Tür-Liste, Fass-Fix).
 
 ## Was ist der Buddy?
 
-Ein deterministischer, regelbasierter KI-Begleiter der in DOOM den Spieler
-als zweite Spielfigur (`players[1]`) begleitet. Aktiviert via `-coop` Flag
-(regelbasiert) oder `-aicoop` Flag (Stub für zukünftige LLM-Schicht).
+Ein **echter Spieler 2** (`players[1]`): eigene Waffen, Schaden, Pickups (außer
+Schlüssel), eigenes „Down/Revive" statt Game-Over. Gesteuert von einem
+**deterministischen, regelbasierten Bot**, der **jeden Tic** (35 Hz) `players[1].cmd`
+baut — `P_AICoop_BuildCmd()`. Deterministisch (nur Geometrie/`P_AproxDistance`, kein
+`P_Random` im State-Flow) → demo-/netz-sicher.
 
-## Aktuelles Verhalten — Top-Down
+- Aktiviert mit **`-aicoop`** (der Bot). `-coop` = stiller Co-op-Slot ohne Bot.
+- Ein **LLM-Director** kann optional High-Level-Taktiken **oben drauf** setzen
+  (`-aidirector` + `tools/director.c`); ohne ihn läuft der Bot autonom.
 
-### 1. Spawn (Datei: `files/p_ai_coop.c`)
+### Lebenszyklus (in `P_SetupLevel`)
+- `P_AICoop_ResetSlot()` **vor** `P_LoadThings`: nullt den stale `players[1].mo`-Pointer
+  und den P2-Start-Sentinel (sonst false-positive „Buddy gespawnt" aus der Vormap).
+- `P_AICoop_VerifySpawn()` **nach** `P_LoadThings`: hat die Map kein `Player_2_Start`,
+  → WARNING + Buddy für die Session aus.
 
-`P_AICoop_Init()` (Z. 71):
-- Liest `-coop` und `-aicoop` Flags
-- **Mutual-Exclusive**: beide zusammen → Fehlermeldung + Buddy aus
-- Single-Player only (`netgame` blockt)
-- Setzt `playeringame[1] = true` → `P_SpawnPlayer` in `P_LoadThings` spawnt Player 2 an `Player_2_Start`-Position
+---
 
-`P_AICoop_VerifySpawn()` (Z. 130):
-- Läuft **nach** `P_LoadThings` in `P_SetupLevel`
-- Checkt ob `players[coop_slot].mo != NULL` UND `playerstarts[coop_slot].type == 2`
-- Wenn fehlt → WARNING + `companion_active = 0` für die Session
+## Entscheidungsbaum (`BuildCmd`, Priorität oben → unten)
 
-`P_AICoop_ResetSlot()` (Z. 117):
-- Läuft **vor** `P_LoadThings` in `P_SetupLevel`
-- Nullt `players[coop_slot].mo` (clear stale dangling pointer)
-- Resettet `playerstarts[coop_slot].type = 0` (sentinel: "kein P2-Start in dieser Map")
-- Resettet auch `x, y, angle, options` zu 0
+Wird einmal pro Tic durchlaufen; der erste passende Zweig setzt `coop_state`, das
+Bewegungsziel `(tx,ty)`, `movethresh` (Stopp-Distanz) und ob gefeuert wird.
 
-### 2. Tick-Loop (jeden 35-tic = einmal pro Sekunde × 35)
+| # | Zweig | Bedingung | Verhalten |
+|--:|-------|-----------|-----------|
+| 0 | **Down** | HP ≤ 0 (incapacitated) | Bleibt liegen, ruft `help:`, **kein** Reborn; wartet auf Revive per USE des Menschen. |
+| 1 | **`goto`** | LLM `BUD_GOTO` (`ai_goto>0`) | Navigiert zum Punkt, ignoriert Kämpfe/Items. |
+| 2 | **`wait`/`stay`** | `user_hold` (Mensch) oder `hold` (Director `BUD_HOLD`) | Hält Position; feuert aber auf ein Monster in Reichweite. |
+| 3 | **`come`** | `summon>0` (7 s, `COOP_SUMMON_TICS`) | Läuft zum Spieler (Pathfinder), ignoriert Kämpfe/Items. |
+| 4 | **Come-Leash** | come-stay aktiv UND (>`COOP_LEASH` 640u weg ODER keine LoS zum Spieler) | Zurück zum Spieler — überschreibt Kampf/Item. |
+| 5 | **Heal** | HP < `COOP_HEAL_HP` (50) UND Medkit < `COOP_HEAL_RANGE` (1024u) | Bricht ab, holt das nächste Medkit. |
+| 6 | **Fight** | Sichtbares Monster `tgt` | Anvisieren + feuern. **Wenn `stayclose`** (HP<50 oder come-leash): nur Bedrohungen < `COOP_ENGAGE_NEAR` (448u) vom Buddy oder < `COOP_LEASH` (640u) vom Spieler, und mehr Abstand (`COOP_KEEP*2`=384u statt 192u). |
+| 7 | **Grab** | Idle UND Spieler < `COOP_GRAB_NEAR` (512u) UND Item < `COOP_ITEM_RANGE` (128u) UND nicht „grab-stuck" | Sammelt das Item ein. |
+| 8 | **Follow** | Default (Spieler existiert) | Folgt dem Spieler auf `COOP_NEAR` (256u; verletzt halb so weit), `avoiddamage=1`. |
 
-`P_AICoop_BuildCmd()` in `p_ai_coop.c`:
-1. **Sicht-Check**: Welche Monster sind in `COOP_SIGHT` (1280u = ~78m)?
-2. **State-Machine** entscheidet aktuellen Modus:
+`stayclose` = `(HP < COOP_CAUTION_HP 50) || come-stay`. Das ist der „weniger
+Kamikaze"-Schalter: Buddy bleibt näher am Spieler und hält im Kampf mehr Abstand.
 
-| State | Code | Trigger | Verhalten |
-|-------|------|---------|-----------|
-| `FOLLOW` | 0 | Default | Folge Spieler 1, halte `COOP_NEAR` (256u) Distanz |
-| `FIGHT` | 1 | Monster in Sicht | Greife nearest an, halte `COOP_KEEP` (192u) Combat-Distanz |
-| `HEAL` | 2 | HP < `COOP_HEAL_HP` (50) | Suche nearest Med-Pack in `COOP_HEAL_RANGE` (1024u) |
-| `HOLD` | 3 | User `wait`/`stay` cmd | Bleib an Position, defensiv |
-| `COME` | 4 | User `come` cmd | Renne zu Spieler 1 für `COOP_SUMMON_TICS` (7s) |
-| `GRAB` | 5 | Idle + Item in `COOP_GRAB_NEAR` (512u) | Pickup nearest Item |
+---
 
-3. **Pathfinding** (Z. 810-1000, `pf.c`-artige Logik):
-   - BSP-Sub-Sector-Dijkstra (max 8000 Nodes, max 32 Edges pro Node)
-   - A* wäre besser aber Dijkstra ist was yapb's `navigate.cpp` MIT-lizensiert
-     als Alternative bietet
-4. **Ticcmd-Generierung**: `forwardmove`/`sidemove`/`angleturn` basierend auf
-   State + Path-Current-Waypoint
+## Zielerfassung (`AICoop_FindTarget`)
 
-### 3. Konsole-Commands (Datei: `files/c_console.c`)
+Nächstes Monster, das **alle** erfüllt:
+- `MF_COUNTKILL` + `MF_SHOOTABLE`, lebt, kein `MF_CORPSE`;
+- in `COOP_SIGHT` (1280u);
+- **direkte Sichtlinie** (`P_CheckSight`);
+- **nicht geblacklistet** (s. u.).
 
-User-zu-Buddy-Kommunikation:
+Ein **Schaden-Watchdog** merkt sich die HP des Ziels: feuert der Buddy ~2 s ohne dass
+die HP fallen (Schüsse verfehlen / unerreichbar), wird das Ziel für `COOP_BL_TICS`
+(5 s) **geblacklistet** (max `COOP_BL_MAX`=8) → er wechselt das Ziel statt einzufrieren.
 
-| Command | Funktion | Verhalten |
-|---------|-----------|-----------|
-| `buddy_come` / `come` | `P_AICoop_Summon()` | Setzt `summon = COOP_SUMMON_TICS` → State=COME |
-| `buddy_wait` / `stay` / `wait` | `P_AICoop_Wait()` | Toggle `hold` Flag → State=HOLD |
-| `buddy_attack` / `attack` | `P_AICoop_Attack()` | Setzt `forceaggro = COOP_ATTACK_TICS` (10s) + `forcetarget` → State=FIGHT |
-| `buddy_report` / `report` | `P_AICoop_StatusReport()` | Print HP/Armor/Weapon/Ammo |
-| `buddy_where` / `where` | `P_AICoop_Report()` | Print Position, Distance, HP, Direction |
+---
 
-### 4. Voice-Ausgabe (Datei: `files/i_voice.c`, `files/p_ai_coop.c`)
+## Feuer-Logik
 
-156 vorgebackene Sprachzeilen (OGG/Vorbis in `run/aidoom.wad`, Joker-HL-Stimme),
-abgespielt über einen eigenen SDL3-Audio-Stream. `P_AICoop_VoiceTag(tag)` /
-`AICoop_Callout(prefix, n)` lösen einen Tag (z.B. `state:fighting`, `kill:0`)
-über `VOICE_MAP` in `i_voice.c` zum 8-Zeichen-Lumpnamen auf.
+Im Fight-Zweig faltet sich pro Tic ab:
+1. **Reaktionszeit** (`-buddyreact`): kurze Verzögerung bei *frisch* gesichtetem Ziel
+   (nicht frame-perfekt).
+2. **Vertikal-Aim**: berechnet die Steigung zum Ziel-Zentrum → `bot->lookdir`
+   (geklammert auf `COOP_LOOKMAX` 56), damit Schüsse zu hohen/tiefen Gegnern elevieren
+   statt in die Wand/Kiste davor.
+3. **Klar-Schuss-Probe**: `P_AimLineAttack` entlang der Peilung. Auswertung:
+   - **Friendly-Fire-Schutz**: `linetarget` ist ein **Spieler** (Mensch in der Linie)
+     → **nicht** feuern, seitwärts straferen bis der Winkel frei ist.
+   - **Feuer**, wenn `linetarget` ein Monster ist **und** er es anvisiert
+     (`|rest-Drehung| < COOP_FACING` ~7°) **und** Reaktionszeit abgelaufen **und** kein
+     Splash-Risiko **und** kein Fass im Weg.
+   - **Fass-Schutz** (`AICoop_BarrelNear`): hält nur, wenn ein Fass *tatsächlich
+     getroffen* werden könnte — in Schussrichtung (Vorwärts-Bogen) **und** in Sicht.
+     Fass hinter einer Wand zählt nicht (sonst feuert er nie).
+   - **Splash-Schutz**: Rakete/BFG auf < `COOP_BLAST_SAFE` (176u) → wechselt auf eine
+     Nicht-Splash-Waffe (`AICoop_BestRanged`) und hält bis der Wechsel durch ist.
+   - **Kein Lock + nah (<768u)**: zurückweichen, um den Winkel zu öffnen (Facing bleibt
+     auf dem Ziel → feuert sobald frei).
+4. **Melee-Hochziehen**: steht der Buddy mit Faust/Kettensäge da, aber das Ziel ist
+   außer Reichweite, schaltet er auf eine Fernwaffe.
+5. **Raketen-Ausweichen** (`COOP_DODGE_RANGE` 256u): seitliches Dodging einkommender
+   Projektile.
 
-**Prioritäts-System** (gegen "Buddy redet zu viel", v.a. über *stuck*): Zeilen
-liegen in 4 Tiers; ein höheres Tier **unterbricht** ein laufendes niedrigeres
-(`I_Voice_Stop()` flusht den Stream) und wird seltener rate-limitiert:
+---
 
-| Tier | Was | Min-Abstand |
-|-----:|-----|-------------|
-| 3 COMMAND | Antworten auf `come`/`wait`/`attack`/`where` — immer, preemptet alles | 0 |
-| 2 WEAPON  | "out of ammo" / "down to fists" | 4 s |
-| 1 KILL    | Monster-Kill / Gib / Spree / "nice shot" | 4 s |
-| 0 AMBIENT | alles andere (stuck/lost/idle/contact/hurt/door/…) | 8 s |
+## Bewegung & Navigation
 
-Kernstück: `AICoop_VoiceGate(prio)` (entscheidet + reserviert den Slot),
-`AICoop_CalloutP(prefix, n, prio)`, `I_Voice_Busy()`/`I_Voice_Stop()`.
-`"stuck:"` ist **edge-getriggert** (einmal pro Klemm-Episode, nicht pro Tic).
-**Vollständiger Zeilen-Katalog + Tier-Zuordnung: `BUDDY_VOICE.md`.**
+### Pathfinder (`PF_*`, BSP-Sub-Sektor-Graph, `Pathfinding.md`)
+- Graph aus Sub-Sektor-Zentroiden, Kanten über begehbare zweiseitige Linien
+  (Kantengewicht = Distanz + Strafen: geschlossene Tür `PF_DOOR_PEN`, Schaden-Boden).
+- **`PF_AStar`** (A* mit Distanz-Heuristik) findet die Route; `PF_NextWaypoint(mo,gx,gy)`
+  liefert den **nächsten** Wegpunkt → der Buddy rundet Ecken statt an der Wand zu
+  schaben. (Dieselbe API nutzt der Monster-Director, `P_AICoop_NextWaypoint`.)
+- **Ecken-Rundung** (`AICoop_ChaseDir`, Doom-Monster-Stil): probiert die 8
+  Kompass-Richtungen (No-Move-Reachability-Probe) und bleibt bei einer Richtung, statt
+  an konkaven Ecken zu zappeln.
 
-Spatial Audio: 3D-positioniert via `AICoop_VoicePan()` (links/rechts-Panning
-basierend auf Spieler-zu-Buddy-Winkel, Distance-Attenuation).
+### Breadcrumb-Trail (`crumbx/crumby`)
+Der Buddy zeichnet die jüngsten begehbaren Positionen des Menschen auf (alle ~48u,
+`CRUMB_GAP`). Kommt er beim Folgen nicht durch (Pathfinder findet keine Route — z. B.
+Teleporter/Secret, die der Graph nicht modelliert), **spielt er die Spur zurück**:
+steuert gerade auf die *neueste direkt erreichbare* Krume zu — jeder Schritt ist ein
+verifiziert begehbarer Sprung Richtung Spieler.
 
-### 5. HUD-Overlay (Datei: `files/hu_buddy.c`)
+### Türen
+- `AICoop_FindDoorAhead` lenkt ihn auf die **Mitte** einer geschlossenen DR-Tür auf der
+  Route (sonst zielt die BSP-Wegpunkt-Logik an der Wand neben der Öffnung vorbei).
+- Beim Verkeilen (`triedmove && stuck`) tippt er **USE** — aber nur, wenn `AICoop_DoorInFront`
+  eine **echte** öffenbare Tür (Spezial 1/31/117/118) im 96u-Vorwärts-Bogen meldet
+  (kein USE-Spam an Wänden). 45-Tic-Cooldown, damit keine DR-Tür mitten im Hub umkehrt.
 
-Top-Bar mit Buddy-Stats in der Mitte (BASE-Koords X=80..240, Y=0..15):
-- HP-Armor-Waffe-Ammo-Distanz-State in einer Zeile
-- Patch-basiert (STBAR/STTNUM/STTPRCNT) + TTF für Labels
-- Config-Toggle `show_buddy_hud` in `m_misc.c` (Default 1)
+### Gefahren & Kanten
+- **Schaden-Boden** (`AICoop_DamagingFloor`): steht er in Nukage/Lava → raus zum
+  nächsten Menschen; Folge-Bewegungen meiden Schaden-Boden voraus.
+- **Kanten** (`AICoop_FallAhead`): kriecht nahe Abgründen/Pits, um nicht runterzurutschen.
+- **Springen** (`AICoop_JumpableStep`, nicht im Netgame): niedrige Stufen, die er nicht
+  hochsteigen kann, überspringt er per `BT_JUMP`.
+- **Safe-Route** (`pf_safemode`): unter `COOP_SAFE_HP` (40) gewichtet `PF_AStar` Kanten
+  zusätzlich nach einer Gefahren-Heatmap (`P_AICoop_NoteDamage` füttert sie) → der Buddy
+  nimmt den ruhigeren Weg nach Hause.
 
-## Determinismus-Eigenschaften
+---
 
-Der Buddy ist **deterministisch reproduzierbar**:
-- Gleicher Seed (levelstarttic) → gleiche Buddy-Aktionen über die Zeit
-- A*-frei (Dijkstra mit fester Distanzberechnung)
-- Kein Random (P_Random() wird im Buddy-State-Machine nicht aufgerufen)
+## Down & Revive (L4D-artig)
 
-**Implikation für Netplay**: Buddy kann theoretisch über mehrere Knoten
-repliziert werden (gleicher Snapshot → gleiche Aktion). Aktuell
-single-player-only.
+- Bei HP ≤ 0 stirbt der Buddy **nicht** (kein Game-Over): er geht „down", bleibt liegen
+  (kein USE → kein Reborn), ruft `help:`.
+- Der Mensch revived ihn, indem er **nah** (`COOP_REVIVE_RANGE` 96u) **steht und USE
+  drückt** — `P_AICoop_RevivePress` überträgt 10 HP vom Menschen (geht nicht, wenn der
+  Mensch ≤ 10 HP hätte) und stellt den Buddy in-place wieder auf.
 
-## Datenstrukturen
+---
 
-```c
-// p_ai_coop.c
-static int  coop_state;        // 0-5, current FSM state
-static int  summon;             // "come" timer (in tics)
-static int  hold;               // "wait" toggle
-static int  forceaggro;          // "attack" timer
-static mobj_t* forcetarget;     // "attack" target
-static int  companion_active;   // 1 if buddy is in this game
-static int  aicoop_layer;      // 1 if -aicoop flag was given
+## Director-Direktiven (LLM-Schicht, optional)
 
-#define COOP_SIGHT    (1280*FRACUNIT)   // 1280 u = ~78m view range
-#define COOP_TURN     1300               // max angleturn per tic (~7 deg)
-#define COOP_FACING   1500               // open fire if |remaining turn| < this
-#define COOP_LOOKMAX  56                 // vertical aim clamp
-#define COOP_NEAR     (256*FRACUNIT)     // follow distance target
-#define YIELD_DIST    (48*FRACUNIT)      // step-aside if human this close
-#define COOP_KEEP     (192*FRACUNIT)     // advance-toward-monster-until-this-close
-#define COOP_HEAL_HP  50                 // seek med-pack below this HP
-#define COOP_HEAL_RANGE (1024*FRACUNIT)  // max heal-search distance
-#define COOP_ITEM_RANGE (128*FRACUNIT)   // idle pickup search radius
-#define COOP_GRAB_NEAR (512*FRACUNIT)    // grab only when still near human
-#define COOP_SUMMON_TICS (7*TICRATE)     // 7s "come" duration
-#define COOP_ATTACK_TICS (10*TICRATE)    // 10s "attack" duration
-```
+`P_AICoop_SetDirective(tactic, focus, x, y, tics)` setzt eine **zeitlich begrenzte**
+High-Level-Taktik, die den Bot überschreibt; läuft sie ab, fällt er auf das
+Regelverhalten zurück.
 
-## Konfigurations-Tunables
+| Taktik | Wirkung |
+|--------|---------|
+| `BUD_ENGAGE` | Bestimmtes Monster (oder nächstes) bekämpfen |
+| `BUD_DEFEND` | Nah am Spieler bleiben, nur nahe Bedrohungen |
+| `BUD_HOLD` | Position halten (`hold`) |
+| `BUD_REGROUP`/`BUD_RETREAT` | Zum Spieler zurück |
+| `BUD_GOTO` | Zu Punkt (x,y) (`ai_goto`) |
+| `BUD_GRAB` | Items sammeln |
 
-In `files/m_misc.c` `defaults[]`:
-```c
-{"show_buddy_hud", &show_buddy_hud, 1},   // 0 = off, 1 = on
-// (keine andere buddy-relevante config aktuell)
-```
+---
 
-Die meisten Tunables sind als `#define COOP_*` hardcoded. Eine Auslagerung
-in die Config wäre ein naheliegender erster Refactor (low risk, hoher UX-Wert).
+## Konsole & Tasten (`c_console.c`)
 
-## Wie portiert man das auf ein anderes Projekt?
+| Befehl | Funktion |
+|--------|----------|
+| `come` | zum Spieler laufen (`summon`) |
+| `wait`/`stay` | Position halten (Toggle `user_hold`) |
+| `attack` | nächstes Monster für `COOP_ATTACK_TICS` (10 s) anstürmen |
+| `where` | Distanz/Richtung/HP/Tätigkeit melden |
+| `report` | HP/Rüstung/Waffe/Munition |
+| `buddygod` | Buddy-Gott-Modus |
+| `buddyarm` | alle Waffen + Munition + Rüstung |
+| `buddyhome` | Buddy zum Map-Spawn teleportieren |
 
-### Szenario 1: Auf einen anderen DOOM-Source-Port (z.B. Crispy Doom, Doom Retro)
+Tasten-Binds (`m_misc.c`): `key_buddy_come` (`,`), `key_buddy_attack` (`.`),
+`key_buddy_stay` (`-`) — rebindbar.
 
-**Schritte:**
-1. `p_ai_coop.c` (~1500 Z.) + `p_ai_coop.h` (~50 Z.) kopieren
-2. In `p_setup.c` `P_SetupLevel`:
-   - ResetHook (`P_AICoop_ResetSlot`) vor `P_LoadThings` einbauen
-   - VerifyHook (`P_AICoop_VerifySpawn`) nach `P_AI_Reset` einbauen
-3. In `p_mobj.c` `P_SpawnPlayer`: keine Änderung (Player-Spawn-Mechanik ist portabel)
-4. In `g_game.c` `G_InitNew` Z. 1521: `players[i].playerstate = PST_REBORN` ist portabel
-5. In `p_tick.c` `P_Ticker`: `P_AICoop_BuildCmd()` aufrufen
-6. In `d_main.c` `D_DoomMain`: `P_AICoop_Init()` + Konsolen-Command-Parser einbauen
+---
 
-**Portabilitäts-Risiken:**
-- `playeringame[]` ist überall gleich
-- `playerstarts[]` ist static global in `p_setup.c` → **muss extern exposed werden**
-  (in `doomstat.h` ist es schon extern deklariert in modernen Source-Ports)
-- `MOBJ`-API ist vanilla DOOM
+## Stimme & HUD
 
-**Aufwand: ~2 Tage**, größte Hürde ist die Hook-Integration im Build-System
-(CMake-glob, Makefile).
+- **Voice** (`i_voice.c`, vorgebackene Clips in `run/aidoom.wad`, positional): getaggte
+  Zeilen (`contact/clear/hurt/stuck/door/revive/help/kill/…`), 4-Tier-Prioritäts-System,
+  rate-limitiert; höheres Tier preemptet niedrigeres. `stuck:` ist **flanken-getriggert**
+  (einmal pro Klemm-Episode) und feuert **nur beim Navigieren** (nicht im Kampf-Jockeying).
+  Voller Katalog: **`BUDDY_VOICE.md`**.
+- **HUD** (`hu_buddy.c`): obere Leiste mittig — HP (eingefärbt), Rüstung, Waffe,
+  Munition, Distanz, State; bei „down" ein 8-Wege-Kompass im Gesichts-Slot. Config
+  `show_buddy_hud` (Default 1). Details: **`BUDDY_HUD.md`**.
 
-### Szenario 2: Auf eine andere Engine (z.B. GZDoom in ZScript, QuakeC für FTEQW)
+---
 
-**Vollständige Neuentwicklung** — die FSM-Logik ist portierbar, die
-DOOM-spezifischen Calls (mobj, sector, ticcmd) sind es nicht.
+## Konstanten (`#define COOP_*` in `p_ai_coop.c`)
 
-**Was zu übernehmen ist (Konzept-Ebene):**
-- State-Machine mit 6 States
-- Distanz-basierte Transitions
-- Pathfinding-Wrapper (egal welche Engine)
-- Voice-System (enginespezifisch: GZDoom hat SNDINFO, QuakeC hat sound())
+| Konstante | Wert | Bedeutung |
+|-----------|------|-----------|
+| `COOP_SIGHT` | 1280u | Monster-Erfassungs-Reichweite |
+| `COOP_NEAR` | 256u | Folge-Distanz zum Menschen |
+| `COOP_KEEP` | 192u | Kampf-Annäherung (×2 wenn verletzt) |
+| `COOP_LEASH` | 640u | come-stay / cautious: max. Abstand |
+| `COOP_ENGAGE_NEAR` | 448u | im stayclose nur so-nahe Bedrohungen |
+| `COOP_CAUTION_HP` | 50 | darunter „spielt sicher" |
+| `COOP_HEAL_HP` / `_RANGE` | 50 / 1024u | Medkit suchen |
+| `COOP_SAFE_HP` | 40 | darunter Safe-Route |
+| `COOP_REVIVE_RANGE` | 96u | Revive-Reichweite (10 HP) |
+| `COOP_BLAST_SAFE` | 176u | Splash-Sicherheit Rakete/BFG |
+| `COOP_DODGE_RANGE` | 256u | Projektil-Ausweichen |
+| `COOP_FACING` / `COOP_TURN` | 1500 / 1300 BAM | Feuer-Winkel / max. Drehung/Tic |
+| `COOP_SUMMON_TICS` / `COOP_ATTACK_TICS` | 7 s / 10 s | `come` / `attack` Dauer |
 
-**Aufwand: ~3-4 Wochen** für sauberen Port auf z.B. QuakeC. Das meiste ist
-Wrapper-Code für die jeweilige Engine-API.
+---
 
-### Szenario 3: Auf eine Custom-Game-Engine (z.B. dein eigenes Spiel)
+## Determinismus
 
-**Wenig ratsam** — der Buddy ist explizit auf DOOM zugeschnitten:
-- BSP-Linedef-Sector-System (für Pathfinding)
-- DoomScript/thinker-Architektur
-- Powerup-Mobj-System
+Geometrie-basiert, kein `P_Random` im State-Flow → gleicher Snapshot = gleiche Aktion
+(demo-/netz-sicher; der LLM-Pfad ist nicht-deterministisch und liegt außerhalb des
+Tic-Locks). Aktuell Single-Player.
 
-Besser wäre: in einer Custom-Engine den Buddy von Grund auf neu zu
-implementieren, aber die **FSM-Logik** (6 States, Distanz-Threshold,
-Pathfinding-Anbindung) 1:1 zu übernehmen.
+---
 
-**Aufwand: ~1 Monat** (Engine-Schnittstellen + FSM-Implementation).
+## Portierung auf einen anderen DOOM-Source-Port
 
-## Was man bei der Portierung leicht falsch macht
+1. `p_ai_coop.c` + `p_ai_coop.h` kopieren (zieht `i_voice.*`, `hu_buddy.*` nach,
+   sowie den Pathfinder, der intern ist).
+2. Hooks: `P_AICoop_ResetSlot()` **vor** und `P_AICoop_VerifySpawn()` **nach**
+   `P_LoadThings` (`p_setup.c`); `P_AICoop_BuildCmd()` im `P_Ticker`; `P_AICoop_Init()`
+   in `D_DoomMain`; Buddy-Befehle im Konsolen-Parser.
+3. `playeringame[1]=true` muss **in `P_AICoop_Init`** gesetzt sein, bevor `P_LoadThings`
+   läuft, sonst spawnt `P_SpawnPlayer` Spieler 2 nicht.
+4. `playerstarts[]` ggf. `extern` exposen (in modernen Ports schon in `doomstat.h`).
 
-1. **`playerstarts[]` ist static** in `p_setup.c` — vergisst man den
-   `extern` in der neuen Engine, gibt's Linker-Errors.
-2. **`players[]` retain Werte zwischen Map-Loads** — der `P_AICoop_ResetSlot`
-   vor `P_LoadThings` ist nicht optional, sonst zeigt der Verify-Hook
-   false-positive "Buddy spawned" wegen dangling pointer aus voriger Map.
-3. **`playeringame[]` muss in `P_AICoop_Init` gesetzt werden** (auf `true`),
-   nicht erst in `P_SetupLevel` — sonst skippt `P_SpawnPlayer` weil der
-   Flag noch nicht gesetzt ist wenn `P_LoadThings` läuft.
-4. **`P_SpawnMapThing` hat einen `break`-statt-`continue`-Bug** für
-   non-commercial cool-monsters (siehe `p_setup.c` Z. 337-338). Wenn deine
-   Port-Engine commercial-Mode hat, irrelevant; wenn nicht, fix mit.
-5. **Voice-System (`i_voice.c`)** ist sehr DOOM-spezifisch (Spatial-Audio
-   mit `S_AdjustSoundParams`). Für anderen Port entweder eigenes
-   Voice-System schreiben oder Buddy-Voice weglassen.
+**Stolperfallen**: `players[]`/`playerstarts[]` behalten Werte über Map-Loads → der
+ResetSlot-Hook ist Pflicht. Das Voice-System ist DOOM-spezifisch (positional über die
+SDL-Streams in `i_voice.c`) — für andere Engines neu schreiben oder weglassen.
 
-## Test-Checkliste für Portierung
-
-Nach dem Port folgende Szenarien manuell testen:
-
-- [ ] `./aidoom -coop` startet vanilla DOOM1 E1M1, Buddy ist bei Player 1
-- [ ] `./aidoom -aicoop` (alleine) startet Buddy mit Stub-Warning
-- [ ] `./aidoom -coop -aicoop` zeigt Mutual-Exclusive-Warning, kein Buddy
-- [ ] Buddy folgt Spieler, greift Monster in Sicht an
-- [ ] Buddy bleibt stehen bei `hold` Konsolen-Cmd
-- [ ] Buddy kommt zu Spieler bei `come` Konsolen-Cmd
-- [ ] Custom-WAD ohne `Player_2_Start` zeigt `P_AICoop_VerifySpawn`-WARNING
-- [ ] Buddy-Pathfinding funktioniert über BSP-Sub-Sector-Edges
-- [ ] HUD-Overlay zeigt Stats korrekt (HP, Armor, State, Distanz)
-- [ ] Voice-Tags werden richtig gemappt (`state:fighting` etc.)
-- [ ] Bei Buddy-Tod: WARNING + `companion_active = 0` bis Quit
-
-## Lizenz-Hinweis
-
-Der gesamte Buddy-Code ist im Repo-Lizenz-Header (DOOM Source License) und
-damit portabel mit Copyright-Vermerk. Keine zusätzlichen Restriktionen
-wie bei yapb (MIT) oder ReGameDLL (GPL).
-
-## Verwandte Docs im Repo
-
-- `AI_IMPROVEMENTS.md` — Plan für AI-Layer-Erweiterung (Punkt 1: LLM-Hook)
-- `VISIBILITY_CACHE.md` — Geplanter Performance-Optimization
-- `YAPB_ARCHITECTURE.md` — yapb-Code-Referenz für Inspiration
-- `AIDOOM_PARAMETERS.md` — Vollständige CLI-Flag-Liste
-- `BUDDY_HUD.md` — HUD-Implementation-Details
-- `BUDDY_VOICE.md` — Voice-Zeilen-Katalog (156 Zeilen) + Prioritäts-System
-- `AGENT_CONTROL.md` §1-13 — Director-Protokoll (LLM-Layer-Plan)
-- `PATHFINDING.md` — BSP-Sub-Sector-Dijkstra-Algorithmus
-
-## Code-Dateien die du für die Portierung brauchst
-
-Alle in `files/`:
-- `p_ai_coop.c` (~1500 Z.) — Kern (State-Machine, Pathfinding, BuildCmd)
-- `p_ai_coop.h` (~50 Z.) — Public API
-- `hu_buddy.c` (~470 Z.) — HUD-Overlay
-- `hu_buddy.h` (~40 Z.) — HUD API
-- `i_voice.c` (~500 Z.) — Voice-System
-- `i_voice.h` — Voice API
-- `c_console.c` — Konsolen-Command-Parser (Buddy-Cmds hinzufügen)
-
-Modifikationen in existierenden Files:
-- `p_setup.c` — ResetSlot/VerifySpawn Hooks hinzufügen
-- `p_tick.c` — BuildCmd im Ticker aufrufen
-- `d_main.c` — AICoop_Init im D_DoomMain aufrufen
-- `m_misc.c` — `show_buddy_hud` config-key
-- `run/start_buddy.sh` + `.bat` — Launcher (Beispiel für End-User-Aufruf)
+## Verwandte Docs
+`BUDDY_HUD.md` (HUD), `BUDDY_VOICE.md` (Voice-Katalog + Tiers), `Pathfinding.md`
+(BSP-Pathfinder), `AGENT_CONTROL.md` (Director-Protokoll), `DIRECTOR_MODES.md`
+(LLM-vs-Regel-Director), `AIDOOM_PARAMETERS.md` (CLI-Flags).
