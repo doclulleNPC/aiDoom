@@ -61,13 +61,17 @@
 // Vertical bands, BASE pixels (we scale 2x for 320->640 feel on a 560px wide
 // window -- comfortable on a 1024-wide desktop).
 #define BANNER_H  80
-#define BUDDY_Y   110
+// The four AI rows are evenly spaced by their VISUAL centres (Δ64): mode rows centre
+// their content at Y+BUDDY_H/2 (=+30), the Options checkboxes at Y+CHK_BOX/2 (=+8).
+// -> centres 120 / 184 / 248 / 312, so the gaps Buddy-Monster-Skill-Options are equal
+// (previously 90/68/46 with Skill's 60px box even overlapping the Options row).
+#define BUDDY_Y   90
 #define BUDDY_H   60
-#define MON_Y     200
+#define MON_Y     154
 #define MON_H     60
-#define SKILL_Y   268			// difficulty row (5 pills)
+#define SKILL_Y   218			// difficulty row (5 pills)
 #define SKILL_H   40
-#define OPTS_Y    314			// toggle row (no-friendly-fire / infight)
+#define OPTS_Y    304			// toggle row (no-friendly-fire / infight); centre 312
 #define CHK_BOX   16			// checkbox square size
 #define OPT_NOFF_X (PAD + 90)		// "No friendly fire" checkbox
 #define OPT_INF_X  (PAD + 300)		// "Monster infight" checkbox
