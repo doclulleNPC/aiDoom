@@ -31,6 +31,7 @@
 #include "w_wad.h"			// W_CheckNumForName -- detect overlaid DOOM2 sprites
 #include "p_ai_director.h"
 #include "p_ai_llm.h"			// P_AI_RuleTactics -- rule-based flank/focus orders
+#include "p_ai_coop.h"			// P_AICoop_NextWaypoint -- route the player takes to the exit
 #include "i_voice.h"			// I_Director_Say -- the spoken game-master persona
 
 // ---- tunables --------------------------------------------------------------
@@ -469,6 +470,25 @@ static int P_Director_ObjProximity (void)
     return (int)(100 * (DIR_OBJ_FAR - best) / (DIR_OBJ_FAR - DIR_OBJ_NEAR));
 }
 
+// 0..100: how close the nearest survivor is to the level EXIT specifically (vs
+// P_Director_ObjProximity, which is the nearest of exit OR keys).  Drives the
+// exit-path spawn ramp: the closer to the exit switch, the more it spawns there.
+static int P_Director_ExitProximity (void)
+{
+    int		i;
+    fixed_t	best = 0x7fffffff;
+    if (!dir_exit_set) return 0;
+    for (i = 0; i < MAXPLAYERS; i++)
+    {
+	if (!playeringame[i] || !players[i].mo || players[i].health <= 0) continue;
+	fixed_t d = P_AproxDistance (players[i].mo->x - dir_exit_x, players[i].mo->y - dir_exit_y);
+	if (d < best) best = d;
+    }
+    if (best >= DIR_OBJ_FAR)  return 0;
+    if (best <= DIR_OBJ_NEAR) return 100;
+    return (int)(100 * (DIR_OBJ_FAR - best) / (DIR_OBJ_FAR - DIR_OBJ_NEAR));
+}
+
 // Choose where the next spawn group centres.  Bias toward the nearest objective
 // (exit/key) so monsters appear out of sight in the room the player is heading to
 // -- more so the nearer the player already is to it -- instead of always "in the
@@ -480,6 +500,20 @@ static void P_Director_SpawnCenter (fixed_t* cx, fixed_t* cy)
     fixed_t	ox, oy;
     *cx = *cy = 0;					// default: behind the survivor
     if (!pl) return;
+
+    // EXIT-PATH RAMP (sub-rule): increasingly often as the player nears the exit
+    // switch, drop the spawn group ON THE ROUTE to the exit -- the pathfinder's next
+    // waypoint from the player toward the exit -- so the way out gets steadily more
+    // contested the closer they get.  ~20% far away, up to ~90% right by the exit.
+    if (dir_exit_set
+	&& (P_Random () % 100) < 20 + P_Director_ExitProximity () * 7 / 10)
+    {
+	fixed_t wx, wy;
+	if (P_AICoop_NextWaypoint (pl, dir_exit_x, dir_exit_y, &wx, &wy))
+	    { *cx = wx; *cy = wy; return; }		// on the path ahead of the player
+	*cx = dir_exit_x; *cy = dir_exit_y; return;	// fallback: the exit room itself
+    }
+
     if (P_Director_NearestObjective (pl->x, pl->y, &ox, &oy) == 0x7fffffff)
 	return;						// no exit/key objective on this map
     // ~40% baseline toward the objective + a proximity ramp (up to +60%): far away
@@ -686,7 +720,7 @@ void P_Director_Ticker (void)
 	boolean fsm_suppressed = dir_llm && (gametic - dir_llmlast <= DIR_LLM_FALLBACK);
 	if (fsm_suppressed && gametic - dir_hordetic > DIR_HORDE_GAP && !P_Director_Stressed ())
 	{
-	    P_Director_SpawnWave (5 + (P_Random () % 4));
+	    P_Director_SpawnWave (5 + (P_Random () % 4) + P_Director_ExitProximity () / 25);
 	    dir_hordetic = gametic;
 	}
     }
@@ -768,7 +802,7 @@ void P_Director_Ticker (void)
 	else if (--dir_spawntic <= 0)
 	{
 	    // ~1-in-4 spawns is a horde (4-6) -- but never a horde on a stressed player.
-	    if (P_Random () < 96 && !stressed) P_Director_SpawnWave (5 + (P_Random () % 4));
+	    if (P_Random () < 96 && !stressed) P_Director_SpawnWave (5 + (P_Random () % 4) + P_Director_ExitProximity () / 25);
 	    else                               P_Director_SpawnMonster ();
 	    // Faster trickle when calm (build tension), slower as intensity climbs...
 	    dir_spawntic = 24 + (dir_acc / 100) * 2;	// faster trickle (~0.7 s calm .. ~2.4 s)
@@ -786,7 +820,7 @@ void P_Director_Ticker (void)
 	else if (--dir_spawntic <= 0)
 	{
 	    // At the peak, hordes are the norm (bigger, 5-7) -- unless the player is stressed.
-	    if (P_Random () < 170 && !stressed) P_Director_SpawnWave (6 + (P_Random () % 4));
+	    if (P_Random () < 170 && !stressed) P_Director_SpawnWave (6 + (P_Random () % 4) + P_Director_ExitProximity () / 25);
 	    else                                P_Director_SpawnMonster ();
 	    dir_spawntic = 49;		// ~1.4 s between peak hordes
 	    dir_spawntic = dir_spawntic * (100 - exf*3/4) / 100;
