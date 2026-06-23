@@ -2299,7 +2299,20 @@ void P_AICoop_BuildCmd (void)
 		}
 	    }
 	    else if (!linetarget && dist < 768*FRACUNIT)
-		backoff = true;
+	    {
+		// No autoaim lock.  At point-blank nothing can really be "in the way" (the
+		// monster is right here) and the close-range slope probe often just misses
+		// -- so FIRE anyway if we face it and it's not a splash suicide, rather than
+		// backing off.  Backing off a point-blank monster made the buddy refuse to
+		// shoot AND look "stuck" oscillating in place against it.  (A human directly
+		// in line would have locked as linetarget->player above, so reaching here
+		// means none is on the bearing -- safe to fire.)
+		if (dist < COOP_KEEP && abs(rem) < COOP_FACING && react_timer == 0
+		    && !splash_close && !AICoop_BarrelNear (mo))
+		    cmd->buttons |= BT_ATTACK;
+		else
+		    backoff = true;			// farther out: open the angle
+	    }
 	}
 
 	// Damage-progress watchdog: remember the target's health, and while we're
@@ -2400,9 +2413,11 @@ void P_AICoop_BuildCmd (void)
 	if (doorwait == 0 && AICoop_DoorInFront (mo)) { cmd->buttons |= BT_USE; doorwait = 45; AICoop_Callout ("door:", 2); }
 	// Sideways wiggle to slip past a barrel / convex corner (non-door wedge).
 	cmd->sidemove += ((wig++ / 24) & 1) ? COOP_RUN : -COOP_RUN;
-	// Announce ONCE per wedge (rising edge) -- this used to fire every tic, so the
-	// buddy complained about being stuck constantly and starved every other line.
-	if (!wasstuck) AICoop_Callout ("stuck:", 3);
+	// Announce ONCE per wedge (rising edge), and ONLY while actually navigating
+	// somewhere (follow/come/goto).  While fighting (navigate==0) the buddy holds
+	// and jockeys in place near a monster -- that reads as "no progress" but isn't
+	// being wedged, so it must not cry "stuck" (the spurious spam the player heard).
+	if (!wasstuck && navigate) AICoop_Callout ("stuck:", 3);
 	wasstuck = true;
     }
     else wasstuck = false;
