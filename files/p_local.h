@@ -210,6 +210,7 @@ extern fixed_t		tmdropoffz;	// lowest adjacent floor (drop-off check)
 extern	line_t*		ceilingline;
 
 boolean P_CheckPosition (mobj_t *thing, fixed_t x, fixed_t y);
+mobj_t* P_SpawnMonsterChecked (fixed_t x, fixed_t y, mobjtype_t type);
 boolean P_TryMove (mobj_t* thing, fixed_t x, fixed_t y);
 boolean P_TeleportMove (mobj_t* thing, fixed_t x, fixed_t y);
 void	P_SlideMove (mobj_t* mo);

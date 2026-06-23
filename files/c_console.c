@@ -51,6 +51,7 @@ extern void		I_Quit (void);
 // 'open'/'close' collide with code elsewhere).
 extern thinker_t	thinkercap;
 extern mobj_t*		P_SpawnMobj (fixed_t x, fixed_t y, fixed_t z, mobjtype_t type);
+extern mobj_t*		P_SpawnMonsterChecked (fixed_t x, fixed_t y, mobjtype_t type);
 extern void		P_DamageMobj (mobj_t* target, mobj_t* inflictor, mobj_t* source, int dmg);
 extern void		P_MobjThinker (mobj_t* mobj);
 
@@ -226,6 +227,13 @@ static int C_MobjByName (const char* s)
     if (!strcmp(s,"shotgunner") || !strcmp(s,"sergeant")) return MT_SHOTGUY;
     if (!strcmp(s,"lostsoul") || !strcmp(s,"soul"))	 return MT_SKULL;
     if (!strcmp(s,"barrel"))				 return MT_BARREL;
+    // Heretic monsters (mummy/clink/gargoyle) -- only when hereticstuff.wad is loaded.
+    // ("imp" stays the DOOM imp above; the Heretic one is "gargoyle".)
+    if (s[0] && Heretic_Available ())
+    {
+	int h = Heretic_TypeByName (s);
+	if (h >= 0) return h;
+    }
     return -1;
 }
 
@@ -385,18 +393,26 @@ static void C_Execute (char* line)
 	    { gameskill = sk-1; C_Printf ("skill = %d (applies to new maps)", sk); }
 	else C_Printf ("usage: skill <1-5>");
     }
-    else if (!strcmp(cmd, "spawn"))
+    else if (!strcmp(cmd, "spawn") || !strcmp(cmd, "summon"))
     {
 	int t = C_MobjByName (args);
 	if (t < 0)
-	    C_Printf ("usage: spawn <imp|demon|spectre|baron|zombie|shotgunner|lostsoul|barrel>");
+	    C_Printf ("usage: summon <imp|demon|spectre|baron|zombie|shotgunner|lostsoul|barrel|mummy|clink|gargoyle>");
 	else if (pl->mo)
 	{
 	    unsigned	an = pl->mo->angle >> ANGLETOFINESHIFT;
 	    fixed_t	x  = pl->mo->x + FixedMul (96*FRACUNIT, finecosine[an]);
 	    fixed_t	y  = pl->mo->y + FixedMul (96*FRACUNIT, finesine[an]);
-	    P_SpawnMobj (x, y, pl->mo->z, (mobjtype_t)t);
-	    C_Printf ("spawned %s", args);
+	    // (C) only place it if it actually fits (no wall) + the sector is tall enough
+	    mobj_t*	m  = P_SpawnMonsterChecked (x, y, (mobjtype_t)t);
+	    if (!m)
+		C_Printf ("summon: no room in front (wall / low ceiling) -- face open space");
+	    else
+	    {
+		m->target = pl->mo;
+		if (m->info->seestate) P_SetMobjState (m, m->info->seestate);	// wake it
+		C_Printf ("summoned %s", args);
+	    }
 	}
     }
     else if (!strcmp(cmd, "where") || !strcmp(cmd, "buddy") || !strcmp(cmd, "comp"))

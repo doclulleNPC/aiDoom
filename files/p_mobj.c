@@ -535,6 +535,25 @@ P_SpawnMobj
 
 
 //
+// P_SpawnMonsterChecked
+// Spawn a monster on the floor at (x,y), but ONLY if it actually fits: no wall/thing
+// overlap AND the sector is tall enough for its height.  Returns NULL (spawning
+// nothing) otherwise, so a caller never leaves a monster wedged in a wall or a
+// squashed sector.  Used by the director / `summon` console cmd / Heretic spawns.
+//
+mobj_t* P_SpawnMonsterChecked (fixed_t x, fixed_t y, mobjtype_t type)
+{
+    mobj_t* mo = P_SpawnMobj (x, y, ONFLOORZ, type);
+    if (!P_CheckPosition (mo, x, y) || tmceilingz - tmfloorz < mo->height)
+    {
+	P_RemoveMobj (mo);
+	return NULL;
+    }
+    return mo;
+}
+
+
+//
 // P_RemoveMobj
 //
 mapthing_t	itemrespawnque[ITEMQUESIZE];

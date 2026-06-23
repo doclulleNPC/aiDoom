@@ -43,6 +43,7 @@ extern void	S_StartSound (void* origin, int sfx_id);
 extern mobj_t*	P_SpawnMobj (fixed_t x, fixed_t y, fixed_t z, mobjtype_t type);
 extern boolean	P_SetMobjState (mobj_t* mobj, statenum_t state);
 extern fixed_t	P_AproxDistance (fixed_t dx, fixed_t dy);
+extern mobj_t*	P_SpawnMonsterChecked (fixed_t x, fixed_t y, mobjtype_t type);
 
 // ---------------------------------------------------------------------------
 // Action functions (crispy heretic/p_enemy.c, adapted to DOOM's 1-arg signature).
@@ -262,5 +263,5 @@ mobj_t* Heretic_Spawn (int type, fixed_t x, fixed_t y)
 {
     if (!Heretic_Available () || type < 0)
 	return NULL;
-    return P_SpawnMobj (x, y, ONFLOORZ, (mobjtype_t)type);
+    return P_SpawnMonsterChecked (x, y, (mobjtype_t)type);	// (C) only if it fits + fits the sector
 }
