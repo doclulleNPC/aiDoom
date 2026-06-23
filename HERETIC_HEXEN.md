@@ -33,9 +33,11 @@ behave** — that's half 2.
   stay untouched. Enum slots (`SPR_HMUM`, `S_HMUM_*`, `MT_HMUMMY`) live at the end of
   `spritenum_t`/`statenum_t`/`mobjtype_t`; `"HMUM"` added to `sprnames[]`. Sprites come
   from `hereticstuff.wad` (renamed `H*`). Safe without the wad (0-frame sprite, gated spawn).
-- **Mummy DONE**: ported from crispy `heretic/info.c` + `p_enemy.c` (`A_MummyAttack` =
-  HITDICE melee), with A_Look/Chase/FaceTarget/Pain/Scream/Fall. Spawn via the `heretic`
-  console command. Verified: boots with/without the wad; spawns, renders, fights, dies.
+- **Mummy + Sabreclaw + Gargoyle DONE**: ported from crispy `heretic/info.c` +
+  `p_enemy.c`. Mummy (`A_MummyAttack` melee), Sabreclaw/clink (`A_ClinkAttack` melee,
+  no blood), Gargoyle/imp (`A_ImpMeAttack` melee + `A_ImpMsAttack` skull-fly dive +
+  `A_ImpDeath`; MF_FLOAT flyer). Spawn via `heretic [mummy|clink|imp]`. Verified: boots
+  with/without the wad; all spawn, render, fight, die.
 
 ### Remaining (each monster = the same pattern; weapons are a bigger stage)
 - More monsters: gargoyle (imp), sabreclaw (clink), undead warrior (knight), weredragon
