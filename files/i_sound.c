@@ -569,6 +569,8 @@ I_UpdateSoundParams
 // SDL3 audio stream callback: SDL asks for more bytes; we mix one slice at a
 // time (I_UpdateSound always produces exactly mixbufferbytes) and push it.
 //
+static void I_MixMusic (Uint8* buf, int bytes);	// mix the synth into the SFX slice (below)
+
 static void SDLCALL
 I_SDLAudioCallback (void *userdata, SDL_AudioStream *stream,
 		    int additional_amount, int total_amount)
@@ -577,6 +579,7 @@ I_SDLAudioCallback (void *userdata, SDL_AudioStream *stream,
     while (additional_amount > 0)
     {
 	I_UpdateSound(NULL, mixbuffer, mixbufferbytes);
+	I_MixMusic(mixbuffer, mixbufferbytes);	// add music on top of the SFX mix
 	SDL_PutAudioStreamData(stream, mixbuffer, mixbufferbytes);
 	additional_amount -= mixbufferbytes;
     }
@@ -660,7 +663,6 @@ I_InitSound()
 // second SDL audio stream bound to the same device as the SFX, so SDL mixes it.
 // A non-MUS lump (e.g. raw MIDI) registers as "no music" and is skipped.
 //
-static SDL_AudioStream*	mus_stream;	// music stream bound to the SFX device
 static int		mus_kind;	// 0 none, 2 MUS (synth)
 static int		mus_paused;
 static int		mus_geninit;	// MUS_Init() done?
@@ -668,26 +670,26 @@ static int		mus_geninit;	// MUS_Init() done?
 void I_InitMusic(void)		{ }
 void I_ShutdownMusic(void)	{ }
 
-// SDL pulls more music PCM through here (runs on the audio thread).
-static void SDLCALL
-I_MusicStreamCallback (void* ud, SDL_AudioStream* s, int additional, int total)
+// Render the FM synth and ADD it on top of the already-SFX-mixed slice `buf`.  Called
+// from I_SDLAudioCallback -- the device callback that actually fires.  (The previous
+// design bound a separate music stream with its own get-callback, but SDL never pulled
+// it, so no music ever played; mixing into the SFX slice here is reliable.)
+static void I_MixMusic (Uint8* buf, int bytes)
 {
-    float	gain = mus_paused ? 0.0f : (i_music_gain / 15.0f);
-    short	buf[1024];		// 512 stereo frames
+    short	mus[2048];		// >= one SFX slice (SAMPLECOUNT*2 = 1024 shorts at 512)
+    short*	mb = (short*)buf;
+    int		n  = bytes / (int)sizeof(short);	// total interleaved samples
+    float	gain;
+    int		i;
 
-    (void)ud; (void)total;
-    if (mus_kind != 2) return;
-    while (additional > 0)
+    if (mus_kind != 2 || mus_paused) return;
+    if (n > (int)(sizeof(mus)/sizeof(mus[0]))) n = (int)(sizeof(mus)/sizeof(mus[0]));
+    MUS_Render (mus, n/2);				// n/2 stereo frames
+    gain = i_music_gain / 15.0f;
+    for (i = 0; i < n; i++)
     {
-	int	frames = additional / (int)(2*sizeof(short));
-	int	i;
-	if (frames > 512) frames = 512;
-	if (frames <= 0) break;
-	MUS_Render (buf, frames);
-	for (i = 0 ; i < frames*2 ; i++)
-	    buf[i] = (short)(buf[i] * gain);
-	SDL_PutAudioStreamData (s, buf, frames*2*(int)sizeof(short));
-	additional -= frames*2*(int)sizeof(short);
+	int v = mb[i] + (int)(mus[i] * gain);
+	mb[i] = (short)(v > 32767 ? 32767 : (v < -32768 ? -32768 : v));
     }
 }
 
@@ -701,21 +703,10 @@ int I_RegisterSong(void* data, int length)
 
 void I_PlaySong(int handle, int looping)
 {
-    SDL_AudioSpec	src, dst;
-
     if (!handle || mus_kind != 2)
 	return;
-
-    MUS_Start (looping);
+    MUS_Start (looping);		// I_MixMusic now renders it into the SFX slice
     mus_paused = 0;
-
-    src.format = SDL_AUDIO_S16; src.channels = 2; src.freq = SAMPLERATE;
-    dst.format = SDL_AUDIO_S16; dst.channels = 2; dst.freq = SAMPLERATE;
-    mus_stream = SDL_CreateAudioStream (&src, &dst);
-    if (!mus_stream)
-	return;
-    SDL_SetAudioStreamGetCallback (mus_stream, I_MusicStreamCallback, NULL);
-    SDL_BindAudioStream (SDL_GetAudioStreamDevice (audiostream), mus_stream);
 }
 
 void I_PauseSong (int handle)	{ (void)handle; mus_paused = 1; }
@@ -724,11 +715,6 @@ void I_ResumeSong (int handle)	{ (void)handle; mus_paused = 0; }
 void I_StopSong(int handle)
 {
     (void)handle;
-    if (mus_stream)			// destroying the stream stops the callback
-    {
-	SDL_DestroyAudioStream (mus_stream);
-	mus_stream = NULL;
-    }
     if (mus_kind == 2)
 	MUS_Stop ();
 }
@@ -736,11 +722,6 @@ void I_StopSong(int handle)
 void I_UnRegisterSong(int handle)
 {
     (void)handle;
-    if (mus_stream)
-    {
-	SDL_DestroyAudioStream (mus_stream);
-	mus_stream = NULL;
-    }
     if (mus_kind == 2)
 	MUS_Stop ();
     mus_kind = 0;
