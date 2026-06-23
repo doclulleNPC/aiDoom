@@ -16,7 +16,7 @@
 //	                       wanders forward, to prove the hook drives the player.
 //
 //	Protocol (one command per line, replies one line):
-//	  observe                 -> {"tic":..,"player":{..},"things":[..]}
+//	  observe                 -> {"tic":..,"player":{..},"exit":[x,y],"buddy":{friend,..},"things":[..]}
 //	  goto <x> <y>            walk to a map point (BSP pathfinder routes there)
 //	  face <x> <y>            turn to look at a point
 //	  turn <degrees>          turn by a relative amount
@@ -140,6 +140,8 @@ static int	in_target = -1;		// registry id to attack, else -1
 static mobj_t*	reg[AGENT_MAXTHINGS];
 static int	reg_n;
 
+static mobj_t*	Agent_Buddy (void);	// the friendly co-op buddy (defined below)
+
 // ---------------------------------------------------------------------------
 // Non-blocking TCP server (one client) -- same shape as p_ai_llm.c
 // ---------------------------------------------------------------------------
@@ -232,6 +234,15 @@ static void Agent_Observe (void)
 	p->ammo[0], p->ammo[1], p->ammo[2], p->ammo[3], p->killcount, p->itemcount);
     if (exit_set) off += snprintf (buf+off, sizeof buf-off, ",\"exit\":[%d,%d]", exit_x>>FRACBITS, exit_y>>FRACBITS);
     else          off += snprintf (buf+off, sizeof buf-off, ",\"exit\":null");
+    {
+	// The AI co-op buddy is a FRIEND (a fellow marine), NOT in `things` and never a
+	// target -- reported separately so the brain knows it's there and can coordinate.
+	mobj_t* b = Agent_Buddy ();
+	if (b) off += snprintf (buf+off, sizeof buf-off,
+		",\"buddy\":{\"friend\":true,\"x\":%d,\"y\":%d,\"health\":%d}",
+		b->x>>FRACBITS, b->y>>FRACBITS, b->health);
+	else   off += snprintf (buf+off, sizeof buf-off, ",\"buddy\":null");
+    }
     off += snprintf (buf+off, sizeof buf-off, ",\"things\":[");
 
     for (th = thinkercap.next ; th != &thinkercap && reg_n < AGENT_MAXTHINGS ; th = th->next)
@@ -332,6 +343,32 @@ static mobj_t* Agent_NearestMonster (mobj_t* mo)
     return best;
 }
 
+// The AI co-op buddy's mobj (player 2), or NULL if no buddy is in the game.  The buddy
+// is a FRIEND -- never a target -- and the marine must not shoot through it.
+static mobj_t* Agent_Buddy (void)
+{
+    int s = P_AICoop_Slot ();
+    if (s < 0 || !playeringame[s]) return NULL;
+    return players[s].mo;
+}
+
+// Would a shot at `tgt` pass through the buddy?  True if the buddy is roughly on the
+// line of fire AND closer than the target (so it'd take the hit) -- then hold fire.
+static boolean Agent_BuddyInLine (mobj_t* mo, mobj_t* tgt)
+{
+    mobj_t*	b = Agent_Buddy ();
+    int		txi, tyi, bxi, byi, dti, perp;
+    if (!b || b->health <= 0) return false;
+    txi = (tgt->x - mo->x) >> FRACBITS; tyi = (tgt->y - mo->y) >> FRACBITS;
+    bxi = (b->x   - mo->x) >> FRACBITS; byi = (b->y   - mo->y) >> FRACBITS;
+    dti = P_AproxDistance (tgt->x - mo->x, tgt->y - mo->y) >> FRACBITS;
+    if (dti < 1)                         return false;
+    if (bxi*txi + byi*tyi <= 0)          return false;	// buddy is behind/beside us
+    if (bxi*bxi + byi*byi >= dti*dti)    return false;	// buddy is farther than the target
+    perp = abs (bxi*tyi - byi*txi) / dti;		// buddy's distance from the shot line
+    return perp < 40;					// within ~a body width -> would be hit
+}
+
 // ---------------------------------------------------------------------------
 // Built-in scripted brain (-aiplayer demo): engage monsters, else wander.
 // ---------------------------------------------------------------------------
@@ -407,8 +444,10 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
 
     if (in_have_face && abs(rem) < 600) in_have_face = 0;	// face reached
 
-    // Fire ONLY at a target we can SEE and are lined up on (auto-aim does the vertical).
-    if (tgt && los && abs(rem) < AGENT_FACING) cmd->buttons |= BT_ATTACK;
+    // Fire ONLY at a target we can SEE and are lined up on (auto-aim does the vertical),
+    // and NEVER when the AI buddy is in the line of fire (friendly: hold and reposition).
+    if (tgt && los && abs(rem) < AGENT_FACING && !Agent_BuddyInLine (mo, tgt))
+	cmd->buttons |= BT_ATTACK;
 
     // Advance toward the goal / out-of-sight target once roughly facing the way.
     if (chase && abs(rem) < (ANG45>>16))       cmd->forwardmove = AGENT_FORWARD;

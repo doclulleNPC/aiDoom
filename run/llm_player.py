@@ -24,6 +24,8 @@ GAP    = float(os.environ.get("DECISION_SECS", "1.0"))
 SYSTEM = """You are the brain of a DOOM marine. Each turn you receive the game state as
 JSON (player x/y/angle/health/ammo, and "things": nearby monsters/items with id, type,
 dist in map units, rel = angle to them in degrees [-180..180], hp, vis=in-line-of-sight).
+A "buddy" field (if not null) is your FRIENDLY co-op marine -- an ally, never a target;
+the engine already holds your fire when the buddy is in your line of fire.
 Reply with exactly ONE command line, nothing else. Commands:
   target <id>     attack that thing (auto-aims it); pick a visible (vis:1) monster
   attack 1        hold fire (auto-aims the nearest visible monster)

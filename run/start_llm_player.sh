@@ -37,7 +37,7 @@ fi
 
 # The game: marine socket + (LLM) director socket + an AI buddy to command.
 ./aidoom -iwad "$IWAD" -warp "$EP" "$MAP" -skill 3 \
-         -aiplayer "$PPORT" -aidirector "$DPORT" -aicoop &
+         -aiplayer "$PPORT" -aidirector "$DPORT" -aicoop -nofriendlyfire &
 GAME=$!
 
 # Let the engine open both sockets, then attach the two LLM brains.
