@@ -119,17 +119,14 @@ R_InstallSpriteLump
     if ((int)frame > maxframe)
 	maxframe = frame;
 		
+    // OVERRIDE tolerance (Boom-style): when two loaded WADs both define this sprite
+    // frame -- e.g. doom2stuff AND freedoom2stuff both carry VILE with different
+    // rot0-vs-rotations conventions -- the LATER-loaded lump wins per frame instead of
+    // an I_Error.  The scan visits lumps in load order, so just let the later one
+    // replace the earlier (also makes a stray duplicate harmless).
     if (rotation == 0)
     {
-	// the lump should be used for all rotations
-	if (sprtemp[frame].rotate == false)
-	    I_Error ("R_InitSprites: Sprite %s frame %c has "
-		     "multip rot=0 lump", spritename, 'A'+frame);
-
-	if (sprtemp[frame].rotate == true)
-	    I_Error ("R_InitSprites: Sprite %s frame %c has rotations "
-		     "and a rot=0 lump", spritename, 'A'+frame);
-			
+	// single rot0 lump -> use for all 8 rotations, replacing any earlier version.
 	sprtemp[frame].rotate = false;
 	for (r=0 ; r<8 ; r++)
 	{
@@ -138,21 +135,14 @@ R_InstallSpriteLump
 	}
 	return;
     }
-	
-    // the lump is only used for one rotation
-    if (sprtemp[frame].rotate == false)
-	I_Error ("R_InitSprites: Sprite %s frame %c has rotations "
-		 "and a rot=0 lump", spritename, 'A'+frame);
-		
-    sprtemp[frame].rotate = true;
 
-    // make 0 based
-    rotation--;		
-    if (sprtemp[frame].lump[rotation] != -1)
-	I_Error ("R_InitSprites: Sprite %s : %c : %c "
-		 "has two lumps mapped to it",
-		 spritename, 'A'+frame, '1'+rotation);
-		
+    // single-rotation lump: if the frame was a rot0 lump from an earlier WAD, reset it
+    // so these rotations replace it cleanly (rotate: 0 = was rot0, -1 = unset).
+    if (sprtemp[frame].rotate == 0)
+	memset (&sprtemp[frame], -1, sizeof(sprtemp[frame]));
+
+    sprtemp[frame].rotate = true;
+    rotation--;				// 0-based; later lump wins (override)
     sprtemp[frame].lump[rotation] = lump;	// `lump` is the merged sprite INDEX now
     sprtemp[frame].flip[rotation] = (byte)flipped;
 }
