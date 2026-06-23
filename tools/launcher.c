@@ -55,7 +55,7 @@
 
 // --- Layout (BASE = 320x200 reference, scaled at runtime) ---
 #define WINW 560
-#define WINH 440
+#define WINH 470
 #define PAD 12
 
 // Vertical bands, BASE pixels (we scale 2x for 320->640 feel on a 560px wide
@@ -75,10 +75,13 @@
 #define CHK_BOX   16			// checkbox square size
 #define OPT_NOFF_X (PAD + 90)		// "No friendly fire" checkbox
 #define OPT_INF_X  (PAD + 300)		// "Monster infight" checkbox
-#define IWAD_Y    282
+#define MONSTERS_Y 268			// extra-monster WAD toggles (FreeDoom / Heretic)
+#define MON_FD_X   (PAD + 90)		// "FreeDoom" checkbox (same column as No-FF)
+#define MON_HER_X  (PAD + 300)		// "Heretic" checkbox  (same column as Infight)
+#define IWAD_Y    310
 #define IWAD_H    22
 #define IWAD_DD_H 80			// dropdown open height
-#define LAUNCH_Y  392
+#define LAUNCH_Y  420
 #define LAUNCH_H  34
 
 // Colours (RGB).
@@ -169,6 +172,8 @@ static int     buddy_mode = BUDDY_RULE;	// default: buddy on (rule-based)
 static int     mon_mode   = MON_L4D;     // default: L4D pacing
 static int     opt_noff;			// -nofriendlyfire: player & buddy can't hurt each other
 static int     opt_infight;			// -infight: monster same-species infighting
+static int     opt_freedoom;			// -file freedoom2stuff.wad (DOOM2 monsters, free art)
+static int     opt_heretic;			// -file hereticstuff.wad   (Heretic monsters)
 static int     opt_skill = 3;			// difficulty 0..4 -> -skill 1..5; default 3 = Ultra-Violence
 static int     dropdown_open;
 
@@ -680,6 +685,17 @@ static int hit_launch_button(int mouse_px, int mouse_py)
 // We also append -warp 1 1 so the user lands in a level rather than the
 // title-screen demo (which has no buddy to see).
 //
+// True if a PWAD is present where the engine looks (run/ID0/ first, then run/).
+static int wad_present(const char* name)
+{
+    char p[1024]; FILE* f;
+    snprintf(p, sizeof p, "%s/ID0/%s", run_dir(), name);
+    if ((f = fopen(p, "rb"))) { fclose(f); return 1; }
+    snprintf(p, sizeof p, "%s/%s", run_dir(), name);
+    if ((f = fopen(p, "rb"))) { fclose(f); return 1; }
+    return 0;
+}
+
 static void build_command(char* out, int n, const char* iwad_path)
 {
     int off = 0;
@@ -708,6 +724,13 @@ static void build_command(char* out, int n, const char* iwad_path)
     // Toggles
     if (opt_noff)    off += snprintf(out + off, n - off, " -nofriendlyfire");
     if (opt_infight) off += snprintf(out + off, n - off, " -infight");
+
+    // Extra-monster WADs (only -file if the PWAD is actually present, so a checked
+    // box with a missing wad can't crash the engine on startup).
+    if (opt_freedoom && wad_present("freedoom2stuff.wad"))
+        off += snprintf(out + off, n - off, " -file freedoom2stuff.wad");
+    if (opt_heretic && wad_present("hereticstuff.wad"))
+        off += snprintf(out + off, n - off, " -file hereticstuff.wad");
 
     // Always land in a level, never the title screen.  Skill 1..5 from the row.
     off += snprintf(out + off, n - off, " -warp 1 1 -skill %d", opt_skill + 1);
@@ -950,6 +973,12 @@ int main(int argc, char** argv)
                             opt_noff = !opt_noff;
                         if (hit_checkbox(OPT_INF_X, OPTS_Y, "Monster infight", mouse_x, mouse_y))
                             opt_infight = !opt_infight;
+
+                        // Monsters row: toggle the extra-monster WAD checkboxes.
+                        if (hit_checkbox(MON_FD_X, MONSTERS_Y, "FreeDoom", mouse_x, mouse_y))
+                            opt_freedoom = !opt_freedoom;
+                        if (hit_checkbox(MON_HER_X, MONSTERS_Y, "Heretic", mouse_x, mouse_y))
+                            opt_heretic = !opt_heretic;
                     }
                 }
                 break;
@@ -992,6 +1021,10 @@ int main(int argc, char** argv)
             text(PAD, OPTS_Y + (CHK_BOX - FONT_CH)/2, "Options", COL_DIM);
             draw_checkbox(OPT_NOFF_X, OPTS_Y, opt_noff,    "No friendly fire");
             draw_checkbox(OPT_INF_X,  OPTS_Y, opt_infight, "Monster infight");
+
+            text(PAD, MONSTERS_Y + (CHK_BOX - FONT_CH)/2, "Monsters", COL_DIM);
+            draw_checkbox(MON_FD_X,  MONSTERS_Y, opt_freedoom, "FreeDoom");
+            draw_checkbox(MON_HER_X, MONSTERS_Y, opt_heretic,  "Heretic");
         }
 
         draw_iwad_dropdown();
