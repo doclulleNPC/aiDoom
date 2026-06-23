@@ -409,6 +409,19 @@ EV_VerticalDoor
 	break;
     }
 
+    // AI co-op: the human just opened a locked door (key check above passed), so demote
+    // its special to the unlocked equivalent -- from now on the keyless AI buddy can open
+    // it too (the squad "has the key").  DR/D1 motion is preserved; only the lock is gone.
+    {
+	extern int P_AICoop_Active (void);
+	if (player && P_AICoop_Active ())
+	    switch (line->special)
+	    {
+	      case 26: case 27: case 28: line->special = 1;  break;	// locked DR -> DR
+	      case 32: case 33: case 34: line->special = 31; break;	// locked D1 -> D1
+	    }
+    }
+
     // if the sector has an active thinker, use it
     sec = sides[ line->sidenum[side^1]] .sector;
     secnum = sec-sectors;

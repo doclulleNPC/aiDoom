@@ -84,6 +84,9 @@ enum {
 // buddy in `observe` and accepts `buddy` orders.
 int  P_AICoop_AIMode (void);
 
+// True if the AI companion (rule -coop OR AI -aicoop) is active.
+int  P_AICoop_Active (void);
+
 // Apply a director tactic to the buddy for `tics` (<=0 -> ~2 s default).  `focus`
 // is the monster to engage (NULL = nearest); x,y the BUD_GOTO point.
 void P_AICoop_SetDirective (int tactic, struct mobj_s* focus, fixed_t x, fixed_t y, int tics);

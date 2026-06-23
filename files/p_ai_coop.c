@@ -305,6 +305,13 @@ boolean P_AICoop_IsBuddy (player_t* p)
     return companion_active && p == &players[coop_slot];
 }
 
+// True if the AI companion (rule -coop or AI -aicoop) is in play -- the keyless buddy
+// that benefits from doors the human has unlocked (see EV_VerticalDoor demotion).
+int P_AICoop_Active (void)
+{
+    return companion_active;
+}
+
 // Public read-only accessor for coop_state (used by c_console.c for the voice
 // tag mapping).  Returns -1 if the buddy is inactive.
 int P_AICoop_State (void)
