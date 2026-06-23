@@ -103,6 +103,9 @@ int  P_AICoop_NavRoute (fixed_t* xs, fixed_t* ys, int maxpts);
 // pathfinder the buddy uses).  Used by director-controlled monsters (p_ai_llm.c) to
 // navigate around corners instead of the vanilla straight 8-dir chase.
 boolean P_AICoop_NextWaypoint (struct mobj_s* mo, fixed_t dx, fixed_t dy, fixed_t* wx, fixed_t* wy);
+// Best walkable 8-dir heading toward (gx,gy) -- DOOM P_NewChaseDir-style corner-rounding.
+// NOTE: keeps a single shared committed-heading state; one navigating caller at a time.
+angle_t AICoop_ChaseDir (struct mobj_s* mo, fixed_t gx, fixed_t gy);
 
 // Savegame persistence for the breadcrumb trail.  Written/read AFTER the savegame
 // consistency marker (g_game.c), so older saves without the block still load.

@@ -1138,7 +1138,7 @@ static boolean AICoop_ChaseTry (mobj_t* mo, int d8)
 // Pick (and commit to) a compass heading toward (gx,gy), Doom-monster style.
 // Returns the heading as a BAM angle.  Keeps the last heading while it stays
 // walkable so the buddy commits to a leg instead of dithering at a corner.
-static angle_t AICoop_ChaseDir (mobj_t* mo, fixed_t gx, fixed_t gy)
+angle_t AICoop_ChaseDir (mobj_t* mo, fixed_t gx, fixed_t gy)
 {
     static int		dir = -1, count;
     static int		flip;

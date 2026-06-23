@@ -54,6 +54,7 @@
 #include "m_fixed.h"
 #include "tables.h"
 #include "p_mobj.h"
+#include "r_defs.h"		// line_t / vertex_t (door + exit-switch detection)
 #include "info.h"
 #include "p_ai_coop.h"		// P_AICoop_NextWaypoint -- shared BSP pathfinder
 #include "g_agent.h"
@@ -65,6 +66,54 @@ extern void		P_MobjThinker (mobj_t*);
 extern boolean		P_CheckSight (mobj_t* t1, mobj_t* t2);
 extern fixed_t		P_AproxDistance (fixed_t dx, fixed_t dy);
 extern angle_t		R_PointToAngle2 (fixed_t x1, fixed_t y1, fixed_t x2, fixed_t y2);
+extern int		numlines;
+extern line_t*		lines;
+
+// ---- autonomous helpers: the level exit + doors/switches in the way ---------
+static int	exit_level = -1;	// gameepisode*100+gamemap the exit was located for
+static fixed_t	exit_x, exit_y;
+static int	exit_set;
+
+// Locate the level exit once per map (an exit linedef special), like the director's.
+static void Agent_FindExit (void)
+{
+    int i, lvl = gameepisode*100 + gamemap;
+    if (exit_level == lvl) return;
+    exit_level = lvl; exit_set = 0;
+    for (i = 0 ; i < numlines ; i++)
+    {
+	int sp = lines[i].special;
+	if (sp==11 || sp==51 || sp==52 || sp==124)	// S1/W1 exit + secret-exit switches
+	{
+	    exit_x = (lines[i].v1->x + lines[i].v2->x) >> 1;
+	    exit_y = (lines[i].v1->y + lines[i].v2->y) >> 1;
+	    exit_set = 1; return;
+	}
+    }
+}
+
+// Is a door (incl. locked) OR the level-exit switch within USE reach, ahead of us?
+// So the marine opens its own way through and presses the exit switch -- the buddy does
+// the same; without it the agent paths up to a shut door and never opens it.
+static boolean Agent_UseAhead (mobj_t* mo)
+{
+    int		i, fa = mo->angle >> ANGLETOFINESHIFT;
+    fixed_t	fwx = finecosine[fa], fwy = finesine[fa];
+    for (i = 0 ; i < numlines ; i++)
+    {
+	line_t*	ld = &lines[i];
+	int	sp = ld->special;
+	fixed_t	mx, my, dx, dy;
+	if (!(sp==1||sp==31||sp==117||sp==118 ||			// plain DR/D1 doors
+	      sp==26||sp==27||sp==28 || sp==32||sp==33||sp==34 ||	// locked doors
+	      sp==11||sp==51)) continue;				// exit switch
+	mx = (ld->v1->x + ld->v2->x) >> 1; my = (ld->v1->y + ld->v2->y) >> 1;
+	dx = mx - mo->x; dy = my - mo->y;
+	if (P_AproxDistance (dx, dy) > 80*FRACUNIT) continue;
+	if (FixedMul (dx, fwx) + FixedMul (dy, fwy) > 0) return true;	// in the forward arc
+    }
+    return false;
+}
 
 #define AGENT_TURN	1400		// max angleturn/tic (~7.7 deg)
 #define AGENT_FACING	1200		// |turn remaining| under which we open fire
@@ -171,15 +220,19 @@ static void Agent_Observe (void)
     int		off, first = 1;
 
     reg_n = 0;
+    Agent_FindExit ();
     if (!mo) { Agent_Send ("{\"player\":null}\n"); return; }
 
     off = snprintf (buf, sizeof buf,
 	"{\"tic\":%d,\"player\":{\"x\":%d,\"y\":%d,\"z\":%d,\"angle\":%u,"
 	"\"health\":%d,\"armor\":%d,\"weapon\":%d,\"ammo\":[%d,%d,%d,%d],"
-	"\"kills\":%d,\"items\":%d},\"things\":[",
+	"\"kills\":%d,\"items\":%d}",
 	leveltime, mo->x>>FRACBITS, mo->y>>FRACBITS, mo->z>>FRACBITS,
 	(unsigned)(mo->angle / (ANG45/45)), p->health, p->armorpoints, p->readyweapon,
 	p->ammo[0], p->ammo[1], p->ammo[2], p->ammo[3], p->killcount, p->itemcount);
+    if (exit_set) off += snprintf (buf+off, sizeof buf-off, ",\"exit\":[%d,%d]", exit_x>>FRACBITS, exit_y>>FRACBITS);
+    else          off += snprintf (buf+off, sizeof buf-off, ",\"exit\":null");
+    off += snprintf (buf+off, sizeof buf-off, ",\"things\":[");
 
     for (th = thinkercap.next ; th != &thinkercap && reg_n < AGENT_MAXTHINGS ; th = th->next)
     {
@@ -284,22 +337,9 @@ static mobj_t* Agent_NearestMonster (mobj_t* mo)
 // ---------------------------------------------------------------------------
 static void Agent_Brain (void)
 {
-    static unsigned seed = 1;			// own RNG -- never touch the playsim's
-    in_attack = 1;				// always engage what we can see
-    if (!in_have_goal && (leveltime & 63) == 0)	// every ~1.8 s pick a new wander goal
-    {
-	mobj_t* mo = players[consoleplayer].mo;
-	if (mo)
-	{
-	    int turn;
-	    seed = seed*1103515245u + 12345u;
-	    turn = (int)((seed >> 16) & 127) - 64;	// -64..+63 degrees
-	    int fa = (mo->angle + (angle_t)(turn * (ANG45/45))) >> ANGLETOFINESHIFT;
-	    in_gx = mo->x + FixedMul (512*FRACUNIT, finecosine[fa]);
-	    in_gy = mo->y + FixedMul (512*FRACUNIT, finesine[fa]);
-	    in_have_goal = 1;
-	}
-    }
+    // Engage what we can see; navigation is left to the idle exit-seek in the reflex
+    // (head to the level exit), so the scripted marine actually progresses through the map.
+    in_attack = 1;
 }
 
 // ---------------------------------------------------------------------------
@@ -315,6 +355,7 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
 
     memset (cmd, 0, sizeof(*cmd));
     Agent_Poll ();
+    Agent_FindExit ();
     if (agent_demo) Agent_Brain ();
     if (!mo || p->playerstate != PST_LIVE) return;
 
@@ -324,32 +365,38 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
     if (!tgt && in_attack) tgt = Agent_NearestMonster (mo);
 
     want = mo->angle;
-    if (tgt)
     {
-	// Only shoot if we can actually SEE the target -- never fire blind at a thing
-	// behind a wall.  When it's out of sight, CLOSE IN (path toward it) until we do.
-	los = P_CheckSight (mo, tgt);
-	if (los)
-	    want = R_PointToAngle2 (mo->x, mo->y, tgt->x, tgt->y);	// line up + fire
-	else
+	fixed_t gx = 0, gy = 0;
+	int	havegoal = 0;
+	if (tgt)
 	{
-	    fixed_t wx, wy;
-	    if (P_AICoop_NextWaypoint (mo, tgt->x, tgt->y, &wx, &wy))
-		want = R_PointToAngle2 (mo->x, mo->y, wx, wy);
-	    else
-		want = R_PointToAngle2 (mo->x, mo->y, tgt->x, tgt->y);
-	    chase = 1;							// move to get a clear shot
+	    // Only shoot if we can actually SEE the target -- never fire blind through a
+	    // wall.  Out of sight -> close in (move) until we have a clear shot.
+	    los = P_CheckSight (mo, tgt);
+	    if (los) want = R_PointToAngle2 (mo->x, mo->y, tgt->x, tgt->y);	// aim + fire, hold
+	    else     { gx = tgt->x; gy = tgt->y; havegoal = 1; }
 	}
-    }
-    else if (in_have_face) want = in_face;
-    else if (in_have_goal)
-    {
-	fixed_t wx, wy;
-	if (P_AICoop_NextWaypoint (mo, in_gx, in_gy, &wx, &wy))
-	    want = R_PointToAngle2 (mo->x, mo->y, wx, wy);
-	chase = 1;
-	if (P_AproxDistance (mo->x - in_gx, mo->y - in_gy) < AGENT_REACH)
-	    { in_have_goal = 0; chase = 0; }			// arrived
+	else if (in_have_face) want = in_face;
+	else if (in_have_goal)
+	{
+	    gx = in_gx; gy = in_gy; havegoal = 1;
+	    if (P_AproxDistance (mo->x - in_gx, mo->y - in_gy) < AGENT_REACH)
+		{ in_have_goal = 0; havegoal = 0; }			// arrived
+	}
+	else if (exit_set)						// idle -> head to the exit
+	    { gx = exit_x; gy = exit_y; havegoal = 1; }
+
+	if (havegoal)
+	{
+	    // A* portal route gives the coarse next waypoint; AICoop_ChaseDir does the LOCAL
+	    // corner-rounding to it (DOOM P_NewChaseDir movement) so the marine threads walls
+	    // and doorways instead of walking straight into a corner and sticking.
+	    fixed_t wx, wy, nx, ny;
+	    if (P_AICoop_NextWaypoint (mo, gx, gy, &wx, &wy)) { nx = wx; ny = wy; }
+	    else                                              { nx = gx; ny = gy; }
+	    want  = AICoop_ChaseDir (mo, nx, ny);
+	    chase = 1;
+	}
     }
 
     rem  = (short)((want - mo->angle) >> 16);
@@ -369,6 +416,34 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
     if (in_use)         { cmd->buttons |= BT_USE; in_use = 0; }
     if (in_weapon >= 0) { cmd->buttons |= BT_CHANGE | ((in_weapon << BT_WEAPONSHIFT) & BT_WEAPONMASK);
 			  in_weapon = -1; }
+
+    // Autonomy: open a door / hit the exit switch in our way, and un-stick if blocked --
+    // without these the marine paths up to a shut door and never gets through.
+    {
+	static int	usewait;
+	static fixed_t	lastx, lasty;
+	static int	stuck;
+	if (usewait > 0) usewait--;
+	if (chase && usewait == 0 && Agent_UseAhead (mo)) { cmd->buttons |= BT_USE; usewait = 16; }
+
+	if (chase)
+	{
+	    if (P_AproxDistance (mo->x - lastx, mo->y - lasty) < 3*FRACUNIT) stuck++;
+	    else                                                            stuck = 0;
+	    lastx = mo->x; lasty = mo->y;
+	    if (stuck > 5)
+	    {
+		// Pinned (the reflex heads straight at the waypoint, no corner-rounding):
+		// SWEEP the view one way while pushing forward + strafing so the marine
+		// rotates until the gap opens; flip the sweep every ~32 tics.
+		cmd->angleturn   = (stuck & 32) ?  AGENT_TURN : -AGENT_TURN;
+		cmd->forwardmove = AGENT_FORWARD;
+		cmd->sidemove    = (stuck & 32) ?  30 : -30;
+		cmd->buttons    |= BT_USE;	// in case a shut door is pinning us
+	    }
+	}
+	else stuck = 0;
+    }
 }
 
 // ---------------------------------------------------------------------------
