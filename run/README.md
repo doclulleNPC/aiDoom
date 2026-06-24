@@ -1,10 +1,12 @@
 # aiDoom run folder (`run/`)
 
 **The `launcher` GUI is the way to start aiDoom.** Run `run/launcher` (or
-`launcher.exe`): pick the IWAD, the Buddy mode (off / `-coop` / `-aicoop`), the
-Monster mode (vanilla / L4D / `-aidirector`), and the Skill, then hit **Launch** —
-it starts the game with the right flags and auto-starts the native `director`
-sidecar when an AI mode is chosen.
+`launcher.exe`): pick the IWAD, optionally an extra **PWAD** (the dropdown below
+IWAD lists every other wad here — freedoomstuff/hereticstuff/hexenstuff/… and any
+PWAD you drop in, minus the IWADs and aidoom.wad — and adds it as `-file`), the
+Buddy mode (off / `-coop` / `-aicoop`), the Monster mode (vanilla / L4D /
+`-aidirector`), and the Skill, then hit **Launch** — it starts the game with the
+right flags and auto-starts the native `director` sidecar when an AI mode is chosen.
 
 > **Game WADs live in `run/ID0/`** (DOOM.WAD, doom2.wad, aidoom.wad,
 > doom2stuff.wad, heretic.wad, …). The engine, launcher and tools search there
