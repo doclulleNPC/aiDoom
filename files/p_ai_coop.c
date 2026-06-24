@@ -668,11 +668,13 @@ static boolean AICoop_DamagingFloor (fixed_t x, fixed_t y)
 //
 boolean AICoop_CanReach (mobj_t* self, fixed_t tx, fixed_t ty, boolean avoiddmg)
 {
+    extern int	pf_ignore_actors;
     fixed_t	dx = tx - self->x;
     fixed_t	dy = ty - self->y;
     fixed_t	dist = P_AproxDistance (dx, dy);
     fixed_t	fz = self->z;			// start at the buddy's feet
     int		steps, i;
+    boolean	res = true;
 
     if (dist < 16*FRACUNIT)
 	return true;				// practically there
@@ -684,6 +686,8 @@ boolean AICoop_CanReach (mobj_t* self, fixed_t tx, fixed_t ty, boolean avoiddmg)
     if (steps > 96)
 	return false;				// too far -- don't bother (bounds cost)
 
+    pf_ignore_actors = 1;
+
     for (i = 1; i <= steps; i++)
     {
 	fixed_t	frac = (i << 16) / steps;	// i/steps as 16.16
@@ -693,15 +697,17 @@ boolean AICoop_CanReach (mobj_t* self, fixed_t tx, fixed_t ty, boolean avoiddmg)
 	// Replicate P_TryMove's feasibility so "reachable" means the buddy can
 	// actually WALK there (point-sampling P_CheckPosition alone said yes to spots
 	// behind a step/ledge the move physics reject, so the buddy wedged there).
-	if (!P_CheckPosition (self, px, py))		return false;	// wall/obstacle
-	if (tmceilingz - tmfloorz < self->height)	return false;	// doesn't fit
-	if (tmceilingz - fz < self->height)		return false;	// no head room
-	if (tmfloorz - fz > 24*FRACUNIT)		return false;	// step up too high
-	if (tmfloorz - tmdropoffz > 24*FRACUNIT)	return false;	// over a drop-off
-	if (avoiddmg && AICoop_DamagingFloor (px, py))	return false;	// nukage/lava
+	if (!P_CheckPosition (self, px, py))		{ res = false; break; }	// wall/obstacle
+	if (tmceilingz - tmfloorz < self->height)	{ res = false; break; }	// doesn't fit
+	if (tmceilingz - fz < self->height)		{ res = false; break; }	// no head room
+	if (tmfloorz - fz > 24*FRACUNIT)		{ res = false; break; }	// step up too high
+	if (tmfloorz - tmdropoffz > 24*FRACUNIT)	{ res = false; break; }	// over a drop-off
+	if (avoiddmg && AICoop_DamagingFloor (px, py))	{ res = false; break; }	// nukage/lava
 	fz = tmfloorz;
     }
-    return true;
+
+    pf_ignore_actors = 0;
+    return res;
 }
 
 

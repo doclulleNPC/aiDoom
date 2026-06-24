@@ -261,6 +261,7 @@ boolean PIT_CheckLine (line_t* ld)
 // too, so infighting is no longer suppressed between same types. Default 0 =
 // vanilla behaviour. Set in D_DoomMain.
 int		infight = 0;
+int		pf_ignore_actors = 0;
 
 boolean PIT_CheckThing (mobj_t* thing)
 {
@@ -268,6 +269,9 @@ boolean PIT_CheckThing (mobj_t* thing)
     boolean		solid;
     int			damage;
 		
+    if (pf_ignore_actors && (thing->flags & MF_SHOOTABLE) && thing->type != MT_BARREL)
+	return true;
+
     if (!(thing->flags & (MF_SOLID|MF_SPECIAL|MF_SHOOTABLE) ))
 	return true;
     

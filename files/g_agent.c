@@ -97,6 +97,7 @@ static unsigned char door_seen[AGENT_MAXDOORS];
 static int	door_n;
 static int	door_wait_timer;
 static int	waiting_at_door;
+static fixed_t	active_door_x, active_door_y;
 
 static boolean Agent_IsDoorSpecial (int sp)
 {
@@ -797,7 +798,18 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
 	else                                              { nx = gx; ny = gy; }
 
 	// Determine stx / sty (steer target point) using buddy navigation logic:
-	if (AICoop_FindDoorAhead (mo, gx, gy, &ddx, &ddy))
+	if (door_wait_timer > 0)
+	{
+	    if (AICoop_CanReach (mo, nx, ny, true) || AICoop_CanReach (mo, gx, gy, false))
+		door_wait_timer = 0;
+	}
+
+	if (door_wait_timer > 0)
+	{
+	    stx = active_door_x; sty = active_door_y;
+	    waiting_at_door = 1;
+	}
+	else if (AICoop_FindDoorAhead (mo, gx, gy, &ddx, &ddy))
 	{
 	    stx = ddx; sty = ddy; // Doorway in reach -> head straight to it
 	    if (P_AproxDistance (mo->x - ddx, mo->y - ddy) < 80*FRACUNIT)
@@ -935,7 +947,11 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
     {
 	fixed_t ddx, ddy;
 	if (AICoop_FindDoorAhead (mo, gx, gy, &ddx, &ddy))
+	{
 	    door_wait_timer = 60;
+	    active_door_x = ddx;
+	    active_door_y = ddy;
+	}
     }
 }
 

@@ -471,16 +471,15 @@ void P_ArchiveSpecials (void)
 }
 
 
-// Bounds-checked sector index -> pointer for the savegame loaders.  A stale/
-// incompatible save (whose layout no longer matches these structs but whose version
-// stamp happens to collide) yields garbage indices here; reject cleanly instead of
-// dereferencing &sectors[garbage] and segfaulting.
 static sector_t* P_SaveSector (intptr_t idx)
 {
-    if (idx < 0 || idx >= numsectors)
+    sector_t* sec = &sectors[idx];
+    if (sec == NULL)
+	return NULL;
+    if (sec < sectors || sec >= sectors + numsectors)
 	I_Error ("P_UnArchiveSpecials: sector index %ld out of range (incompatible or "
 		 "corrupt savegame)", (long)idx);
-    return &sectors[idx];
+    return sec;
 }
 
 //
