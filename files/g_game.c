@@ -911,39 +911,74 @@ void G_PlayerFinishLevel (int player)
 // Called after a player dies 
 // almost everything is cleared and initialized 
 //
-void G_PlayerReborn (int player) 
-{ 
-    player_t*	p; 
-    int		i; 
-    int		frags[MAXPLAYERS]; 
+void G_PlayerReborn (int player)
+{
+    player_t*	p;
+    int		i;
+    int		frags[MAXPLAYERS];
     int		killcount;
     int		itemcount;
-    int		secretcount; 
-	 
-    memcpy (frags,players[player].frags,sizeof(frags)); 
-    killcount = players[player].killcount; 
-    itemcount = players[player].itemcount; 
-    secretcount = players[player].secretcount; 
-	 
-    p = &players[player]; 
-    memset (p, 0, sizeof(*p)); 
- 
-    memcpy (players[player].frags, frags, sizeof(players[player].frags)); 
-    players[player].killcount = killcount; 
-    players[player].itemcount = itemcount; 
-    players[player].secretcount = secretcount; 
- 
-    p->usedown = p->attackdown = true;	// don't do anything immediately 
-    p->playerstate = PST_LIVE;       
-    p->health = MAXHEALTH; 
-    p->readyweapon = p->pendingweapon = wp_pistol; 
-    p->weaponowned[wp_fist] = true; 
-    p->weaponowned[wp_pistol] = true; 
-    p->ammo[am_clip] = 50; 
-	 
-    for (i=0 ; i<NUMAMMO ; i++) 
-	p->maxammo[i] = maxammo[i]; 
-		 
+    int		secretcount;
+
+    // Co-op buddy mode: a death respawns BOTH marines (the level reloads), and vanilla
+    // reborn would strip them back to fist+pistol with no keys.  When the buddy is active
+    // we carry each reborn player's weapons, ammo (+ caps/backpack) and keys across the
+    // wipe -- so a death doesn't undo the run's progress.
+    boolean	keepgear = P_AICoop_Active ();
+    boolean	owned[NUMWEAPONS];
+    int		ammo[NUMAMMO];
+    int		ammomax[NUMAMMO];
+    boolean	cards[NUMCARDS];
+    boolean	backpack = false;
+    weapontype_t ready = wp_pistol, pending = wp_pistol;
+
+    if (keepgear)
+    {
+	memcpy (owned,   players[player].weaponowned, sizeof(owned));
+	memcpy (ammo,    players[player].ammo,        sizeof(ammo));
+	memcpy (ammomax, players[player].maxammo,     sizeof(ammomax));
+	memcpy (cards,   players[player].cards,       sizeof(cards));
+	backpack = players[player].backpack;
+	ready    = players[player].readyweapon;
+	pending  = players[player].pendingweapon;
+    }
+
+    memcpy (frags,players[player].frags,sizeof(frags));
+    killcount = players[player].killcount;
+    itemcount = players[player].itemcount;
+    secretcount = players[player].secretcount;
+
+    p = &players[player];
+    memset (p, 0, sizeof(*p));
+
+    memcpy (players[player].frags, frags, sizeof(players[player].frags));
+    players[player].killcount = killcount;
+    players[player].itemcount = itemcount;
+    players[player].secretcount = secretcount;
+
+    p->usedown = p->attackdown = true;	// don't do anything immediately
+    p->playerstate = PST_LIVE;
+    p->health = MAXHEALTH;
+    p->readyweapon = p->pendingweapon = wp_pistol;
+    p->weaponowned[wp_fist] = true;
+    p->weaponowned[wp_pistol] = true;
+    p->ammo[am_clip] = 50;
+
+    for (i=0 ; i<NUMAMMO ; i++)
+	p->maxammo[i] = maxammo[i];
+
+    if (keepgear)
+    {
+	memcpy (p->weaponowned, owned,   sizeof(p->weaponowned));
+	memcpy (p->ammo,        ammo,    sizeof(p->ammo));
+	memcpy (p->maxammo,     ammomax, sizeof(p->maxammo));
+	memcpy (p->cards,       cards,   sizeof(p->cards));
+	p->backpack      = backpack;
+	p->weaponowned[wp_fist]   = true;	// always keep the bare minimum
+	p->weaponowned[wp_pistol] = true;
+	p->readyweapon   = ready;
+	p->pendingweapon = pending;
+    }
 }
 
 //
@@ -1373,6 +1408,7 @@ void G_DoLoadGame (void)
     
     // draw the pattern into the back screen
     R_FillBackScreen ();   
+    paused = false;
 } 
  
 
@@ -1466,20 +1502,25 @@ G_DeferedInitNew
 } 
 
 
-void G_DoNewGame (void) 
+void G_DoNewGame (void)
 {
-    demoplayback = false; 
+    demoplayback = false;
     netdemo = false;
     netgame = false;
     deathmatch = false;
-    playeringame[1] = playeringame[2] = playeringame[3] = 0;
-    respawnparm = false;
-    fastparm = false;
-    nomonsters = false;
+    // Keep the session's launch options across a console "map"/"warp" (and menu New Game):
+    // the AI co-op buddy stays in the game, and -nomonsters / -respawn / -fast persist
+    // instead of silently reverting -- so changing maps mid-session doesn't drop the
+    // companion or re-enable monsters.  (gameskill is already carried via d_skill.)
+    playeringame[1] = P_AICoop_Active () ? true : false;
+    playeringame[2] = playeringame[3] = 0;
+    respawnparm = M_CheckParm ("-respawn") != 0;
+    fastparm    = M_CheckParm ("-fast") != 0;
+    nomonsters  = M_CheckParm ("-nomonsters") != 0;
     consoleplayer = 0;
-    G_InitNew (d_skill, d_episode, d_map); 
-    gameaction = ga_nothing; 
-} 
+    G_InitNew (d_skill, d_episode, d_map);
+    gameaction = ga_nothing;
+}
 
 // The sky texture to be used instead of the F_SKY1 dummy.
 extern  int	skytexture; 
