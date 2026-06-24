@@ -1386,10 +1386,7 @@ printf("added\n");
     p = M_CheckParm ("-loadgame");
     if (p && p < myargc-1)
     {
-	if (M_CheckParm("-cdrom"))
-	    sprintf(file, "c:\\doomdata\\"SAVEGAMENAME"%c.dsg",myargv[p+1][0]);
-	else
-	    sprintf(file, SAVEGAMENAME"%c.dsg",myargv[p+1][0]);
+	sprintf(file, SAVEGAMENAME"%c.dsg",myargv[p+1][0]);	// always ID0/ -- no c:\doomdata
 	G_LoadGame (file);
     }
 	
