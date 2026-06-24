@@ -11,14 +11,14 @@ plans at its own (slower) pace.
 Env:
   AIPLAYER_PORT  game agent port           (default 31700)
   OLLAMA_URL     Ollama server             (default http://192.168.2.114:11434)
-  OLLAMA_MODEL   model name                (default llama3.1:8b)
+  OLLAMA_MODEL   model name                (default mistral:7b-instruct)
   DECISION_SECS  seconds between decisions (default 1.0)
 """
 import json, os, socket, sys, time, urllib.request
 
 PORT   = int(os.environ.get("AIPLAYER_PORT", "31700"))
 OLLAMA = os.environ.get("OLLAMA_URL", "http://192.168.2.114:11434")
-MODEL  = os.environ.get("OLLAMA_MODEL", "llama3.1:8b")
+MODEL  = os.environ.get("OLLAMA_MODEL", "mistral:7b-instruct")
 GAP    = float(os.environ.get("DECISION_SECS", "1.0"))
 
 SYSTEM = """You are the brain of a DOOM marine. Each turn you receive the game state as
