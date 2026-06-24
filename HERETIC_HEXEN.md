@@ -64,10 +64,25 @@ doom2stuff. The bosses (brain/spawner) are still TODO.
   teleport and wizard-summon are omitted, and (no SDTH sprite extracted) the death is a
   brief body-frame fade.
 
-**All 10 Heretic monsters are now in, with authentic Heretic sounds.** Remaining: the
-weapons, then Hexen (fire column /
-  ice / whirlwind), **D'Sparil** (2-phase: rides a serpent, then teleporting sorcerer) --
-  each needs multiple projectile actors + custom A_* (the big stage).
+**All 10 Heretic monsters are now in, with authentic Heretic sounds.** Remaining Heretic
+work: the weapons.  Then **Hexen** (the bigger game) -- see the asset tool below.
+
+### Hexen assets (`tools/extract_hexen.py` -> `run/ID0/hexenstuff.wad`)
+
+The Hexen counterpart of `extract_heretic_monsters.py`: it extracts the Hexen **monsters
+and weapons** (sprites palette-converted to the DOOM palette, plus their DMX sounds) into
+`run/ID0/hexenstuff.wad`, ready for a future `files/hexen.c` port.
+- **Sprites** (98 codes: ettin, centaur/slaughtaur, both chaos serpents, reiver, minotaur,
+  stalker, dark bishop, death wyvern, afrit, wendigo, heresiarch, korax, pig + all three
+  classes' weapons & the 4th-weapon pieces) are renamed into a collision-free **`X`**
+  (heXen) namespace -- the full code map is printed and written to
+  `tools/hexen_sprite_map.txt` so the C port uses the SAME codes.
+- **Sounds** are copied **verbatim** (Hexen lump names are descriptive and up to 8 chars,
+  so they can't take a `DS` prefix like Heretic's 6-char names did); choosing their
+  engine-facing names is a porting-step decision.
+- Run: `python3 tools/extract_hexen.py` (auto-detects a DOOM IWAD in ID0 for the target
+  palette).  Verified: the wad loads under DOOM with no crash and the sprites render
+  correctly (ettin / serpent / fighter-axe checked).
 - Authentic Heretic **sounds DONE**: `extract_heretic_monsters.py` now copies the Heretic
   SFX with a `DS` prefix (so the engine's `ds%s` lookup finds them); 51 `sfx_h_*` rows in
   sounds.h/.c, and every Heretic monster's see/attack/pain/death/active sounds are wired to
