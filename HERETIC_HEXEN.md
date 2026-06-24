@@ -59,7 +59,13 @@ doom2stuff. The bosses (brain/spawner) are still TODO.
 - **Iron Lich DONE**: floating 700-hp boss -- ice ball (MT_HHEADFX1) + a HOMING whirlwind
   (MT_HWHIRLWIND, steered by the engine's A_Tracer via tracer); sprites HIRO/HIRB/HIRX.
   In the director guard pool. (Fire-column 3rd attack omitted.)
-- Boss still TODO: **D'Sparil** (fire column /
+- **D'Sparil DONE** (simplified): the phase-2 sorcerer -- floats and hurls exploding blue
+  bolts (MT_HDSPARILFX + A_Explode), 3500 hp; sprites HSR2/HSRB. The serpent phase 1,
+  teleport and wizard-summon are omitted, and (no SDTH sprite extracted) the death is a
+  brief body-frame fade.
+
+**All 10 Heretic monsters are now in.** Remaining Heretic work: authentic sounds, the
+weapons, then Hexen (fire column /
   ice / whirlwind), **D'Sparil** (2-phase: rides a serpent, then teleporting sorcerer) --
   each needs multiple projectile actors + custom A_* (the big stage).
 - Authentic Heretic **sounds** (currently DOOM SFX are reused): extend `sfxenum_t` +

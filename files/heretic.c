@@ -9,9 +9,8 @@
 //	the enum slots live at the end of statenum_t/mobjtype_t/spritenum_t (info.h).
 //	Sprites: hereticstuff.wad (renamed H*).  Sounds: DOOM SFX reused for now.
 //
-//	Monsters: Mummy, Sabreclaw, Gargoyle, Knight (melee), + Weredragon, Disciple,
-//	Ophidian (ranged), + Maulotaur (charge/mace) & Iron Lich (ice/whirlwind) bosses.
-//	D'Sparil TODO.
+//	Monsters (all 10): Mummy, Sabreclaw, Gargoyle, Knight (melee); Weredragon, Disciple,
+//	Ophidian (ranged); Maulotaur, Iron Lich, D'Sparil (bosses).  Weapons/Hexen still TODO.
 //
 //-----------------------------------------------------------------------------
 
@@ -48,6 +47,7 @@ extern fixed_t	P_AproxDistance (fixed_t dx, fixed_t dy);
 extern mobj_t*	P_SpawnMonsterChecked (fixed_t x, fixed_t y, mobjtype_t type);
 extern mobj_t*	P_SpawnMissile (mobj_t* source, mobj_t* dest, mobjtype_t type);
 extern void	A_Tracer (mobj_t*);		// revenant homing -- reused for the lich whirlwind
+extern void	A_Explode (mobj_t*);		// rocket-style radius blast -- d'sparil bolt impact
 
 // ---------------------------------------------------------------------------
 // Action functions (crispy heretic/p_enemy.c, adapted to DOOM's 1-arg signature).
@@ -233,6 +233,19 @@ void A_LichAttack (mobj_t* actor)
 	mobj_t* wh = P_SpawnMissile (actor, t, MT_HWHIRLWIND);	// homing whirlwind
 	if (wh) { wh->tracer = t; wh->z += 32*FRACUNIT; }
     }
+}
+
+// D'Sparil (phase-2 sorcerer): brutal melee, else fire an exploding blue bolt.  (The serpent
+// phase, the teleport, and the wizard-summon attack are omitted -- this is the standing
+// final-boss caster.)
+void A_DsparilAttack (mobj_t* actor)
+{
+    if (!actor->target)
+	return;
+    S_StartSound (actor, actor->info->attacksound);
+    if (P_CheckMeleeRange (actor))
+	{ P_DamageMobj (actor->target, actor, actor, HITDICE (8)); return; }
+    P_SpawnMissile (actor, actor->target, MT_HDSPARILFX);
 }
 
 // ---------------------------------------------------------------------------
@@ -713,6 +726,56 @@ void Heretic_Init (void)
     m->speed = 10*FRACUNIT; m->radius = 16*FRACUNIT; m->height = 74*FRACUNIT; m->mass = 100;
     m->damage = 2; m->activesound = sfx_None;
     m->flags = MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY; m->raisestate = S_NULL;
+
+    // ====================================================================
+    // D'Sparil (phase-2 sorcerer): the final boss -- floats, hurls exploding blue bolts.
+    // (Serpent phase 1, teleport and wizard-summon omitted; no SDTH death sprite extracted,
+    //  so the death is a brief fade on the body frame.)  3500 hp.
+    // ====================================================================
+    ST (S_HSR2_LOOK1, SPR_HSR2, 12, 10, (actionf_p1)A_Look,        S_HSR2_LOOK2);
+    ST (S_HSR2_LOOK2, SPR_HSR2, 13, 10, (actionf_p1)A_Look,        S_HSR2_LOOK1);
+    ST (S_HSR2_WALK1, SPR_HSR2, 12, 4, (actionf_p1)A_Chase,        S_HSR2_WALK2);
+    ST (S_HSR2_WALK2, SPR_HSR2, 13, 4, (actionf_p1)A_Chase,        S_HSR2_WALK3);
+    ST (S_HSR2_WALK3, SPR_HSR2, 14, 4, (actionf_p1)A_Chase,        S_HSR2_WALK4);
+    ST (S_HSR2_WALK4, SPR_HSR2, 15, 4, (actionf_p1)A_Chase,        S_HSR2_WALK1);
+    ST (S_HSR2_ATK1,  SPR_HSR2, 17, 9, (actionf_p1)A_FaceTarget,   S_HSR2_ATK2);
+    ST (S_HSR2_ATK2,  SPR_HSR2, 18, 9, (actionf_p1)A_FaceTarget,   S_HSR2_ATK3);
+    ST (S_HSR2_ATK3,  SPR_HSR2, 19, 20, (actionf_p1)A_DsparilAttack, S_HSR2_WALK1);
+    ST (S_HSR2_PAIN1, SPR_HSR2, 16, 3, NULL,                       S_HSR2_PAIN2);
+    ST (S_HSR2_PAIN2, SPR_HSR2, 16, 6, (actionf_p1)A_Pain,         S_HSR2_WALK1);
+    ST (S_HSR2_DIE1,  SPR_HSR2, 16, 8, (actionf_p1)A_Scream,       S_HSR2_DIE2);
+    ST (S_HSR2_DIE2,  SPR_HSR2, 16, 8, NULL,                       S_HSR2_DIE3);
+    ST (S_HSR2_DIE3,  SPR_HSR2, 16, 8, (actionf_p1)A_Fall,         S_HSR2_DIE4);
+    ST (S_HSR2_DIE4,  SPR_HSR2, 16, -1, NULL,                      S_NULL);
+    ST (S_HSRB1, SPR_HSRB, 32768, 3, NULL, S_HSRB2);
+    ST (S_HSRB2, SPR_HSRB, 32769, 3, NULL, S_HSRB3);
+    ST (S_HSRB3, SPR_HSRB, 32770, 3, NULL, S_HSRB1);
+    ST (S_HSRBX1, SPR_HSRB, 32774, 5, (actionf_p1)A_Explode, S_HSRBX2);
+    ST (S_HSRBX2, SPR_HSRB, 32775, 5, NULL, S_HSRBX3);
+    ST (S_HSRBX3, SPR_HSRB, 32776, 5, NULL, S_HSRBX4);
+    ST (S_HSRBX4, SPR_HSRB, 32777, 5, NULL, S_HSRBX5);
+    ST (S_HSRBX5, SPR_HSRB, 32778, 5, NULL, S_HSRBX6);
+    ST (S_HSRBX6, SPR_HSRB, 32779, 5, NULL, S_NULL);
+
+    m = &mobjinfo[MT_HDSPARIL];
+    m->doomednum = -1;        m->spawnstate  = S_HSR2_LOOK1; m->spawnhealth = 3500;
+    m->seestate  = S_HSR2_WALK1; m->seesound  = sfx_cacsit;  m->reactiontime = 8;
+    m->attacksound = sfx_firsht; m->painstate = S_HSR2_PAIN1; m->painchance = 32;
+    m->painsound = sfx_dmpain; m->meleestate = S_HSR2_ATK1;  m->missilestate = S_HSR2_ATK1;
+    m->deathstate = S_HSR2_DIE1; m->xdeathstate = S_NULL;    m->deathsound = sfx_bosdth;
+    m->speed = 14; m->radius = 22*FRACUNIT; m->height = 72*FRACUNIT; m->mass = 150;
+    m->damage = 0; m->activesound = sfx_dmact;
+    m->flags = MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL|MF_FLOAT|MF_NOGRAVITY; m->raisestate = S_NULL;
+
+    m = &mobjinfo[MT_HDSPARILFX];
+    m->doomednum = -1;        m->spawnstate  = S_HSRB1;      m->spawnhealth = 1000;
+    m->seestate  = S_NULL;       m->seesound  = sfx_None;    m->reactiontime = 8;
+    m->attacksound = sfx_None;   m->painstate = S_NULL;      m->painchance = 0;
+    m->painsound = sfx_None;     m->meleestate = S_NULL;     m->missilestate = S_NULL;
+    m->deathstate = S_HSRBX1;    m->xdeathstate = S_NULL;    m->deathsound = sfx_firxpl;
+    m->speed = 20*FRACUNIT; m->radius = 12*FRACUNIT; m->height = 8*FRACUNIT; m->mass = 100;
+    m->damage = 2; m->activesound = sfx_None;
+    m->flags = MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY; m->raisestate = S_NULL;
 }
 
 // hereticstuff.wad sprites loaded?  (the mummy's first frame lump)
@@ -733,6 +796,7 @@ int Heretic_TypeByName (const char* name)
     if (!strcmp (name, "snake") || !strcmp (name, "ophidian"))  return MT_HSNAKE;
     if (!strcmp (name, "maulotaur")||!strcmp (name, "minotaur")) return MT_HMINOTAUR;
     if (!strcmp (name, "ironlich") ||!strcmp (name, "lich"))     return MT_HIRONLICH;
+    if (!strcmp (name, "dsparil") ||!strcmp (name, "sorcerer")) return MT_HDSPARIL;
     return -1;
 }
 

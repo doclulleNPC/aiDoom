@@ -184,6 +184,8 @@ typedef enum
     SPR_HIRO,		// iron lich (head)
     SPR_HIRB,		// iron lich ice ball
     SPR_HIRX,		// iron lich whirlwind
+    SPR_HSR2,		// d'sparil (phase-2 sorcerer)
+    SPR_HSRB,		// d'sparil blue bolt
     // Freedoom DOOM2-exclusive monsters (renamed sprites from freedoom2stuff.wad, so
     // they never collide with / override DOOM or doom2stuff).  See files/freedoom.c.
     SPR_FSKE,		// revenant      (doom2 SKEL)
@@ -1251,6 +1253,14 @@ typedef enum
     S_HIRBX1, S_HIRBX2, S_HIRBX3, S_HIRBX4,
     S_HIRX1, S_HIRX2, S_HIRX3, S_HIRX4, S_HIRX5, S_HIRX6, S_HIRX7,
     S_HIRXX1, S_HIRXX2,
+    // ---- D'Sparil (phase-2 sorcerer) + blue bolt ----
+    S_HSR2_LOOK1, S_HSR2_LOOK2,
+    S_HSR2_WALK1, S_HSR2_WALK2, S_HSR2_WALK3, S_HSR2_WALK4,
+    S_HSR2_ATK1, S_HSR2_ATK2, S_HSR2_ATK3,
+    S_HSR2_PAIN1, S_HSR2_PAIN2,
+    S_HSR2_DIE1, S_HSR2_DIE2, S_HSR2_DIE3, S_HSR2_DIE4,
+    S_HSRB1, S_HSRB2, S_HSRB3,
+    S_HSRBX1, S_HSRBX2, S_HSRBX3, S_HSRBX4, S_HSRBX5, S_HSRBX6,
     // Freedoom: a reserved block of state slots that freedoom.c fills at runtime by
     // CLONING each DOOM2 monster's state graph (with the sprite remapped).  512 covers
     // ~9 monsters + 4 projectiles (~340 states) with headroom.  See files/freedoom.c.
@@ -1431,6 +1441,8 @@ typedef enum {
     MT_HIRONLICH,	// Heretic iron lich (boss)
     MT_HHEADFX1,	// iron lich ice ball
     MT_HWHIRLWIND,	// iron lich homing whirlwind
+    MT_HDSPARIL,	// Heretic d'sparil (final boss, phase-2 sorcerer)
+    MT_HDSPARILFX,	// d'sparil blue bolt
     // Freedoom DOOM2-exclusive monsters -- runtime clones of the DOOM2 actors with
     // renamed sprites (files/freedoom.c).  Projectiles first (monsters reference them).
     MT_FD_TRACER,	// revenant homing missile
