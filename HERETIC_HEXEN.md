@@ -44,7 +44,7 @@ doom2stuff. The bosses (brain/spawner) are still TODO.
   stay untouched. Enum slots (`SPR_HMUM`, `S_HMUM_*`, `MT_HMUMMY`) live at the end of
   `spritenum_t`/`statenum_t`/`mobjtype_t`; `"HMUM"` added to `sprnames[]`. Sprites come
   from `hereticstuff.wad` (renamed `H*`). Safe without the wad (0-frame sprite, gated spawn).
-- **Mummy + Sabreclaw + Gargoyle + Knight DONE**: ported from crispy `heretic/info.c` +
+- **Mummy + Sabreclaw + Gargoyle + Knight + Weredragon + Disciple + Ophidian DONE**: ported from crispy `heretic/info.c` +
   `p_enemy.c`. Mummy (`A_MummyAttack` melee), Sabreclaw/clink (`A_ClinkAttack` melee,
   no blood), Gargoyle/imp (`A_ImpMeAttack` melee + `A_ImpMsAttack` skull-fly dive +
   `A_ImpDeath`; MF_FLOAT flyer), Knight/undead warrior (`A_KnightAttack`: melee
@@ -54,9 +54,9 @@ doom2stuff. The bosses (brain/spawner) are still TODO.
   wad; all spawn, render, fight, die (the knight throws + the axe flies/explodes).
 
 ### Remaining (each monster = the same pattern; weapons are a bigger stage)
-- More monsters: gargoyle (imp), sabreclaw (clink), undead warrior (knight), weredragon
-  (beast), disciple (wizard) [melee/simple first], then ranged/boss (ophidian, iron lich,
-  maulotaur, d'sparil) which need their projectile actors + custom A_* (homing, etc.).
+- Bosses still TODO: **Maulotaur** (charge + fire/mace), **Iron Lich** (fire column /
+  ice / whirlwind), **D'Sparil** (2-phase: rides a serpent, then teleporting sorcerer) --
+  each needs multiple projectile actors + custom A_* (the big stage).
 - Authentic Heretic **sounds** (currently DOOM SFX are reused): extend `sfxenum_t` +
   `S_sfx[]` with `sfx_h_*` rows for the lumps `extract_heretic_monsters.py` copied.
 - **Weapons** (staff/gauntlets/wand/crossbow/dragonclaw/hellstaff/phoenix/firemace +

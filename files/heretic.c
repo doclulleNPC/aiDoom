@@ -9,7 +9,8 @@
 //	the enum slots live at the end of statenum_t/mobjtype_t/spritenum_t (info.h).
 //	Sprites: hereticstuff.wad (renamed H*).  Sounds: DOOM SFX reused for now.
 //
-//	Monsters so far: Mummy (golem) -- a melee grunt.  More follow the same pattern.
+//	Monsters: Mummy, Sabreclaw, Gargoyle, Knight (melee), + Weredragon, Disciple,
+//	Ophidian (ranged w/ projectiles).  Bosses (Maulotaur, Iron Lich, D'Sparil) TODO.
 //
 //-----------------------------------------------------------------------------
 
@@ -129,6 +130,39 @@ void A_KnightAttack (mobj_t* actor)
 void A_ContMobjSound (mobj_t* actor)
 {
     S_StartSound (actor, sfx_firsht);
+}
+
+#define HITDICE(d)	(((P_Random () & 7) + 1) * (d))
+
+// Weredragon (beast): melee HITDICE(3), else hurl a fireball.
+void A_BeastAttack (mobj_t* actor)
+{
+    if (!actor->target)
+	return;
+    S_StartSound (actor, actor->info->attacksound);
+    if (P_CheckMeleeRange (actor))
+	{ P_DamageMobj (actor->target, actor, actor, HITDICE (3)); return; }
+    P_SpawnMissile (actor, actor->target, MT_HBEASTBALL);
+}
+
+// Disciple (wizard): melee HITDICE(4), else fire a homing-coloured bolt.
+void A_WizardAttack (mobj_t* actor)
+{
+    if (!actor->target)
+	return;
+    S_StartSound (actor, actor->info->attacksound);
+    if (P_CheckMeleeRange (actor))
+	{ P_DamageMobj (actor->target, actor, actor, HITDICE (4)); return; }
+    P_SpawnMissile (actor, actor->target, MT_HWIZFX);
+}
+
+// Ophidian (snake): pure ranged -- spit a projectile.
+void A_SnakeAttack (mobj_t* actor)
+{
+    if (!actor->target)
+	return;
+    S_StartSound (actor, actor->info->attacksound);
+    P_SpawnMissile (actor, actor->target, MT_HSNAKEPRO);
 }
 
 // ---------------------------------------------------------------------------
@@ -317,6 +351,172 @@ void Heretic_Init (void)
     m->speed = 9*FRACUNIT; m->radius = 10*FRACUNIT; m->height = 8*FRACUNIT; m->mass = 100;
     m->damage = 2; m->activesound = sfx_None;
     m->flags = MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY; m->raisestate = S_NULL;
+
+    // ====================================================================
+    // Weredragon (beast): melee + lobbed fireball
+    // ====================================================================
+    ST (S_HBEA_LOOK1, SPR_HBEA, 0, 10, (actionf_p1)A_Look,        S_HBEA_LOOK2);
+    ST (S_HBEA_LOOK2, SPR_HBEA, 1, 10, (actionf_p1)A_Look,        S_HBEA_LOOK1);
+    ST (S_HBEA_WALK1, SPR_HBEA, 0,  3, (actionf_p1)A_Chase,       S_HBEA_WALK2);
+    ST (S_HBEA_WALK2, SPR_HBEA, 1,  3, (actionf_p1)A_Chase,       S_HBEA_WALK3);
+    ST (S_HBEA_WALK3, SPR_HBEA, 2,  3, (actionf_p1)A_Chase,       S_HBEA_WALK4);
+    ST (S_HBEA_WALK4, SPR_HBEA, 3,  3, (actionf_p1)A_Chase,       S_HBEA_WALK5);
+    ST (S_HBEA_WALK5, SPR_HBEA, 4,  3, (actionf_p1)A_Chase,       S_HBEA_WALK6);
+    ST (S_HBEA_WALK6, SPR_HBEA, 5,  3, (actionf_p1)A_Chase,       S_HBEA_WALK1);
+    ST (S_HBEA_ATK1,  SPR_HBEA, 7, 10, (actionf_p1)A_FaceTarget,  S_HBEA_ATK2);
+    ST (S_HBEA_ATK2,  SPR_HBEA, 8, 10, (actionf_p1)A_BeastAttack, S_HBEA_WALK1);
+    ST (S_HBEA_PAIN1, SPR_HBEA, 6,  3, NULL,                      S_HBEA_PAIN2);
+    ST (S_HBEA_PAIN2, SPR_HBEA, 6,  3, (actionf_p1)A_Pain,        S_HBEA_WALK1);
+    ST (S_HBEA_DIE1,  SPR_HBEA, 17, 6, NULL,                      S_HBEA_DIE2);
+    ST (S_HBEA_DIE2,  SPR_HBEA, 18, 6, (actionf_p1)A_Scream,      S_HBEA_DIE3);
+    ST (S_HBEA_DIE3,  SPR_HBEA, 19, 6, NULL,                      S_HBEA_DIE4);
+    ST (S_HBEA_DIE4,  SPR_HBEA, 20, 6, NULL,                      S_HBEA_DIE5);
+    ST (S_HBEA_DIE5,  SPR_HBEA, 21, 6, NULL,                      S_HBEA_DIE6);
+    ST (S_HBEA_DIE6,  SPR_HBEA, 22, 6, (actionf_p1)A_Fall,        S_HBEA_DIE7);
+    ST (S_HBEA_DIE7,  SPR_HBEA, 23, 6, NULL,                      S_HBEA_DIE8);
+    ST (S_HBEA_DIE8,  SPR_HBEA, 24, 6, NULL,                      S_HBEA_DIE9);
+    ST (S_HBEA_DIE9,  SPR_HBEA, 25, -1, NULL,                     S_NULL);
+    ST (S_HBEB1, SPR_HBEB, 32768, 2, NULL, S_HBEB2);
+    ST (S_HBEB2, SPR_HBEB, 32768, 2, NULL, S_HBEB3);
+    ST (S_HBEB3, SPR_HBEB, 32769, 2, NULL, S_HBEB4);
+    ST (S_HBEB4, SPR_HBEB, 32769, 2, NULL, S_HBEB5);
+    ST (S_HBEB5, SPR_HBEB, 32770, 2, NULL, S_HBEB6);
+    ST (S_HBEB6, SPR_HBEB, 32770, 2, NULL, S_HBEB1);
+    ST (S_HBEBX1, SPR_HBEB, 32771, 4, NULL, S_HBEBX2);
+    ST (S_HBEBX2, SPR_HBEB, 32772, 4, NULL, S_HBEBX3);
+    ST (S_HBEBX3, SPR_HBEB, 32773, 4, NULL, S_HBEBX4);
+    ST (S_HBEBX4, SPR_HBEB, 32774, 4, NULL, S_HBEBX5);
+    ST (S_HBEBX5, SPR_HBEB, 32775, 4, NULL, S_NULL);
+
+    m = &mobjinfo[MT_HBEAST];
+    m->doomednum = -1;        m->spawnstate  = S_HBEA_LOOK1; m->spawnhealth = 220;
+    m->seestate  = S_HBEA_WALK1; m->seesound  = sfx_bgsit2;  m->reactiontime = 8;
+    m->attacksound = sfx_firsht; m->painstate = S_HBEA_PAIN1; m->painchance = 100;
+    m->painsound = sfx_popain; m->meleestate = S_HBEA_ATK1;  m->missilestate = S_HBEA_ATK1;
+    m->deathstate = S_HBEA_DIE1; m->xdeathstate = S_NULL;    m->deathsound = sfx_bgdth2;
+    m->speed = 14; m->radius = 32*FRACUNIT; m->height = 74*FRACUNIT; m->mass = 200;
+    m->damage = 0; m->activesound = sfx_bgact;
+    m->flags = MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL; m->raisestate = S_NULL;
+
+    m = &mobjinfo[MT_HBEASTBALL];
+    m->doomednum = -1;        m->spawnstate  = S_HBEB1;      m->spawnhealth = 1000;
+    m->seestate  = S_NULL;       m->seesound  = sfx_None;    m->reactiontime = 8;
+    m->attacksound = sfx_None;   m->painstate = S_NULL;      m->painchance = 0;
+    m->painsound = sfx_None;     m->meleestate = S_NULL;     m->missilestate = S_NULL;
+    m->deathstate = S_HBEBX1;    m->xdeathstate = S_NULL;    m->deathsound = sfx_firxpl;
+    m->speed = 12*FRACUNIT; m->radius = 9*FRACUNIT; m->height = 8*FRACUNIT; m->mass = 100;
+    m->damage = 4; m->activesound = sfx_None;
+    m->flags = MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY; m->raisestate = S_NULL;
+
+    // ====================================================================
+    // Disciple (wizard): floating caster, fires bolts
+    // ====================================================================
+    ST (S_HWIZ_LOOK1, SPR_HWIZ, 0, 10, (actionf_p1)A_Look,         S_HWIZ_LOOK2);
+    ST (S_HWIZ_LOOK2, SPR_HWIZ, 1, 10, (actionf_p1)A_Look,         S_HWIZ_LOOK1);
+    ST (S_HWIZ_WALK1, SPR_HWIZ, 0,  3, (actionf_p1)A_Chase,        S_HWIZ_WALK2);
+    ST (S_HWIZ_WALK2, SPR_HWIZ, 0,  4, (actionf_p1)A_Chase,        S_HWIZ_WALK3);
+    ST (S_HWIZ_WALK3, SPR_HWIZ, 0,  3, (actionf_p1)A_Chase,        S_HWIZ_WALK4);
+    ST (S_HWIZ_WALK4, SPR_HWIZ, 0,  4, (actionf_p1)A_Chase,        S_HWIZ_WALK5);
+    ST (S_HWIZ_WALK5, SPR_HWIZ, 1,  3, (actionf_p1)A_Chase,        S_HWIZ_WALK6);
+    ST (S_HWIZ_WALK6, SPR_HWIZ, 1,  4, (actionf_p1)A_Chase,        S_HWIZ_WALK7);
+    ST (S_HWIZ_WALK7, SPR_HWIZ, 1,  3, (actionf_p1)A_Chase,        S_HWIZ_WALK8);
+    ST (S_HWIZ_WALK8, SPR_HWIZ, 1,  4, (actionf_p1)A_Chase,        S_HWIZ_WALK1);
+    ST (S_HWIZ_ATK1,  SPR_HWIZ, 2,  4, (actionf_p1)A_FaceTarget,   S_HWIZ_ATK2);
+    ST (S_HWIZ_ATK2,  SPR_HWIZ, 2,  4, (actionf_p1)A_FaceTarget,   S_HWIZ_ATK3);
+    ST (S_HWIZ_ATK3,  SPR_HWIZ, 3, 12, (actionf_p1)A_WizardAttack, S_HWIZ_WALK1);
+    ST (S_HWIZ_PAIN1, SPR_HWIZ, 4,  3, NULL,                       S_HWIZ_PAIN2);
+    ST (S_HWIZ_PAIN2, SPR_HWIZ, 4,  3, (actionf_p1)A_Pain,         S_HWIZ_WALK1);
+    ST (S_HWIZ_DIE1,  SPR_HWIZ, 5,  6, NULL,                       S_HWIZ_DIE2);
+    ST (S_HWIZ_DIE2,  SPR_HWIZ, 6,  6, (actionf_p1)A_Scream,       S_HWIZ_DIE3);
+    ST (S_HWIZ_DIE3,  SPR_HWIZ, 7,  6, NULL,                       S_HWIZ_DIE4);
+    ST (S_HWIZ_DIE4,  SPR_HWIZ, 8,  6, NULL,                       S_HWIZ_DIE5);
+    ST (S_HWIZ_DIE5,  SPR_HWIZ, 9,  6, (actionf_p1)A_Fall,         S_HWIZ_DIE6);
+    ST (S_HWIZ_DIE6,  SPR_HWIZ, 10, 6, NULL,                       S_HWIZ_DIE7);
+    ST (S_HWIZ_DIE7,  SPR_HWIZ, 11, 6, NULL,                       S_HWIZ_DIE8);
+    ST (S_HWIZ_DIE8,  SPR_HWIZ, 12, -1, NULL,                      S_NULL);
+    ST (S_HWIB1, SPR_HWIB, 32768, 6, NULL, S_HWIB2);
+    ST (S_HWIB2, SPR_HWIB, 32769, 6, NULL, S_HWIB1);
+    ST (S_HWIBX1, SPR_HWIB, 32770, 5, NULL, S_HWIBX2);
+    ST (S_HWIBX2, SPR_HWIB, 32771, 5, NULL, S_HWIBX3);
+    ST (S_HWIBX3, SPR_HWIB, 32772, 5, NULL, S_HWIBX4);
+    ST (S_HWIBX4, SPR_HWIB, 32773, 5, NULL, S_HWIBX5);
+    ST (S_HWIBX5, SPR_HWIB, 32774, 5, NULL, S_NULL);
+
+    m = &mobjinfo[MT_HWIZARD];
+    m->doomednum = -1;        m->spawnstate  = S_HWIZ_LOOK1; m->spawnhealth = 180;
+    m->seestate  = S_HWIZ_WALK1; m->seesound  = sfx_cacsit;  m->reactiontime = 8;
+    m->attacksound = sfx_firsht; m->painstate = S_HWIZ_PAIN1; m->painchance = 64;
+    m->painsound = sfx_dmpain; m->meleestate = S_NULL;       m->missilestate = S_HWIZ_ATK1;
+    m->deathstate = S_HWIZ_DIE1; m->xdeathstate = S_NULL;    m->deathsound = sfx_cacdth;
+    m->speed = 12; m->radius = 16*FRACUNIT; m->height = 68*FRACUNIT; m->mass = 100;
+    m->damage = 0; m->activesound = sfx_dmact;
+    m->flags = MF_SOLID|MF_SHOOTABLE|MF_FLOAT|MF_NOGRAVITY|MF_COUNTKILL; m->raisestate = S_NULL;
+
+    m = &mobjinfo[MT_HWIZFX];
+    m->doomednum = -1;        m->spawnstate  = S_HWIB1;      m->spawnhealth = 1000;
+    m->seestate  = S_NULL;       m->seesound  = sfx_None;    m->reactiontime = 8;
+    m->attacksound = sfx_None;   m->painstate = S_NULL;      m->painchance = 0;
+    m->painsound = sfx_None;     m->meleestate = S_NULL;     m->missilestate = S_NULL;
+    m->deathstate = S_HWIBX1;    m->xdeathstate = S_NULL;    m->deathsound = sfx_firxpl;
+    m->speed = 18*FRACUNIT; m->radius = 10*FRACUNIT; m->height = 6*FRACUNIT; m->mass = 100;
+    m->damage = 3; m->activesound = sfx_None;
+    m->flags = MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY; m->raisestate = S_NULL;
+
+    // ====================================================================
+    // Ophidian (snake): stationary-ish ranged spitter
+    // ====================================================================
+    ST (S_HSNK_LOOK1, SPR_HSNK, 0, 10, (actionf_p1)A_Look,        S_HSNK_LOOK2);
+    ST (S_HSNK_LOOK2, SPR_HSNK, 1, 10, (actionf_p1)A_Look,        S_HSNK_LOOK1);
+    ST (S_HSNK_WALK1, SPR_HSNK, 0,  4, (actionf_p1)A_Chase,       S_HSNK_WALK2);
+    ST (S_HSNK_WALK2, SPR_HSNK, 1,  4, (actionf_p1)A_Chase,       S_HSNK_WALK3);
+    ST (S_HSNK_WALK3, SPR_HSNK, 2,  4, (actionf_p1)A_Chase,       S_HSNK_WALK4);
+    ST (S_HSNK_WALK4, SPR_HSNK, 3,  4, (actionf_p1)A_Chase,       S_HSNK_WALK1);
+    ST (S_HSNK_ATK1,  SPR_HSNK, 5,  5, (actionf_p1)A_FaceTarget,  S_HSNK_ATK2);
+    ST (S_HSNK_ATK2,  SPR_HSNK, 5,  5, (actionf_p1)A_FaceTarget,  S_HSNK_ATK3);
+    ST (S_HSNK_ATK3,  SPR_HSNK, 5,  4, (actionf_p1)A_SnakeAttack, S_HSNK_ATK4);
+    ST (S_HSNK_ATK4,  SPR_HSNK, 5,  4, (actionf_p1)A_SnakeAttack, S_HSNK_ATK5);
+    ST (S_HSNK_ATK5,  SPR_HSNK, 5,  4, (actionf_p1)A_SnakeAttack, S_HSNK_WALK1);
+    ST (S_HSNK_PAIN1, SPR_HSNK, 4,  3, NULL,                      S_HSNK_PAIN2);
+    ST (S_HSNK_PAIN2, SPR_HSNK, 4,  3, (actionf_p1)A_Pain,        S_HSNK_WALK1);
+    ST (S_HSNK_DIE1,  SPR_HSNK, 6,  5, NULL,                      S_HSNK_DIE2);
+    ST (S_HSNK_DIE2,  SPR_HSNK, 7,  5, (actionf_p1)A_Scream,      S_HSNK_DIE3);
+    ST (S_HSNK_DIE3,  SPR_HSNK, 8,  5, NULL,                      S_HSNK_DIE4);
+    ST (S_HSNK_DIE4,  SPR_HSNK, 9,  5, NULL,                      S_HSNK_DIE5);
+    ST (S_HSNK_DIE5,  SPR_HSNK, 10, 5, NULL,                      S_HSNK_DIE6);
+    ST (S_HSNK_DIE6,  SPR_HSNK, 11, 5, NULL,                      S_HSNK_DIE7);
+    ST (S_HSNK_DIE7,  SPR_HSNK, 12, 5, (actionf_p1)A_Fall,        S_HSNK_DIE8);
+    ST (S_HSNK_DIE8,  SPR_HSNK, 13, 5, NULL,                      S_HSNK_DIE9);
+    ST (S_HSNK_DIE9,  SPR_HSNK, 14, 5, NULL,                      S_HSNK_DIE10);
+    ST (S_HSNK_DIE10, SPR_HSNK, 15, -1, NULL,                     S_NULL);
+    ST (S_HSNB1, SPR_HSNB, 32768, 5, NULL, S_HSNB2);
+    ST (S_HSNB2, SPR_HSNB, 32769, 5, NULL, S_HSNB3);
+    ST (S_HSNB3, SPR_HSNB, 32770, 5, NULL, S_HSNB4);
+    ST (S_HSNB4, SPR_HSNB, 32771, 5, NULL, S_HSNB1);
+    ST (S_HSNBX1, SPR_HSNB, 32772, 5, NULL, S_HSNBX2);
+    ST (S_HSNBX2, SPR_HSNB, 32773, 5, NULL, S_HSNBX3);
+    ST (S_HSNBX3, SPR_HSNB, 32774, 4, NULL, S_HSNBX4);
+    ST (S_HSNBX4, SPR_HSNB, 32775, 3, NULL, S_HSNBX5);
+    ST (S_HSNBX5, SPR_HSNB, 32776, 3, NULL, S_NULL);
+
+    m = &mobjinfo[MT_HSNAKE];
+    m->doomednum = -1;        m->spawnstate  = S_HSNK_LOOK1; m->spawnhealth = 280;
+    m->seestate  = S_HSNK_WALK1; m->seesound  = sfx_bgsit1;  m->reactiontime = 8;
+    m->attacksound = sfx_firsht; m->painstate = S_HSNK_PAIN1; m->painchance = 48;
+    m->painsound = sfx_popain; m->meleestate = S_NULL;       m->missilestate = S_HSNK_ATK1;
+    m->deathstate = S_HSNK_DIE1; m->xdeathstate = S_NULL;    m->deathsound = sfx_bgdth1;
+    m->speed = 10; m->radius = 22*FRACUNIT; m->height = 70*FRACUNIT; m->mass = 100;
+    m->damage = 0; m->activesound = sfx_bgact;
+    m->flags = MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL; m->raisestate = S_NULL;
+
+    m = &mobjinfo[MT_HSNAKEPRO];
+    m->doomednum = -1;        m->spawnstate  = S_HSNB1;      m->spawnhealth = 1000;
+    m->seestate  = S_NULL;       m->seesound  = sfx_None;    m->reactiontime = 8;
+    m->attacksound = sfx_None;   m->painstate = S_NULL;      m->painchance = 0;
+    m->painsound = sfx_None;     m->meleestate = S_NULL;     m->missilestate = S_NULL;
+    m->deathstate = S_HSNBX1;    m->xdeathstate = S_NULL;    m->deathsound = sfx_firxpl;
+    m->speed = 14*FRACUNIT; m->radius = 12*FRACUNIT; m->height = 8*FRACUNIT; m->mass = 100;
+    m->damage = 3; m->activesound = sfx_None;
+    m->flags = MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY; m->raisestate = S_NULL;
 }
 
 // hereticstuff.wad sprites loaded?  (the mummy's first frame lump)
@@ -332,6 +532,9 @@ int Heretic_TypeByName (const char* name)
     if (!strcmp (name, "clink") || !strcmp (name, "sabreclaw")) return MT_HCLINK;
     if (!strcmp (name, "imp")   || !strcmp (name, "gargoyle"))  return MT_HIMP;
     if (!strcmp (name, "knight")|| !strcmp (name, "undead"))    return MT_HKNIGHT;
+    if (!strcmp (name, "beast") || !strcmp (name, "weredragon")) return MT_HBEAST;
+    if (!strcmp (name, "wizard")|| !strcmp (name, "disciple"))  return MT_HWIZARD;
+    if (!strcmp (name, "snake") || !strcmp (name, "ophidian"))  return MT_HSNAKE;
     return -1;
 }
 

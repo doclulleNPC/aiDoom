@@ -102,7 +102,7 @@ static const mobjtype_t dir_special2[] = { MT_UNDEAD, MT_FATSO, MT_KNIGHT, MT_BA
 static const mobjtype_t dir_guards[]   = { MT_UNDEAD, MT_VILE, MT_FATSO, MT_KNIGHT, MT_BRUISER }; // revenant, arch-vile, mancubus, hell knight, baron
 // Heretic monsters (hereticstuff.wad overlaid) mixed into the spawn pools so the
 // director uses them too -- a melee trash tier + the Knight as a ranged miniboss.
-static const mobjtype_t dir_heretic[]  = { MT_HMUMMY, MT_HCLINK, MT_HIMP };	// golem, sabreclaw, gargoyle
+static const mobjtype_t dir_heretic[]  = { MT_HMUMMY, MT_HCLINK, MT_HIMP, MT_HBEAST, MT_HWIZARD, MT_HSNAKE };
 
 #define DIR_TRACK	(dir_on || dir_llm)	// intensity is tracked in either mode
 

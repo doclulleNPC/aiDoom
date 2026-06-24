@@ -173,6 +173,12 @@ typedef enum
     SPR_HIMP,		// gargoyle (imp)
     SPR_HKNI,		// undead warrior (knight)
     SPR_HKAX,		// knight's thrown axe
+    SPR_HBEA,		// weredragon (beast)
+    SPR_HBEB,		// weredragon fireball
+    SPR_HWIZ,		// disciple (wizard)
+    SPR_HWIB,		// disciple fireball
+    SPR_HSNK,		// ophidian (snake)
+    SPR_HSNB,		// ophidian projectile
     // Freedoom DOOM2-exclusive monsters (renamed sprites from freedoom2stuff.wad, so
     // they never collide with / override DOOM or doom2stuff).  See files/freedoom.c.
     SPR_FSKE,		// revenant      (doom2 SKEL)
@@ -1196,6 +1202,30 @@ typedef enum
     // knight's thrown axe projectile: spin (3) + explode (3)
     S_HKAX1, S_HKAX2, S_HKAX3,
     S_HKAXX1, S_HKAXX2, S_HKAXX3,
+    // ---- Weredragon (beast) + fireball ----
+    S_HBEA_LOOK1, S_HBEA_LOOK2,
+    S_HBEA_WALK1, S_HBEA_WALK2, S_HBEA_WALK3, S_HBEA_WALK4, S_HBEA_WALK5, S_HBEA_WALK6,
+    S_HBEA_ATK1, S_HBEA_ATK2,
+    S_HBEA_PAIN1, S_HBEA_PAIN2,
+    S_HBEA_DIE1, S_HBEA_DIE2, S_HBEA_DIE3, S_HBEA_DIE4, S_HBEA_DIE5, S_HBEA_DIE6, S_HBEA_DIE7, S_HBEA_DIE8, S_HBEA_DIE9,
+    S_HBEB1, S_HBEB2, S_HBEB3, S_HBEB4, S_HBEB5, S_HBEB6,
+    S_HBEBX1, S_HBEBX2, S_HBEBX3, S_HBEBX4, S_HBEBX5,
+    // ---- Disciple (wizard) + fireball ----
+    S_HWIZ_LOOK1, S_HWIZ_LOOK2,
+    S_HWIZ_WALK1, S_HWIZ_WALK2, S_HWIZ_WALK3, S_HWIZ_WALK4, S_HWIZ_WALK5, S_HWIZ_WALK6, S_HWIZ_WALK7, S_HWIZ_WALK8,
+    S_HWIZ_ATK1, S_HWIZ_ATK2, S_HWIZ_ATK3,
+    S_HWIZ_PAIN1, S_HWIZ_PAIN2,
+    S_HWIZ_DIE1, S_HWIZ_DIE2, S_HWIZ_DIE3, S_HWIZ_DIE4, S_HWIZ_DIE5, S_HWIZ_DIE6, S_HWIZ_DIE7, S_HWIZ_DIE8,
+    S_HWIB1, S_HWIB2,
+    S_HWIBX1, S_HWIBX2, S_HWIBX3, S_HWIBX4, S_HWIBX5,
+    // ---- Ophidian (snake) + projectile ----
+    S_HSNK_LOOK1, S_HSNK_LOOK2,
+    S_HSNK_WALK1, S_HSNK_WALK2, S_HSNK_WALK3, S_HSNK_WALK4,
+    S_HSNK_ATK1, S_HSNK_ATK2, S_HSNK_ATK3, S_HSNK_ATK4, S_HSNK_ATK5,
+    S_HSNK_PAIN1, S_HSNK_PAIN2,
+    S_HSNK_DIE1, S_HSNK_DIE2, S_HSNK_DIE3, S_HSNK_DIE4, S_HSNK_DIE5, S_HSNK_DIE6, S_HSNK_DIE7, S_HSNK_DIE8, S_HSNK_DIE9, S_HSNK_DIE10,
+    S_HSNB1, S_HSNB2, S_HSNB3, S_HSNB4,
+    S_HSNBX1, S_HSNBX2, S_HSNBX3, S_HSNBX4, S_HSNBX5,
     // Freedoom: a reserved block of state slots that freedoom.c fills at runtime by
     // CLONING each DOOM2 monster's state graph (with the sprite remapped).  512 covers
     // ~9 monsters + 4 projectiles (~340 states) with headroom.  See files/freedoom.c.
@@ -1365,6 +1395,12 @@ typedef enum {
     MT_HIMP,		// Heretic gargoyle
     MT_HKNIGHT,		// Heretic undead warrior (knight)
     MT_HKNIGHTAXE,	// Heretic knight's thrown axe (projectile)
+    MT_HBEAST,		// Heretic weredragon (beast)
+    MT_HBEASTBALL,	// weredragon fireball
+    MT_HWIZARD,		// Heretic disciple (wizard)
+    MT_HWIZFX,		// disciple fireball
+    MT_HSNAKE,		// Heretic ophidian (snake)
+    MT_HSNAKEPRO,	// ophidian projectile
     // Freedoom DOOM2-exclusive monsters -- runtime clones of the DOOM2 actors with
     // renamed sprites (files/freedoom.c).  Projectiles first (monsters reference them).
     MT_FD_TRACER,	// revenant homing missile
