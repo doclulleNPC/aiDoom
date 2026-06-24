@@ -16,7 +16,9 @@
 //	                       wanders forward, to prove the hook drives the player.
 //
 //	Protocol (one command per line, replies one line):
-//	  observe                 -> {"tic":..,"player":{..},"exit":[x,y],"buddy":{friend,..},"things":[..]}
+//	  observe                 -> {"tic":..,"player":{..},"exit":[x,y],"buddy":{friend,..},
+//	                             "things":[nearby..],"fetching_key":0..3,
+//	                             "monsters":[[x,y,type]..],"items":[[x,y,sprite]..]}  (whole map)
 //	  goto <x> <y>            walk to a map point (BSP pathfinder routes there)
 //	  face <x> <y>            turn to look at a point
 //	  turn <degrees>          turn by a relative amount
@@ -68,11 +70,16 @@ extern fixed_t		P_AproxDistance (fixed_t dx, fixed_t dy);
 extern angle_t		R_PointToAngle2 (fixed_t x1, fixed_t y1, fixed_t x2, fixed_t y2);
 extern int		numlines;
 extern line_t*		lines;
+extern char*		sprnames[];	// 4-char sprite tags, for naming map items
 
 // ---- autonomous helpers: the level exit + doors/switches in the way ---------
 static int	exit_level = -1;	// gameepisode*100+gamemap the exit was located for
 static fixed_t	exit_x, exit_y;
 static int	exit_set;
+
+// ---- key fetch: when a locked door blocks us, detour to its key first -------
+static int	key_seek;		// key colour we're fetching (0 = none), persists
+static fixed_t	key_x, key_y;		// that key's location
 
 // Locate the level exit once per map (an exit linedef special), like the director's.
 static void Agent_FindExit (void)
@@ -80,6 +87,7 @@ static void Agent_FindExit (void)
     int i, lvl = gameepisode*100 + gamemap;
     if (exit_level == lvl) return;
     exit_level = lvl; exit_set = 0;
+    key_seek = 0;					// drop any stale key detour from the old map
     for (i = 0 ; i < numlines ; i++)
     {
 	int sp = lines[i].special;
@@ -220,7 +228,7 @@ static void Agent_Observe (void)
     player_t*	p = &players[consoleplayer];
     mobj_t*	mo = p->mo;
     thinker_t*	th;
-    char	buf[4096];
+    char	buf[16384];	// holds the player + nearby things + the full map overview
     int		off, first = 1;
 
     reg_n = 0;
@@ -265,6 +273,41 @@ static void Agent_Observe (void)
 	    "%s{\"id\":%d,\"type\":\"%s\",\"dist\":%d,\"rel\":%d,\"hp\":%d,\"vis\":%d}",
 	    first?"":",", reg_n, Agent_TypeName (m->type), d>>FRACBITS, relangle, m->health, vis);
 	first = 0; reg_n++;
+    }
+    off += snprintf (buf+off, sizeof buf-off, "]");		// close "things"
+
+    // Whole-map orientation: EVERY live monster and EVERY pickup as [x,y,"type"], beyond
+    // the in-sight `things` -- so the brain knows the layout (where the keys, health packs
+    // and foes are, even out of view).  Capped so the line stays bounded.  Plus
+    // `fetching_key` (0/1/2/3 = none/blue/yellow/red): the marine is auto-detouring to that
+    // key because a locked door blocks it, so the brain can cooperate instead of fighting it.
+    off += snprintf (buf+off, sizeof buf-off, ",\"fetching_key\":%d,\"monsters\":[", key_seek);
+    {
+	int n = 0; first = 1;
+	for (th = thinkercap.next ; th != &thinkercap && n < 96 ; th = th->next)
+	{
+	    mobj_t* m;
+	    if (th->function.acp1 != (actionf_p1)P_MobjThinker) continue;
+	    m = (mobj_t*)th;
+	    if (!(m->flags & MF_COUNTKILL) || m->health <= 0) continue;
+	    off += snprintf (buf+off, sizeof buf-off, "%s[%d,%d,\"%s\"]",
+			     first?"":",", m->x>>FRACBITS, m->y>>FRACBITS, Agent_TypeName (m->type));
+	    first = 0; n++;
+	}
+    }
+    off += snprintf (buf+off, sizeof buf-off, "],\"items\":[");
+    {
+	int n = 0; first = 1;
+	for (th = thinkercap.next ; th != &thinkercap && n < 96 ; th = th->next)
+	{
+	    mobj_t* m;
+	    if (th->function.acp1 != (actionf_p1)P_MobjThinker) continue;
+	    m = (mobj_t*)th;
+	    if (!(m->flags & MF_SPECIAL) || m->health <= 0) continue;
+	    off += snprintf (buf+off, sizeof buf-off, "%s[%d,%d,\"%s\"]",
+			     first?"":",", m->x>>FRACBITS, m->y>>FRACBITS, sprnames[m->sprite]);
+	    first = 0; n++;
+	}
     }
     off += snprintf (buf+off, sizeof buf-off, "]}\n");
     Agent_Send (buf);
@@ -371,6 +414,82 @@ static boolean Agent_BuddyInLine (mobj_t* mo, mobj_t* tgt)
     return perp < 40;					// within ~a body width -> would be hit
 }
 
+// An explosive barrel sitting in our line of fire?  Don't shoot it -- the blast is as
+// likely to hurt us as the target.  Same in-line test as the buddy guard, over MT_BARREL.
+static boolean Agent_BarrelInLine (mobj_t* mo, mobj_t* tgt)
+{
+    thinker_t*	th;
+    int		txi = (tgt->x - mo->x) >> FRACBITS, tyi = (tgt->y - mo->y) >> FRACBITS;
+    int		dti = P_AproxDistance (tgt->x - mo->x, tgt->y - mo->y) >> FRACBITS;
+    if (dti < 1) return false;
+    for (th = thinkercap.next ; th != &thinkercap ; th = th->next)
+    {
+	mobj_t*	m; int bxi, byi;
+	if (th->function.acp1 != (actionf_p1)P_MobjThinker) continue;
+	m = (mobj_t*)th;
+	if (m->type != MT_BARREL || m->health <= 0) continue;
+	bxi = (m->x - mo->x) >> FRACBITS; byi = (m->y - mo->y) >> FRACBITS;
+	if (bxi*txi + byi*tyi <= 0)       continue;		// behind/beside us
+	if (bxi*bxi + byi*byi >= dti*dti) continue;		// past the target
+	if (abs (bxi*tyi - byi*txi) / dti < 36) return true;	// roughly on the shot line
+    }
+    return false;
+}
+
+// ---- locked doors: fetch the right key before trying to open them -----------
+// A locked-door linedef special encodes the key colour it needs (DOOM specials 26/32 =
+// blue, 27/34 = yellow, 28/33 = red).  We can't open it without the matching card/skull.
+static boolean Agent_HasKey (int color)
+{
+    player_t* p = &players[consoleplayer];
+    switch (color)
+    {
+      case 1: return p->cards[it_bluecard]   || p->cards[it_blueskull];
+      case 2: return p->cards[it_yellowcard] || p->cards[it_yellowskull];
+      case 3: return p->cards[it_redcard]    || p->cards[it_redskull];
+    }
+    return true;
+}
+
+// A locked door right ahead that we CAN'T open yet -> its key colour (1/2/3), else 0.
+static int Agent_LockedNeedAhead (mobj_t* mo)
+{
+    int		i, fa = mo->angle >> ANGLETOFINESHIFT;
+    fixed_t	fwx = finecosine[fa], fwy = finesine[fa];
+    for (i = 0 ; i < numlines ; i++)
+    {
+	int	sp = lines[i].special, color;
+	fixed_t	mx, my, dx, dy;
+	if      (sp==26 || sp==32) color = 1;		// blue
+	else if (sp==27 || sp==34) color = 2;		// yellow
+	else if (sp==28 || sp==33) color = 3;		// red
+	else continue;
+	if (Agent_HasKey (color)) continue;		// already openable
+	mx = (lines[i].v1->x + lines[i].v2->x) >> 1; my = (lines[i].v1->y + lines[i].v2->y) >> 1;
+	dx = mx - mo->x; dy = my - mo->y;
+	if (P_AproxDistance (dx, dy) > 256*FRACUNIT) continue;	// detect it as we approach
+	if (FixedMul (dx, fwx) + FixedMul (dy, fwy) > 0) return color;	// in front of us
+    }
+    return 0;
+}
+
+// Locate a key item of the given colour anywhere in the map -> its position.
+static boolean Agent_FindKey (int color, fixed_t* kx, fixed_t* ky)
+{
+    thinker_t* th;
+    for (th = thinkercap.next ; th != &thinkercap ; th = th->next)
+    {
+	mobj_t*	m; int hit = 0;
+	if (th->function.acp1 != (actionf_p1)P_MobjThinker) continue;
+	m = (mobj_t*)th;
+	if (color==1) hit = (m->sprite==SPR_BKEY || m->sprite==SPR_BSKU);
+	if (color==2) hit = (m->sprite==SPR_YKEY || m->sprite==SPR_YSKU);
+	if (color==3) hit = (m->sprite==SPR_RKEY || m->sprite==SPR_RSKU);
+	if (hit) { *kx = m->x; *ky = m->y; return true; }
+    }
+    return false;
+}
+
 // ---------------------------------------------------------------------------
 // Built-in scripted brain (-aiplayer demo): engage monsters, else wander.
 // ---------------------------------------------------------------------------
@@ -408,6 +527,15 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
     tgt = Agent_Target ();
     if (!tgt && in_attack) tgt = Agent_NearestMonster (mo);
 
+    // Key fetch: drop the detour once we have the key; otherwise, if a locked door we
+    // can't open is right ahead and its key exists in the map, start fetching that key.
+    if (key_seek && Agent_HasKey (key_seek)) key_seek = 0;
+    if (!key_seek)
+    {
+	int c = Agent_LockedNeedAhead (mo);
+	if (c && Agent_FindKey (c, &key_x, &key_y)) key_seek = c;
+    }
+
     want = mo->angle;
     {
 	fixed_t gx = 0, gy = 0;
@@ -424,6 +552,8 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
 	    else
 		{ gx = tgt->x; gy = tgt->y; havegoal = 1; }		// close in
 	}
+	else if (key_seek)						// fetch the needed key
+	    { gx = key_x; gy = key_y; havegoal = 1; }
 	else if (in_have_face) want = in_face;
 	else if (in_have_goal)
 	{
@@ -459,11 +589,19 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
     // Fire ONLY at a target we can SEE, in range, and tightly lined up on (auto-aim does
     // the vertical), and NEVER with the AI buddy in the line of fire (hold + reposition).
     if (tgt && los && td < AGENT_FIRE_RANGE && abs(rem) < AGENT_FACING
-	&& !Agent_BuddyInLine (mo, tgt))
+	&& !Agent_BuddyInLine (mo, tgt) && !Agent_BarrelInLine (mo, tgt))
 	cmd->buttons |= BT_ATTACK;
 
-    // Advance toward the goal / out-of-sight target once roughly facing the way.
-    if (chase && abs(rem) < (ANG45>>16))       cmd->forwardmove = AGENT_FORWARD;
+    // Move toward the (walkable) ChaseDir heading by DECOMPOSING it into forward + strafe
+    // relative to our facing -- so the marine slides exactly along the A*/corner-rounded
+    // route immediately, instead of only walking forward after it finishes turning (which
+    // made it plough into walls mid-turn).  Same scheme the buddy uses.
+    if (chase)
+    {
+	angle_t rel = (want - mo->angle) >> ANGLETOFINESHIFT;
+	cmd->forwardmove =  (signed char)(FixedMul (AGENT_FORWARD*FRACUNIT, finecosine[rel]) >> FRACBITS);
+	cmd->sidemove    = -(signed char)(FixedMul (AGENT_FORWARD*FRACUNIT, finesine[rel])   >> FRACBITS);
+    }
 
     if (in_use)         { cmd->buttons |= BT_USE; in_use = 0; }
     if (in_weapon >= 0) { cmd->buttons |= BT_CHANGE | ((in_weapon << BT_WEAPONSHIFT) & BT_WEAPONMASK);

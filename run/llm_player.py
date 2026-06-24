@@ -26,6 +26,12 @@ JSON (player x/y/angle/health/ammo, and "things": nearby monsters/items with id,
 dist in map units, rel = angle to them in degrees [-180..180], hp, vis=in-line-of-sight).
 A "buddy" field (if not null) is your FRIENDLY co-op marine -- an ally, never a target;
 the engine already holds your fire when the buddy is in your line of fire.
+For orientation you also get the WHOLE map: "exit":[x,y] the level exit; "monsters":[[x,y,
+type]..] every monster; "items":[[x,y,tag]..] every pickup (tags: MEDI/STIM health, ARM1/
+ARM2 armor, CLIP/SHEL/ROCK/CELL ammo, BKEY/YKEY/RKEY keycards, BSKU/YSKU/RSKU skull keys,
+BPAK backpack, weapons MGUN/LAUN/PLAS/BFUG/SHOT/SGN2). Use `goto x y` to reach any of them.
+"fetching_key":N (0/1/2/3 = none/blue/yellow/red): the engine is already auto-detouring to
+that key because a locked door blocks the way -- let it, or `goto` the key yourself.
 Reply with exactly ONE command line, nothing else. Commands:
   target <id>     attack that thing (auto-aims it); pick a visible (vis:1) monster
   attack 1        hold fire (auto-aims the nearest visible monster)
