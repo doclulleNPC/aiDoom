@@ -16,7 +16,16 @@ SYSTEM = """You are the brain of a DOOM marine. Each turn you receive the game s
 JSON (player status, exit coordinates, doors and their seen status, and "things": nearby monsters/items).
 Your buddy is a FRIENDLY co-op marine.
 
-You have short-term memory of your last actions. Try to explore rooms, collect items, open doors, and eliminate monsters.
+Sensory Inputs:
+- "lidar": 8 values (front, front-left, left, back-left, back, back-right, right, front-right) representing distances in map units to the nearest wall or obstacle. Use this for local navigation and avoiding walls.
+- "sounds": a list of spatial sound events (e.g., shoot, item, door, growl) with distance and relative direction angle in degrees (positive is left, negative is right). Use this to locate hidden monsters or doors.
+- "doors": list of doorways with their positions and "seen" state (1 if visited, 0 if unexplored).
+
+Tactical guidelines:
+- If a door is unopened (seen:0), you can explore it by sending "goto <x> <y>" with its coordinates.
+- If you hear monsters (sound events) or see them (vis:1), target them or switch to a suitable weapon.
+- Try to explore new rooms, collect items, open doors, and eliminate monsters.
+
 Respond in this format:
 THOUGHT: <brief reasoning about your current strategy, map exploration, and goals>
 COMMAND: <exactly one command from the list below>
@@ -96,6 +105,20 @@ def check_trigger(curr_state):
     
     if not prev_state:
         return True, "initial_state"
+        
+    # If waiting at door, only trigger on damage or near visible monsters (dist < 400)
+    if curr_state.get("waiting_at_door") == True:
+        stuck_since = None  # Reset stuck timer while waiting
+        prev_hp = prev_state.get("player", {}).get("health", 100)
+        curr_hp = curr_state.get("player", {}).get("health", 100)
+        if curr_hp < prev_hp:
+            return True, "player_damaged"
+            
+        curr_vis_monsters = [t for t in curr_state.get("things", []) if t.get("vis") == 1 and t.get("type") != "item" and t.get("dist") < 400]
+        if curr_vis_monsters:
+            return True, "monster_near"
+            
+        return False, None
         
     # 1. Timeout backup (at least run once every 3.0 seconds to keep updated)
     if now - last_llm_time > 3.0:

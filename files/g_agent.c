@@ -62,6 +62,7 @@
 #include "info.h"
 #include "p_ai_coop.h"		// P_AICoop_NextWaypoint -- shared BSP pathfinder
 #include "g_agent.h"
+#include "sounds.h"
 
 // Play-sim hooks declared by hand: p_local.h pulls p_spec.h, whose `open`/`close`
 // enum values collide with the socket close()/read()/write() used here.
@@ -95,6 +96,7 @@ static fixed_t	door_x[AGENT_MAXDOORS], door_y[AGENT_MAXDOORS];
 static unsigned char door_seen[AGENT_MAXDOORS];
 static int	door_n;
 static int	door_wait_timer;
+static int	waiting_at_door;
 
 static boolean Agent_IsDoorSpecial (int sp)
 {
@@ -153,6 +155,17 @@ static boolean Agent_UseAhead (mobj_t* mo)
 	if (!(sp==1||sp==31||sp==117||sp==118 ||			// plain DR/D1 doors
 	      sp==26||sp==27||sp==28 || sp==32||sp==33||sp==34 ||	// locked doors
 	      sp==11||sp==51)) continue;				// exit switch
+
+	// Skip doors that are already open/passable
+	if (sp != 11 && sp != 51 && ld->frontsector && ld->backsector)
+	{
+	    sector_t* fs = ld->frontsector;
+	    sector_t* bs = ld->backsector;
+	    fixed_t opening = (fs->ceilingheight < bs->ceilingheight ? fs->ceilingheight : bs->ceilingheight)
+		- (fs->floorheight   > bs->floorheight   ? fs->floorheight   : bs->floorheight);
+	    if (opening >= 56*FRACUNIT) continue;
+	}
+
 	mx = (ld->v1->x + ld->v2->x) >> 1; my = (ld->v1->y + ld->v2->y) >> 1;
 	dx = mx - mo->x; dy = my - mo->y;
 	if (P_AproxDistance (dx, dy) > 80*FRACUNIT) continue;
@@ -319,6 +332,39 @@ static int Agent_TraceDistance (mobj_t* mo, angle_t angle)
     return (i - 1) * 16;
 }
 
+#define MAX_LOGGED_SOUNDS 8
+typedef struct {
+    char name[16];
+    int dist;
+    int dir;
+} agent_sound_t;
+
+static agent_sound_t logged_sounds[MAX_LOGGED_SOUNDS];
+static int logged_sounds_n = 0;
+
+void G_Agent_LogSound (void* origin, int sfx_id)
+{
+    mobj_t* mo = (mobj_t*)origin;
+    mobj_t* player_mo = players[consoleplayer].mo;
+    if (!player_mo || !mo || sfx_id <= 0) return;
+
+    fixed_t d = P_AproxDistance (mo->x - player_mo->x, mo->y - player_mo->y);
+    if (d > 1600*FRACUNIT) return; // limit hearing distance
+
+    int relangle = (int)(((R_PointToAngle2 (player_mo->x, player_mo->y, mo->x, mo->y) - player_mo->angle)) / (ANG45/45));
+    if (relangle > 180) relangle -= 360;
+
+    if (logged_sounds_n < MAX_LOGGED_SOUNDS)
+    {
+	agent_sound_t* s = &logged_sounds[logged_sounds_n];
+	strncpy (s->name, S_sfx[sfx_id].name, sizeof(s->name)-1);
+	s->name[sizeof(s->name)-1] = 0;
+	s->dist = (int)(d >> FRACBITS);
+	s->dir = relangle;
+	logged_sounds_n++;
+    }
+}
+
 static void Agent_Observe (void)
 {
     player_t*	p = &players[consoleplayer];
@@ -392,6 +438,19 @@ static void Agent_Observe (void)
 	    lidar[0], lidar[1], lidar[2], lidar[3], lidar[4], lidar[5], lidar[6], lidar[7]);
     }
 
+    // Expose sound events
+    {
+	off += snprintf (buf+off, sizeof buf-off, ",\"sounds\":[");
+	for (i = 0; i < logged_sounds_n; i++)
+	{
+	    off += snprintf (buf+off, sizeof buf-off, "%s{\"name\":\"%s\",\"dist\":%d,\"rel\":%d}",
+		i == 0 ? "" : ",", logged_sounds[i].name, logged_sounds[i].dist, logged_sounds[i].dir);
+	}
+	off += snprintf (buf+off, sizeof buf-off, "]");
+	logged_sounds_n = 0;
+    }
+
+    off += snprintf (buf+off, sizeof buf-off, ",\"waiting_at_door\":%s", waiting_at_door ? "true" : "false");
     off += snprintf (buf+off, sizeof buf-off, "}\n");
     Agent_Send (buf);
 }
@@ -643,7 +702,9 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
     angle_t	want;
     int		rem, turn, chase = 0, los = 0;
     fixed_t	td = 0;			// distance to the current target
+    static int	stuck;
 
+    waiting_at_door = 0;
     memset (cmd, 0, sizeof(*cmd));
     Agent_Poll ();
     if (door_wait_timer > 0) door_wait_timer--;
@@ -699,6 +760,7 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
     // 2. Determine MOVEMENT Target (gx, gy, havegoal)
     fixed_t gx = 0, gy = 0;
     int havegoal = 0;
+    int force_straight = (leveltime < 105 && !in_have_goal && !key_seek && !tgt);
 
     if (in_have_goal)
     {
@@ -718,7 +780,7 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
 	// Close in on target if we don't have a specific path goal
 	gx = tgt->x; gy = tgt->y; havegoal = 1;
     }
-    else if (exit_set)
+    else if (exit_set && !force_straight)
     {
 	gx = exit_x; gy = exit_y; havegoal = 1;
     }
@@ -735,17 +797,17 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
 	else                                              { nx = gx; ny = gy; }
 
 	// Determine stx / sty (steer target point) using buddy navigation logic:
-	if (door_wait_timer > 0 && AICoop_FindDoorAhead (mo, gx, gy, &ddx, &ddy))
+	if (AICoop_FindDoorAhead (mo, gx, gy, &ddx, &ddy))
 	{
-	    stx = ddx; sty = ddy; // Force steer target to the doorway midpoint
+	    stx = ddx; sty = ddy; // Doorway in reach -> head straight to it
+	    if (P_AproxDistance (mo->x - ddx, mo->y - ddy) < 80*FRACUNIT)
+	    {
+		waiting_at_door = 1;
+	    }
 	}
 	else if (AICoop_CanReach (mo, gx, gy, false))
 	{
 	    stx = gx; sty = gy; // Final target reachable -> head straight to it
-	}
-	else if (AICoop_FindDoorAhead (mo, gx, gy, &ddx, &ddy) && AICoop_CanReach (mo, ddx, ddy, true))
-	{
-	    stx = ddx; sty = ddy; // Doorway in reach -> head straight to it
 	}
 	else if (AICoop_CanReach (mo, nx, ny, true))
 	{
@@ -763,9 +825,24 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
 	move_angle = R_PointToAngle2 (mo->x, mo->y, stx, sty);
 	chase = 1;
 
-	// If we are NOT aiming at a monster or face target, face where we walk
-	if (!(tgt && los && td < AGENT_FIRE_RANGE) && !in_have_face)
+	// If we are waiting for a door to open, face it and prevent stuck wiggling
+	if (waiting_at_door)
+	{
+	    stuck = 0;
 	    want = move_angle;
+	}
+	// If we are NOT aiming at a monster or face target, face where we walk
+	else if (!(tgt && los && td < AGENT_FIRE_RANGE) && !in_have_face)
+	    want = move_angle;
+    }
+
+    if (force_straight)
+    {
+	move_angle = mo->angle;
+	chase = 0;
+	want = mo->angle;
+	cmd->forwardmove = AGENT_FORWARD / 2;
+	cmd->sidemove = 0;
     }
 
     if (exit_set && P_AproxDistance (mo->x - exit_x, mo->y - exit_y) < 64*FRACUNIT)
@@ -832,9 +909,8 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
     {
 	static int	usewait;
 	static fixed_t	lastx, lasty;
-	static int	stuck;
 	if (usewait > 0) usewait--;
-	if (chase && usewait == 0 && Agent_UseAhead (mo)) { cmd->buttons |= BT_USE; usewait = 16; }
+	if ((chase || waiting_at_door) && usewait == 0 && door_wait_timer == 0 && Agent_UseAhead (mo)) { cmd->buttons |= BT_USE; usewait = 16; }
 
 	if (chase)
 	{
@@ -849,7 +925,7 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
 		cmd->angleturn   = (stuck & 32) ?  AGENT_TURN : -AGENT_TURN;
 		cmd->forwardmove = AGENT_FORWARD;
 		cmd->sidemove    = (stuck & 32) ?  30 : -30;
-		cmd->buttons    |= BT_USE;	// in case a shut door is pinning us
+		if (door_wait_timer == 0) cmd->buttons |= BT_USE;	// in case a shut door is pinning us
 	    }
 	}
 	else stuck = 0;
@@ -859,7 +935,7 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
     {
 	fixed_t ddx, ddy;
 	if (AICoop_FindDoorAhead (mo, gx, gy, &ddx, &ddy))
-	    door_wait_timer = 30;
+	    door_wait_timer = 60;
     }
 }
 

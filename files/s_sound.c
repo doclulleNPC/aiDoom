@@ -394,11 +394,14 @@ S_StartSoundAtVolume
 				       priority);
 }	
 
+extern void G_Agent_LogSound (void* origin, int sfx_id);
+
 void
 S_StartSound
 ( void*		origin,
   int		sfx_id )
 {
+    G_Agent_LogSound (origin, sfx_id);
 #ifdef SAWDEBUG
     // if (sfx_id == sfx_sawful)
     // sfx_id = sfx_itemup;

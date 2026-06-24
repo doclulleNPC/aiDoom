@@ -53,13 +53,29 @@ Non-blocking single-client server (`Agent_OpenSocket`/`Agent_Poll`), same shape 
  "exit":[x,y]|null,
  "buddy":{"friend":true,"x","y","health"}|null,
  "things":[{"id","type","dist","rel","hp","vis","x","y","z"}, ...],
- "doors":[{"pos":[x,y],"seen":0|1}, ...]}
+ "doors":[{"pos":[x,y],"seen":0|1}, ...],
+ "lidar":[d0,d1,...,d7],
+ "sounds":[{"name","dist","rel"}, ...],
+ "waiting_at_door":true|false}
 ```
 Notes: `angle` is degrees; `rel` is the bearing to a thing in degrees `[-180,180]`;
 `vis` is line-of-sight; `id` indexes the per-observe **target registry** (`reg[]`) that
 `target <id>` resolves through. Only live monsters (`MF_COUNTKILL`) and pickups
 (`MF_SPECIAL`) appear — no barrels, no corpses. The **buddy is reported separately and is
 never a thing/target** (it's a friend).
+
+### Perception beyond `things` — sight, lidar, hearing
+- **`things`** is *semantic* sight: every live monster/pickup with bearing + LoS, regardless
+  of distance (the brain decides what's relevant).
+- **`lidar`** is *geometric* sight: 8 ray distances at 45° around the marine
+  (`Agent_TraceDistance`), each the walkable run before a wall, a >24u step-up, a >24u
+  drop-off, or no head-room — out to 1024u. Index 0 is straight ahead, then CCW. Lets the
+  brain see corridors/ledges/dead-ends without map geometry.
+- **`sounds`** is *hearing*: every SFX the engine starts within 1600u of the marine is logged
+  (`G_Agent_LogSound`, hooked into `S_StartSound`) with its lump name, distance and bearing,
+  then drained each `observe`. So the brain hears gunfire / monster wake-ups / doors out of
+  sight.
+- **`waiting_at_door`** — the reflex is parked at a doorway waiting for it to rise (below).
 
 ### Intents (set state, no reply)
 | command | effect |
@@ -96,25 +112,36 @@ strafing toward a different goal. Order of operations:
    combat target > the level exit.
 8. **Steering** (buddy-grade, `AICoop_*` from `p_ai_coop.c`) — turn the far goal into a
    reachable **steer point**:
-   - `AICoop_CanReach(goal)` clear → head straight at the goal;
-   - else a doorway on the way (`AICoop_FindDoorAhead`) that's reachable → head at it;
+   - a doorway on the way (`AICoop_FindDoorAhead`) → head straight at it (and if we're
+     within 80u of it, set `waiting_at_door`);
+   - else `AICoop_CanReach(goal)` clear → head straight at the goal;
    - else the A* portal waypoint (`P_AICoop_NextWaypoint`) if reachable → head at it;
    - else **corner-round**: `AICoop_ChaseDir` picks a walkable 8-dir, projected 96u ahead.
-9. **Movement** = decompose the steer direction into **forward + strafe** relative to facing
-   (`finecosine`/`finesine`), so the marine slides exactly along the route no matter which
-   way it's looking. While not aiming a monster/face, `want` follows the move direction.
-10. **Turn** toward `want`, clamped to `AGENT_TURN`/tic.
-11. **Fire** iff target visible **and** within `AGENT_FIRE_RANGE` **and** lined up within
+9. **Start nudge** (`force_straight`) → for the first ~3 s of a level with no goal/target,
+   walk straight ahead at half speed, so the marine clears the spawn instead of dithering.
+10. **Movement** = decompose the steer direction into **forward + strafe** relative to facing
+    (`finecosine`/`finesine`), so the marine slides exactly along the route no matter which
+    way it's looking. While not aiming a monster/face, `want` follows the move direction.
+11. **At the exit switch** (within 64u) → face it, press `BT_USE`, stop — finishes the level.
+12. **Turn** toward `want`, clamped to `AGENT_TURN`/tic.
+13. **Fire** iff target visible **and** within `AGENT_FIRE_RANGE` **and** lined up within
     `AGENT_FACING` **and** the buddy is not in the line (`Agent_BuddyInLine`) **and** no
     explosive barrel is in the line (`Agent_BarrelInLine`).
-12. **Kite (survival)** → a *visible* target closer than 128u (or 384u when `health < 40`)
+14. **Kite (survival)** → a *visible* target closer than 128u (or 384u when `health < 40`)
     flips movement to **back away** while still firing — keeps a melee pinky off us.
-13. **Weapon up** → if holding fist/pistol but we own a chaingun/shotgun, switch to it (one
+15. **Weapon up** → if holding fist/pistol but we own a chaingun/shotgun, switch to it (one
     shot, so a foe dies before it reaches melee).
-14. **USE** → `Agent_UseAhead` taps USE on a door (incl. locked) or the exit switch in the
-    forward arc within 80u.
-15. **Stuck recovery** → no progress for >5 tics while chasing → sweep the view + strafe +
-    USE to free up.
+16. **Door open + WAIT** → `Agent_UseAhead` taps USE on a *shut* door (it skips ones already
+    risen ≥56u) or the exit switch in the forward arc within 80u. Pressing USE on a doorway
+    arms `door_wait_timer = 60`: for ~1.7 s the marine **faces the door and waits** for it to
+    rise — it does not re-spam USE or wiggle (the fix for jittering against an opening door).
+    `waiting_at_door` is reported in `observe`.
+17. **Stuck recovery** → no progress for >5 tics while chasing (and not door-waiting) → sweep
+    the view + strafe + USE to free up.
+
+The agent's intent state (goal, attack/use flags, `door_wait_timer`) is **saved/restored
+with the game** (`G_Agent_Archive`/`G_Agent_UnArchive`, called from `g_game.c`), so a
+load resumes mid-plan instead of resetting.
 
 ### Tunables (top of `g_agent.c`)
 `AGENT_TURN 1400` (max turn/tic ≈ 7.7°) · `AGENT_FACING 900` (fire cone ≈ 5°, ≈ auto-aim)
@@ -197,9 +224,12 @@ random-walk fallback can thread it — stochastic). The navigation pieces are bu
 the remaining work is higher-level survival (hazard avoidance, low-HP retreat to health).
 
 ## 8. Files
-- `files/g_agent.c` / `g_agent.h` — the agent (server, protocol, reflex, demo brain).
+- `files/g_agent.c` / `g_agent.h` — the agent (server, protocol, perception, reflex, demo
+  brain, savegame archive).
 - `files/g_game.c` — the `G_BuildTiccmd` hook. `files/d_main.c` — `G_AgentInit`.
 - `files/p_ai_coop.c` — shared navigation (`P_AICoop_NextWaypoint`, `AICoop_CanReach`,
   `AICoop_FindDoorAhead`, `AICoop_ChaseDir`).
+- `files/s_sound.c` — calls `G_Agent_LogSound` from `S_StartSound` (the `sounds` feed).
+- `files/g_game.c` — also calls `G_Agent_Archive`/`G_Agent_UnArchive` (intent state in saves).
 - `run/llm_player.py` — the Ollama brain. `run/start_llm_player.sh` — full-LLM launch.
 - `AGENT_CONTROL.md` — the design rationale this implements.
