@@ -78,21 +78,46 @@ static int	exit_set;
 static int	key_seek;		// key colour we're fetching (0 = none), persists
 static fixed_t	key_x, key_y;		// that key's location
 
-// Locate the level exit once per map (an exit linedef special), like the director's.
+// ---- door map: the level's doorways, collected once at start --------------
+// The route to a key or the exit almost always runs through one or more doors, so the
+// explorer steers toward the nearest not-yet-visited doorway -- directed exploration that
+// threads the map, rather than a random walk that wanders off or an exit beeline that pins.
+#define AGENT_MAXDOORS	96
+static fixed_t	door_x[AGENT_MAXDOORS], door_y[AGENT_MAXDOORS];
+static unsigned char door_seen[AGENT_MAXDOORS];
+static int	door_n;
+
+static boolean Agent_IsDoorSpecial (int sp)
+{
+    return sp==1||sp==31||sp==117||sp==118 ||		// plain DR/D1 doors
+	   sp==26||sp==27||sp==28 || sp==32||sp==33||sp==34;	// locked doors
+}
+
+// Locate the level exit + collect the door linedefs, once per map.
 static void Agent_FindExit (void)
 {
     int i, lvl = gameepisode*100 + gamemap;
     if (exit_level == lvl) return;
     exit_level = lvl; exit_set = 0;
     key_seek = 0;					// drop any stale key detour from the old map
+    door_n = 0;
     for (i = 0 ; i < numlines ; i++)
     {
 	int sp = lines[i].special;
+	fixed_t mx, my;
 	if (sp==11 || sp==51 || sp==52 || sp==124)	// S1/W1 exit + secret-exit switches
 	{
-	    exit_x = (lines[i].v1->x + lines[i].v2->x) >> 1;
-	    exit_y = (lines[i].v1->y + lines[i].v2->y) >> 1;
-	    exit_set = 1; return;
+	    if (!exit_set) {
+		exit_x = (lines[i].v1->x + lines[i].v2->x) >> 1;
+		exit_y = (lines[i].v1->y + lines[i].v2->y) >> 1;
+		exit_set = 1;
+	    }
+	    continue;
+	}
+	if (Agent_IsDoorSpecial (sp) && door_n < AGENT_MAXDOORS)
+	{
+	    mx = (lines[i].v1->x + lines[i].v2->x) >> 1; my = (lines[i].v1->y + lines[i].v2->y) >> 1;
+	    door_x[door_n] = mx; door_y[door_n] = my; door_seen[door_n] = 0; door_n++;
 	}
     }
 }
@@ -457,28 +482,56 @@ static boolean Agent_FindKey (int color, fixed_t* kx, fixed_t* ky)
 // ---------------------------------------------------------------------------
 static void Agent_Brain (void)
 {
-    // Engage what we can see, and EXPLORE: every ~1.8 s pick a fresh random wander goal
-    // (the reflex A*-routes to it).  Random exploration covers the map -- threading doors
-    // and rooms -- and actually finishes levels, where a fixed beeline at the exit just
-    // pins on the first wall/ledge between here and it.
     static unsigned seed = 1;			// own RNG -- never touch the playsim's
+    static int goaltic, cur_door = -1;
+    mobj_t* mo = players[consoleplayer].mo;
     in_attack = 1;
-    if (!in_have_goal && (leveltime & 63) == 0)
+    if (!mo) return;
+
+    // PRIMARY DIRECTIVE: kill monsters.  A foe in view -> drop the wander goal and let the
+    // reflex lock onto it (face + fire + kite) instead of strolling past it.
+    if (Agent_NearestMonster (mo)) { in_have_goal = 0; return; }
+
+    // Abandon a goal chased >3 s without arriving; if it was a door, mark it done so we
+    // stop retrying one we can't reach (e.g. still locked).
+    if (in_have_goal && leveltime - goaltic > 105)
     {
-	mobj_t* mo = players[consoleplayer].mo;
-	if (mo)
+	in_have_goal = 0;
+	if (cur_door >= 0) door_seen[cur_door] = 1;
+	cur_door = -1;
+    }
+
+    if (!in_have_goal && (leveltime & 31) == 0)
+    {
+	// Near the exit -> go finish it (Agent_UseAhead then presses the exit switch).
+	if (exit_set && P_AproxDistance (mo->x - exit_x, mo->y - exit_y) < 512*FRACUNIT)
+	    { in_gx = exit_x; in_gy = exit_y; cur_door = -1; }
+	else
 	{
-	    int spread, fa;
-	    // Bias the random heading toward the level EXIT (wide +/-128 deg spread), so the
-	    // marine explores but TRENDS toward the exit instead of wandering off at random.
-	    angle_t base = exit_set ? R_PointToAngle2 (mo->x, mo->y, exit_x, exit_y) : mo->angle;
-	    seed = seed*1103515245u + 12345u;
-	    spread = (int)((seed >> 16) & 255) - 128;	// -128..+127 deg off the exit direction
-	    fa = (base + (angle_t)(spread * (ANG45/45))) >> ANGLETOFINESHIFT;
-	    in_gx = mo->x + FixedMul (512*FRACUNIT, finecosine[fa]);
-	    in_gy = mo->y + FixedMul (512*FRACUNIT, finesine[fa]);
-	    in_have_goal = 1;
+	    // SECONDARY: thread the map through its doors -- steer to the nearest doorway we
+	    // haven't been to yet (marking ones we pass as done).  The key/exit route runs
+	    // through doors, so this explores far more purposefully than a random walk.
+	    int i, best = -1; fixed_t bd = (fixed_t)1<<30;
+	    for (i = 0 ; i < door_n ; i++)
+	    {
+		fixed_t d = P_AproxDistance (mo->x - door_x[i], mo->y - door_y[i]);
+		if (d < 160*FRACUNIT) door_seen[i] = 1;
+		if (!door_seen[i] && d < bd) { bd = d; best = i; }
+	    }
+	    if (best >= 0) { in_gx = door_x[best]; in_gy = door_y[best]; cur_door = best; }
+	    else
+	    {
+		// All doors done (or none) -> random walk to cover open areas / reach the exit.
+		int turn, fa;
+		seed = seed*1103515245u + 12345u;
+		turn = (int)((seed >> 16) & 127) - 64;
+		fa = (mo->angle + (angle_t)(turn * (ANG45/45))) >> ANGLETOFINESHIFT;
+		in_gx = mo->x + FixedMul (512*FRACUNIT, finecosine[fa]);
+		in_gy = mo->y + FixedMul (512*FRACUNIT, finesine[fa]);
+		cur_door = -1;
+	    }
 	}
+	in_have_goal = 1; goaltic = leveltime;
     }
 }
 
@@ -577,9 +630,33 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
     // Advance toward the goal / out-of-sight target once roughly facing the way.
     if (chase && abs(rem) < (ANG45>>16))       cmd->forwardmove = AGENT_FORWARD;
 
+    // Survival (primary directive: kill monsters, STAY ALIVE).  Keep a melee threat -- a
+    // charging pinky -- at arm's length: once a visible target gets close, BACK AWAY while
+    // we keep firing (kite), and from further out when we're hurt.  This is the fix for the
+    // marine walking into a pinky's bite and dying.
+    if (tgt && los)
+    {
+	// Stand and fire at range (stable aim -> hits); only back away once a foe is in
+	// melee reach (128u), or from further out when we're hurt.
+	fixed_t kite = (p->health < 40) ? 384*FRACUNIT : 128*FRACUNIT;
+	if (td < kite) cmd->forwardmove = -AGENT_FORWARD;
+    }
+
     if (in_use)         { cmd->buttons |= BT_USE; in_use = 0; }
     if (in_weapon >= 0) { cmd->buttons |= BT_CHANGE | ((in_weapon << BT_WEAPONSHIFT) & BT_WEAPONMASK);
 			  in_weapon = -1; }
+
+    // Bring the best owned weapon to bear instead of plinking with the fist/pistol, so a
+    // pinky dies before it reaches melee.  One-shot (only when not already switching).
+    if (tgt && !(cmd->buttons & BT_CHANGE) && p->pendingweapon == wp_nochange
+	&& (p->readyweapon == wp_fist || p->readyweapon == wp_pistol))
+    {
+	int best = -1;
+	if      (p->weaponowned[wp_chaingun]) best = wp_chaingun;
+	else if (p->weaponowned[wp_shotgun])  best = wp_shotgun;
+	if (best >= 0)
+	    cmd->buttons |= BT_CHANGE | ((best << BT_WEAPONSHIFT) & BT_WEAPONMASK);
+    }
 
     // Autonomy: open a door / hit the exit switch in our way, and un-stick if blocked --
     // without these the marine paths up to a shut door and never gets through.
