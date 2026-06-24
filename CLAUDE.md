@@ -162,6 +162,12 @@ add modern AI — keep them clearly distinct:
 - **Pack-hunt monster AI** (`p_enemy.c`, config `monster_pack 1`) — monsters
   acquire the player on spawn (even with no LoS) and steer toward nearby allies,
   so they gather and assault in groups.
+- **LLM/agent player control** (`files/g_agent.c`/`.h`, `-aiplayer [port|demo]`) — drives
+  the *human marine* (player 1) instead of the keyboard. A slow external BRAIN (an LLM via
+  `run/llm_player.py`, or the built-in `demo` brain) issues high-level intents over a TCP
+  line protocol (`map`/`observe` + `goto/target/attack/use/…`); a 35 Hz C REFLEX in
+  `G_AgentBuildTiccmd` turns them into ticcmds (buddy-grade nav, kiting, door-use, weapon-up).
+  Hook: `G_BuildTiccmd` (`g_game.c`). Full as-built reference: **`AIPLAYER.md`**.
 
 Related gameplay flags worth knowing: `-infight` (same-species infighting),
 `-nofriendlyfire`/`-noff` (player ↔ buddy don't hurt each other), plus free-look
@@ -194,7 +200,8 @@ Related gameplay flags worth knowing: `-infight` (same-species infighting),
   peer-to-peer `d_net.c`.
 
 There is a large set of design docs at the repo root (one per feature):
-`AGENT_CONTROL.md`, `AIDOOM_PARAMETERS.md`, `BUDDY_*.md`, `GPUMON.md`,
+`AGENT_CONTROL.md` (agent/LLM control *design*) and `AIPLAYER.md` (the shipped `-aiplayer`
+*as-built*), `AIDOOM_PARAMETERS.md`, `BUDDY_*.md`, `GPUMON.md`,
 `Pathfinding.md`, `VISIBILITY_CACHE.md`, `YAPB_ARCHITECTURE.md`, `Collision.md`,
 `HD_TEXTURES.md` (how the `../sdldoom-sdl3` sibling does true-color PNG texture/
 sprite/voxel replacement — a porting reference, not yet implemented here),

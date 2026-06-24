@@ -15,8 +15,12 @@
 //	`-aiplayer demo`       built-in scripted brain (no LLM) -- engages monsters and
 //	                       wanders forward, to prove the hook drives the player.
 //
+//	Full as-built reference (protocol, reflex flow, demo brain, LLM client): AIPLAYER.md.
+//	Design rationale: AGENT_CONTROL.md sec.1-11.
+//
 //	Protocol (one command per line, replies one line):
-//	  observe                 -> {"tic":..,"player":{..},"exit":[x,y],"buddy":{friend,..},"things":[..]}
+//	  map                     -> {"start":..,"exit":..,"doors":[..],"lines":[..]}  (static, once)
+//	  observe                 -> {"tic":..,"player":{..},"exit":..,"buddy":..,"things":[..],"doors":[..]}
 //	  goto <x> <y>            walk to a map point (BSP pathfinder routes there)
 //	  face <x> <y>            turn to look at a point
 //	  turn <degrees>          turn by a relative amount
@@ -68,6 +72,10 @@ extern fixed_t		P_AproxDistance (fixed_t dx, fixed_t dy);
 extern angle_t		R_PointToAngle2 (fixed_t x1, fixed_t y1, fixed_t x2, fixed_t y2);
 extern int		numlines;
 extern line_t*		lines;
+extern boolean		P_CheckPosition (mobj_t* thing, fixed_t x, fixed_t y);
+extern fixed_t		tmceilingz;
+extern fixed_t		tmfloorz;
+extern fixed_t		tmdropoffz;
 
 // ---- autonomous helpers: the level exit + doors/switches in the way ---------
 static int	exit_level = -1;	// gameepisode*100+gamemap the exit was located for
@@ -86,6 +94,7 @@ static fixed_t	key_x, key_y;		// that key's location
 static fixed_t	door_x[AGENT_MAXDOORS], door_y[AGENT_MAXDOORS];
 static unsigned char door_seen[AGENT_MAXDOORS];
 static int	door_n;
+static int	door_wait_timer;
 
 static boolean Agent_IsDoorSpecial (int sp)
 {
@@ -108,9 +117,16 @@ static void Agent_FindExit (void)
 	if (sp==11 || sp==51 || sp==52 || sp==124)	// S1/W1 exit + secret-exit switches
 	{
 	    if (!exit_set) {
-		exit_x = (lines[i].v1->x + lines[i].v2->x) >> 1;
-		exit_y = (lines[i].v1->y + lines[i].v2->y) >> 1;
-		exit_set = 1;
+		fixed_t dx = lines[i].v2->x - lines[i].v1->x;
+		fixed_t dy = lines[i].v2->y - lines[i].v1->y;
+		fixed_t len = P_AproxDistance (dx, dy);
+		if (len > 0) {
+		    fixed_t nx = FixedDiv (dy, len) * 32;
+		    fixed_t ny = FixedDiv (-dx, len) * 32;
+		    exit_x = ((lines[i].v1->x + lines[i].v2->x) >> 1) + nx;
+		    exit_y = ((lines[i].v1->y + lines[i].v2->y) >> 1) + ny;
+		    exit_set = 1;
+		}
 	    }
 	    continue;
 	}
@@ -152,7 +168,7 @@ static boolean Agent_UseAhead (mobj_t* mo)
 #define AGENT_SIGHT	(2048*FRACUNIT)	// monster auto-aim acquisition range
 #define AGENT_FIRE_RANGE (1024*FRACUNIT)// don't open fire past this -- close in first
 #define AGENT_REACH	(64*FRACUNIT)	// goal considered reached within this
-#define AGENT_MAXTHINGS	24		// observe + target registry size
+#define AGENT_MAXTHINGS	256		// observe + target registry size
 
 int		agent_active;
 static int	agent_port = 31700;
@@ -245,13 +261,71 @@ static const char* Agent_TypeName (mobjtype_t t)
     }
 }
 
+static void Agent_SendMap (void)
+{
+    char* buf = malloc (65536);
+    int off = 0, i;
+
+    Agent_FindExit ();
+    off += snprintf (buf+off, 65536-off, "{\"start\":[%d,%d],\"exit\":",
+	playerstarts[consoleplayer].x, playerstarts[consoleplayer].y);
+    if (exit_set) off += snprintf (buf+off, 65536-off, "[%d,%d]", exit_x>>FRACBITS, exit_y>>FRACBITS);
+    else          off += snprintf (buf+off, 65536-off, "null");
+
+    off += snprintf (buf+off, 65536-off, ",\"doors\":[");
+    for (i = 0; i < door_n; i++)
+    {
+	off += snprintf (buf+off, 65536-off, "%s[%d,%d]",
+	    i == 0 ? "" : ",", door_x[i]>>FRACBITS, door_y[i]>>FRACBITS);
+    }
+    off += snprintf (buf+off, 65536-off, "],\"lines\":[");
+
+    int max_lines = numlines < 1200 ? numlines : 1200;
+    for (i = 0; i < max_lines; i++)
+    {
+	off += snprintf (buf+off, 65536-off, "%s[%d,%d,%d,%d,%d]",
+	    i == 0 ? "" : ",",
+	    lines[i].v1->x>>FRACBITS, lines[i].v1->y>>FRACBITS,
+	    lines[i].v2->x>>FRACBITS, lines[i].v2->y>>FRACBITS,
+	    lines[i].special);
+    }
+    off += snprintf (buf+off, 65536-off, "]}\n");
+    Agent_Send (buf);
+    free (buf);
+}
+
+static int Agent_TraceDistance (mobj_t* mo, angle_t angle)
+{
+    int i;
+    fixed_t fz = mo->z;
+    int fa = angle >> ANGLETOFINESHIFT;
+    fixed_t cos_v = finecosine[fa];
+    fixed_t sin_v = finesine[fa];
+
+    for (i = 1; i <= 64; i++)
+    {
+	fixed_t dist = i * 16 * FRACUNIT;
+	fixed_t px = mo->x + FixedMul (cos_v, dist);
+	fixed_t py = mo->y + FixedMul (sin_v, dist);
+
+	if (!P_CheckPosition (mo, px, py))		break;
+	if (tmceilingz - tmfloorz < mo->height)	break;
+	if (tmceilingz - fz < mo->height)		break;
+	if (tmfloorz - fz > 24*FRACUNIT)		break;
+	if (tmfloorz - tmdropoffz > 24*FRACUNIT)	break;
+
+	fz = tmfloorz;
+    }
+    return (i - 1) * 16;
+}
+
 static void Agent_Observe (void)
 {
     player_t*	p = &players[consoleplayer];
     mobj_t*	mo = p->mo;
     thinker_t*	th;
-    char	buf[4096];
-    int		off, first = 1;
+    char	buf[32768];
+    int		off, first = 1, i;
 
     reg_n = 0;
     Agent_FindExit ();
@@ -286,17 +360,39 @@ static void Agent_Observe (void)
 	if (!(m->flags & (MF_COUNTKILL|MF_SPECIAL))) continue;	// monsters + pickups only (no barrels)
 	if (m->health <= 0) continue;				// skip corpses
 	d = P_AproxDistance (m->x - mo->x, m->y - mo->y);
-	if (d > AGENT_SIGHT) continue;
 	relangle = (int)(((R_PointToAngle2 (mo->x, mo->y, m->x, m->y) - mo->angle)) / (ANG45/45));
 	if (relangle > 180) relangle -= 360;
 	vis = P_CheckSight (mo, m) ? 1 : 0;
 	reg[reg_n] = m;
 	off += snprintf (buf+off, sizeof buf-off,
-	    "%s{\"id\":%d,\"type\":\"%s\",\"dist\":%d,\"rel\":%d,\"hp\":%d,\"vis\":%d}",
-	    first?"":",", reg_n, Agent_TypeName (m->type), d>>FRACBITS, relangle, m->health, vis);
+	    "%s{\"id\":%d,\"type\":\"%s\",\"dist\":%d,\"rel\":%d,\"hp\":%d,\"vis\":%d,\"x\":%d,\"y\":%d,\"z\":%d}",
+	    first?"":",", reg_n, Agent_TypeName (m->type), d>>FRACBITS, relangle, m->health, vis,
+	    m->x>>FRACBITS, m->y>>FRACBITS, m->z>>FRACBITS);
 	first = 0; reg_n++;
     }
-    off += snprintf (buf+off, sizeof buf-off, "]}\n");
+    off += snprintf (buf+off, sizeof buf-off, "]");
+
+    // Expose topological doors
+    off += snprintf (buf+off, sizeof buf-off, ",\"doors\":[");
+    for (i = 0; i < door_n; i++)
+    {
+	off += snprintf (buf+off, sizeof buf-off, "%s{\"pos\":[%d,%d],\"seen\":%d}",
+	    i == 0 ? "" : ",", door_x[i]>>FRACBITS, door_y[i]>>FRACBITS, door_seen[i]);
+    }
+    off += snprintf (buf+off, sizeof buf-off, "]");
+
+    // Expose lidar data
+    {
+	int lidar[8];
+	for (i = 0; i < 8; i++)
+	{
+	    lidar[i] = Agent_TraceDistance (mo, mo->angle + (angle_t)i * ANG45);
+	}
+	off += snprintf (buf+off, sizeof buf-off, ",\"lidar\":[%d,%d,%d,%d,%d,%d,%d,%d]",
+	    lidar[0], lidar[1], lidar[2], lidar[3], lidar[4], lidar[5], lidar[6], lidar[7]);
+    }
+
+    off += snprintf (buf+off, sizeof buf-off, "}\n");
     Agent_Send (buf);
 }
 
@@ -308,6 +404,7 @@ static void Agent_HandleLine (char* line)
     int a, b;
     while (*line == ' ') line++;
     if      (!strncmp (line, "observe", 7))      Agent_Observe ();
+    else if (!strncmp (line, "map", 3))          Agent_SendMap ();
     else if (sscanf (line, "goto %d %d", &a, &b) == 2)
 	{ in_gx = a*FRACUNIT; in_gy = b*FRACUNIT; in_have_goal = 1; in_have_face = 0; }
     else if (sscanf (line, "face %d %d", &a, &b) == 2)
@@ -549,6 +646,7 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
 
     memset (cmd, 0, sizeof(*cmd));
     Agent_Poll ();
+    if (door_wait_timer > 0) door_wait_timer--;
     // The level-end intermission (and finale) screens wait for a key -- pulse fire to
     // advance them, else the LLM marine stalls on the tally screen forever.
     if (gamestate != GS_LEVEL)
@@ -556,6 +654,16 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
     Agent_FindExit ();
     if (agent_demo) Agent_Brain ();
     if (!mo || p->playerstate != PST_LIVE) return;
+
+    // Update seen status of doors the player passes near
+    {
+	int i;
+	for (i = 0 ; i < door_n ; i++)
+	{
+	    if (P_AproxDistance (mo->x - door_x[i], mo->y - door_y[i]) < 160*FRACUNIT)
+		door_seen[i] = 1;
+	}
+    }
 
     // Target priority: an explicit `target`, else the nearest visible monster while
     // `attack` is held.  Aim there; otherwise honour an explicit face, then the goal.
@@ -572,45 +680,99 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
     }
 
     want = mo->angle;
+    if (tgt)
     {
-	fixed_t gx = 0, gy = 0;
-	int	havegoal = 0;
-	if (tgt)
-	{
-	    // Shoot only at a target we can SEE *and* that's in effective range -- never
-	    // fire blind through a wall, and don't waste shots at long range where they
-	    // miss.  Out of sight OR too far -> close in until we have a clean shot.
-	    los = P_CheckSight (mo, tgt);
-	    td  = P_AproxDistance (tgt->x - mo->x, tgt->y - mo->y);
-	    if (los && td < AGENT_FIRE_RANGE)
-		want = R_PointToAngle2 (mo->x, mo->y, tgt->x, tgt->y);	// aim + fire, hold
-	    else
-		{ gx = tgt->x; gy = tgt->y; havegoal = 1; }		// close in
-	}
-	else if (key_seek)						// fetch the needed key
-	    { gx = key_x; gy = key_y; havegoal = 1; }
-	else if (in_have_face) want = in_face;
-	else if (in_have_goal)
-	{
-	    gx = in_gx; gy = in_gy; havegoal = 1;
-	    if (P_AproxDistance (mo->x - in_gx, mo->y - in_gy) < AGENT_REACH)
-		{ in_have_goal = 0; havegoal = 0; }			// arrived
-	}
-	else if (exit_set)						// idle -> head to the exit
-	    { gx = exit_x; gy = exit_y; havegoal = 1; }
+	los = P_CheckSight (mo, tgt);
+	td  = P_AproxDistance (tgt->x - mo->x, tgt->y - mo->y);
+    }
 
-	if (havegoal)
+    // 1. Determine AIM Target (want)
+    if (tgt && los && td < AGENT_FIRE_RANGE)
+    {
+	want = R_PointToAngle2 (mo->x, mo->y, tgt->x, tgt->y);
+    }
+    else if (in_have_face)
+    {
+	want = in_face;
+    }
+
+    // 2. Determine MOVEMENT Target (gx, gy, havegoal)
+    fixed_t gx = 0, gy = 0;
+    int havegoal = 0;
+
+    if (in_have_goal)
+    {
+	gx = in_gx; gy = in_gy; havegoal = 1;
+	if (P_AproxDistance (mo->x - in_gx, mo->y - in_gy) < AGENT_REACH)
 	{
-	    // A* portal route gives the coarse next waypoint; AICoop_ChaseDir does the LOCAL
-	    // corner-rounding to it (DOOM P_NewChaseDir movement) so the marine threads walls
-	    // and doorways instead of walking straight into a corner and sticking.
-	    static chasedir_t agent_chase = { -1, 0, 0 };
-	    fixed_t wx, wy, nx, ny;
-	    if (P_AICoop_NextWaypoint (mo, gx, gy, &wx, &wy)) { nx = wx; ny = wy; }
-	    else                                              { nx = gx; ny = gy; }
-	    want  = AICoop_ChaseDir (mo, nx, ny, &agent_chase);	// marine's OWN heading state
-	    chase = 1;
+	    in_have_goal = 0;
+	    havegoal = 0;
 	}
+    }
+    else if (key_seek)
+    {
+	gx = key_x; gy = key_y; havegoal = 1;
+    }
+    else if (tgt)
+    {
+	// Close in on target if we don't have a specific path goal
+	gx = tgt->x; gy = tgt->y; havegoal = 1;
+    }
+    else if (exit_set)
+    {
+	gx = exit_x; gy = exit_y; havegoal = 1;
+    }
+
+    // 3. Process pathfinding and movement heading
+    angle_t move_angle = mo->angle;
+    if (havegoal)
+    {
+	static chasedir_t agent_chase = { -1, 0, 0 };
+	fixed_t wx, wy, nx, ny;
+	fixed_t ddx, ddy, stx, sty;
+
+	if (P_AICoop_NextWaypoint (mo, gx, gy, &wx, &wy)) { nx = wx; ny = wy; }
+	else                                              { nx = gx; ny = gy; }
+
+	// Determine stx / sty (steer target point) using buddy navigation logic:
+	if (door_wait_timer > 0 && AICoop_FindDoorAhead (mo, gx, gy, &ddx, &ddy))
+	{
+	    stx = ddx; sty = ddy; // Force steer target to the doorway midpoint
+	}
+	else if (AICoop_CanReach (mo, gx, gy, false))
+	{
+	    stx = gx; sty = gy; // Final target reachable -> head straight to it
+	}
+	else if (AICoop_FindDoorAhead (mo, gx, gy, &ddx, &ddy) && AICoop_CanReach (mo, ddx, ddy, true))
+	{
+	    stx = ddx; sty = ddy; // Doorway in reach -> head straight to it
+	}
+	else if (AICoop_CanReach (mo, nx, ny, true))
+	{
+	    stx = nx; sty = ny; // Waypoint in reach -> head straight to it
+	}
+	else
+	{
+	    // Waypoint or doorway is behind a wall/corner -> use corner-rounding ChaseDir
+	    angle_t cd = AICoop_ChaseDir (mo, nx, ny, &agent_chase);
+	    angle_t a  = cd >> ANGLETOFINESHIFT;
+	    stx = mo->x + FixedMul (96*FRACUNIT, finecosine[a]);
+	    sty = mo->y + FixedMul (96*FRACUNIT, finesine[a]);
+	}
+
+	move_angle = R_PointToAngle2 (mo->x, mo->y, stx, sty);
+	chase = 1;
+
+	// If we are NOT aiming at a monster or face target, face where we walk
+	if (!(tgt && los && td < AGENT_FIRE_RANGE) && !in_have_face)
+	    want = move_angle;
+    }
+
+    if (exit_set && P_AproxDistance (mo->x - exit_x, mo->y - exit_y) < 64*FRACUNIT)
+    {
+	want = R_PointToAngle2 (mo->x, mo->y, exit_x, exit_y);
+	cmd->buttons |= BT_USE;
+	chase = 0;
     }
 
     rem  = (short)((want - mo->angle) >> 16);
@@ -627,19 +789,26 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
 	&& !Agent_BuddyInLine (mo, tgt) && !Agent_BarrelInLine (mo, tgt))
 	cmd->buttons |= BT_ATTACK;
 
-    // Advance toward the goal / out-of-sight target once roughly facing the way.
-    if (chase && abs(rem) < (ANG45>>16))       cmd->forwardmove = AGENT_FORWARD;
+    // Move relative to current view angle (strafe + forward/back)
+    if (chase)
+    {
+	angle_t diff = move_angle - mo->angle;
+	int fa = diff >> ANGLETOFINESHIFT;
+	cmd->forwardmove = (char)((FixedMul (finecosine[fa], AGENT_FORWARD * FRACUNIT)) >> FRACBITS);
+	cmd->sidemove    = (char)(-((FixedMul (finesine[fa], AGENT_FORWARD * FRACUNIT)) >> FRACBITS));
+    }
 
     // Survival (primary directive: kill monsters, STAY ALIVE).  Keep a melee threat -- a
     // charging pinky -- at arm's length: once a visible target gets close, BACK AWAY while
-    // we keep firing (kite), and from further out when we're hurt.  This is the fix for the
-    // marine walking into a pinky's bite and dying.
+    // we keep firing (kite), and from further out when we're hurt.
     if (tgt && los)
     {
-	// Stand and fire at range (stable aim -> hits); only back away once a foe is in
-	// melee reach (128u), or from further out when we're hurt.
 	fixed_t kite = (p->health < 40) ? 384*FRACUNIT : 128*FRACUNIT;
-	if (td < kite) cmd->forwardmove = -AGENT_FORWARD;
+	if (td < kite)
+	{
+	    cmd->forwardmove = -AGENT_FORWARD;
+	    cmd->sidemove    = 0;
+	}
     }
 
     if (in_use)         { cmd->buttons |= BT_USE; in_use = 0; }
@@ -685,6 +854,13 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
 	}
 	else stuck = 0;
     }
+
+    if ((cmd->buttons & BT_USE) && havegoal)
+    {
+	fixed_t ddx, ddy;
+	if (AICoop_FindDoorAhead (mo, gx, gy, &ddx, &ddy))
+	    door_wait_timer = 30;
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -705,3 +881,80 @@ void G_AgentInit (void)
 }
 
 int G_AgentActive (void) { return agent_active; }
+
+extern byte* save_p;
+
+void G_Agent_Archive (void)
+{
+    int i;
+    // Archive intents
+    memcpy (save_p, &in_have_goal, sizeof(int)); save_p += sizeof(int);
+    memcpy (save_p, &in_gx, sizeof(fixed_t)); save_p += sizeof(fixed_t);
+    memcpy (save_p, &in_gy, sizeof(fixed_t)); save_p += sizeof(fixed_t);
+    memcpy (save_p, &in_attack, sizeof(int)); save_p += sizeof(int);
+    memcpy (save_p, &in_use, sizeof(int)); save_p += sizeof(int);
+    memcpy (save_p, &in_weapon, sizeof(int)); save_p += sizeof(int);
+    memcpy (save_p, &in_have_face, sizeof(int)); save_p += sizeof(int);
+    memcpy (save_p, &in_face, sizeof(angle_t)); save_p += sizeof(angle_t);
+    memcpy (save_p, &in_target, sizeof(int)); save_p += sizeof(int);
+
+    // Archive level exit & key seek info
+    memcpy (save_p, &exit_level, sizeof(int)); save_p += sizeof(int);
+    memcpy (save_p, &exit_x, sizeof(fixed_t)); save_p += sizeof(fixed_t);
+    memcpy (save_p, &exit_y, sizeof(fixed_t)); save_p += sizeof(fixed_t);
+    memcpy (save_p, &exit_set, sizeof(int)); save_p += sizeof(int);
+    memcpy (save_p, &key_seek, sizeof(int)); save_p += sizeof(int);
+    memcpy (save_p, &key_x, sizeof(fixed_t)); save_p += sizeof(fixed_t);
+    memcpy (save_p, &key_y, sizeof(fixed_t)); save_p += sizeof(fixed_t);
+
+    // Archive door seen statuses & waiting timer
+    memcpy (save_p, &door_wait_timer, sizeof(int)); save_p += sizeof(int);
+    memcpy (save_p, &door_n, sizeof(int)); save_p += sizeof(int);
+    for (i = 0; i < door_n; i++)
+    {
+	memcpy (save_p, &door_seen[i], sizeof(unsigned char)); save_p += sizeof(unsigned char);
+    }
+}
+
+void G_Agent_UnArchive (void)
+{
+    int i, saved_door_n = 0;
+
+    // Run FindExit to ensure static geometry (door_x/y, exit_x/y) is loaded first
+    exit_level = -1; // Force FindExit to repopulate
+    Agent_FindExit();
+
+    // Unarchive intents
+    memcpy (&in_have_goal, save_p, sizeof(int)); save_p += sizeof(int);
+    memcpy (&in_gx, save_p, sizeof(fixed_t)); save_p += sizeof(fixed_t);
+    memcpy (&in_gy, save_p, sizeof(fixed_t)); save_p += sizeof(fixed_t);
+    memcpy (&in_attack, save_p, sizeof(int)); save_p += sizeof(int);
+    memcpy (&in_use, save_p, sizeof(int)); save_p += sizeof(int);
+    memcpy (&in_weapon, save_p, sizeof(int)); save_p += sizeof(int);
+    memcpy (&in_have_face, save_p, sizeof(int)); save_p += sizeof(int);
+    memcpy (&in_face, save_p, sizeof(angle_t)); save_p += sizeof(angle_t);
+    memcpy (&in_target, save_p, sizeof(int)); save_p += sizeof(int);
+
+    // Unarchive level exit & key seek info
+    memcpy (&exit_level, save_p, sizeof(int)); save_p += sizeof(int);
+    memcpy (&exit_x, save_p, sizeof(fixed_t)); save_p += sizeof(fixed_t);
+    memcpy (&exit_y, save_p, sizeof(fixed_t)); save_p += sizeof(fixed_t);
+    memcpy (&exit_set, save_p, sizeof(int)); save_p += sizeof(int);
+    memcpy (&key_seek, save_p, sizeof(int)); save_p += sizeof(int);
+    memcpy (&key_x, save_p, sizeof(fixed_t)); save_p += sizeof(fixed_t);
+    memcpy (&key_y, save_p, sizeof(fixed_t)); save_p += sizeof(fixed_t);
+
+    // Unarchive door seen statuses & waiting timer
+    memcpy (&door_wait_timer, save_p, sizeof(int)); save_p += sizeof(int);
+    memcpy (&saved_door_n, save_p, sizeof(int)); save_p += sizeof(int);
+
+    for (i = 0; i < saved_door_n; i++)
+    {
+	unsigned char seen = 0;
+	memcpy (&seen, save_p, sizeof(unsigned char)); save_p += sizeof(unsigned char);
+	if (i < door_n)
+	{
+	    door_seen[i] = seen;
+	}
+    }
+}

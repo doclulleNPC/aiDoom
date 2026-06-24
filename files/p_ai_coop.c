@@ -666,7 +666,7 @@ static boolean AICoop_DamagingFloor (fixed_t x, fixed_t y)
 // rises more than a 24-unit step.  Rejects items behind a wall or up a ledge so
 // the bot doesn't run face-first into geometry trying to fetch them.
 //
-static boolean AICoop_CanReach (mobj_t* self, fixed_t tx, fixed_t ty, boolean avoiddmg)
+boolean AICoop_CanReach (mobj_t* self, fixed_t tx, fixed_t ty, boolean avoiddmg)
 {
     fixed_t	dx = tx - self->x;
     fixed_t	dy = ty - self->y;
@@ -1086,7 +1086,7 @@ static boolean AICoop_DoorInFront (mobj_t* mo)
 // heads INTO the doorway and just grinds the wall next to it.  Steering at the
 // door's own midpoint walks it down the corridor into the opening, where the Use
 // tap in the stuck handler opens the (unlocked) door.
-static boolean AICoop_FindDoorAhead (mobj_t* mo, fixed_t gx, fixed_t gy,
+boolean AICoop_FindDoorAhead (mobj_t* mo, fixed_t gx, fixed_t gy,
 				     fixed_t* ox, fixed_t* oy)
 {
     int		i;
@@ -1448,7 +1448,7 @@ static boolean PF_NextWaypoint (mobj_t* mo, fixed_t dx, fixed_t dy, fixed_t* wx,
     start = PF_SS (mo->x, mo->y);
     goal  = PF_SS (dx, dy);
     if (start == goal) { *wx = dx; *wy = dy; return true; }
-    if (!PF_AStar (start, goal))
+    if (!PF_AStar (goal, start))
     {
 	// No route -- the graph is built once at level start, so a door/lift/secret
 	// wall that has since OPENED isn't in it yet (it had no passable edge when
@@ -1457,23 +1457,20 @@ static boolean PF_NextWaypoint (mobj_t* mo, fixed_t dx, fixed_t dy, fixed_t* wx,
 	if (gametic - pf_lastbuild > 50)
 	{
 	    PF_Build (mo); pf_lastbuild = gametic;
-	    if (!PF_AStar (start, goal)) return false;
+	    if (!PF_AStar (goal, start)) return false;
 	}
 	else
 	    return false;
     }
 
-    // reconstruct goal -> ... -> first step (pf_path[len-1] is adjacent to start)
-    len = 0; c = goal;
-    while (c != -1 && c != start && len < PF_PATHMAX) { pf_path[len++] = c; c = pf_prev[c]; }
+    // reconstruct start -> ... -> goal (pf_path[0] is adjacent to start, pf_path[len-1] is goal)
+    len = 0; c = start;
+    while (c != -1 && c != goal && len < PF_PATHMAX) { pf_path[len++] = c; c = pf_prev[c]; }
     if (len == 0) { *wx = dx; *wy = dy; return true; }
 
-    // Collect PORTAL points along the route (start -> n1 -> ... -> goal).  A portal
-    // is a walkable point on a sub-sector boundary, so -- unlike a sub-sector
-    // CENTROID, which can sit behind a wall and made the buddy grind/chase it -- it
-    // is always reachable, and the buddy can steer straight to it.
+    // Collect PORTAL points along the route (start -> n1 -> ... -> goal).
     np = 0; prev = start;
-    for (i = len - 1; i >= 0; i--)			// path order: start -> goal
+    for (i = 0; i < len; i++)			// path order: start -> goal
     {
 	fixed_t qx, qy;
 	if (PF_Portal (prev, pf_path[i], &qx, &qy)) { portx[np] = qx; porty[np] = qy; np++; }

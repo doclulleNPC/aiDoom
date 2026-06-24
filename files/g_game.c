@@ -1362,6 +1362,9 @@ void G_DoLoadGame (void)
     if (save_p - savebuffer < length)
 	P_AICoop_UnArchiveTrail ();
 
+    if (save_p - savebuffer < length)
+	G_Agent_UnArchive ();
+
     // done
     Z_Free (savebuffer);
  
@@ -1428,6 +1431,7 @@ void G_DoSaveGame (void)
     *save_p++ = 0x1d;		// consistancy marker
 
     P_AICoop_ArchiveTrail ();	// buddy breadcrumb trail (after the marker -> back-compatible)
+    G_Agent_Archive ();         // agent state (after trail -> back-compatible)
 
     length = save_p - savebuffer;
     if (length > SAVEGAMESIZE) 
