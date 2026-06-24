@@ -566,14 +566,38 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
 
 	if (havegoal)
 	{
-	    // A* portal route gives the coarse next waypoint; AICoop_ChaseDir does the LOCAL
-	    // corner-rounding to it (DOOM P_NewChaseDir movement) so the marine threads walls
-	    // and doorways instead of walking straight into a corner and sticking.
-	    static chasedir_t agent_chase = { -1, 0, 0 };
-	    fixed_t wx, wy, nx, ny;
-	    if (P_AICoop_NextWaypoint (mo, gx, gy, &wx, &wy)) { nx = wx; ny = wy; }
-	    else                                              { nx = gx; ny = gy; }
-	    want  = AICoop_ChaseDir (mo, nx, ny, &agent_chase);	// marine's OWN heading state
+	    // Buddy-style steering: aim at a POINT, never the raw 8-dir.  CRUCIAL: recompute
+	    // that point only ~3x/s (navtimer), NOT every tic -- the BSP pathfinder returns
+	    // slightly different next-waypoints on consecutive calls, and steering at a target
+	    // that jumps each tic made the marine spin in place.  Hold the steer point between
+	    // refreshes; refresh when it goes stale or we reach it.  When the waypoint is a
+	    // clear straight shot, steer right at it; only behind a wall/corner fall back to
+	    // AICoop_ChaseDir and project a steer point 96u ahead.
+	    static int		navtimer;
+	    static fixed_t	wpx, wpy;	// cached A* waypoint
+	    static chasedir_t	agent_chase = { -1, 0, 0 };
+	    fixed_t		stx, sty;
+	    // Recompute only the (expensive) A* WAYPOINT ~3x/s; the pathfinder jitters between
+	    // calls, so caching it stops the steer target from flapping each tic.
+	    if (--navtimer <= 0)
+	    {
+		fixed_t wx, wy;
+		navtimer = 10;
+		if (P_AICoop_NextWaypoint (mo, gx, gy, &wx, &wy)) { wpx = wx; wpy = wy; }
+		else                                              { wpx = gx; wpy = gy; }
+	    }
+	    // But recompute the STEER POINT every tic: clear shot -> head straight at the
+	    // waypoint; behind a wall -> AICoop_ChaseDir (its 8-dir holds for ~8 tics, so the
+	    // 96u-ahead point glides forward WITH us instead of being a fixed dot we overshoot
+	    // and then spin back toward).
+	    if (AICoop_CanReach (mo, wpx, wpy, false)) { stx = wpx; sty = wpy; }
+	    else
+	    {
+		angle_t a = AICoop_ChaseDir (mo, wpx, wpy, &agent_chase) >> ANGLETOFINESHIFT;
+		stx = mo->x + FixedMul (96*FRACUNIT, finecosine[a]);
+		sty = mo->y + FixedMul (96*FRACUNIT, finesine[a]);
+	    }
+	    want  = R_PointToAngle2 (mo->x, mo->y, stx, sty);
 	    chase = 1;
 	}
     }
@@ -592,16 +616,12 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
 	&& !Agent_BuddyInLine (mo, tgt) && !Agent_BarrelInLine (mo, tgt))
 	cmd->buttons |= BT_ATTACK;
 
-    // Move toward the (walkable) ChaseDir heading by DECOMPOSING it into forward + strafe
-    // relative to our facing -- so the marine slides exactly along the A*/corner-rounded
-    // route immediately, instead of only walking forward after it finishes turning (which
-    // made it plough into walls mid-turn).  Same scheme the buddy uses.
-    if (chase)
-    {
-	angle_t rel = (want - mo->angle) >> ANGLETOFINESHIFT;
-	cmd->forwardmove =  (signed char)(FixedMul (AGENT_FORWARD*FRACUNIT, finecosine[rel]) >> FRACBITS);
-	cmd->sidemove    = -(signed char)(FixedMul (AGENT_FORWARD*FRACUNIT, finesine[rel])   >> FRACBITS);
-    }
+    // Turn toward the steer point, and walk FORWARD once roughly facing it (within ~60 deg).
+    // Plain forward motion -- NOT a full-speed forward+strafe decomposition: strafing drove
+    // the marine in a circle around the steer point (which sits only ~96u ahead), so it
+    // orbited and spun instead of advancing.  Turning to face first keeps the heading stable.
+    if (chase && abs(rem) < 11000)
+	cmd->forwardmove = AGENT_FORWARD;
 
     if (in_use)         { cmd->buttons |= BT_USE; in_use = 0; }
     if (in_weapon >= 0) { cmd->buttons |= BT_CHANGE | ((in_weapon << BT_WEAPONSHIFT) & BT_WEAPONMASK);
@@ -623,13 +643,12 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
 	    lastx = mo->x; lasty = mo->y;
 	    if (stuck > 5)
 	    {
-		// Pinned (the reflex heads straight at the waypoint, no corner-rounding):
-		// SWEEP the view one way while pushing forward + strafing so the marine
-		// rotates until the gap opens; flip the sweep every ~32 tics.
-		cmd->angleturn   = (stuck & 32) ?  AGENT_TURN : -AGENT_TURN;
-		cmd->forwardmove = AGENT_FORWARD;
-		cmd->sidemove    = (stuck & 32) ?  30 : -30;
-		cmd->buttons    |= BT_USE;	// in case a shut door is pinning us
+	    	// Pinned: strafe-wiggle to slip past the obstacle and tap USE in case it's
+	    	// a shut door.  Keep the navigation turn (no angleturn override) -- the old
+	    	// ramped sweep just span the marine in place.
+	    	cmd->sidemove     = ((stuck / 16) & 1) ? 45 : -45;
+	    	if (!cmd->forwardmove) cmd->forwardmove = AGENT_FORWARD;
+	    	cmd->buttons     |= BT_USE;
 	    }
 	}
 	else stuck = 0;

@@ -108,6 +108,9 @@ boolean P_AICoop_NextWaypoint (struct mobj_s* mo, fixed_t dx, fixed_t dy, fixed_
 // don't clobber each other); pass NULL for a shared internal default.
 typedef struct { int dir, count, flip; } chasedir_t;
 angle_t AICoop_ChaseDir (struct mobj_s* mo, fixed_t gx, fixed_t gy, chasedir_t* st);
+// True if (tx,ty) is reachable from self in a straight walk (no wall/ledge between).
+// Used to choose smooth straight-line steering vs the ChaseDir corner-rounding fallback.
+boolean AICoop_CanReach (struct mobj_s* self, fixed_t tx, fixed_t ty, boolean avoiddmg);
 
 // Savegame persistence for the breadcrumb trail.  Written/read AFTER the savegame
 // consistency marker (g_game.c), so older saves without the block still load.

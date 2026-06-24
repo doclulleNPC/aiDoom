@@ -666,7 +666,7 @@ static boolean AICoop_DamagingFloor (fixed_t x, fixed_t y)
 // rises more than a 24-unit step.  Rejects items behind a wall or up a ledge so
 // the bot doesn't run face-first into geometry trying to fetch them.
 //
-static boolean AICoop_CanReach (mobj_t* self, fixed_t tx, fixed_t ty, boolean avoiddmg)
+boolean AICoop_CanReach (mobj_t* self, fixed_t tx, fixed_t ty, boolean avoiddmg)
 {
     fixed_t	dx = tx - self->x;
     fixed_t	dy = ty - self->y;
