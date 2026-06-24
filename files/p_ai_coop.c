@@ -1477,12 +1477,6 @@ static boolean PF_NextWaypoint (mobj_t* mo, fixed_t dx, fixed_t dy, fixed_t* wx,
 	prev = pf_path[i];
     }
 
-    // Skip the first portal if we are already close to it to ensure we cross it and advance
-    if (np > 0 && P_AproxDistance (mo->x - portx[0], mo->y - porty[0]) < 32*FRACUNIT)
-    {
-	if (np > 1) { *wx = portx[1]; *wy = porty[1]; return true; }
-	else        { *wx = dx;       *wy = dy;       return true; }
-    }
 
     // Funnel-lite string pull: steer to the FURTHEST point we can straight-walk to --
     // the goal itself if it's in sight, else the furthest reachable portal, else the

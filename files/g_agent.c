@@ -845,11 +845,34 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
 	cmd->sidemove = 0;
     }
 
-    if (exit_set && P_AproxDistance (mo->x - exit_x, mo->y - exit_y) < 64*FRACUNIT)
+    if (exit_set)
     {
-	want = R_PointToAngle2 (mo->x, mo->y, exit_x, exit_y);
-	cmd->buttons |= BT_USE;
-	chase = 0;
+	int i;
+	fixed_t bestd = 512*FRACUNIT;
+	fixed_t mx = exit_x, my = exit_y;
+	for (i = 0; i < numlines; i++)
+	{
+	    int sp = lines[i].special;
+	    if (sp==11 || sp==51 || sp==52 || sp==124)
+	    {
+		fixed_t lx = (lines[i].v1->x + lines[i].v2->x) >> 1;
+		fixed_t ly = (lines[i].v1->y + lines[i].v2->y) >> 1;
+		fixed_t d = P_AproxDistance (mo->x - lx, mo->y - ly);
+		if (d < bestd)
+		{
+		    bestd = d;
+		    mx = lx;
+		    my = ly;
+		}
+	    }
+	}
+
+	if (bestd < 56*FRACUNIT)
+	{
+	    want = R_PointToAngle2 (mo->x, mo->y, mx, my);
+	    cmd->buttons |= BT_USE;
+	    chase = 0;
+	}
     }
 
     rem  = (short)((want - mo->angle) >> 16);
@@ -917,7 +940,7 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
 	    if (P_AproxDistance (mo->x - lastx, mo->y - lasty) < 3*FRACUNIT) stuck++;
 	    else                                                            stuck = 0;
 	    lastx = mo->x; lasty = mo->y;
-	    if (stuck > 5)
+	    if (stuck > 30)
 	    {
 		// Pinned (the reflex heads straight at the waypoint, no corner-rounding):
 		// SWEEP the view one way while pushing forward + strafing so the marine
@@ -931,11 +954,9 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
 	else stuck = 0;
     }
 
-    if ((cmd->buttons & BT_USE) && havegoal)
+    if ((cmd->buttons & BT_USE) && Agent_UseAhead (mo))
     {
-	fixed_t ddx, ddy;
-	if (AICoop_FindDoorAhead (mo, gx, gy, &ddx, &ddy))
-	    door_wait_timer = 60;
+	door_wait_timer = 80;
     }
 }
 
