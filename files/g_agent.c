@@ -457,9 +457,29 @@ static boolean Agent_FindKey (int color, fixed_t* kx, fixed_t* ky)
 // ---------------------------------------------------------------------------
 static void Agent_Brain (void)
 {
-    // Engage what we can see; navigation is left to the idle exit-seek in the reflex
-    // (head to the level exit), so the scripted marine actually progresses through the map.
+    // Engage what we can see, and EXPLORE: every ~1.8 s pick a fresh random wander goal
+    // (the reflex A*-routes to it).  Random exploration covers the map -- threading doors
+    // and rooms -- and actually finishes levels, where a fixed beeline at the exit just
+    // pins on the first wall/ledge between here and it.
+    static unsigned seed = 1;			// own RNG -- never touch the playsim's
     in_attack = 1;
+    if (!in_have_goal && (leveltime & 63) == 0)
+    {
+	mobj_t* mo = players[consoleplayer].mo;
+	if (mo)
+	{
+	    int spread, fa;
+	    // Bias the random heading toward the level EXIT (wide +/-128 deg spread), so the
+	    // marine explores but TRENDS toward the exit instead of wandering off at random.
+	    angle_t base = exit_set ? R_PointToAngle2 (mo->x, mo->y, exit_x, exit_y) : mo->angle;
+	    seed = seed*1103515245u + 12345u;
+	    spread = (int)((seed >> 16) & 255) - 128;	// -128..+127 deg off the exit direction
+	    fa = (base + (angle_t)(spread * (ANG45/45))) >> ANGLETOFINESHIFT;
+	    in_gx = mo->x + FixedMul (512*FRACUNIT, finecosine[fa]);
+	    in_gy = mo->y + FixedMul (512*FRACUNIT, finesine[fa]);
+	    in_have_goal = 1;
+	}
+    }
 }
 
 // ---------------------------------------------------------------------------
