@@ -10,7 +10,7 @@
 //	Sprites: hereticstuff.wad (renamed H*).  Sounds: DOOM SFX reused for now.
 //
 //	Monsters: Mummy, Sabreclaw, Gargoyle, Knight (melee), + Weredragon, Disciple,
-//	Ophidian (ranged w/ projectiles).  Bosses (Maulotaur, Iron Lich, D'Sparil) TODO.
+//	Ophidian (ranged), + Maulotaur (charge/mace miniboss).  Iron Lich, D'Sparil TODO.
 //
 //-----------------------------------------------------------------------------
 
@@ -163,6 +163,53 @@ void A_SnakeAttack (mobj_t* actor)
 	return;
     S_StartSound (actor, actor->info->attacksound);
     P_SpawnMissile (actor, actor->target, MT_HSNAKEPRO);
+}
+
+// ---- Maulotaur (minotaur miniboss): swing + slam-charge + mace ball --------
+#define MNTR_CHARGE_SPEED (13*FRACUNIT)
+
+void A_MinotaurAtk1 (mobj_t* actor)			// melee hammer swing
+{
+    if (!actor->target)
+	return;
+    S_StartSound (actor, actor->info->attacksound);
+    if (P_CheckMeleeRange (actor))
+	P_DamageMobj (actor->target, actor, actor, HITDICE (4));
+}
+
+// Mid-range: maybe SLAM-CHARGE the target.  Set MF_SKULLFLY + momentum and switch to the
+// charge state; the engine's skull-fly path (p_map.c) carries it, damages on contact and
+// reverts to spawnstate on the slam -- no Heretic special1 charge-timer needed.
+void A_MinotaurDecide (mobj_t* actor)
+{
+    mobj_t*	t = actor->target;
+    angle_t	an;
+    fixed_t	dist;
+    if (!t)
+	return;
+    dist = P_AproxDistance (actor->x - t->x, actor->y - t->y);
+    if (dist > 64*FRACUNIT && dist < 8*64*FRACUNIT && P_Random () < 150)
+    {
+	S_StartSound (actor, actor->info->seesound);
+	A_FaceTarget (actor);
+	actor->flags |= MF_SKULLFLY;
+	an = actor->angle >> ANGLETOFINESHIFT;
+	actor->momx = FixedMul (MNTR_CHARGE_SPEED, finecosine[an]);
+	actor->momy = FixedMul (MNTR_CHARGE_SPEED, finesine[an]);
+	P_SetMobjState (actor, S_HMIN_ATK4_1);
+    }
+}
+
+void A_MinotaurCharge (mobj_t* actor) { (void)actor; }	// engine skull-fly does the slam
+
+void A_MinotaurAtk2 (mobj_t* actor)			// melee, else hurl a mace ball
+{
+    if (!actor->target || (actor->flags & MF_SKULLFLY))	// (mid-charge -> no throw)
+	return;
+    S_StartSound (actor, actor->info->attacksound);
+    if (P_CheckMeleeRange (actor))
+	{ P_DamageMobj (actor->target, actor, actor, HITDICE (5)); return; }
+    P_SpawnMissile (actor, actor->target, MT_HMINOTAURFX);
 }
 
 // ---------------------------------------------------------------------------
@@ -517,6 +564,68 @@ void Heretic_Init (void)
     m->speed = 14*FRACUNIT; m->radius = 12*FRACUNIT; m->height = 8*FRACUNIT; m->mass = 100;
     m->damage = 3; m->activesound = sfx_None;
     m->flags = MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY; m->raisestate = S_NULL;
+
+    // ====================================================================
+    // Maulotaur (minotaur): hammer swing + slam-charge + mace ball -- a miniboss (3000 hp)
+    // ====================================================================
+    ST (S_HMIN_LOOK1, SPR_HMIN, 0, 10, (actionf_p1)A_Look,          S_HMIN_LOOK2);
+    ST (S_HMIN_LOOK2, SPR_HMIN, 1, 10, (actionf_p1)A_Look,          S_HMIN_LOOK1);
+    ST (S_HMIN_WALK1, SPR_HMIN, 0,  5, (actionf_p1)A_Chase,         S_HMIN_WALK2);
+    ST (S_HMIN_WALK2, SPR_HMIN, 1,  5, (actionf_p1)A_Chase,         S_HMIN_WALK3);
+    ST (S_HMIN_WALK3, SPR_HMIN, 2,  5, (actionf_p1)A_Chase,         S_HMIN_WALK4);
+    ST (S_HMIN_WALK4, SPR_HMIN, 3,  5, (actionf_p1)A_Chase,         S_HMIN_WALK1);
+    ST (S_HMIN_ATK1_1, SPR_HMIN, 21, 10, (actionf_p1)A_FaceTarget,  S_HMIN_ATK1_2);
+    ST (S_HMIN_ATK1_2, SPR_HMIN, 22,  7, (actionf_p1)A_FaceTarget,  S_HMIN_ATK1_3);
+    ST (S_HMIN_ATK1_3, SPR_HMIN, 23, 12, (actionf_p1)A_MinotaurAtk1,S_HMIN_WALK1);
+    ST (S_HMIN_ATK2_1, SPR_HMIN, 21, 10, (actionf_p1)A_MinotaurDecide, S_HMIN_ATK2_2);
+    ST (S_HMIN_ATK2_2, SPR_HMIN, 24,  4, (actionf_p1)A_FaceTarget,  S_HMIN_ATK2_3);
+    ST (S_HMIN_ATK2_3, SPR_HMIN, 25,  9, (actionf_p1)A_MinotaurAtk2,S_HMIN_WALK1);
+    ST (S_HMIN_ATK4_1, SPR_HMIN, 20,  2, (actionf_p1)A_MinotaurCharge, S_HMIN_ATK4_1);
+    ST (S_HMIN_PAIN1, SPR_HMIN, 4,  3, NULL,                        S_HMIN_PAIN2);
+    ST (S_HMIN_PAIN2, SPR_HMIN, 4,  6, (actionf_p1)A_Pain,          S_HMIN_WALK1);
+    ST (S_HMIN_DIE1,  SPR_HMIN, 5,  6, NULL,                        S_HMIN_DIE2);
+    ST (S_HMIN_DIE2,  SPR_HMIN, 6,  5, NULL,                        S_HMIN_DIE3);
+    ST (S_HMIN_DIE3,  SPR_HMIN, 7,  6, (actionf_p1)A_Scream,        S_HMIN_DIE4);
+    ST (S_HMIN_DIE4,  SPR_HMIN, 8,  5, NULL,                        S_HMIN_DIE5);
+    ST (S_HMIN_DIE5,  SPR_HMIN, 9,  6, NULL,                        S_HMIN_DIE6);
+    ST (S_HMIN_DIE6,  SPR_HMIN, 10, 5, NULL,                        S_HMIN_DIE7);
+    ST (S_HMIN_DIE7,  SPR_HMIN, 11, 6, NULL,                        S_HMIN_DIE8);
+    ST (S_HMIN_DIE8,  SPR_HMIN, 12, 5, (actionf_p1)A_Fall,          S_HMIN_DIE9);
+    ST (S_HMIN_DIE9,  SPR_HMIN, 13, 6, NULL,                        S_HMIN_DIE10);
+    ST (S_HMIN_DIE10, SPR_HMIN, 14, 5, NULL,                        S_HMIN_DIE11);
+    ST (S_HMIN_DIE11, SPR_HMIN, 15, 6, NULL,                        S_HMIN_DIE12);
+    ST (S_HMIN_DIE12, SPR_HMIN, 16, 5, NULL,                        S_HMIN_DIE13);
+    ST (S_HMIN_DIE13, SPR_HMIN, 17, 6, NULL,                        S_HMIN_DIE14);
+    ST (S_HMIN_DIE14, SPR_HMIN, 18, 5, NULL,                        S_HMIN_DIE15);
+    ST (S_HMIN_DIE15, SPR_HMIN, 19, -1, NULL,                       S_NULL);
+    ST (S_HMNA1, SPR_HMNA, 32768, 6, NULL, S_HMNA2);
+    ST (S_HMNA2, SPR_HMNA, 32769, 6, NULL, S_HMNA1);
+    ST (S_HMNAX1, SPR_HMNA, 32770, 5, NULL, S_HMNAX2);
+    ST (S_HMNAX2, SPR_HMNA, 32771, 5, NULL, S_HMNAX3);
+    ST (S_HMNAX3, SPR_HMNA, 32772, 5, NULL, S_HMNAX4);
+    ST (S_HMNAX4, SPR_HMNA, 32773, 5, NULL, S_HMNAX5);
+    ST (S_HMNAX5, SPR_HMNA, 32774, 5, NULL, S_HMNAX6);
+    ST (S_HMNAX6, SPR_HMNA, 32775, 5, NULL, S_NULL);
+
+    m = &mobjinfo[MT_HMINOTAUR];
+    m->doomednum = -1;        m->spawnstate  = S_HMIN_LOOK1; m->spawnhealth = 3000;
+    m->seestate  = S_HMIN_WALK1; m->seesound  = sfx_kntsit;  m->reactiontime = 8;
+    m->attacksound = sfx_firsht; m->painstate = S_HMIN_PAIN1; m->painchance = 25;
+    m->painsound = sfx_dmpain; m->meleestate = S_HMIN_ATK1_1; m->missilestate = S_HMIN_ATK2_1;
+    m->deathstate = S_HMIN_DIE1; m->xdeathstate = S_NULL;    m->deathsound = sfx_kntdth;
+    m->speed = 16; m->radius = 28*FRACUNIT; m->height = 100*FRACUNIT; m->mass = 800;
+    m->damage = 0; m->activesound = sfx_dmact;
+    m->flags = MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL|MF_DROPOFF; m->raisestate = S_NULL;
+
+    m = &mobjinfo[MT_HMINOTAURFX];
+    m->doomednum = -1;        m->spawnstate  = S_HMNA1;      m->spawnhealth = 1000;
+    m->seestate  = S_NULL;       m->seesound  = sfx_None;    m->reactiontime = 8;
+    m->attacksound = sfx_None;   m->painstate = S_NULL;      m->painchance = 0;
+    m->painsound = sfx_None;     m->meleestate = S_NULL;     m->missilestate = S_NULL;
+    m->deathstate = S_HMNAX1;    m->xdeathstate = S_NULL;    m->deathsound = sfx_firxpl;
+    m->speed = 20*FRACUNIT; m->radius = 10*FRACUNIT; m->height = 6*FRACUNIT; m->mass = 100;
+    m->damage = 4; m->activesound = sfx_None;
+    m->flags = MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY; m->raisestate = S_NULL;
 }
 
 // hereticstuff.wad sprites loaded?  (the mummy's first frame lump)
@@ -535,6 +644,7 @@ int Heretic_TypeByName (const char* name)
     if (!strcmp (name, "beast") || !strcmp (name, "weredragon")) return MT_HBEAST;
     if (!strcmp (name, "wizard")|| !strcmp (name, "disciple"))  return MT_HWIZARD;
     if (!strcmp (name, "snake") || !strcmp (name, "ophidian"))  return MT_HSNAKE;
+    if (!strcmp (name, "maulotaur")||!strcmp (name, "minotaur")) return MT_HMINOTAUR;
     return -1;
 }
 

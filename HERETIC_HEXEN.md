@@ -54,7 +54,9 @@ doom2stuff. The bosses (brain/spawner) are still TODO.
   wad; all spawn, render, fight, die (the knight throws + the axe flies/explodes).
 
 ### Remaining (each monster = the same pattern; weapons are a bigger stage)
-- Bosses still TODO: **Maulotaur** (charge + fire/mace), **Iron Lich** (fire column /
+- **Maulotaur DONE**: hammer swing + slam-charge (MF_SKULLFLY, engine-driven) + mace
+  ball (MT_HMINOTAURFX); 3000 hp miniboss, in the director's exit-guard pool.
+- Bosses still TODO: **Iron Lich** (fire column /
   ice / whirlwind), **D'Sparil** (2-phase: rides a serpent, then teleporting sorcerer) --
   each needs multiple projectile actors + custom A_* (the big stage).
 - Authentic Heretic **sounds** (currently DOOM SFX are reused): extend `sfxenum_t` +

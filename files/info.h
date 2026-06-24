@@ -179,6 +179,8 @@ typedef enum
     SPR_HWIB,		// disciple fireball
     SPR_HSNK,		// ophidian (snake)
     SPR_HSNB,		// ophidian projectile
+    SPR_HMIN,		// maulotaur (minotaur)
+    SPR_HMNA,		// maulotaur mace ball
     // Freedoom DOOM2-exclusive monsters (renamed sprites from freedoom2stuff.wad, so
     // they never collide with / override DOOM or doom2stuff).  See files/freedoom.c.
     SPR_FSKE,		// revenant      (doom2 SKEL)
@@ -1226,6 +1228,17 @@ typedef enum
     S_HSNK_DIE1, S_HSNK_DIE2, S_HSNK_DIE3, S_HSNK_DIE4, S_HSNK_DIE5, S_HSNK_DIE6, S_HSNK_DIE7, S_HSNK_DIE8, S_HSNK_DIE9, S_HSNK_DIE10,
     S_HSNB1, S_HSNB2, S_HSNB3, S_HSNB4,
     S_HSNBX1, S_HSNBX2, S_HSNBX3, S_HSNBX4, S_HSNBX5,
+    // ---- Maulotaur (minotaur) + mace ball ----
+    S_HMIN_LOOK1, S_HMIN_LOOK2,
+    S_HMIN_WALK1, S_HMIN_WALK2, S_HMIN_WALK3, S_HMIN_WALK4,
+    S_HMIN_ATK1_1, S_HMIN_ATK1_2, S_HMIN_ATK1_3,
+    S_HMIN_ATK2_1, S_HMIN_ATK2_2, S_HMIN_ATK2_3,
+    S_HMIN_ATK4_1,
+    S_HMIN_PAIN1, S_HMIN_PAIN2,
+    S_HMIN_DIE1, S_HMIN_DIE2, S_HMIN_DIE3, S_HMIN_DIE4, S_HMIN_DIE5, S_HMIN_DIE6, S_HMIN_DIE7, S_HMIN_DIE8,
+    S_HMIN_DIE9, S_HMIN_DIE10, S_HMIN_DIE11, S_HMIN_DIE12, S_HMIN_DIE13, S_HMIN_DIE14, S_HMIN_DIE15,
+    S_HMNA1, S_HMNA2,
+    S_HMNAX1, S_HMNAX2, S_HMNAX3, S_HMNAX4, S_HMNAX5, S_HMNAX6,
     // Freedoom: a reserved block of state slots that freedoom.c fills at runtime by
     // CLONING each DOOM2 monster's state graph (with the sprite remapped).  512 covers
     // ~9 monsters + 4 projectiles (~340 states) with headroom.  See files/freedoom.c.
@@ -1401,6 +1414,8 @@ typedef enum {
     MT_HWIZFX,		// disciple fireball
     MT_HSNAKE,		// Heretic ophidian (snake)
     MT_HSNAKEPRO,	// ophidian projectile
+    MT_HMINOTAUR,	// Heretic maulotaur (minotaur miniboss)
+    MT_HMINOTAURFX,	// maulotaur mace ball
     // Freedoom DOOM2-exclusive monsters -- runtime clones of the DOOM2 actors with
     // renamed sprites (files/freedoom.c).  Projectiles first (monsters reference them).
     MT_FD_TRACER,	// revenant homing missile

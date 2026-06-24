@@ -58,6 +58,7 @@ char *sprnames[NUMSPRITES] = {
     "HKNI",		// Heretic undead warrior (knight)
     "HKAX",		// Heretic knight's thrown axe
     "HBEA","HBEB","HWIZ","HWIB","HSNK","HSNB",	// weredragon / disciple / ophidian + projectiles
+    "HMIN","HMNA",				// maulotaur + mace ball
     "FSKE","FFAT","FVIL","FBSP","FCPO","FBO2","FPAI","FSSW","FKEE",	// Freedoom monsters
     "FFAB","FFBX","FMAN","FFIR","FAPL","FAPB"				// Freedoom projectiles
 };
