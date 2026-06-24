@@ -55,7 +55,7 @@
 
 // --- Layout (BASE = 320x200 reference, scaled at runtime) ---
 #define WINW 560
-#define WINH 470
+#define WINH 492
 #define PAD 12
 
 // Vertical bands, BASE pixels (we scale 2x for 320->640 feel on a 560px wide
@@ -81,7 +81,8 @@
 #define IWAD_Y    310
 #define IWAD_H    22
 #define IWAD_DD_H 80			// dropdown open height
-#define LAUNCH_Y  420
+#define PWAD_Y    338			// extra PWAD selector (one row below IWAD)
+#define LAUNCH_Y  442
 #define LAUNCH_H  34
 
 // Colours (RGB).
@@ -171,6 +172,15 @@ static iwad_t  iwads[MAX_IWADS];
 static int     iwad_count;
 static int     iwad_sel;			// index into iwads[]
 
+// PWAD list: every other .wad in the wad dirs (NOT a known IWAD, NOT aidoom.wad),
+// offered as an optional extra "-file" load.  pwads[0] is always "(none)".
+#define MAX_PWADS 48
+static char    pwads[MAX_PWADS][64];
+static int     pwad_count;
+static int     pwad_sel;			// 0 = none, else index into pwads[]
+static int     pwad_dd_open;			// PWAD dropdown open (mutually exclusive w/ IWAD)
+static int     pwad_scroll;			// first visible row when the open list overflows
+
 // Mode selections.
 static int     buddy_mode = BUDDY_RULE;	// default: buddy on (rule-based)
 static int     mon_mode   = MON_L4D;     // default: L4D pacing
@@ -195,6 +205,7 @@ static void rect(float x, float y, float w, float h, Uint8 r, Uint8 g, Uint8 b);
 static void draw_rect_outline(float x, float y, float w, float h, Uint8 r, Uint8 g, Uint8 b);
 
 static void scan_iwads(void);
+static void scan_pwads(void);
 static const char* iwad_label(int idx);
 static int  is_known_iwad(const char* filename);
 
@@ -207,6 +218,8 @@ static void draw_mode_row(float y, const char* title,
 static int  pick_mode(float* hitboxes, int n_opts, int mouse_px, int mouse_py);
 static void draw_iwad_dropdown(void);
 static int  hit_iwad_dropdown(int mouse_px, int mouse_py);
+static void draw_pwad_dropdown(void);
+static int  hit_pwad_dropdown(int mouse_px, int mouse_py);
 static void draw_launch_button(void);
 static int  hit_launch_button(int mouse_px, int mouse_py);
 
@@ -472,6 +485,43 @@ static void scan_iwads(void)
         if (iwads[i].detected) { iwad_sel = i; break; }
 }
 
+// ----------------------------------------------------------------- pwad scan
+// Every .wad in the wad dirs that ISN'T a known IWAD and isn't our own aidoom.wad
+// voice asset -- offered as an optional extra "-file" load (freedoomstuff,
+// hereticstuff, hexenstuff, or any user PWAD dropped into run/ID0).
+static void pwad_add(const char* fname)
+{
+    size_t L = fname ? strlen(fname) : 0;
+    if (pwad_count >= MAX_PWADS || L < 5 || L >= 60) return;
+    if (strcasecmp(fname + L - 4, ".wad") != 0)  return;    // .wad only
+    if (is_known_iwad(fname))                     return;   // IWADs are the OTHER dropdown
+    if (strcasecmp(fname, "aidoom.wad") == 0)     return;   // our voice PWAD -- never list it
+    for (int i=1; i<pwad_count; i++)                        // de-dupe (same name in two dirs)
+        if (strcasecmp(pwads[i], fname) == 0) return;
+    snprintf(pwads[pwad_count], sizeof pwads[0], "%s", fname);
+    pwad_count++;
+}
+
+static void scan_pwads(void)
+{
+    pwad_count = 0;
+    snprintf(pwads[pwad_count++], sizeof pwads[0], "(none)");   // index 0 = no extra PWAD
+
+    char id0[300];
+    snprintf(id0, sizeof id0, "%s/ID0", run_dir());
+    const char* dirs[2] = { id0, run_dir() };
+    const char* pats[2] = { "*.wad", "*.WAD" };		// glob both cases (Linux is case-sensitive)
+    for (int d = 0; d < 2; d++)
+        for (int p = 0; p < 2; p++) {
+            int count = 0;
+            char** files = SDL_GlobDirectory(dirs[d], pats[p], 0, &count);
+            if (!files) continue;
+            for (int i = 0; i < count; i++) pwad_add(files[i]);
+            SDL_free(files);
+        }
+    if (pwad_sel >= pwad_count) pwad_sel = 0;
+}
+
 // ----------------------------------------------------------------- banner
 //
 // "DOOM" banner drawn as text scaled 4x, baseline-aligned to the bottom of
@@ -631,6 +681,66 @@ static int hit_iwad_dropdown(int mouse_px, int mouse_py)
     return -1;
 }
 
+// ----------------------------------------------------------------- pwad dropdown
+// Mirror of the IWAD dropdown for the optional extra "-file" PWAD.  pwads[0] is
+// "(none)"; a non-zero pick adds "-file <name>" to the launch command.
+#define PWAD_SHOW 6			// rows shown open (fits within WINH)
+static void draw_pwad_dropdown(void)
+{
+    float x = PAD, y = PWAD_Y, w = WINW - 2*PAD, h = IWAD_H;
+    rect(x, y, w, h, COL_DD_BG);
+    draw_rect_outline(x, y, w, h, COL_DD_BD_R, COL_DD_BD_G, COL_DD_BD_B);
+
+    text(x + 8, y + (h - FONT_CH)/2, "PWAD:", COL_DIM);
+    text(x + 8 + 5*FONT_CW + 6, y + (h - FONT_CH)/2,
+         pwads[pwad_sel],
+         pwad_sel ? 255 : 150, pwad_sel ? 230 : 150, pwad_sel ? 100 : 150);
+
+    const char* arrow = pwad_dd_open ? "^" : "v";
+    text(x + w - FONT_CW - 6, y + (h - FONT_CH)/2, arrow, COL_DIM);
+
+    if (pwad_dd_open && pwad_count > 0) {
+        float dy = y + h;
+        int max_scroll = pwad_count - PWAD_SHOW; if (max_scroll < 0) max_scroll = 0;
+        if (pwad_scroll > max_scroll) pwad_scroll = max_scroll;
+        if (pwad_scroll < 0) pwad_scroll = 0;
+        int show = pwad_count < PWAD_SHOW ? pwad_count : PWAD_SHOW;
+        for (int i=0; i<show; i++) {
+            int idx = pwad_scroll + i;
+            float oy = dy + i * IWAD_H;
+            int hover = (mouse_x >= x && mouse_x <= x+w &&
+                         mouse_y >= oy && mouse_y <= oy + IWAD_H);
+            rect(x, oy, w, IWAD_H, hover ? COL_DD_HOV : COL_DD_BG);
+            draw_rect_outline(x, oy, w, IWAD_H, COL_DD_BD_R, COL_DD_BD_G, COL_DD_BD_B);
+            text(x + 8, oy + (IWAD_H - FONT_CH)/2, pwads[idx],
+                 idx==pwad_sel ? 255 : 210, idx==pwad_sel ? 230 : 210, idx==pwad_sel ? 100 : 200);
+            // scroll hints (mouse-wheel scrolls when the list overflows PWAD_SHOW rows)
+            if (i == 0 && pwad_scroll > 0)
+                text(x + w - FONT_CW - 6, oy + (IWAD_H - FONT_CH)/2, "^", COL_DIM);
+            if (i == show-1 && pwad_scroll < max_scroll)
+                text(x + w - FONT_CW - 6, oy + (IWAD_H - FONT_CH)/2, "v", COL_DIM);
+        }
+    }
+}
+
+static int hit_pwad_dropdown(int mouse_px, int mouse_py)
+{
+    if (mouse_px >= PAD && mouse_px <= WINW-PAD &&
+        mouse_py >= PWAD_Y && mouse_py <= PWAD_Y + IWAD_H)
+        return 0;        // toggles the dropdown
+
+    if (!pwad_dd_open) return -1;
+
+    int show = pwad_count < PWAD_SHOW ? pwad_count : PWAD_SHOW;
+    for (int i=0; i<show; i++) {
+        float oy = PWAD_Y + IWAD_H + i * IWAD_H;
+        if (mouse_px >= PAD && mouse_px <= WINW-PAD &&
+            mouse_py >= oy && mouse_py <= oy + IWAD_H)
+            return pwad_scroll + i + 1;   // 1-based, scroll-adjusted index
+    }
+    return -1;
+}
+
 // ----------------------------------------------------------------- checkboxes
 //
 // A small amber-accented toggle: empty box + label when off, filled box +
@@ -743,6 +853,15 @@ static void build_command(char* out, int n, const char* iwad_path)
         off += snprintf(out + off, n - off, " -file freedoomstuff.wad");
     if (opt_heretic && wad_present("hereticstuff.wad"))
         off += snprintf(out + off, n - off, " -file hereticstuff.wad");
+
+    // Extra PWAD picked in the PWAD dropdown (skip if a checkbox already loaded it).
+    if (pwad_sel > 0 && pwad_sel < pwad_count) {
+        const char* pw = pwads[pwad_sel];
+        int dup = (opt_freedoom && !strcasecmp(pw, "freedoomstuff.wad"))
+               || (opt_heretic  && !strcasecmp(pw, "hereticstuff.wad"));
+        if (!dup)
+            off += snprintf(out + off, n - off, " -file %s", pw);
+    }
 
     // Always land in a level, never the title screen.  Skill 1..5 from the row.
     off += snprintf(out + off, n - off, " -warp 1 1 -skill %d", opt_skill + 1);
@@ -917,6 +1036,7 @@ int main(int argc, char** argv)
 
     font_init();
     scan_iwads();
+    scan_pwads();
 
     int running = 1;
     SDL_Event ev;
@@ -926,10 +1046,10 @@ int main(int argc, char** argv)
             case SDL_EVENT_QUIT: running = 0; break;
             case SDL_EVENT_KEY_DOWN:
                 if (ev.key.key == SDLK_ESCAPE) {
-                    if (dropdown_open) dropdown_open = 0;
+                    if (dropdown_open || pwad_dd_open) { dropdown_open = 0; pwad_dd_open = 0; }
                     else running = 0;
                 }
-                if (ev.key.key == SDLK_RETURN && !dropdown_open) {
+                if (ev.key.key == SDLK_RETURN && !dropdown_open && !pwad_dd_open) {
                     do_launch();
                 }
                 break;
@@ -940,12 +1060,20 @@ int main(int argc, char** argv)
             case SDL_EVENT_MOUSE_BUTTON_DOWN:
                 if (ev.button.button == SDL_BUTTON_LEFT) {
                     mouse_down = 1;
-                    int hh = hit_iwad_dropdown(mouse_x, mouse_y);
-                    if (hh == 0) {
-                        dropdown_open = !dropdown_open;
-                    } else if (hh > 0) {
-                        iwad_sel = hh - 1;
+                    // Modal dropdowns: while one is open it's the ONLY thing that
+                    // takes clicks (a click anywhere closes it / picks an item).
+                    if (dropdown_open) {
+                        int hh = hit_iwad_dropdown(mouse_x, mouse_y);
+                        if (hh > 0) iwad_sel = hh - 1;
                         dropdown_open = 0;
+                    } else if (pwad_dd_open) {
+                        int hh = hit_pwad_dropdown(mouse_x, mouse_y);
+                        if (hh > 0) pwad_sel = hh - 1;
+                        pwad_dd_open = 0;
+                    } else if (hit_iwad_dropdown(mouse_x, mouse_y) == 0) {
+                        dropdown_open = 1;
+                    } else if (hit_pwad_dropdown(mouse_x, mouse_y) == 0) {
+                        pwad_dd_open = 1; pwad_scroll = 0;
                     } else if (hit_launch_button(mouse_x, mouse_y)) {
                         do_launch();
                     } else {
@@ -1016,6 +1144,14 @@ int main(int argc, char** argv)
             case SDL_EVENT_MOUSE_BUTTON_UP:
                 mouse_down = 0;
                 break;
+            case SDL_EVENT_MOUSE_WHEEL:
+                if (pwad_dd_open) {     // scroll the open PWAD list
+                    int ms = pwad_count - PWAD_SHOW; if (ms < 0) ms = 0;
+                    pwad_scroll -= (int)ev.wheel.y;
+                    if (pwad_scroll < 0)  pwad_scroll = 0;
+                    if (pwad_scroll > ms) pwad_scroll = ms;
+                }
+                break;
             case SDL_EVENT_WINDOW_RESIZED: {
                 SDL_RenderViewportSet(ren);
             } break;
@@ -1064,7 +1200,8 @@ int main(int argc, char** argv)
                 draw_checkbox_disabled(MON_HER_X, MONSTERS_Y, "Heretic");
         }
 
-        draw_iwad_dropdown();
+        // Launch button + status first; the IWAD/PWAD dropdowns draw on top so an open
+        // list overlays them (the OPEN one is drawn last for correct z-order).
         draw_launch_button();
 
         // Status line (launch error / confirmation) just above the button.
@@ -1072,6 +1209,9 @@ int main(int argc, char** argv)
             if (g_status_err) text(PAD, LAUNCH_Y - 16, g_status, COL_BTN_BD);
             else              text(PAD, LAUNCH_Y - 16, g_status, COL_CHECK);
         }
+
+        if (dropdown_open) { draw_pwad_dropdown(); draw_iwad_dropdown(); }
+        else               { draw_iwad_dropdown(); draw_pwad_dropdown(); }
 
         SDL_RenderPresent(ren);
     }
