@@ -10,7 +10,8 @@
 //	Sprites: hereticstuff.wad (renamed H*).  Sounds: DOOM SFX reused for now.
 //
 //	Monsters: Mummy, Sabreclaw, Gargoyle, Knight (melee), + Weredragon, Disciple,
-//	Ophidian (ranged), + Maulotaur (charge/mace miniboss).  Iron Lich, D'Sparil TODO.
+//	Ophidian (ranged), + Maulotaur (charge/mace) & Iron Lich (ice/whirlwind) bosses.
+//	D'Sparil TODO.
 //
 //-----------------------------------------------------------------------------
 
@@ -46,6 +47,7 @@ extern boolean	P_SetMobjState (mobj_t* mobj, statenum_t state);
 extern fixed_t	P_AproxDistance (fixed_t dx, fixed_t dy);
 extern mobj_t*	P_SpawnMonsterChecked (fixed_t x, fixed_t y, mobjtype_t type);
 extern mobj_t*	P_SpawnMissile (mobj_t* source, mobj_t* dest, mobjtype_t type);
+extern void	A_Tracer (mobj_t*);		// revenant homing -- reused for the lich whirlwind
 
 // ---------------------------------------------------------------------------
 // Action functions (crispy heretic/p_enemy.c, adapted to DOOM's 1-arg signature).
@@ -210,6 +212,27 @@ void A_MinotaurAtk2 (mobj_t* actor)			// melee, else hurl a mace ball
     if (P_CheckMeleeRange (actor))
 	{ P_DamageMobj (actor->target, actor, actor, HITDICE (5)); return; }
     P_SpawnMissile (actor, actor->target, MT_HMINOTAURFX);
+}
+
+// Iron lich: melee HITDICE(6), else lob an ice ball or release a HOMING whirlwind.  The
+// whirlwind's tracer is set to the target so the engine's A_Tracer (revenant homing) steers
+// it -- the lich's signature seeking attack.  (The fire-column third attack is omitted.)
+void A_LichAttack (mobj_t* actor)
+{
+    mobj_t*	t = actor->target;
+    if (!t)
+	return;
+    A_FaceTarget (actor);
+    if (P_CheckMeleeRange (actor))
+	{ P_DamageMobj (t, actor, actor, HITDICE (6)); return; }
+    S_StartSound (actor, actor->info->attacksound);
+    if (P_Random () < 160)
+	P_SpawnMissile (actor, t, MT_HHEADFX1);			// ice ball
+    else
+    {
+	mobj_t* wh = P_SpawnMissile (actor, t, MT_HWHIRLWIND);	// homing whirlwind
+	if (wh) { wh->tracer = t; wh->z += 32*FRACUNIT; }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -626,6 +649,70 @@ void Heretic_Init (void)
     m->speed = 20*FRACUNIT; m->radius = 10*FRACUNIT; m->height = 6*FRACUNIT; m->mass = 100;
     m->damage = 4; m->activesound = sfx_None;
     m->flags = MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY; m->raisestate = S_NULL;
+
+    // ====================================================================
+    // Iron Lich (head): floating boss -- ice ball + homing whirlwind (700 hp)
+    // ====================================================================
+    ST (S_HIRO_LOOK,  SPR_HIRO, 0, 10, (actionf_p1)A_Look,        S_HIRO_LOOK);
+    ST (S_HIRO_FLOAT, SPR_HIRO, 0,  4, (actionf_p1)A_Chase,       S_HIRO_FLOAT);
+    ST (S_HIRO_ATK1,  SPR_HIRO, 0,  5, (actionf_p1)A_FaceTarget,  S_HIRO_ATK2);
+    ST (S_HIRO_ATK2,  SPR_HIRO, 1, 20, (actionf_p1)A_LichAttack,  S_HIRO_FLOAT);
+    ST (S_HIRO_PAIN1, SPR_HIRO, 0,  4, NULL,                      S_HIRO_PAIN2);
+    ST (S_HIRO_PAIN2, SPR_HIRO, 0,  4, (actionf_p1)A_Pain,        S_HIRO_FLOAT);
+    ST (S_HIRO_DIE1,  SPR_HIRO, 2,  7, NULL,                      S_HIRO_DIE2);
+    ST (S_HIRO_DIE2,  SPR_HIRO, 3,  7, (actionf_p1)A_Scream,      S_HIRO_DIE3);
+    ST (S_HIRO_DIE3,  SPR_HIRO, 4,  7, NULL,                      S_HIRO_DIE4);
+    ST (S_HIRO_DIE4,  SPR_HIRO, 5,  7, NULL,                      S_HIRO_DIE5);
+    ST (S_HIRO_DIE5,  SPR_HIRO, 6,  7, (actionf_p1)A_Fall,        S_HIRO_DIE6);
+    ST (S_HIRO_DIE6,  SPR_HIRO, 7,  7, NULL,                      S_HIRO_DIE7);
+    ST (S_HIRO_DIE7,  SPR_HIRO, 8, -1, NULL,                      S_NULL);
+    ST (S_HIRB1, SPR_HIRB, 0, 6, NULL, S_HIRB2);
+    ST (S_HIRB2, SPR_HIRB, 1, 6, NULL, S_HIRB3);
+    ST (S_HIRB3, SPR_HIRB, 2, 6, NULL, S_HIRB1);
+    ST (S_HIRBX1, SPR_HIRB, 3, 5, NULL, S_HIRBX2);
+    ST (S_HIRBX2, SPR_HIRB, 4, 5, NULL, S_HIRBX3);
+    ST (S_HIRBX3, SPR_HIRB, 5, 5, NULL, S_HIRBX4);
+    ST (S_HIRBX4, SPR_HIRB, 6, 5, NULL, S_NULL);
+    ST (S_HIRX1, SPR_HIRX, 3, 3, NULL,                  S_HIRX2);
+    ST (S_HIRX2, SPR_HIRX, 4, 3, NULL,                  S_HIRX3);
+    ST (S_HIRX3, SPR_HIRX, 5, 3, NULL,                  S_HIRX4);
+    ST (S_HIRX4, SPR_HIRX, 6, 3, NULL,                  S_HIRX5);
+    ST (S_HIRX5, SPR_HIRX, 0, 3, (actionf_p1)A_Tracer,  S_HIRX6);
+    ST (S_HIRX6, SPR_HIRX, 1, 3, (actionf_p1)A_Tracer,  S_HIRX7);
+    ST (S_HIRX7, SPR_HIRX, 2, 3, (actionf_p1)A_Tracer,  S_HIRX5);
+    ST (S_HIRXX1, SPR_HIRX, 6, 4, NULL, S_HIRXX2);
+    ST (S_HIRXX2, SPR_HIRX, 6, 4, NULL, S_NULL);
+
+    m = &mobjinfo[MT_HIRONLICH];
+    m->doomednum = -1;        m->spawnstate  = S_HIRO_LOOK;  m->spawnhealth = 700;
+    m->seestate  = S_HIRO_FLOAT; m->seesound  = sfx_cacsit;  m->reactiontime = 8;
+    m->attacksound = sfx_firsht; m->painstate = S_HIRO_PAIN1; m->painchance = 32;
+    m->painsound = sfx_dmpain; m->meleestate = S_HIRO_ATK1;  m->missilestate = S_HIRO_ATK1;
+    m->deathstate = S_HIRO_DIE1; m->xdeathstate = S_NULL;    m->deathsound = sfx_cacdth;
+    m->speed = 6; m->radius = 40*FRACUNIT; m->height = 72*FRACUNIT; m->mass = 325;
+    m->damage = 0; m->activesound = sfx_dmact;
+    m->flags = MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL|MF_FLOAT|MF_NOGRAVITY|MF_NOBLOOD;
+    m->raisestate = S_NULL;
+
+    m = &mobjinfo[MT_HHEADFX1];
+    m->doomednum = -1;        m->spawnstate  = S_HIRB1;      m->spawnhealth = 1000;
+    m->seestate  = S_NULL;       m->seesound  = sfx_None;    m->reactiontime = 8;
+    m->attacksound = sfx_None;   m->painstate = S_NULL;      m->painchance = 0;
+    m->painsound = sfx_None;     m->meleestate = S_NULL;     m->missilestate = S_NULL;
+    m->deathstate = S_HIRBX1;    m->xdeathstate = S_NULL;    m->deathsound = sfx_firxpl;
+    m->speed = 13*FRACUNIT; m->radius = 12*FRACUNIT; m->height = 6*FRACUNIT; m->mass = 100;
+    m->damage = 2; m->activesound = sfx_None;
+    m->flags = MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY; m->raisestate = S_NULL;
+
+    m = &mobjinfo[MT_HWHIRLWIND];
+    m->doomednum = -1;        m->spawnstate  = S_HIRX1;      m->spawnhealth = 1000;
+    m->seestate  = S_NULL;       m->seesound  = sfx_None;    m->reactiontime = 8;
+    m->attacksound = sfx_None;   m->painstate = S_NULL;      m->painchance = 0;
+    m->painsound = sfx_None;     m->meleestate = S_NULL;     m->missilestate = S_NULL;
+    m->deathstate = S_HIRXX1;    m->xdeathstate = S_NULL;    m->deathsound = sfx_None;
+    m->speed = 10*FRACUNIT; m->radius = 16*FRACUNIT; m->height = 74*FRACUNIT; m->mass = 100;
+    m->damage = 2; m->activesound = sfx_None;
+    m->flags = MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY; m->raisestate = S_NULL;
 }
 
 // hereticstuff.wad sprites loaded?  (the mummy's first frame lump)
@@ -645,6 +732,7 @@ int Heretic_TypeByName (const char* name)
     if (!strcmp (name, "wizard")|| !strcmp (name, "disciple"))  return MT_HWIZARD;
     if (!strcmp (name, "snake") || !strcmp (name, "ophidian"))  return MT_HSNAKE;
     if (!strcmp (name, "maulotaur")||!strcmp (name, "minotaur")) return MT_HMINOTAUR;
+    if (!strcmp (name, "ironlich") ||!strcmp (name, "lich"))     return MT_HIRONLICH;
     return -1;
 }
 

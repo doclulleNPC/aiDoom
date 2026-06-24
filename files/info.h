@@ -181,6 +181,9 @@ typedef enum
     SPR_HSNB,		// ophidian projectile
     SPR_HMIN,		// maulotaur (minotaur)
     SPR_HMNA,		// maulotaur mace ball
+    SPR_HIRO,		// iron lich (head)
+    SPR_HIRB,		// iron lich ice ball
+    SPR_HIRX,		// iron lich whirlwind
     // Freedoom DOOM2-exclusive monsters (renamed sprites from freedoom2stuff.wad, so
     // they never collide with / override DOOM or doom2stuff).  See files/freedoom.c.
     SPR_FSKE,		// revenant      (doom2 SKEL)
@@ -1239,6 +1242,15 @@ typedef enum
     S_HMIN_DIE9, S_HMIN_DIE10, S_HMIN_DIE11, S_HMIN_DIE12, S_HMIN_DIE13, S_HMIN_DIE14, S_HMIN_DIE15,
     S_HMNA1, S_HMNA2,
     S_HMNAX1, S_HMNAX2, S_HMNAX3, S_HMNAX4, S_HMNAX5, S_HMNAX6,
+    // ---- Iron Lich (head) + ice ball + homing whirlwind ----
+    S_HIRO_LOOK, S_HIRO_FLOAT,
+    S_HIRO_ATK1, S_HIRO_ATK2,
+    S_HIRO_PAIN1, S_HIRO_PAIN2,
+    S_HIRO_DIE1, S_HIRO_DIE2, S_HIRO_DIE3, S_HIRO_DIE4, S_HIRO_DIE5, S_HIRO_DIE6, S_HIRO_DIE7,
+    S_HIRB1, S_HIRB2, S_HIRB3,
+    S_HIRBX1, S_HIRBX2, S_HIRBX3, S_HIRBX4,
+    S_HIRX1, S_HIRX2, S_HIRX3, S_HIRX4, S_HIRX5, S_HIRX6, S_HIRX7,
+    S_HIRXX1, S_HIRXX2,
     // Freedoom: a reserved block of state slots that freedoom.c fills at runtime by
     // CLONING each DOOM2 monster's state graph (with the sprite remapped).  512 covers
     // ~9 monsters + 4 projectiles (~340 states) with headroom.  See files/freedoom.c.
@@ -1416,6 +1428,9 @@ typedef enum {
     MT_HSNAKEPRO,	// ophidian projectile
     MT_HMINOTAUR,	// Heretic maulotaur (minotaur miniboss)
     MT_HMINOTAURFX,	// maulotaur mace ball
+    MT_HIRONLICH,	// Heretic iron lich (boss)
+    MT_HHEADFX1,	// iron lich ice ball
+    MT_HWHIRLWIND,	// iron lich homing whirlwind
     // Freedoom DOOM2-exclusive monsters -- runtime clones of the DOOM2 actors with
     // renamed sprites (files/freedoom.c).  Projectiles first (monsters reference them).
     MT_FD_TRACER,	// revenant homing missile

@@ -56,7 +56,10 @@ doom2stuff. The bosses (brain/spawner) are still TODO.
 ### Remaining (each monster = the same pattern; weapons are a bigger stage)
 - **Maulotaur DONE**: hammer swing + slam-charge (MF_SKULLFLY, engine-driven) + mace
   ball (MT_HMINOTAURFX); 3000 hp miniboss, in the director's exit-guard pool.
-- Bosses still TODO: **Iron Lich** (fire column /
+- **Iron Lich DONE**: floating 700-hp boss -- ice ball (MT_HHEADFX1) + a HOMING whirlwind
+  (MT_HWHIRLWIND, steered by the engine's A_Tracer via tracer); sprites HIRO/HIRB/HIRX.
+  In the director guard pool. (Fire-column 3rd attack omitted.)
+- Boss still TODO: **D'Sparil** (fire column /
   ice / whirlwind), **D'Sparil** (2-phase: rides a serpent, then teleporting sorcerer) --
   each needs multiple projectile actors + custom A_* (the big stage).
 - Authentic Heretic **sounds** (currently DOOM SFX are reused): extend `sfxenum_t` +

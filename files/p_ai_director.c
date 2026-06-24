@@ -297,6 +297,8 @@ static mobjtype_t P_Director_PickType (void)
 // NEVER guarded by mere trash.
 static mobjtype_t P_Director_PickGuard (void)
 {
+    if (P_Director_HereticAvailable () && (P_Random () % 100) < 12)
+	return MT_HIRONLICH;					// Heretic iron lich -- a flying boss guard
     if (P_Director_HereticAvailable () && (P_Random () % 100) < 18)
 	return MT_HMINOTAUR;					// Heretic maulotaur -- the toughest guard
     if (P_Director_HereticAvailable () && (P_Random () % 100) < 30)
