@@ -186,7 +186,7 @@ typedef enum
     SPR_HIRX,		// iron lich whirlwind
     SPR_HSR2,		// d'sparil (phase-2 sorcerer)
     SPR_HSRB,		// d'sparil blue bolt
-    // Freedoom DOOM2-exclusive monsters (renamed sprites from freedoom2stuff.wad, so
+    // Freedoom DOOM2-exclusive monsters (renamed sprites from freedoomstuff.wad, so
     // they never collide with / override DOOM or doom2stuff).  See files/freedoom.c.
     SPR_FSKE,		// revenant      (doom2 SKEL)
     SPR_FFAT,		// mancubus      (FATT)

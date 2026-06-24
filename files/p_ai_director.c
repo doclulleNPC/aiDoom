@@ -249,7 +249,7 @@ static int P_Director_LiveMonsters (void)
 }
 
 // DOOM2-tier monsters can be used if we're in DOOM2, OR a DOOM1 game has the DOOM2
-// sprites overlaid -- doom2stuff.wad (SKEL...) or freedoom2stuff.wad (FSKE..., the
+// sprites overlaid -- doom2stuff.wad (SKEL...) or freedoomstuff.wad (FSKE..., the
 // renamed Freedoom clones).  SafeType() maps each type to whatever art exists.
 //
 // Probe the renderer's sprite table (numframes), NOT a lump name: doom2/freedoom store
@@ -260,7 +260,7 @@ static boolean P_Director_Doom2Available (void)
 {
     if (gamemode == commercial) return true;
     return sprites && (sprites[SPR_SKEL].numframes > 0		// doom2stuff overlay
-		    || sprites[SPR_FSKE].numframes > 0);	// freedoom2stuff overlay
+		    || sprites[SPR_FSKE].numframes > 0);	// freedoomstuff overlay
 }
 
 // Heretic monsters loaded (hereticstuff.wad overlaid)?  Probe the mummy/golem sprite.

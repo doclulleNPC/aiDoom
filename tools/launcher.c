@@ -176,7 +176,7 @@ static int     buddy_mode = BUDDY_RULE;	// default: buddy on (rule-based)
 static int     mon_mode   = MON_L4D;     // default: L4D pacing
 static int     opt_noff;			// -nofriendlyfire: player & buddy can't hurt each other
 static int     opt_infight;			// -infight: monster same-species infighting
-static int     opt_freedoom;			// -file freedoom2stuff.wad (DOOM2 monsters, free art)
+static int     opt_freedoom;			// -file freedoomstuff.wad (DOOM2 monsters, free art)
 static int     opt_heretic;			// -file hereticstuff.wad   (Heretic monsters)
 static int     opt_skill = 3;			// difficulty 0..4 -> -skill 1..5; default 3 = Ultra-Violence
 static int     dropdown_open;
@@ -739,8 +739,8 @@ static void build_command(char* out, int n, const char* iwad_path)
 
     // Extra-monster WADs (only -file if the PWAD is actually present, so a checked
     // box with a missing wad can't crash the engine on startup).
-    if (opt_freedoom && wad_present("freedoom2stuff.wad"))
-        off += snprintf(out + off, n - off, " -file freedoom2stuff.wad");
+    if (opt_freedoom && wad_present("freedoomstuff.wad"))
+        off += snprintf(out + off, n - off, " -file freedoomstuff.wad");
     if (opt_heretic && wad_present("hereticstuff.wad"))
         off += snprintf(out + off, n - off, " -file hereticstuff.wad");
 
@@ -1004,7 +1004,7 @@ int main(int argc, char** argv)
 
                         // Monsters row: toggle the extra-monster WAD checkboxes
                         // (ignored when greyed out -- the PWAD isn't present).
-                        if (wad_present("freedoom2stuff.wad") &&
+                        if (wad_present("freedoomstuff.wad") &&
                             hit_checkbox(MON_FD_X, MONSTERS_Y, "FreeDoom", mouse_x, mouse_y))
                             opt_freedoom = !opt_freedoom;
                         if (wad_present("hereticstuff.wad") &&
@@ -1054,7 +1054,7 @@ int main(int argc, char** argv)
             draw_checkbox(OPT_INF_X,  OPTS_Y, opt_infight, "Monster infight");
 
             text(PAD, MONSTERS_Y + (CHK_BOX - FONT_CH)/2, "Monsters", COL_DIM);
-            if (wad_present("freedoom2stuff.wad"))
+            if (wad_present("freedoomstuff.wad"))
                 draw_checkbox(MON_FD_X, MONSTERS_Y, opt_freedoom, "FreeDoom");
             else
                 draw_checkbox_disabled(MON_FD_X, MONSTERS_Y, "FreeDoom");

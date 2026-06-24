@@ -27,7 +27,7 @@ behave** — that's half 2.
 ## 3. Freedoom DOOM2 monsters -- DONE (free art, clone approach)
 
 `tools/extract_freedoom2.py` renames the DOOM2-exclusive monster/projectile sprites
-(SKEL->FSKE ...) from a free freedoom2.wad into `freedoom2stuff.wad` (no collision with
+(SKEL->FSKE ...) from a free freedoom2.wad into `freedoomstuff.wad` (no collision with
 DOOM/doom2stuff). `files/freedoom.c` clones each DOOM2 actor (revenant, mancubus,
 arch-vile, arachnotron, chaingunner, hell knight, pain elemental, SS, keen) + its
 projectiles into `MT_FD_*` at startup -- deep-copying the state graph with the sprite

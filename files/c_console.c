@@ -258,7 +258,7 @@ static int C_MobjByName (const char* s)
 	int h = Heretic_TypeByName (s);
 	if (h >= 0) return h;
     }
-    // Freedoom DOOM2 monsters (revenant/mancubus/...) -- when freedoom2stuff is loaded.
+    // Freedoom DOOM2 monsters (revenant/mancubus/...) -- when freedoomstuff is loaded.
     if (s[0] && Freedoom_Available ())
     {
 	int f = Freedoom_TypeByName (s);

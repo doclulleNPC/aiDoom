@@ -1,6 +1,6 @@
 // Additive Freedoom DOOM2 monsters for aiDoom: runtime clones of the engine's DOOM2
 // actors (revenant, mancubus, arch-vile, ...) with sprites renamed to F* (from
-// freedoom2stuff.wad) so they never collide with / override DOOM or doom2stuff.
+// freedoomstuff.wad) so they never collide with / override DOOM or doom2stuff.
 // See files/freedoom.c.
 #ifndef __FREEDOOM__
 #define __FREEDOOM__
@@ -12,7 +12,7 @@ struct mobj_s;
 // startup, after the info tables exist and before any Freedoom monster spawns.
 void Freedoom_Init (void);
 
-// True if freedoom2stuff.wad's renamed sprites are loaded (else they'd render blank).
+// True if freedoomstuff.wad's renamed sprites are loaded (else they'd render blank).
 int  Freedoom_Available (void);
 
 // Map a name ("revenant"/"mancubus"/...) to an MT_FD_* type, or -1 if unknown.

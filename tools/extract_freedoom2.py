@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-extract_freedoom2.py -- build run/ID0/freedoom2stuff.wad: the DOOM2-exclusive monsters
+extract_freedoom2.py -- build run/ID0/freedoomstuff.wad: the DOOM2-exclusive monsters
 (revenant, mancubus, arch-vile, arachnotron, chaingunner, hell knight, pain elemental,
 the Wolfenstein SS, commander keen) + their projectiles + sounds, taken from a FREE
 freedoom2.wad so they can be spawned in DOOM1.
@@ -17,7 +17,7 @@ freedoom2 uses the DOOM palette, so sprite pixels are copied verbatim (no remap)
 
 Usage:
     python3 tools/extract_freedoom2.py                 # ID0/freedoom2.wad
-    ./aidoom -iwad DOOM.WAD -file freedoom2stuff.wad -director ...
+    ./aidoom -iwad DOOM.WAD -file freedoomstuff.wad -director ...
 """
 
 import argparse
@@ -75,7 +75,7 @@ def main():
     ap = argparse.ArgumentParser(description="Extract DOOM2-exclusive monsters from freedoom2 (renamed, free art)")
     ap.add_argument("--src",   default=str(id0/"freedoom2.wad"), help="freedoom2 IWAD")
     ap.add_argument("--doom1", default=str(id0/"DOOM.WAD"),      help="DOOM1 IWAD (sound diff)")
-    ap.add_argument("--out",   default=str(id0/"freedoom2stuff.wad"))
+    ap.add_argument("--out",   default=str(id0/"freedoomstuff.wad"))
     a = ap.parse_args()
     src, d1, outp = Path(a.src), Path(a.doom1), Path(a.out)
     if not src.exists():

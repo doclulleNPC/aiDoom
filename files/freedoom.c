@@ -14,7 +14,7 @@
 //	     graph into a reserved S_FD_* block, remapping the sprite to its F* twin and
 //	     re-pointing the missile-spawn actions at cloned F* projectiles, then build a
 //	     parallel mobjinfo[MT_FD_*].  Sounds keep their DS* names (the clone reuses
-//	     the same sfx indices; freedoom2stuff carries those lumps).
+//	     the same sfx indices; freedoomstuff carries those lumps).
 //
 //	Result: MT_FD_UNDEAD (revenant), MT_FD_FATSO (mancubus), MT_FD_VILE (arch-vile),
 //	MT_FD_BABY (arachnotron), MT_FD_CHAINGUY, MT_FD_KNIGHT (hell knight),
@@ -31,6 +31,7 @@
 #include "tables.h"		// finecosine/finesine, ANGLETOFINESHIFT, ANG90
 #include "p_mobj.h"
 #include "w_wad.h"
+#include "r_state.h"		// sprites[] -- presence test by parsed sprite, not lump name
 #include "freedoom.h"
 
 #define FATSPREAD	(ANG90/8)
@@ -223,10 +224,12 @@ void Freedoom_Init (void)
     CloneMobj (MT_KEEN,     MT_FD_KEEN);
 }
 
-// freedoom2stuff.wad's renamed sprites loaded?  (revenant's first walk frame)
+// freedoomstuff.wad's renamed sprites loaded?  Test the PARSED sprite (numframes), not a
+// guessed lump name: the revenant's frame-A lumps are mirror-packed ("FSKEA1D1", not
+// "FSKEA1"), so W_CheckNumForName("FSKEA1") wrongly returns -1 and blocked every summon.
 int Freedoom_Available (void)
 {
-    return W_CheckNumForName ("FSKEA1") >= 0;
+    return numsprites > SPR_FSKE && sprites[SPR_FSKE].numframes > 0;
 }
 
 int Freedoom_TypeByName (const char* name)
