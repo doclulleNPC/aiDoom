@@ -162,14 +162,16 @@ def main():
             n_spr += 1
     out.append(("S_END", b""))
 
-    # + heretic monster sounds (DMX, verbatim).  Names kept; heretic.c references them.
+    # + heretic monster sounds (DMX).  PREFIX with "DS" so the engine's "ds%s" lump lookup
+    # (i_sound.c) finds them -- e.g. MUMSIT -> DSMUMSIT, referenced as sfx name "mumsit"
+    # (sounds.c sfx_h_*).  Heretic names are <=6 chars, so "DS"+name stays within 8.
     n_snd = 0
     want = ("imp", "mum", "bst", "clk", "snk", "kgt", "wiz", "hed", "minsit",
             "minat", "mindth", "minact", "minpai", "sbtsit", "sorzap")
     for nm, fp, sz in hent:
         raw = hdata[fp:fp+sz]
         if is_dmx(raw) and any(k in nm.lower() for k in want):
-            out.append((nm, raw)); n_snd += 1
+            out.append(("DS" + nm[:6], raw)); n_snd += 1
 
     op.parent.mkdir(parents=True, exist_ok=True)
     write_wad(op, out)

@@ -7,7 +7,8 @@
 //	(action funcs).  The states/mobjinfo are appended to the engine tables at
 //	runtime (Heretic_Init) so info.c's huge generated initializers stay untouched;
 //	the enum slots live at the end of statenum_t/mobjtype_t/spritenum_t (info.h).
-//	Sprites: hereticstuff.wad (renamed H*).  Sounds: DOOM SFX reused for now.
+//	Sprites + AUTHENTIC SOUNDS: hereticstuff.wad (renamed H* sprites; Heretic SFX copied
+//	with a DS prefix -> sfx_h_* in sounds.c, so monsters sound like Heretic, not DOOM).
 //
 //	Monsters (all 10): Mummy, Sabreclaw, Gargoyle, Knight (melee); Weredragon, Disciple,
 //	Ophidian (ranged); Maulotaur, Iron Lich, D'Sparil (bosses).  Weapons/Hexen still TODO.
@@ -293,23 +294,23 @@ void Heretic_Init (void)
     m->spawnstate   = S_HMUM_LOOK1;
     m->spawnhealth  = 80;
     m->seestate     = S_HMUM_WALK1;
-    m->seesound     = sfx_bgsit1;
+    m->seesound     = sfx_h_mumsit;
     m->reactiontime = 8;
-    m->attacksound  = sfx_claw;
+    m->attacksound  = sfx_h_mumat1;
     m->painstate    = S_HMUM_PAIN1;
     m->painchance   = 128;
-    m->painsound    = sfx_popain;
+    m->painsound    = sfx_h_mumpai;
     m->meleestate   = S_HMUM_ATK1;
     m->missilestate = S_NULL;
     m->deathstate   = S_HMUM_DIE1;
     m->xdeathstate  = S_NULL;
-    m->deathsound   = sfx_bgdth1;
+    m->deathsound   = sfx_h_mumdth;
     m->speed        = 12;
     m->radius       = 22 * FRACUNIT;
     m->height       = 62 * FRACUNIT;
     m->mass         = 75;
     m->damage       = 0;
-    m->activesound  = sfx_bgact;
+    m->activesound  = sfx_h_mumsit;
     m->flags        = MF_SOLID | MF_SHOOTABLE | MF_COUNTKILL;
     m->raisestate   = S_NULL;
 
@@ -335,12 +336,12 @@ void Heretic_Init (void)
 
     m = &mobjinfo[MT_HCLINK];
     m->doomednum = -1;        m->spawnstate  = S_HCLK_LOOK1; m->spawnhealth = 150;
-    m->seestate  = S_HCLK_WALK1; m->seesound  = sfx_sgtsit;  m->reactiontime = 8;
-    m->attacksound = sfx_sgtatk; m->painstate = S_HCLK_PAIN1; m->painchance = 32;
-    m->painsound = sfx_dmpain; m->meleestate = S_HCLK_ATK1;  m->missilestate = S_NULL;
-    m->deathstate = S_HCLK_DIE1; m->xdeathstate = S_NULL;    m->deathsound = sfx_sgtdth;
+    m->seestate  = S_HCLK_WALK1; m->seesound  = sfx_h_clksit;  m->reactiontime = 8;
+    m->attacksound = sfx_h_clkatk; m->painstate = S_HCLK_PAIN1; m->painchance = 32;
+    m->painsound = sfx_h_clkpai; m->meleestate = S_HCLK_ATK1;  m->missilestate = S_NULL;
+    m->deathstate = S_HCLK_DIE1; m->xdeathstate = S_NULL;    m->deathsound = sfx_h_clkdth;
     m->speed = 14; m->radius = 20*FRACUNIT; m->height = 64*FRACUNIT; m->mass = 75;
-    m->damage = 0; m->activesound = sfx_dmact;
+    m->damage = 0; m->activesound = sfx_h_clkact;
     m->flags = MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL|MF_NOBLOOD; m->raisestate = S_NULL;
 
     // ---- Gargoyle (imp): flies; melee + skull-fly dive ----
@@ -376,12 +377,12 @@ void Heretic_Init (void)
 
     m = &mobjinfo[MT_HIMP];
     m->doomednum = -1;        m->spawnstate  = S_HIMP_LOOK1; m->spawnhealth = 40;
-    m->seestate  = S_HIMP_FLY1; m->seesound   = sfx_sgtsit;  m->reactiontime = 8;
-    m->attacksound = sfx_sklatk; m->painstate = S_HIMP_PAIN1; m->painchance = 200;
-    m->painsound = sfx_dmpain; m->meleestate = S_HIMP_MEATK1; m->missilestate = S_HIMP_MSATK1;
-    m->deathstate = S_HIMP_DIE1; m->xdeathstate = S_NULL;    m->deathsound = sfx_skldth;
+    m->seestate  = S_HIMP_FLY1; m->seesound   = sfx_h_impsit;  m->reactiontime = 8;
+    m->attacksound = sfx_h_impat1; m->painstate = S_HIMP_PAIN1; m->painchance = 200;
+    m->painsound = sfx_h_imppai; m->meleestate = S_HIMP_MEATK1; m->missilestate = S_HIMP_MSATK1;
+    m->deathstate = S_HIMP_DIE1; m->xdeathstate = S_NULL;    m->deathsound = sfx_h_impdth;
     m->speed = 10; m->radius = 16*FRACUNIT; m->height = 36*FRACUNIT; m->mass = 50;
-    m->damage = 0; m->activesound = sfx_dmact;
+    m->damage = 0; m->activesound = sfx_h_impsit;
     m->flags = MF_SOLID|MF_SHOOTABLE|MF_FLOAT|MF_NOGRAVITY|MF_COUNTKILL; m->raisestate = S_NULL;
 
     // ---- Undead warrior (knight): melee + thrown spinning axe ----
@@ -417,12 +418,12 @@ void Heretic_Init (void)
 
     m = &mobjinfo[MT_HKNIGHT];
     m->doomednum = -1;        m->spawnstate  = S_HKNI_STND1; m->spawnhealth = 200;
-    m->seestate  = S_HKNI_WALK1; m->seesound  = sfx_kntsit;  m->reactiontime = 8;
-    m->attacksound = sfx_firsht; m->painstate = S_HKNI_PAIN1; m->painchance = 100;
-    m->painsound = sfx_dmpain; m->meleestate = S_HKNI_ATK1;  m->missilestate = S_HKNI_ATK1;
-    m->deathstate = S_HKNI_DIE1; m->xdeathstate = S_NULL;    m->deathsound = sfx_kntdth;
+    m->seestate  = S_HKNI_WALK1; m->seesound  = sfx_h_kgtsit;  m->reactiontime = 8;
+    m->attacksound = sfx_h_kgtatk; m->painstate = S_HKNI_PAIN1; m->painchance = 100;
+    m->painsound = sfx_h_kgtpai; m->meleestate = S_HKNI_ATK1;  m->missilestate = S_HKNI_ATK1;
+    m->deathstate = S_HKNI_DIE1; m->xdeathstate = S_NULL;    m->deathsound = sfx_h_kgtdth;
     m->speed = 12; m->radius = 24*FRACUNIT; m->height = 78*FRACUNIT; m->mass = 150;
-    m->damage = 0; m->activesound = sfx_dmact;
+    m->damage = 0; m->activesound = sfx_h_kgtsit;
     m->flags = MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL; m->raisestate = S_NULL;
 
     m = &mobjinfo[MT_HKNIGHTAXE];
@@ -473,12 +474,12 @@ void Heretic_Init (void)
 
     m = &mobjinfo[MT_HBEAST];
     m->doomednum = -1;        m->spawnstate  = S_HBEA_LOOK1; m->spawnhealth = 220;
-    m->seestate  = S_HBEA_WALK1; m->seesound  = sfx_bgsit2;  m->reactiontime = 8;
-    m->attacksound = sfx_firsht; m->painstate = S_HBEA_PAIN1; m->painchance = 100;
-    m->painsound = sfx_popain; m->meleestate = S_HBEA_ATK1;  m->missilestate = S_HBEA_ATK1;
-    m->deathstate = S_HBEA_DIE1; m->xdeathstate = S_NULL;    m->deathsound = sfx_bgdth2;
+    m->seestate  = S_HBEA_WALK1; m->seesound  = sfx_h_bstsit;  m->reactiontime = 8;
+    m->attacksound = sfx_h_bstatk; m->painstate = S_HBEA_PAIN1; m->painchance = 100;
+    m->painsound = sfx_h_bstpai; m->meleestate = S_HBEA_ATK1;  m->missilestate = S_HBEA_ATK1;
+    m->deathstate = S_HBEA_DIE1; m->xdeathstate = S_NULL;    m->deathsound = sfx_h_bstdth;
     m->speed = 14; m->radius = 32*FRACUNIT; m->height = 74*FRACUNIT; m->mass = 200;
-    m->damage = 0; m->activesound = sfx_bgact;
+    m->damage = 0; m->activesound = sfx_h_bstact;
     m->flags = MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL; m->raisestate = S_NULL;
 
     m = &mobjinfo[MT_HBEASTBALL];
@@ -527,12 +528,12 @@ void Heretic_Init (void)
 
     m = &mobjinfo[MT_HWIZARD];
     m->doomednum = -1;        m->spawnstate  = S_HWIZ_LOOK1; m->spawnhealth = 180;
-    m->seestate  = S_HWIZ_WALK1; m->seesound  = sfx_cacsit;  m->reactiontime = 8;
-    m->attacksound = sfx_firsht; m->painstate = S_HWIZ_PAIN1; m->painchance = 64;
-    m->painsound = sfx_dmpain; m->meleestate = S_NULL;       m->missilestate = S_HWIZ_ATK1;
-    m->deathstate = S_HWIZ_DIE1; m->xdeathstate = S_NULL;    m->deathsound = sfx_cacdth;
+    m->seestate  = S_HWIZ_WALK1; m->seesound  = sfx_h_wizsit;  m->reactiontime = 8;
+    m->attacksound = sfx_h_wizatk; m->painstate = S_HWIZ_PAIN1; m->painchance = 64;
+    m->painsound = sfx_h_wizpai; m->meleestate = S_NULL;       m->missilestate = S_HWIZ_ATK1;
+    m->deathstate = S_HWIZ_DIE1; m->xdeathstate = S_NULL;    m->deathsound = sfx_h_wizdth;
     m->speed = 12; m->radius = 16*FRACUNIT; m->height = 68*FRACUNIT; m->mass = 100;
-    m->damage = 0; m->activesound = sfx_dmact;
+    m->damage = 0; m->activesound = sfx_h_wizact;
     m->flags = MF_SOLID|MF_SHOOTABLE|MF_FLOAT|MF_NOGRAVITY|MF_COUNTKILL; m->raisestate = S_NULL;
 
     m = &mobjinfo[MT_HWIZFX];
@@ -583,12 +584,12 @@ void Heretic_Init (void)
 
     m = &mobjinfo[MT_HSNAKE];
     m->doomednum = -1;        m->spawnstate  = S_HSNK_LOOK1; m->spawnhealth = 280;
-    m->seestate  = S_HSNK_WALK1; m->seesound  = sfx_bgsit1;  m->reactiontime = 8;
-    m->attacksound = sfx_firsht; m->painstate = S_HSNK_PAIN1; m->painchance = 48;
-    m->painsound = sfx_popain; m->meleestate = S_NULL;       m->missilestate = S_HSNK_ATK1;
-    m->deathstate = S_HSNK_DIE1; m->xdeathstate = S_NULL;    m->deathsound = sfx_bgdth1;
+    m->seestate  = S_HSNK_WALK1; m->seesound  = sfx_h_snksit;  m->reactiontime = 8;
+    m->attacksound = sfx_h_snkatk; m->painstate = S_HSNK_PAIN1; m->painchance = 48;
+    m->painsound = sfx_h_snkpai; m->meleestate = S_NULL;       m->missilestate = S_HSNK_ATK1;
+    m->deathstate = S_HSNK_DIE1; m->xdeathstate = S_NULL;    m->deathsound = sfx_h_snkdth;
     m->speed = 10; m->radius = 22*FRACUNIT; m->height = 70*FRACUNIT; m->mass = 100;
-    m->damage = 0; m->activesound = sfx_bgact;
+    m->damage = 0; m->activesound = sfx_h_snkact;
     m->flags = MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL; m->raisestate = S_NULL;
 
     m = &mobjinfo[MT_HSNAKEPRO];
@@ -645,12 +646,12 @@ void Heretic_Init (void)
 
     m = &mobjinfo[MT_HMINOTAUR];
     m->doomednum = -1;        m->spawnstate  = S_HMIN_LOOK1; m->spawnhealth = 3000;
-    m->seestate  = S_HMIN_WALK1; m->seesound  = sfx_kntsit;  m->reactiontime = 8;
-    m->attacksound = sfx_firsht; m->painstate = S_HMIN_PAIN1; m->painchance = 25;
-    m->painsound = sfx_dmpain; m->meleestate = S_HMIN_ATK1_1; m->missilestate = S_HMIN_ATK2_1;
-    m->deathstate = S_HMIN_DIE1; m->xdeathstate = S_NULL;    m->deathsound = sfx_kntdth;
+    m->seestate  = S_HMIN_WALK1; m->seesound  = sfx_h_minsit;  m->reactiontime = 8;
+    m->attacksound = sfx_h_minat1; m->painstate = S_HMIN_PAIN1; m->painchance = 25;
+    m->painsound = sfx_h_minpai; m->meleestate = S_HMIN_ATK1_1; m->missilestate = S_HMIN_ATK2_1;
+    m->deathstate = S_HMIN_DIE1; m->xdeathstate = S_NULL;    m->deathsound = sfx_h_mindth;
     m->speed = 16; m->radius = 28*FRACUNIT; m->height = 100*FRACUNIT; m->mass = 800;
-    m->damage = 0; m->activesound = sfx_dmact;
+    m->damage = 0; m->activesound = sfx_h_minact;
     m->flags = MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL|MF_DROPOFF; m->raisestate = S_NULL;
 
     m = &mobjinfo[MT_HMINOTAURFX];
@@ -698,12 +699,12 @@ void Heretic_Init (void)
 
     m = &mobjinfo[MT_HIRONLICH];
     m->doomednum = -1;        m->spawnstate  = S_HIRO_LOOK;  m->spawnhealth = 700;
-    m->seestate  = S_HIRO_FLOAT; m->seesound  = sfx_cacsit;  m->reactiontime = 8;
-    m->attacksound = sfx_firsht; m->painstate = S_HIRO_PAIN1; m->painchance = 32;
-    m->painsound = sfx_dmpain; m->meleestate = S_HIRO_ATK1;  m->missilestate = S_HIRO_ATK1;
-    m->deathstate = S_HIRO_DIE1; m->xdeathstate = S_NULL;    m->deathsound = sfx_cacdth;
+    m->seestate  = S_HIRO_FLOAT; m->seesound  = sfx_h_hedsit;  m->reactiontime = 8;
+    m->attacksound = sfx_h_hedat1; m->painstate = S_HIRO_PAIN1; m->painchance = 32;
+    m->painsound = sfx_h_hedpai; m->meleestate = S_HIRO_ATK1;  m->missilestate = S_HIRO_ATK1;
+    m->deathstate = S_HIRO_DIE1; m->xdeathstate = S_NULL;    m->deathsound = sfx_h_heddth;
     m->speed = 6; m->radius = 40*FRACUNIT; m->height = 72*FRACUNIT; m->mass = 325;
-    m->damage = 0; m->activesound = sfx_dmact;
+    m->damage = 0; m->activesound = sfx_h_hedact;
     m->flags = MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL|MF_FLOAT|MF_NOGRAVITY|MF_NOBLOOD;
     m->raisestate = S_NULL;
 
@@ -760,7 +761,7 @@ void Heretic_Init (void)
     m = &mobjinfo[MT_HDSPARIL];
     m->doomednum = -1;        m->spawnstate  = S_HSR2_LOOK1; m->spawnhealth = 3500;
     m->seestate  = S_HSR2_WALK1; m->seesound  = sfx_cacsit;  m->reactiontime = 8;
-    m->attacksound = sfx_firsht; m->painstate = S_HSR2_PAIN1; m->painchance = 32;
+    m->attacksound = sfx_h_sorzap; m->painstate = S_HSR2_PAIN1; m->painchance = 32;
     m->painsound = sfx_dmpain; m->meleestate = S_HSR2_ATK1;  m->missilestate = S_HSR2_ATK1;
     m->deathstate = S_HSR2_DIE1; m->xdeathstate = S_NULL;    m->deathsound = sfx_bosdth;
     m->speed = 14; m->radius = 22*FRACUNIT; m->height = 72*FRACUNIT; m->mass = 150;

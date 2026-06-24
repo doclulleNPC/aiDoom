@@ -64,12 +64,14 @@ doom2stuff. The bosses (brain/spawner) are still TODO.
   teleport and wizard-summon are omitted, and (no SDTH sprite extracted) the death is a
   brief body-frame fade.
 
-**All 10 Heretic monsters are now in.** Remaining Heretic work: authentic sounds, the
+**All 10 Heretic monsters are now in, with authentic Heretic sounds.** Remaining: the
 weapons, then Hexen (fire column /
   ice / whirlwind), **D'Sparil** (2-phase: rides a serpent, then teleporting sorcerer) --
   each needs multiple projectile actors + custom A_* (the big stage).
-- Authentic Heretic **sounds** (currently DOOM SFX are reused): extend `sfxenum_t` +
-  `S_sfx[]` with `sfx_h_*` rows for the lumps `extract_heretic_monsters.py` copied.
+- Authentic Heretic **sounds DONE**: `extract_heretic_monsters.py` now copies the Heretic
+  SFX with a `DS` prefix (so the engine's `ds%s` lookup finds them); 51 `sfx_h_*` rows in
+  sounds.h/.c, and every Heretic monster's see/attack/pain/death/active sounds are wired to
+  them.  **Re-run the extractor** to refresh `hereticstuff.wad` after this change.
 - **Weapons** (staff/gauntlets/wand/crossbow/dragonclaw/hellstaff/phoenix/firemace +
   tomed modes) from `heretic/p_pspr.c` — a separate, larger stage.
 - Director wiring so it spawns the Heretic monsters alongside DOOM ones.
