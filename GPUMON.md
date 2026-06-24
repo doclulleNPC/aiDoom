@@ -11,6 +11,8 @@ target from `aidoom.cfg`.
 ## Where the data comes from
 
 - **`nvidia-smi` over SSH** → true GPU utilisation, VRAM, temp, power.
+- **Ollama `/api/ps` over HTTP** (direct to the Ollama host, no SSH) → the name of the
+  model currently loaded on the GPU, shown under the card name (or "(none loaded)").
 - **localhost** → `nvidia-smi` is run **directly, without SSH** (no key needed) when
   the host is empty / `localhost` / `127.0.0.1`.
 - **WSL hosts:** if the SSH session lands in a WSL shell (where `nvidia-smi` isn't on

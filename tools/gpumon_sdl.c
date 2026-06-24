@@ -25,7 +25,7 @@
 #endif
 
 #define WINW 460
-#define WINH 300
+#define WINH 322
 #define POLL_SECS 2
 
 static SDL_Window*   win;
@@ -35,12 +35,14 @@ static SDL_Texture*  font;
 static char host[128] = "192.168.2.114";
 static char user[64]  = "lubee";
 static int  sshport   = 22;
+static char ohost[128] = "";	// Ollama host for the model query (defaults to `host`)
 
 // shared GPU state (worker thread -> main thread)
 typedef struct {
     int   valid, util, mem_used, mem_total, temp;
     float power;
     char  name[64];
+    char  model[64];	// Ollama model currently loaded on the GPU (from /api/ps)
     char  err[160];
 } gpustat_t;
 static gpustat_t   g_stat;
@@ -69,6 +71,8 @@ static void load_cfg(void)
     }
     fclose(f);
     if (!have_gpuhost && ollama[0]) strncpy(host, ollama, sizeof(host)-1);
+    // Model query hits Ollama directly (HTTP): prefer ollama_host, else the GPU host.
+    strncpy(ohost, ollama[0] ? ollama : host, sizeof(ohost)-1);
 }
 
 // ----------------------------------------------------------------- font/draw
@@ -242,6 +246,22 @@ static int fetch_thread(void* unused)
             snprintf(s.err, sizeof(s.err), "ssh/nvidia-smi failed (%s@%s)", user, host);
         }
 
+        // Ask Ollama which model is loaded -- a direct HTTP GET (no SSH); /api/ps returns
+        // {"models":[{"name":"llama3.1:8b",...}]} (empty when the model has been unloaded).
+        if (s.valid) {
+            char mcmd[400], mline[512];
+            snprintf(mcmd, sizeof(mcmd),
+                "curl -s --max-time 4 http://%s:11434/api/ps 2>&1", ohost[0] ? ohost : host);
+            if (run_query(mcmd, mline, sizeof(mline))) {
+                char* p = strstr(mline, "\"name\":\"");
+                if (p) {
+                    p += 8; int i = 0;
+                    while (p[i] && p[i] != '"' && i < (int)sizeof(s.model)-1) { s.model[i] = p[i]; i++; }
+                    s.model[i] = 0;
+                }
+            }
+        }
+
         SDL_LockMutex(g_lock); g_stat = s; SDL_UnlockMutex(g_lock);
 
         // On error: stop here (no auto-reconnect) until the user hits Reconnect.
@@ -291,17 +311,20 @@ static void draw(void)
 
     text(16, 44, s.name, 180,180,190);
 
+    if (s.model[0]) { snprintf(buf,sizeof(buf),"model: %s", s.model); text(16, 66, buf, 130,210,150); }
+    else            text(16, 66, "model: (none loaded)", 110,110,125);
+
     snprintf(buf,sizeof(buf),"%d%%", s.util);
-    bar(76,  "GPU load", s.util/100.0f, buf);
+    bar(98,  "GPU load", s.util/100.0f, buf);
 
     snprintf(buf,sizeof(buf),"%d / %d MiB", s.mem_used, s.mem_total);
-    bar(112, "VRAM", s.mem_total ? (float)s.mem_used/s.mem_total : 0, buf);
+    bar(134, "VRAM", s.mem_total ? (float)s.mem_used/s.mem_total : 0, buf);
 
     snprintf(buf,sizeof(buf),"%d C", s.temp);
-    bar(148, "Temp", s.temp/100.0f, buf);
+    bar(170, "Temp", s.temp/100.0f, buf);
 
     snprintf(buf,sizeof(buf),"%.0f W", s.power);
-    bar(184, "Power", s.power/350.0f, buf);
+    bar(206, "Power", s.power/350.0f, buf);
 
     text(16, WINH-22, "live (nvidia-smi over ssh) -- Esc to quit", 110,110,122);
     SDL_RenderPresent(ren);
