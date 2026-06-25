@@ -2573,13 +2573,32 @@ void P_AICoop_BuildCmd (void)
     // wall).  Overrides the combat advance above.
     if (backoff && aimmon)
     {
-	angle_t	ra = R_PointToAngle2 (aimmon->x, aimmon->y, mo->x, mo->y) >> ANGLETOFINESHIFT;
-	fixed_t	rx = mo->x + FixedMul (64*FRACUNIT, finecosine[ra]);
-	fixed_t	ry = mo->y + FixedMul (64*FRACUNIT, finesine[ra]);
-	if (!AICoop_DamagingFloor (rx, ry) && AICoop_CanReach (mo, rx, ry, true))
+	// (I) Retreat DIAGONALLY backward -- away from the target AND to one side at once
+	// (back-left or back-right), so the buddy weaves back instead of reversing in a
+	// dead-straight line.  Prefer one back-diagonal (sticky); if it's blocked or over a
+	// hazard, take the other; only as a last resort fall straight back.  Facing stays on
+	// the target, so it keeps aiming and fires the instant the angle opens.
+	static int	backside = 1;		// +1 = back-left, -1 = back-right; flips when blocked
+	angle_t		away = R_PointToAngle2 (aimmon->x, aimmon->y, mo->x, mo->y);	// straight-away bearing
+	int		t;
+	for (t = 0; t < 3; t++)
 	{
-	    AICoop_ThrustToward (cmd, mo, rx, ry);
-	    triedmove = 1;
+	    angle_t	a;
+	    unsigned	fa;
+	    fixed_t	rx, ry;
+	    if (t == 0)      a = (backside > 0) ? away + ANG45 : away - ANG45;	// preferred back-diagonal
+	    else if (t == 1) a = (backside > 0) ? away - ANG45 : away + ANG45;	// the other one
+	    else             a = away;						// last resort: straight back
+	    fa = a >> ANGLETOFINESHIFT;
+	    rx = mo->x + FixedMul (64*FRACUNIT, finecosine[fa]);
+	    ry = mo->y + FixedMul (64*FRACUNIT, finesine[fa]);
+	    if (!AICoop_DamagingFloor (rx, ry) && AICoop_CanReach (mo, rx, ry, true))
+	    {
+		AICoop_ThrustToward (cmd, mo, rx, ry);
+		triedmove = 1;
+		if (t == 1) backside = -backside;	// preferred side was blocked -> switch and stick
+		break;
+	    }
 	}
     }
 
