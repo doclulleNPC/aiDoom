@@ -1137,8 +1137,9 @@ static boolean AICoop_ChaseTry (mobj_t* mo, int d8)
 {
     angle_t	a    = ((angle_t)d8 * ANG45) >> ANGLETOFINESHIFT;
     fixed_t	step = mo->radius + 24*FRACUNIT;
+    boolean avoiddmg = (mo->player && (mo->player != &players[consoleplayer]));
     return AICoop_CanReach (mo, mo->x + FixedMul (step, finecosine[a]),
-				mo->y + FixedMul (step, finesine[a]), true);
+				mo->y + FixedMul (step, finesine[a]), avoiddmg);
 }
 
 // Pick (and commit to) a compass heading toward (gx,gy), Doom-monster style.
@@ -1240,6 +1241,59 @@ static boolean PF_Portal (int u, int v, fixed_t* px, fixed_t* py)
     for (k = 0; k < pf_nadj[u]; k++)
 	if (pf_adj[u*PF_MAXADJ + k] == v)
 	{ *px = pf_adjpx[u*PF_MAXADJ + k]; *py = pf_adjpy[u*PF_MAXADJ + k]; return true; }
+    return false;
+}
+
+static boolean PF_HasKey (int color)
+{
+    player_t* p = &players[consoleplayer];
+    boolean res = false;
+    switch (color)
+    {
+      case 1: res = p->cards[it_bluecard]   || p->cards[it_blueskull]; break;
+      case 2: res = p->cards[it_yellowcard] || p->cards[it_yellowskull]; break;
+      case 3: res = p->cards[it_redcard]    || p->cards[it_redskull]; break;
+      default: res = true; break;
+    }
+    return res;
+}
+
+static boolean PF_LineIntersection (fixed_t a1x, fixed_t a1y, fixed_t a2x, fixed_t a2y,
+				    fixed_t b1x, fixed_t b1y, fixed_t b2x, fixed_t b2y)
+{
+    double d1, d2, d3, d4;
+    double ax1 = a1x, ay1 = a1y, ax2 = a2x, ay2 = a2y;
+    double bx1 = b1x, by1 = b1y, bx2 = b2x, by2 = b2y;
+
+    d1 = (ax2 - ax1) * (by1 - ay1) - (ay2 - ay1) * (bx1 - ax1);
+    d2 = (ax2 - ax1) * (by2 - ay1) - (ay2 - ay1) * (bx2 - ax1);
+    d3 = (bx2 - bx1) * (ay1 - by1) - (by2 - by1) * (ax1 - bx1);
+    d4 = (bx2 - bx1) * (ay2 - by1) - (by2 - by1) * (ax2 - bx1);
+
+    if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) &&
+	((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0)))
+	return true;
+
+    return false;
+}
+
+static boolean PF_LockedLineCrossed (fixed_t ax, fixed_t ay, fixed_t bx, fixed_t by)
+{
+    int i;
+    for (i = 0; i < numlines; i++)
+    {
+	line_t* ld = &lines[i];
+	int sp = ld->special;
+	int color = 0;
+	if      (sp==26 || sp==32 || sp==99 || sp==133) color = 1;	// blue
+	else if (sp==27 || sp==34 || sp==136 || sp==137) color = 2;	// yellow
+	else if (sp==28 || sp==33 || sp==134 || sp==135) color = 3;	// red
+	if (color && !PF_HasKey (color))
+	{
+	    if (PF_LineIntersection (ax, ay, bx, by, ld->v1->x, ld->v1->y, ld->v2->x, ld->v2->y))
+		return true;
+	}
+    }
     return false;
 }
 
@@ -1346,6 +1400,7 @@ static void PF_Build (mobj_t* ref)
 		fixed_t	ty = k ? gy+step : gy;
 		int	b = nb[k], w;
 		if (b == a) continue;
+		if (PF_LockedLineCrossed (gx, gy, tx, ty)) continue;
 		if (!PF_LineWalkable (gx, gy, tx, ty, ref, af)) continue;
 		w = (int)(P_AproxDistance (pf_cx[a]-pf_cx[b], pf_cy[a]-pf_cy[b]) >> FRACBITS);
 		if (w < 1) w = 1;
@@ -1365,6 +1420,8 @@ static void PF_Build (mobj_t* ref)
 // notably a locked door the player just unlocked (EV_VerticalDoor demotes its special) --
 // the buddy's cached route is stale.  Calling this invalidates it so the route picks up
 // the now-openable door immediately, instead of only after an A* dead-end + rebuild.
+
+
 void P_AICoop_NavDirty (void)
 {
     pf_level = -1;
@@ -1379,6 +1436,14 @@ static int PF_EdgeWeight (seg_t* sg, int u, int v)
     if (w < 1) w = 1;
     if (ld)						// real wall line (not a BSP miniseg)
     {
+	int sp = ld->special;
+	int color = 0;
+	if      (sp==26 || sp==32 || sp==99 || sp==133) color = 1;	// blue
+	else if (sp==27 || sp==34 || sp==136 || sp==137) color = 2;	// yellow
+	else if (sp==28 || sp==33 || sp==134 || sp==135) color = 3;	// red
+
+	if (color && !PF_HasKey (color)) return -1;		// locked door we don't have the key for is blocked!
+
 	sector_t*	fs = sg->frontsector;
 	sector_t*	bs = sg->backsector;
 	fixed_t		opening, step;
@@ -1422,8 +1487,8 @@ static boolean PF_AStar (int start, int goal)
 	for (i = 0; i < pf_n; i++)			// pop lowest f = g + h
 	    if (!pf_done[i] && pf_dist[i] < PF_INF)
 	    {
-		int h = (int)(P_AproxDistance (pf_cx[i]-gx, pf_cy[i]-gy) >> FRACBITS);
-		int f = pf_dist[i] + h;
+		// Dijkstra search (h = 0) prevents path oscillation from heuristic inconsistency
+		int f = pf_dist[i];
 		if (f < bestf) { bestf = f; u = i; }
 	    }
 	if (u < 0) break;				// nothing left reachable
@@ -1483,11 +1548,19 @@ static boolean PF_NextWaypoint (mobj_t* mo, fixed_t dx, fixed_t dy, fixed_t* wx,
 	prev = pf_path[i];
     }
 
-    // Skip the first portal if we are already close to it to ensure we cross it and advance
-    if (np > 0 && P_AproxDistance (mo->x - portx[0], mo->y - porty[0]) < 32*FRACUNIT)
+    // Skip the first portal if we are already close to it to ensure we cross it and advance.
+    // Skip conditionally if distance is within 56 and the next waypoint is directly reachable,
+    // or unconditionally if we are extremely close (within 32 units, original threshold).
+    if (np > 0)
     {
-	if (np > 1) { *wx = portx[1]; *wy = porty[1]; return true; }
-	else        { *wx = dx;       *wy = dy;       return true; }
+	fixed_t dist = P_AproxDistance (mo->x - portx[0], mo->y - porty[0]);
+	fixed_t tx = (np > 1) ? portx[1] : dx;
+	fixed_t ty = (np > 1) ? porty[1] : dy;
+	if (dist < 32*FRACUNIT || (dist < 56*FRACUNIT && AICoop_CanReach (mo, tx, ty, true)))
+	{
+	    *wx = tx; *wy = ty;
+	    return true;
+	}
     }
 
     // Funnel-lite string pull: steer to the FURTHEST point we can straight-walk to --
@@ -1883,6 +1956,9 @@ void P_AICoop_BuildCmd (void)
 	if (gametic - prog_tic >= 35)			// re-check ~1x/s
 	{
 	    prog_tic = gametic;
+	    printf("Buddy Debug: pos=[%d,%d] pld=%d state=%d trail=%d stuck=%d\n",
+		   mo->x>>FRACBITS, mo->y>>FRACBITS, pld>>FRACBITS, coop_state, trail_active, stuck);
+	    fflush(stdout);
 	    // Progress = reaching a NEW minimum distance.  Tracking the best (not the
 	    // last) defeats jitter: oscillating in place bounces pld ~+/-100u, which the
 	    // old "closer than last second" test mistook for progress, so the watchdog
@@ -1902,15 +1978,48 @@ void P_AICoop_BuildCmd (void)
     // Yield (top priority): the human is bumping into us -> get out of the way by
     // stepping straight away from them.  Use forward+side move so we slide aside
     // immediately instead of slowly turning around (which keeps blocking).
-    if (pl && P_AproxDistance (pl->x - mo->x, pl->y - mo->y) < YIELD_DIST)
+    if (pl)
     {
-	unsigned fa = (R_PointToAngle2 (pl->x, pl->y, mo->x, mo->y) - mo->angle)
-		      >> ANGLETOFINESHIFT;
-	cmd->forwardmove =  (signed char)(FixedMul (COOP_RUN*FRACUNIT, finecosine[fa]) >> FRACBITS);
-	cmd->sidemove    = -(signed char)(FixedMul (COOP_RUN*FRACUNIT, finesine[fa])   >> FRACBITS);
-	triedmove  = 1;
-	coop_state = 0;
-	return;
+	fixed_t yield_d = P_AproxDistance (pl->x - mo->x, pl->y - mo->y);
+	if (yield_d < YIELD_DIST)
+	{
+	    angle_t base_ang = R_PointToAngle2 (pl->x, pl->y, mo->x, mo->y);
+	    fixed_t step = 32*FRACUNIT;
+	    angle_t choose_ang = base_ang;
+	    
+
+
+	    // Check if directly away is clear
+	    fixed_t tx = mo->x + FixedMul (step, finecosine[base_ang >> ANGLETOFINESHIFT]);
+	    fixed_t ty = mo->y + FixedMul (step, finesine[base_ang >> ANGLETOFINESHIFT]);
+	    if (!AICoop_CanReach (mo, tx, ty, false))
+	    {
+		// Try stepping left (90 deg)
+		tx = mo->x + FixedMul (step, finecosine[(base_ang + ANG90) >> ANGLETOFINESHIFT]);
+		ty = mo->y + FixedMul (step, finesine[(base_ang + ANG90) >> ANGLETOFINESHIFT]);
+		if (AICoop_CanReach (mo, tx, ty, false))
+		{
+		    choose_ang = base_ang + ANG90;
+		}
+		else
+		{
+		    // Try stepping right (-90 deg)
+		    tx = mo->x + FixedMul (step, finecosine[(base_ang - ANG90) >> ANGLETOFINESHIFT]);
+		    ty = mo->y + FixedMul (step, finesine[(base_ang - ANG90) >> ANGLETOFINESHIFT]);
+		    if (AICoop_CanReach (mo, tx, ty, false))
+		    {
+			choose_ang = base_ang - ANG90;
+		    }
+		}
+	    }
+
+	    unsigned fa = (choose_ang - mo->angle) >> ANGLETOFINESHIFT;
+	    cmd->forwardmove =  (signed char)(FixedMul (COOP_RUN*FRACUNIT, finecosine[fa]) >> FRACBITS);
+	    cmd->sidemove    = -(signed char)(FixedMul (COOP_RUN*FRACUNIT, finesine[fa])   >> FRACBITS);
+	    triedmove  = 1;
+	    coop_state = 0;
+	    return;
+	}
     }
 
     tgt  = AICoop_FindTarget (mo);
@@ -2070,9 +2179,7 @@ void P_AICoop_BuildCmd (void)
 	}
 	// fight the nearest monster -- but while staying close (hurt / come-leash) only
 	// engage threats near us or near the player, and keep extra distance (no charge).
-	else if (tgt && (!stayclose
-			 || P_AproxDistance (tgt->x - mo->x, tgt->y - mo->y) < COOP_ENGAGE_NEAR
-			 || (pl && P_AproxDistance (tgt->x - pl->x, tgt->y - pl->y) < COOP_LEASH)))
+	else if (tgt)
 	{
 	    coop_state = 1; haveaim = 1; fire = 1; aimmon = tgt;
 	    movethresh = stayclose ? COOP_KEEP*2 : COOP_KEEP;
@@ -2191,7 +2298,7 @@ void P_AICoop_BuildCmd (void)
 		// follow the human even across nukage (e.g. MAP01's teleporter lands in it).
 		stx = tx; sty = ty;
 	    }
-	    else if (AICoop_FindDoorAhead (mo, tx, ty, &ddx, &ddy)
+	    else if (AICoop_FindDoorAhead (mo, goalx, goaly, &ddx, &ddy)
 		&& AICoop_CanReach (mo, ddx, ddy, true))
 	    {
 		stx = ddx; sty = ddy;		// doorway in reach -> head right at it + Use

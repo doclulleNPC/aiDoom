@@ -79,9 +79,10 @@ extern fixed_t		tmfloorz;
 extern fixed_t		tmdropoffz;
 
 // ---- autonomous helpers: the level exit + doors/switches in the way ---------
-static int	exit_level = -1;	// gameepisode*100+gamemap the exit was located for
-static fixed_t	exit_x, exit_y;
+static int	exit_level;		// gameepisode*100 + gamemap
 static int	exit_set;
+static fixed_t	exit_x, exit_y;
+static fixed_t	exit_sw_x, exit_sw_y;
 
 // ---- key fetch: when a locked door blocks us, detour to its key first -------
 static int	key_seek;		// key colour we're fetching (0 = none), persists
@@ -98,11 +99,15 @@ static int	door_n;
 static int	door_wait_timer;
 static int	waiting_at_door;
 static fixed_t	active_door_x, active_door_y;
+static int	passing_door;
+static fixed_t	beyond_door_x, beyond_door_y;
+static angle_t	door_pass_angle;
 
 static boolean Agent_IsDoorSpecial (int sp)
 {
     return sp==1||sp==31||sp==117||sp==118 ||		// plain DR/D1 doors
-	   sp==26||sp==27||sp==28 || sp==32||sp==33||sp==34;	// locked doors
+	   sp==26||sp==27||sp==28 || sp==32||sp==33||sp==34 || // locked doors
+	   sp==99||sp==133||sp==134||sp==135||sp==136||sp==137; // locked switches/buttons
 }
 
 // Locate the level exit + collect the door linedefs, once per map.
@@ -128,6 +133,8 @@ static void Agent_FindExit (void)
 		    fixed_t ny = FixedDiv (-dx, len) * 32;
 		    exit_x = ((lines[i].v1->x + lines[i].v2->x) >> 1) + nx;
 		    exit_y = ((lines[i].v1->y + lines[i].v2->y) >> 1) + ny;
+		    exit_sw_x = (lines[i].v1->x + lines[i].v2->x) >> 1;
+		    exit_sw_y = (lines[i].v1->y + lines[i].v2->y) >> 1;
 		    exit_set = 1;
 		}
 	    }
@@ -155,10 +162,13 @@ static boolean Agent_UseAhead (mobj_t* mo)
 	fixed_t	mx, my, dx, dy;
 	if (!(sp==1||sp==31||sp==117||sp==118 ||			// plain DR/D1 doors
 	      sp==26||sp==27||sp==28 || sp==32||sp==33||sp==34 ||	// locked doors
-	      sp==11||sp==51)) continue;				// exit switch
+	      sp==99||sp==133||sp==134||sp==135||sp==136||sp==137 || // locked switches/buttons
+	      sp==11||sp==51||sp==52||sp==124)) continue;		// exit switches
 
 	// Skip doors that are already open/passable
-	if (sp != 11 && sp != 51 && ld->frontsector && ld->backsector)
+	if (sp != 11 && sp != 51 && sp != 52 && sp != 124 &&
+	    sp != 99 && sp != 133 && sp != 134 && sp != 135 && sp != 136 && sp != 137 &&
+	    ld->frontsector && ld->backsector)
 	{
 	    sector_t* fs = ld->frontsector;
 	    sector_t* bs = ld->backsector;
@@ -598,21 +608,20 @@ static boolean Agent_HasKey (int color)
 // A locked door right ahead that we CAN'T open yet -> its key colour (1/2/3), else 0.
 static int Agent_LockedNeedAhead (mobj_t* mo)
 {
-    int		i, fa = mo->angle >> ANGLETOFINESHIFT;
-    fixed_t	fwx = finecosine[fa], fwy = finesine[fa];
+    int		i;
     for (i = 0 ; i < numlines ; i++)
     {
 	int	sp = lines[i].special, color;
 	fixed_t	mx, my, dx, dy;
-	if      (sp==26 || sp==32) color = 1;		// blue
-	else if (sp==27 || sp==34) color = 2;		// yellow
-	else if (sp==28 || sp==33) color = 3;		// red
+	if      (sp==26 || sp==32 || sp==99 || sp==133) color = 1;		// blue
+	else if (sp==27 || sp==34 || sp==136 || sp==137) color = 2;		// yellow
+	else if (sp==28 || sp==33 || sp==134 || sp==135) color = 3;		// red
 	else continue;
 	if (Agent_HasKey (color)) continue;		// already openable
 	mx = (lines[i].v1->x + lines[i].v2->x) >> 1; my = (lines[i].v1->y + lines[i].v2->y) >> 1;
 	dx = mx - mo->x; dy = my - mo->y;
 	if (P_AproxDistance (dx, dy) > 256*FRACUNIT) continue;	// detect it as we approach
-	if (FixedMul (dx, fwx) + FixedMul (dy, fwy) > 0) return color;	// in front of us
+	return color;
     }
     return 0;
 }
@@ -651,7 +660,11 @@ static void Agent_Brain (void)
 
     // Abandon a goal chased >3 s without arriving; if it was a door, mark it done so we
     // stop retrying one we can't reach (e.g. still locked).
-    if (in_have_goal && leveltime - goaltic > 105)
+    if (key_seek)
+    {
+	goaltic = leveltime; // keep goal alive while seeking key
+    }
+    else if (in_have_goal && leveltime - goaltic > 105)
     {
 	in_have_goal = 0;
 	if (cur_door >= 0) door_seen[cur_door] = 1;
@@ -708,7 +721,12 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
     waiting_at_door = 0;
     memset (cmd, 0, sizeof(*cmd));
     Agent_Poll ();
-    if (door_wait_timer > 0) door_wait_timer--;
+    if (door_wait_timer > 0)
+    {
+	door_wait_timer--;
+	if (door_wait_timer == 0)
+	    passing_door = 0;
+    }
     // The level-end intermission (and finale) screens wait for a key -- pulse fire to
     // advance them, else the LLM marine stalls on the tally screen forever.
     if (gamestate != GS_LEVEL)
@@ -716,6 +734,26 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
     Agent_FindExit ();
     if (agent_demo) Agent_Brain ();
     if (!mo || p->playerstate != PST_LIVE) return;
+
+    if (passing_door == 1)
+    {
+	fixed_t d = P_AproxDistance (mo->x - active_door_x, mo->y - active_door_y);
+	if (d < 24*FRACUNIT)
+	{
+	    passing_door = 2;
+	    beyond_door_x = active_door_x + FixedMul (96*FRACUNIT, finecosine[door_pass_angle >> ANGLETOFINESHIFT]);
+	    beyond_door_y = active_door_y + FixedMul (96*FRACUNIT, finesine[door_pass_angle >> ANGLETOFINESHIFT]);
+	}
+    }
+    else if (passing_door == 2)
+    {
+	fixed_t d = P_AproxDistance (mo->x - beyond_door_x, mo->y - beyond_door_y);
+	if (d < 32*FRACUNIT)
+	{
+	    passing_door = 0;
+	    door_wait_timer = 0;
+	}
+    }
 
     // Update seen status of doors the player passes near
     {
@@ -734,11 +772,21 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
 
     // Key fetch: drop the detour once we have the key; otherwise, if a locked door we
     // can't open is right ahead and its key exists in the map, start fetching that key.
-    if (key_seek && Agent_HasKey (key_seek)) key_seek = 0;
+    if (key_seek && Agent_HasKey (key_seek))
+    {
+	printf ("Agent: key seek succeeded, key %d acquired!\n", key_seek);
+	key_seek = 0;
+	P_AICoop_NavDirty ();
+    }
     if (!key_seek)
     {
 	int c = Agent_LockedNeedAhead (mo);
-	if (c && Agent_FindKey (c, &key_x, &key_y)) key_seek = c;
+	if (c && Agent_FindKey (c, &key_x, &key_y))
+	{
+	    key_seek = c;
+	    printf ("Agent: locked door/switch color %d detected! Seeking key at [%d, %d]\n",
+		    key_seek, key_x >> FRACBITS, key_y >> FRACBITS);
+	}
     }
 
     want = mo->angle;
@@ -759,11 +807,15 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
     }
 
     // 2. Determine MOVEMENT Target (gx, gy, havegoal)
-    fixed_t gx = 0, gy = 0;
+    fixed_t gx = 0, gy = 0, nx = 0, ny = 0;
     int havegoal = 0;
     int force_straight = (leveltime < 105 && !in_have_goal && !key_seek && !tgt);
 
-    if (in_have_goal)
+    if (key_seek)
+    {
+	gx = key_x; gy = key_y; havegoal = 1;
+    }
+    else if (in_have_goal)
     {
 	gx = in_gx; gy = in_gy; havegoal = 1;
 	if (P_AproxDistance (mo->x - in_gx, mo->y - in_gy) < AGENT_REACH)
@@ -771,10 +823,6 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
 	    in_have_goal = 0;
 	    havegoal = 0;
 	}
-    }
-    else if (key_seek)
-    {
-	gx = key_x; gy = key_y; havegoal = 1;
     }
     else if (tgt)
     {
@@ -791,25 +839,24 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
     if (havegoal)
     {
 	static chasedir_t agent_chase = { -1, 0, 0 };
-	fixed_t wx, wy, nx, ny;
+	fixed_t wx, wy;
 	fixed_t ddx, ddy, stx, sty;
 
 	if (P_AICoop_NextWaypoint (mo, gx, gy, &wx, &wy)) { nx = wx; ny = wy; }
 	else                                              { nx = gx; ny = gy; }
 
 	// Determine stx / sty (steer target point) using buddy navigation logic:
-	if (door_wait_timer > 0)
-	{
-	    if (AICoop_CanReach (mo, nx, ny, true) || AICoop_CanReach (mo, gx, gy, false))
-		door_wait_timer = 0;
-	}
-
-	if (door_wait_timer > 0)
+	if (passing_door == 1)
 	{
 	    stx = active_door_x; sty = active_door_y;
 	    waiting_at_door = 1;
 	}
-	else if (AICoop_FindDoorAhead (mo, gx, gy, &ddx, &ddy))
+	else if (passing_door == 2)
+	{
+	    stx = beyond_door_x; sty = beyond_door_y;
+	    waiting_at_door = 1;
+	}
+	else if (AICoop_FindDoorAhead (mo, nx, ny, &ddx, &ddy))
 	{
 	    stx = ddx; sty = ddy; // Doorway in reach -> head straight to it
 	    if (P_AproxDistance (mo->x - ddx, mo->y - ddy) < 80*FRACUNIT)
@@ -821,7 +868,7 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
 	{
 	    stx = gx; sty = gy; // Final target reachable -> head straight to it
 	}
-	else if (AICoop_CanReach (mo, nx, ny, true))
+	else if (AICoop_CanReach (mo, nx, ny, false))
 	{
 	    stx = nx; sty = ny; // Waypoint in reach -> head straight to it
 	}
@@ -837,10 +884,14 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
 	move_angle = R_PointToAngle2 (mo->x, mo->y, stx, sty);
 	chase = 1;
 
-	// If we are waiting for a door to open, face it and prevent stuck wiggling
 	if (waiting_at_door)
 	{
 	    stuck = 0;
+	}
+
+	// If we are waiting for a door to open and not aiming at a monster, face it
+	if (waiting_at_door && !(tgt && los && td < AGENT_FIRE_RANGE))
+	{
 	    want = move_angle;
 	}
 	// If we are NOT aiming at a monster or face target, face where we walk
@@ -857,11 +908,14 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
 	cmd->sidemove = 0;
     }
 
-    if (exit_set && P_AproxDistance (mo->x - exit_x, mo->y - exit_y) < 64*FRACUNIT)
+    if (exit_set && P_AproxDistance (mo->x - exit_x, mo->y - exit_y) < 128*FRACUNIT)
     {
-	want = R_PointToAngle2 (mo->x, mo->y, exit_x, exit_y);
-	cmd->buttons |= BT_USE;
-	chase = 0;
+	want = R_PointToAngle2 (mo->x, mo->y, exit_sw_x, exit_sw_y);
+	if (P_AproxDistance (mo->x - exit_sw_x, mo->y - exit_sw_y) < 56*FRACUNIT)
+	{
+	    cmd->buttons |= BT_USE;
+	    chase = 0;
+	}
     }
 
     rem  = (short)((want - mo->angle) >> 16);
@@ -885,6 +939,34 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
 	int fa = diff >> ANGLETOFINESHIFT;
 	cmd->forwardmove = (char)((FixedMul (finecosine[fa], AGENT_FORWARD * FRACUNIT)) >> FRACBITS);
 	cmd->sidemove    = (char)(-((FixedMul (finesine[fa], AGENT_FORWARD * FRACUNIT)) >> FRACBITS));
+
+	// Buddy avoidance: if the coop buddy is close and in front of our moving path,
+	// modify movement to slide around them.
+	mobj_t* buddy = Agent_Buddy();
+	if (buddy && buddy->health > 0)
+	{
+	    fixed_t bd = P_AproxDistance (buddy->x - mo->x, buddy->y - mo->y);
+	    if (bd < 56*FRACUNIT)
+	    {
+		angle_t to_buddy = R_PointToAngle2 (mo->x, mo->y, buddy->x, buddy->y);
+		angle_t ang_diff = to_buddy - move_angle;
+		if (ang_diff < ANG90 || ang_diff > (unsigned)-ANG90)
+		{
+		    // Buddy is in front of our movement path!
+		    // Try to strafe sideways to get around them.
+		    angle_t strafe_ang;
+		    if (ang_diff < ANG180)
+			strafe_ang = move_angle - ANG90; // strafe right
+		    else
+			strafe_ang = move_angle + ANG90; // strafe left
+			
+		    angle_t diff = strafe_ang - mo->angle;
+		    int fa = diff >> ANGLETOFINESHIFT;
+		    cmd->forwardmove = (char)((FixedMul (finecosine[fa], AGENT_FORWARD * FRACUNIT)) >> FRACBITS);
+		    cmd->sidemove    = (char)(-((FixedMul (finesine[fa], AGENT_FORWARD * FRACUNIT)) >> FRACBITS));
+		}
+	    }
+	}
     }
 
     // Survival (primary directive: kill monsters, STAY ALIVE).  Keep a melee threat -- a
@@ -924,23 +1006,44 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
 	if (usewait > 0) usewait--;
 	if ((chase || waiting_at_door) && usewait == 0 && door_wait_timer == 0 && Agent_UseAhead (mo)) { cmd->buttons |= BT_USE; usewait = 16; }
 
+	static int was_chase;
 	if (chase)
 	{
-	    if (P_AproxDistance (mo->x - lastx, mo->y - lasty) < 3*FRACUNIT) stuck++;
-	    else                                                            stuck = 0;
-	    lastx = mo->x; lasty = mo->y;
+	    static fixed_t histx[16], histy[16];
+	    static int histcnt;
+	    if (!was_chase) histcnt = 0;
+	    histx[histcnt & 15] = mo->x;
+	    histy[histcnt & 15] = mo->y;
+	    histcnt++;
+	    if (histcnt >= 16)
+	    {
+		fixed_t dx = mo->x - histx[histcnt & 15];
+		fixed_t dy = mo->y - histy[histcnt & 15];
+		if (P_AproxDistance (dx, dy) < 16*FRACUNIT) stuck++;
+		else                                        stuck = 0;
+	    }
+	    else stuck = 0;
+
 	    if (stuck > 5)
 	    {
 		// Pinned (the reflex heads straight at the waypoint, no corner-rounding):
-		// SWEEP the view one way while pushing forward + strafing so the marine
+		// SWEEP the view one way while pushing/pulling + strafing so the marine
 		// rotates until the gap opens; flip the sweep every ~32 tics.
 		cmd->angleturn   = (stuck & 32) ?  AGENT_TURN : -AGENT_TURN;
-		cmd->forwardmove = AGENT_FORWARD;
+		cmd->forwardmove = (stuck > 15) ? -AGENT_FORWARD : AGENT_FORWARD;
 		cmd->sidemove    = (stuck & 32) ?  30 : -30;
 		if (door_wait_timer == 0) cmd->buttons |= BT_USE;	// in case a shut door is pinning us
+
+		if (stuck > 40)
+		{
+		    in_have_goal = 0;	// clear goal so we re-evaluate
+		    key_seek = 0;	// also clear key detour in case we are stuck on it
+		    stuck = 0;
+		}
 	    }
 	}
 	else stuck = 0;
+	was_chase = chase;
     }
 
     if ((cmd->buttons & BT_USE) && havegoal)
@@ -948,10 +1051,22 @@ void G_AgentBuildTiccmd (ticcmd_t* cmd)
 	fixed_t ddx, ddy;
 	if (AICoop_FindDoorAhead (mo, gx, gy, &ddx, &ddy))
 	{
-	    door_wait_timer = 60;
+	    door_wait_timer = 75;
 	    active_door_x = ddx;
 	    active_door_y = ddy;
+	    passing_door = 1;
+	    door_pass_angle = R_PointToAngle2 (mo->x, mo->y, ddx, ddy);
 	}
+    }
+
+    static int last_print_tic;
+    if (gametic - last_print_tic >= 35)
+    {
+	last_print_tic = gametic;
+	printf ("Agent Debug: pos=[%d,%d] angle=%u havegoal=%d gx=%d gy=%d nx=%d ny=%d key_seek=%d stuck=%d\n",
+		mo->x >> FRACBITS, mo->y >> FRACBITS,
+		(unsigned)(mo->angle / (ANG45/45)), havegoal, gx >> FRACBITS, gy >> FRACBITS, nx >> FRACBITS, ny >> FRACBITS, key_seek, stuck);
+	fflush (stdout);
     }
 }
 
