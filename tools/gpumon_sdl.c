@@ -230,7 +230,18 @@ static void wrap_cmd(char* out, int n, const char* inner)
         snprintf(out, n,
             "ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=5 "
             "-o ServerAliveInterval=3 -o ServerAliveCountMax=2 -p %d %s@%s "
+            // The remote command MUST be expanded by the TARGET shell, not ours.  On POSIX
+            // we run via popen() -> `sh -c`, which would expand $PATH (to the local box's
+            // PATH) and the detect probe's $(uname -s)/$(nvidia-smi ...)/$(sysctl ...)
+            // command-substitutions LOCALLY -- so a Linux/macOS gpumon talking to a remote
+            // Mac sent it garbage and mis-detected/failed.  SINGLE-quote the remote command
+            // so sh passes it through verbatim and the target expands it.  (Windows cmd /c
+            // doesn't expand $... at all, so it keeps double quotes and already worked.)
+#ifdef _WIN32
             "\"PATH=/opt/homebrew/bin:/usr/local/bin:$PATH; %s\" 2>&1",
+#else
+            "'PATH=/opt/homebrew/bin:/usr/local/bin:$PATH; %s' 2>&1",
+#endif
             sshport, user, host, inner);
 }
 
