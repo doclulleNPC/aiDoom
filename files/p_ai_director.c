@@ -402,6 +402,30 @@ static void P_Director_Announce (const char* msg)
 // and set it charging the nearest survivor.  cx==cy==0 -> centre on that survivor
 // (the default "in the dark behind you").  Pass the exit point to populate the room
 // the player is heading for.  Bails quietly if no valid hidden spot is found.
+// Is (x,y) genuinely INSIDE the level geometry (not the void)?  R_PointInSubsector
+// always returns SOME BSP leaf even for a point outside every wall, and P_CheckPosition
+// passes in the void (no blockmap lines there) -- so spawns landed OUTSIDE the map (the
+// player heard monsters that were stuck out in the void).  A point is really inside its
+// subsector iff it's on the FRONT side of every one of that subsector's segs (the leaf is
+// convex; R_PointInSubsector already put it on the right side of all BSP partitions, so
+// only the walls/segs can place it outside).
+extern subsector_t* R_PointInSubsector (fixed_t x, fixed_t y);
+static boolean P_Director_PointInMap (fixed_t x, fixed_t y)
+{
+    subsector_t* ss = R_PointInSubsector (x, y);
+    int i;
+    for (i = 0; i < ss->numlines; i++)
+    {
+	seg_t* sg = &segs[ss->firstline + i];
+	// cross = (P-v1) x (v2-v1); DOOM's front side is < 0, so > 0 means behind a wall.
+	long long cross = (long long)(x - sg->v1->x) * (long long)(sg->v2->y - sg->v1->y)
+			- (long long)(y - sg->v1->y) * (long long)(sg->v2->x - sg->v1->x);
+	if (cross < 0)
+	    return false;		// behind a wall -> outside the subsector (void)
+    }
+    return true;
+}
+
 static boolean P_Director_SpawnMonsterNear (mobjtype_t mt, fixed_t cx, fixed_t cy)
 {
     mobj_t*	sv;
@@ -424,6 +448,8 @@ static boolean P_Director_SpawnMonsterNear (mobjtype_t mt, fixed_t cx, fixed_t c
 	mobj_t*		mo;
 	int		i, seen = 0;
 
+	if (!P_Director_PointInMap (x, y))
+	    continue;			// in the void (outside the walls) -- never spawn there
 	mo = P_SpawnMobj (x, y, ONFLOORZ, mt);
 	// Fits where it landed (no wall/thing overlap, enough head room)?
 	if (!P_CheckPosition (mo, x, y) || tmceilingz - tmfloorz < mo->height)
@@ -467,8 +493,11 @@ static boolean P_Director_SpawnGuard (mobjtype_t mt, fixed_t cx, fixed_t cy)
 	fixed_t	dist = 64*FRACUNIT + (P_Random () * ((320*FRACUNIT) >> 8));	// 64..384u
 	fixed_t	x    = cx + FixedMul (dist, finecosine[fa]);
 	fixed_t	y    = cy + FixedMul (dist, finesine[fa]);
-	mobj_t*	mo   = P_SpawnMobj (x, y, ONFLOORZ, mt);
+	mobj_t*	mo;
 	int	i, seen = 0;
+	if (!P_Director_PointInMap (x, y))
+	    continue;			// in the void -- skip
+	mo = P_SpawnMobj (x, y, ONFLOORZ, mt);
 	if (!P_CheckPosition (mo, x, y) || tmceilingz - tmfloorz < mo->height)
 	    { P_RemoveMobj (mo); continue; }
 	for (i = 0; i < MAXPLAYERS; i++)
