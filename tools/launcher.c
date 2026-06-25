@@ -861,6 +861,42 @@ static int wad_present(const char* name)
     return 0;
 }
 
+// Find the selected PWAD's FIRST map and write the matching -warp args ("7" for MAP07,
+// "2 4" for E2M4) into `warp`.  A custom map rarely sits on MAP01/E1M1, so blindly warping
+// there would drop the player into the IWAD's vanilla first map instead of the PWAD.  Leaves
+// `warp` empty if the PWAD has no map (then the caller keeps its default).
+static void pwad_first_map_warp(const char* name, char* warp, int wn)
+{
+    warp[0] = 0;
+    char p[1024]; FILE* f;
+    snprintf(p, sizeof p, "%s/ID0/%s", run_dir(), name);
+    if (!(f = fopen(p, "rb"))) { snprintf(p, sizeof p, "%s/%s", run_dir(), name); f = fopen(p, "rb"); }
+    if (!f) return;
+    unsigned char hdr[12];
+    if (fread(hdr, 1, 12, f) != 12) { fclose(f); return; }
+    unsigned nl = hdr[4] | hdr[5]<<8 | hdr[6]<<16 | (unsigned)hdr[7]<<24;
+    unsigned of = hdr[8] | hdr[9]<<8 | hdr[10]<<16 | (unsigned)hdr[11]<<24;
+    if (!nl || nl > 100000 || fseek(f, (long)of, SEEK_SET) != 0) { fclose(f); return; }
+    int best = 1000, mode = 0, be = 0, bm = 0;   // mode 1 = MAPxx, 2 = ExMy
+    for (unsigned i = 0; i < nl; i++) {
+        unsigned char e[16];
+        if (fread(e, 1, 16, f) != 16) break;
+        char nm[9]; memcpy(nm, e+8, 8); nm[8] = 0;
+        if (nm[0]=='M' && nm[1]=='A' && nm[2]=='P' &&
+            isdigit((unsigned char)nm[3]) && isdigit((unsigned char)nm[4]) && !nm[5]) {
+            int mp = (nm[3]-'0')*10 + (nm[4]-'0');
+            if (mp < best) { best = mp; mode = 1; bm = mp; }
+        } else if (nm[0]=='E' && nm[1]>='1' && nm[1]<='9' &&
+                   nm[2]=='M' && nm[3]>='1' && nm[3]<='9' && !nm[4]) {
+            int key = (nm[1]-'0')*10 + (nm[3]-'0');
+            if (key < best) { best = key; mode = 2; be = nm[1]-'0'; bm = nm[3]-'0'; }
+        }
+    }
+    fclose(f);
+    if      (mode == 1) snprintf(warp, wn, "%d", bm);
+    else if (mode == 2) snprintf(warp, wn, "%d %d", be, bm);
+}
+
 static void build_command(char* out, int n, const char* iwad_path)
 {
     int off = 0;
@@ -906,8 +942,14 @@ static void build_command(char* out, int n, const char* iwad_path)
             off += snprintf(out + off, n - off, " -file %s", pw);
     }
 
-    // Always land in a level, never the title screen.  Skill 1..5 from the row.
-    off += snprintf(out + off, n - off, " -warp 1 1 -skill %d", opt_skill + 1);
+    // Always land in a level, never the title screen.  If a PWAD is loaded, warp to ITS
+    // first map (custom maps rarely sit on MAP01/E1M1); else the IWAD's first map.
+    char warp[32] = "1 1";
+    if (pwad_sel > 0 && pwad_sel < pwad_count) {
+        char w[32]; pwad_first_map_warp(pwads[pwad_sel], w, sizeof w);
+        if (w[0]) snprintf(warp, sizeof warp, "%s", w);
+    }
+    off += snprintf(out + off, n - off, " -warp %s -skill %d", warp, opt_skill + 1);
 
     (void)n;
 }
