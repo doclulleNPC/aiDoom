@@ -76,8 +76,9 @@
 #define OPT_NOFF_X (PAD + 90)		// "No friendly fire" checkbox
 #define OPT_INF_X  (PAD + 300)		// "Monster infight" checkbox
 #define MONSTERS_Y 268			// extra-monster WAD toggles (FreeDoom / Heretic)
-#define MON_FD_X   (PAD + 90)		// "FreeDoom" checkbox (same column as No-FF)
-#define MON_HER_X  (PAD + 300)		// "Heretic" checkbox  (same column as Infight)
+#define MON_FD_X   (PAD + 70)		// "FreeDoom" checkbox
+#define MON_HER_X  (PAD + 250)		// "Heretic" checkbox
+#define MON_HEX_X  (PAD + 410)		// "Hexen" checkbox
 #define IWAD_Y    310
 #define IWAD_H    22
 #define IWAD_DD_H 80			// dropdown open height
@@ -188,6 +189,7 @@ static int     opt_noff;			// -nofriendlyfire: player & buddy can't hurt each ot
 static int     opt_infight;			// -infight: monster same-species infighting
 static int     opt_freedoom;			// -file freedoomstuff.wad (DOOM2 monsters, free art)
 static int     opt_heretic;			// -file hereticstuff.wad   (Heretic monsters)
+static int     opt_hexen;			// -file hexenstuff.wad     (Hexen monsters)
 static int     opt_skill = 3;			// difficulty 0..4 -> -skill 1..5; default 3 = Ultra-Violence
 static int     dropdown_open;
 
@@ -932,12 +934,15 @@ static void build_command(char* out, int n, const char* iwad_path)
         off += snprintf(out + off, n - off, " -file freedoomstuff.wad");
     if (opt_heretic && wad_present("hereticstuff.wad"))
         off += snprintf(out + off, n - off, " -file hereticstuff.wad");
+    if (opt_hexen && wad_present("hexenstuff.wad"))
+        off += snprintf(out + off, n - off, " -file hexenstuff.wad");
 
     // Extra PWAD picked in the PWAD dropdown (skip if a checkbox already loaded it).
     if (pwad_sel > 0 && pwad_sel < pwad_count) {
         const char* pw = pwads[pwad_sel];
         int dup = (opt_freedoom && !strcasecmp(pw, "freedoomstuff.wad"))
-               || (opt_heretic  && !strcasecmp(pw, "hereticstuff.wad"));
+               || (opt_heretic  && !strcasecmp(pw, "hereticstuff.wad"))
+               || (opt_hexen    && !strcasecmp(pw, "hexenstuff.wad"));
         if (!dup)
             off += snprintf(out + off, n - off, " -file %s", pw);
     }
@@ -1223,6 +1228,9 @@ int main(int argc, char** argv)
                         if (wad_present("hereticstuff.wad") &&
                             hit_checkbox(MON_HER_X, MONSTERS_Y, "Heretic", mouse_x, mouse_y))
                             opt_heretic = !opt_heretic;
+                        if (wad_present("hexenstuff.wad") &&
+                            hit_checkbox(MON_HEX_X, MONSTERS_Y, "Hexen", mouse_x, mouse_y))
+                            opt_hexen = !opt_hexen;
                     }
                 }
                 break;
@@ -1283,6 +1291,10 @@ int main(int argc, char** argv)
                 draw_checkbox(MON_HER_X, MONSTERS_Y, opt_heretic, "Heretic");
             else
                 draw_checkbox_disabled(MON_HER_X, MONSTERS_Y, "Heretic");
+            if (wad_present("hexenstuff.wad"))
+                draw_checkbox(MON_HEX_X, MONSTERS_Y, opt_hexen, "Hexen");
+            else
+                draw_checkbox_disabled(MON_HEX_X, MONSTERS_Y, "Hexen");
         }
 
         // Launch button + status first; the IWAD/PWAD dropdowns draw on top so an open

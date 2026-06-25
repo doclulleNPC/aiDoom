@@ -203,6 +203,8 @@ typedef enum
     SPR_FFIR,		// arch-vile fire          (FIRE)
     SPR_FAPL,		// arachnotron plasma      (APLS)
     SPR_FAPB,		// arachnotron plasma blast(APBX)
+    // Hexen monsters (renamed sprites from hexenstuff.wad, X* namespace)
+    SPR_XETT,		// ettin (XETT)
     NUMSPRITES
 
 } spritenum_t;
@@ -1266,6 +1268,13 @@ typedef enum
     // ~9 monsters + 4 projectiles (~340 states) with headroom.  See files/freedoom.c.
     S_FD_FIRST,
     S_FD_LAST = S_FD_FIRST + 511,
+    // ---- Hexen monsters (filled at runtime by Hexen_Init) ----
+    S_XETT_LOOK1, S_XETT_LOOK2,
+    S_XETT_CHASE1, S_XETT_CHASE2, S_XETT_CHASE3, S_XETT_CHASE4,
+    S_XETT_PAIN1,
+    S_XETT_ATK1, S_XETT_ATK2, S_XETT_ATK3,
+    S_XETT_DIE1, S_XETT_DIE2, S_XETT_DIE3, S_XETT_DIE4, S_XETT_DIE5,
+    S_XETT_DIE6, S_XETT_DIE7, S_XETT_DIE8, S_XETT_DIE9,
     NUMSTATES
 } statenum_t;
 
@@ -1458,6 +1467,7 @@ typedef enum {
     MT_FD_PAIN,		// pain elemental
     MT_FD_WOLFSS,	// wolfenstein SS
     MT_FD_KEEN,		// commander keen
+    MT_XETTIN,		// Hexen ettin (melee brute)
     NUMMOBJTYPES
 
 } mobjtype_t;

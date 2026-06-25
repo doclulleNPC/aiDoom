@@ -83,6 +83,21 @@ and weapons** (sprites palette-converted to the DOOM palette, plus their DMX sou
 - Run: `python3 tools/extract_hexen.py` (auto-detects a DOOM IWAD in ID0 for the target
   palette).  Verified: the wad loads under DOOM with no crash and the sprites render
   correctly (ettin / serpent / fighter-axe checked).
+
+#### Hexen monster port -- STARTED (`files/hexen.c` + `hexen.h`)
+
+Same additive mechanism as `files/heretic.c`: `Hexen_Init()` (called from `D_DoomMain`)
+appends the Hexen monsters' states/mobjinfo at runtime; enums (`SPR_XETT`, `S_XETT_*`,
+`MT_XETTIN`) live at the end of `spritenum_t`/`statenum_t`/`mobjtype_t`; `"XETT"` added to
+`sprnames[]`.  Sprites come from `hexenstuff.wad` (the `X*` codes in `hexen_sprite_map.txt`);
+sounds reuse DOOM SFX for now.  Gated by `Hexen_Available()` (sprite present), safe without
+the wad.
+- **Ettin DONE** (first monster): a melee brute (`A_EttinAttack`, HITDICE(2)), hp 175.
+  Spawn via `summon ettin`.  Verified: spawns, chases, hits, dies with no crash.
+- Launcher: a **Hexen** checkbox (next to FreeDoom/Heretic) adds `-file hexenstuff.wad`.
+- Remaining (each follows the Ettin pattern; bigger ones need projectile actors + Hexen
+  `special1/2`/teleport/summon): centaur/slaughtaur, chaos serpent, reiver, afrit, wendigo,
+  stalker, dark bishop, death wyvern, then the bosses (heresiarch, korax).
 - Authentic Heretic **sounds DONE**: `extract_heretic_monsters.py` now copies the Heretic
   SFX with a `DS` prefix (so the engine's `ds%s` lookup finds them); 51 `sfx_h_*` rows in
   sounds.h/.c, and every Heretic monster's see/attack/pain/death/active sounds are wired to

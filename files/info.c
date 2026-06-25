@@ -62,7 +62,8 @@ char *sprnames[NUMSPRITES] = {
     "HIRO","HIRB","HIRX",			// iron lich + ice ball + whirlwind
     "HSR2","HSRB",				// d'sparil (phase 2) + blue bolt
     "FSKE","FFAT","FVIL","FBSP","FCPO","FBO2","FPAI","FSSW","FKEE",	// Freedoom monsters
-    "FFAB","FFBX","FMAN","FFIR","FAPL","FAPB"				// Freedoom projectiles
+    "FFAB","FFBX","FMAN","FFIR","FAPL","FAPB",				// Freedoom projectiles
+    "XETT"								// Hexen ettin
 };
 
 

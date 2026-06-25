@@ -77,6 +77,7 @@ static int access(char *file, int mode)
 
 #include "g_game.h"
 #include "heretic.h"		// Heretic_Init -- additive Heretic monsters
+#include "hexen.h"		// Hexen_Init   -- additive Hexen monsters
 #include "freedoom.h"		// Freedoom_Init -- cloned DOOM2 monsters (free art)
 #include "g_agent.h"		// G_AgentInit -- full agent/LLM player control (-aiplayer)
 
@@ -1302,6 +1303,7 @@ printf("added\n");
     P_Init ();
 
     Heretic_Init ();		// fill the appended Heretic monster states/mobjinfo
+    Hexen_Init ();		// fill the appended Hexen monster states/mobjinfo
     Freedoom_Init ();		// clone the DOOM2 monsters into the MT_FD_* slots
 
     printf ("I_Init: Setting up machine state.\n");

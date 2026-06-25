@@ -32,6 +32,7 @@
 
 #include "tables.h"		// finecosine, ANGLETOFINESHIFT
 #include "heretic.h"		// Heretic_SpawnMummy (console spawn)
+#include "hexen.h"		// Hexen monsters (console spawn)
 #include "freedoom.h"		// Freedoom monsters (console spawn)
 #include "info.h"		// mobjtype_t, MT_*
 #include "d_items.h"		// weaponinfo (give <weapon> -> its ammo)
@@ -263,6 +264,12 @@ static int C_MobjByName (const char* s)
     {
 	int f = Freedoom_TypeByName (s);
 	if (f >= 0) return f;
+    }
+    // Hexen monsters (ettin/...) -- only when hexenstuff.wad is loaded.
+    if (s[0] && Hexen_Available ())
+    {
+	int x = Hexen_TypeByName (s);
+	if (x >= 0) return x;
     }
     return -1;
 }
