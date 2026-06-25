@@ -112,6 +112,8 @@ def main():
         if (nm.startswith("DS") or nm.startswith("DP")) and is_dmx(raw):
             out.append((nm, raw)); n_snd += 1
 
+    # tag as an aiDoom-internal asset pack so the launcher hides it from the user PWAD list
+    out.insert(0, ("AISTUFF", b"aiDoom internal asset pack -- loaded by the game, not a user PWAD\n"))
     outp.parent.mkdir(parents=True, exist_ok=True)
     write_wad(outp, out)
     total = sum(len(d) for _n, d in out)

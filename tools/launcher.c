@@ -504,6 +504,32 @@ static int wad_is_iwad(const char* dir, const char* fname)
     return n == 4 && memcmp(magic, "IWAD", 4) == 0;
 }
 
+// Does the WAD contain a lump with this 8-char name?  aiDoom's own internal asset packs
+// (freedoomstuff/hereticstuff/hexenstuff/doom2stuff.wad) carry a marker lump "AISTUFF" so
+// the launcher can hide them from the user PWAD list -- they're loaded by the game / the
+// monster checkboxes, not picked as a "-file".  (tools/extract_*.py add it; existing wads
+// are tagged by tools/mark_internal_wad.py.)
+static int wad_has_lump(const char* dir, const char* fname, const char* lump)
+{
+    char path[1024]; unsigned char hdr[12]; FILE* f; int found = 0;
+    snprintf(path, sizeof path, "%s/%s", dir, fname);
+    if (!(f = fopen(path, "rb"))) return 0;
+    if (fread(hdr, 1, 12, f) == 12) {
+        unsigned n  = hdr[4] | hdr[5]<<8 | hdr[6]<<16 | (unsigned)hdr[7]<<24;
+        unsigned of = hdr[8] | hdr[9]<<8 | hdr[10]<<16 | (unsigned)hdr[11]<<24;
+        if (n && n <= 100000 && fseek(f, (long)of, SEEK_SET) == 0) {
+            unsigned char e[16];
+            for (unsigned i = 0; i < n && !found; i++) {
+                if (fread(e, 1, 16, f) != 16) break;
+                char nm[9]; memcpy(nm, e+8, 8); nm[8] = 0;
+                if (strncasecmp(nm, lump, 8) == 0) found = 1;
+            }
+        }
+    }
+    fclose(f);
+    return found;
+}
+
 static void pwad_add(const char* dir, const char* fname)
 {
     size_t L = fname ? strlen(fname) : 0;
@@ -512,6 +538,7 @@ static void pwad_add(const char* dir, const char* fname)
     if (is_known_iwad(fname) >= 0)                return;   // known DOOM IWADs are the OTHER dropdown
     if (strcasecmp(fname, "aidoom.wad") == 0)     return;   // our voice PWAD -- never list it
     if (wad_is_iwad(dir, fname))                  return;   // a full IWAD (hexen/heretic/...) -> not a PWAD
+    if (wad_has_lump(dir, fname, "AISTUFF"))      return;   // aiDoom-internal asset pack -> not a user PWAD
     for (int i=1; i<pwad_count; i++)                        // de-dupe (same name in two dirs)
         if (strcasecmp(pwads[i], fname) == 0) return;
     snprintf(pwads[pwad_count], sizeof pwads[0], "%s", fname);

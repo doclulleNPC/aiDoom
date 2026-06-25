@@ -117,6 +117,8 @@ def main():
             sound_lumps.append((nm, data2[fp: fp + sz]))
 
     lumps = sprite_lumps + sound_lumps
+    # tag as an aiDoom-internal asset pack so the launcher hides it from the user PWAD list
+    lumps.insert(0, ("AISTUFF", b"aiDoom internal asset pack -- loaded by the game, not a user PWAD\n"))
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     write_wad(out, lumps)

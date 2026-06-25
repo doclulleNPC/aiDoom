@@ -225,6 +225,8 @@ def main():
         if nm not in seen and is_dmx(raw) and any(k in nm.lower() for k in SOUND_KEYWORDS):
             out.append((nm[:8], raw)); n_snd += 1; snd_names.append(nm); seen.add(nm)
 
+    # tag as an aiDoom-internal asset pack so the launcher hides it from the user PWAD list
+    out.insert(0, ("AISTUFF", b"aiDoom internal asset pack -- loaded by the game, not a user PWAD\n"))
     op.parent.mkdir(parents=True, exist_ok=True)
     write_wad(op, out)
 
