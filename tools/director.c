@@ -68,6 +68,7 @@ static void mem_trim (void)
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include "font_atlas.h"
+#include "../files/aidoom_icon.h"	// shared 64x64 RGBA window icon (from aidoom.ico)
 
 // ===========================================================================
 //  Tiny JSON parser (object/array/string/number/bool/null) -- in-house.
@@ -938,6 +939,13 @@ int main (int argc, char** argv)
     SDL_SetMainReady ();
     if (!SDL_Init (SDL_INIT_VIDEO)) { fprintf (stderr, "SDL_Init: %s\n", SDL_GetError ()); return 1; }
     SDL_Window* win = SDL_CreateWindow ("aiDoom AI Director", WINW, WINH, 0);
+    {
+        // Window/taskbar icon from the shared aidoom.ico (same as the game).
+        SDL_Surface* icon = SDL_CreateSurfaceFrom (
+            AIDOOM_ICON_W, AIDOOM_ICON_H, SDL_PIXELFORMAT_RGBA32,
+            (void *)aidoom_icon_rgba, AIDOOM_ICON_W*4);
+        if (icon) { SDL_SetWindowIcon (win, icon); SDL_DestroySurface (icon); }
+    }
     ren = SDL_CreateRenderer (win, NULL);
     SDL_SetRenderVSync (ren, 1);
     font_init ();

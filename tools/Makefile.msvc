@@ -45,10 +45,11 @@ launcher.exe: launcher.c launcher.res font_atlas.h ..\files\aidoom_icon.h
 	@if not exist ..\run mkdir ..\run
 	@copy /Y launcher.exe ..\run\launcher.exe >nul
 
-# Native LLM monster director (no .rc/icon; needs ws2_32 [via #pragma in the
-# source] + psapi for the self-RSS readout).
-director.exe: director.c font_atlas.h
-	$(CC) $(CFLAGS) /Fe:director.exe director.c $(LDFLAGS) $(LIBS) psapi.lib
+director.res: director.rc ..\aidoom.ico
+	rc /nologo /fo director.res director.rc
+
+director.exe: director.c director.res font_atlas.h ..\files\aidoom_icon.h
+	$(CC) $(CFLAGS) /Fe:director.exe director.c director.res $(LDFLAGS) $(LIBS) psapi.lib
 	@if not exist ..\run mkdir ..\run
 	@copy /Y director.exe ..\run\director.exe >nul
 
