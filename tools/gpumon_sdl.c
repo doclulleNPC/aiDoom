@@ -508,19 +508,25 @@ int main(int argc, char** argv)
     int run = 1;
     while (run) {
         SDL_Event e;
-        while (SDL_PollEvent(&e)) {
-            if (e.type == SDL_EVENT_QUIT) run = 0;
-            else if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_ESCAPE) run = 0;
-            else if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN && e.button.button == SDL_BUTTON_LEFT) {
-                int err; SDL_LockMutex(g_lock); err = (g_stat.err[0]!=0); SDL_UnlockMutex(g_lock);
-                float mx=e.button.x, my=e.button.y;
-                if (err && mx>=btn_reconnect.x && mx<btn_reconnect.x+btn_reconnect.w
-                        && my>=btn_reconnect.y && my<btn_reconnect.y+btn_reconnect.h)
-                    do_reconnect();
-            }
+        // Block up to ~33 ms for an event so the window reacts to input (move/click/close)
+        // and WM events INSTANTLY, then redraw.  The old PollEvent + SDL_Delay(100) slept
+        // 100 ms per frame ignoring input, which felt frozen/unresponsive while the worker's
+        // first SSH connect (a few seconds, "connecting...") was in flight.  On timeout we
+        // fall through and redraw (~30 Hz) so the live bars stay smooth.
+        if (SDL_WaitEventTimeout(&e, 33)) {
+            do {
+                if (e.type == SDL_EVENT_QUIT) run = 0;
+                else if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_ESCAPE) run = 0;
+                else if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN && e.button.button == SDL_BUTTON_LEFT) {
+                    int err; SDL_LockMutex(g_lock); err = (g_stat.err[0]!=0); SDL_UnlockMutex(g_lock);
+                    float mx=e.button.x, my=e.button.y;
+                    if (err && mx>=btn_reconnect.x && mx<btn_reconnect.x+btn_reconnect.w
+                            && my>=btn_reconnect.y && my<btn_reconnect.y+btn_reconnect.h)
+                        do_reconnect();
+                }
+            } while (SDL_PollEvent(&e));   // drain the rest of the batch, then one redraw
         }
         draw();
-        SDL_Delay(100);
     }
 
     SDL_SetAtomicInt(&g_running, 0);
