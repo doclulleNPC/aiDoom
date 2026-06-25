@@ -245,6 +245,21 @@ static void wrap_cmd(char* out, int n, const char* inner)
             sshport, user, host, inner);
 }
 
+// Like wrap_cmd but PLAIN: no homebrew PATH prefix and double-quoted, so it works on a
+// Windows target whose SSH shell is cmd.exe / PowerShell (which can't parse the POSIX
+// `PATH=...;` prefix or `if/fi`).  Use this for nvidia-smi -- it's on the system PATH on
+// Windows, WSL and Linux alike, and the command carries no `$` to expand locally.
+static void wrap_plain(char* out, int n, const char* inner)
+{
+    if (host_is_local())
+        snprintf(out, n, "%s 2>&1", inner);
+    else
+        snprintf(out, n,
+            "ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=5 "
+            "-o ServerAliveInterval=3 -o ServerAliveCountMax=2 -p %d %s@%s \"%s\" 2>&1",
+            sshport, user, host, inner);
+}
+
 // --- tiny JSON scrapers for macmon's `pipe` output (no JSON lib needed) ------
 // Number right after the first `"key":` (handles ints and floats).
 static int json_num(const char* buf, const char* key, double* out)
@@ -273,30 +288,58 @@ static int json_arr1(const char* buf, const char* key, double* out)
 // Probe the target once for which tool is present (+ the GPU/chip name).
 // Sets g_mode and g_gpuname.  Returns 0 only if the probe itself failed (e.g.
 // ssh down), so the caller can show a connection error and let the user retry.
+// Is `line` a real nvidia-smi GPU name rather than a "command not found" style error?
+static int looks_like_gpu_name(const char* s)
+{
+    if (!*s) return 0;
+    static const char* errs[] = {
+        "not recognized", "not found", "No such", "command not", "is not",
+        "Permission", "cannot", "Error", "error:", "usage:", "Usage:", NULL };
+    for (int i = 0; errs[i]; i++)
+        if (strstr(s, errs[i])) return 0;
+    return 1;
+}
+
 static int detect_mode(void)
 {
 #ifdef _WIN32
     if (host_is_local()) { g_mode = GM_NVIDIA; return 1; }	// Windows-local: NVIDIA via Sysnative
 #endif
-    // One marker line ("GMTOOL=<tool> NAME=<gpu>") so we can find the verdict even
-    // if the SSH login prints an MOTD/banner first.  No double quotes in here -- it
-    // rides inside ssh "...".
+    char cmd[1024], buf[2048];
+
+    // 1) NVIDIA first, SHELL-AGNOSTIC: a bare nvidia-smi name query works on a Windows SSH
+    //    shell (cmd.exe / PowerShell), on WSL bash and on Linux -- no POSIX `if/fi`, no
+    //    homebrew PATH prefix (which a Windows shell can't parse).  A GPU name back -> NVIDIA.
+    wrap_plain(cmd, sizeof(cmd),
+        "nvidia-smi --query-gpu=name --format=csv,noheader "
+        "|| nvidia-smi.exe --query-gpu=name --format=csv,noheader");
+    if (run_raw(cmd, buf, sizeof(buf)) > 0) {
+        for (char* p = buf; *p; ) {
+            while (*p==' '||*p=='\t'||*p=='\r'||*p=='\n') p++;
+            char* eol = p; while (*eol && *eol!='\r' && *eol!='\n') eol++;
+            char save = *eol; *eol = 0;
+            if (eol > p && looks_like_gpu_name(p)) {
+                g_mode = GM_NVIDIA;
+                snprintf(g_gpuname, sizeof g_gpuname, "%s", p);
+                return 1;
+            }
+            *eol = save; p = (*eol) ? eol + 1 : eol;
+        }
+    }
+
+    // 2) macmon (Apple Silicon): a POSIX shell + the homebrew PATH (set by wrap_cmd).
     static const char* probe =
-        "if command -v nvidia-smi >/dev/null 2>&1; then "
-          "echo GMTOOL=NVIDIA NAME=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -n1); "
-        "elif command -v macmon >/dev/null 2>&1; then "
+        "if command -v macmon >/dev/null 2>&1; then "
           "echo GMTOOL=MACMON NAME=$(sysctl -n machdep.cpu.brand_string 2>/dev/null); "
         "elif [ $(uname -s 2>/dev/null) = Darwin ]; then echo GMTOOL=MACOS; "
         "else echo GMTOOL=NONE; fi";
-    char cmd[1024], buf[1024];
     wrap_cmd(cmd, sizeof(cmd), probe);
     if (run_raw(cmd, buf, sizeof(buf)) <= 0) return 0;		// ssh/exec failed
 
     char* t = strstr(buf, "GMTOOL=");
-    if (!t) return 0;						// no verdict (ssh error/garble) -> retry
+    if (!t) return 0;						// no verdict -> retry
     t += 7;
-    if      (!strncmp(t,"NVIDIA",6)) g_mode = GM_NVIDIA;
-    else if (!strncmp(t,"MACMON",6)) g_mode = GM_MACMON;
+    if      (!strncmp(t,"MACMON",6)) g_mode = GM_MACMON;
     else if (!strncmp(t,"MACOS",5))  g_mode = GM_MACOS_NOMACMON;
     else if (!strncmp(t,"NONE",4))   g_mode = GM_NONE;
     else return 0;
@@ -354,12 +397,14 @@ static int fetch_thread(void* unused)
 #endif
             } else {
                 // nvidia-smi on PATH, then nvidia-smi.exe (WSL), then the explicit
-                // WSL System32 path -- works whether ssh lands in a unix or WSL shell.
+                // WSL System32 path -- works whether ssh lands in a Windows (cmd/PowerShell),
+                // WSL or unix shell.  wrap_PLAIN: no homebrew PATH prefix, which a Windows
+                // shell can't parse (that prefix is only for the macmon/Mac path).
                 char inner[640];
                 snprintf(inner, sizeof(inner),
                     "nvidia-smi %s || nvidia-smi.exe %s || /mnt/c/Windows/System32/nvidia-smi.exe %s",
                     smiargs, smiargs, smiargs);
-                wrap_cmd(cmd, sizeof(cmd), inner);
+                wrap_plain(cmd, sizeof(cmd), inner);
             }
             if (run_query(cmd, line, sizeof(line))) {
                 if (sscanf(line, "%d, %d, %d, %d, %f, %63[^\r\n]",
