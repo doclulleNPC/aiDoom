@@ -634,7 +634,11 @@ reconnect:
             json_escape (histesc, sizeof histesc, j); }
         char* body = malloc (16000);
         snprintf (body, 16000,
-            "{\"model\":\"%s\",\"stream\":false,\"format\":\"json\","
+            // "think":false turns OFF reasoning -- a thinking model (deepseek-r1, qwen3,
+            // supergemma, ...) otherwise spends its whole token budget in a "thinking" field
+            // and returns an EMPTY message.content, so the director got no orders.  Harmless
+            // on non-thinking models.  With it the model writes the JSON straight to content.
+            "{\"model\":\"%s\",\"stream\":false,\"format\":\"json\",\"think\":false,"
             // num_predict caps generation so a model that loops can't run away
             // (the runaway response was what ballooned the director's RAM).
             "\"options\":{\"temperature\":0.6,\"num_predict\":768},\"messages\":["
