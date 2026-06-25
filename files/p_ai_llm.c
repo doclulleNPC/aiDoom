@@ -461,18 +461,18 @@ static int AI_Serialize (void)
     AI_BuildRegistry ();
     AI_OccReset ();
 
-    n += snprintf (obsbuf+n, OBSBUF-n, "{\"tic\":%d,\"player\":{", leveltime);
+    if (n < OBSBUF) n += snprintf (obsbuf+n, OBSBUF-n, "{\"tic\":%d,\"player\":{", leveltime);
     if (pl->mo)
     {
 	int reg = AI_REGION (pl->mo); AI_OccAdd (reg);
-	n += snprintf (obsbuf+n, OBSBUF-n,
+	if (n < OBSBUF) n += snprintf (obsbuf+n, OBSBUF-n,
 		"\"pos\":[%d,%d,%d],\"angle\":%u,\"health\":%d,\"armor\":%d,\"weapon\":%d,\"region\":%d}",
 		pl->mo->x/fx, pl->mo->y/fx, pl->mo->z/fx,
 		(unsigned)(((uint64_t)pl->mo->angle * 360u) >> 32),	// BAM -> degrees
 		pl->health, pl->armorpoints, pl->readyweapon, reg);
     }
     else
-	n += snprintf (obsbuf+n, OBSBUF-n, "\"dead\":true}");
+	if (n < OBSBUF) n += snprintf (obsbuf+n, OBSBUF-n, "\"dead\":true}");
 
     // Buddy (-aicoop only): the director also commands the player's AI companion.
     {
@@ -489,18 +489,18 @@ static int AI_Serialize (void)
 	    int		nr = P_AICoop_NavRoute (rx, ry, 6), r;
 	    int dpl = pl->mo ? (int)(P_AproxDistance (b->mo->x - pl->mo->x,
 						     b->mo->y - pl->mo->y) >> FRACBITS) : -1;
-	    n += snprintf (obsbuf+n, OBSBUF-n,
+	    if (n < OBSBUF) n += snprintf (obsbuf+n, OBSBUF-n,
 		",\"buddy\":{\"pos\":[%d,%d],\"health\":%d,\"armor\":%d,"
 		"\"weapon\":%d,\"ammo\":%d,\"state\":\"%s\",\"region\":%d,\"d_player\":%d,\"route\":[",
 		b->mo->x/fx, b->mo->y/fx, b->health, b->armorpoints,
 		w, ammo, (st>=0 && st<6) ? sname[st] : "follow", breg, dpl);
 	    for (r = 0; r < nr; r++)
-		n += snprintf (obsbuf+n, OBSBUF-n, "%s[%d,%d]", r?",":"", rx[r]/fx, ry[r]/fx);
-	    n += snprintf (obsbuf+n, OBSBUF-n, "]}");
+		if (n < OBSBUF) n += snprintf (obsbuf+n, OBSBUF-n, "%s[%d,%d]", r?",":"", rx[r]/fx, ry[r]/fx);
+	    if (n < OBSBUF) n += snprintf (obsbuf+n, OBSBUF-n, "]}");
 	}
     }
 
-    n += snprintf (obsbuf+n, OBSBUF-n, ",\"monsters\":[");
+    if (n < OBSBUF) n += snprintf (obsbuf+n, OBSBUF-n, ",\"monsters\":[");
     for (i = 0; i < aient_count; i++)
     {
 	mobj_t* m = aient[i].mo;
@@ -510,8 +510,8 @@ static int AI_Serialize (void)
 	int dbud  = bmo    ? (int)(P_AproxDistance (m->x - bmo->x,    m->y - bmo->y)    >> FRACBITS) : -1;
 	int reg   = AI_REGION (m); AI_OccAdd (reg);
 	if (i)
-	    n += snprintf (obsbuf+n, OBSBUF-n, ",");
-	n += snprintf (obsbuf+n, OBSBUF-n,
+	    if (n < OBSBUF) n += snprintf (obsbuf+n, OBSBUF-n, ",");
+	if (n < OBSBUF) n += snprintf (obsbuf+n, OBSBUF-n,
 	    "{\"id\":%d,\"type\":\"%s\",\"pos\":[%d,%d],\"hp\":%d,\"region\":%d,"
 	    "\"see_player\":%s,\"see_buddy\":%s,\"d_player\":%d,\"d_buddy\":%d,\"order\":\"%s\"}",
 	    i+1, AI_TypeName(m->type), m->x/fx, m->y/fx, m->health, reg,
@@ -520,7 +520,7 @@ static int AI_Serialize (void)
 	if (n > OBSBUF - 512)
 	    break;		// buffer guard
     }
-    n += snprintf (obsbuf+n, OBSBUF-n, "],\"count\":%d", aient_count);
+    if (n < OBSBUF) n += snprintf (obsbuf+n, OBSBUF-n, "],\"count\":%d", aient_count);
 
     // Room graph: lets the LLM reason about walls / flanking lanes / doors, not just
     // raw coordinates.  Expand the entity-occupied regions by one hop (so the
@@ -563,24 +563,24 @@ static int AI_Serialize (void)
 	      if (p == npr && npr < 160) { pr[p].a = a; pr[p].b = b; pr[p].k = k; npr++; } }
 	}
 
-	n += snprintf (obsbuf+n, OBSBUF-n, ",\"regions\":[");
+	if (n < OBSBUF) n += snprintf (obsbuf+n, OBSBUF-n, ",\"regions\":[");
 	for (p = 0; p < ai_nocc; p++)
-	    n += snprintf (obsbuf+n, OBSBUF-n, "%s[%d,%d,%d]", p ? "," : "", ai_occ[p],
+	    if (n < OBSBUF) n += snprintf (obsbuf+n, OBSBUF-n, "%s[%d,%d,%d]", p ? "," : "", ai_occ[p],
 		cnt[p] ? (int)(cx[p]/cnt[p]/fx) : 0, cnt[p] ? (int)(cy[p]/cnt[p]/fx) : 0);
-	n += snprintf (obsbuf+n, OBSBUF-n, "],\"links\":[");
+	if (n < OBSBUF) n += snprintf (obsbuf+n, OBSBUF-n, "],\"links\":[");
 	for (p = 0; p < npr; p++)
-	    n += snprintf (obsbuf+n, OBSBUF-n, "%s[%d,%d,\"%s\"]", p ? "," : "",
+	    if (n < OBSBUF) n += snprintf (obsbuf+n, OBSBUF-n, "%s[%d,%d,\"%s\"]", p ? "," : "",
 		pr[p].a, pr[p].b, pr[p].k == 2 ? "locked" : pr[p].k == 1 ? "door" : "open");
-	n += snprintf (obsbuf+n, OBSBUF-n, "]");
+	if (n < OBSBUF) n += snprintf (obsbuf+n, OBSBUF-n, "]");
     }
 
     // L4D director stress (so the LLM can pace spawns): intensity 0..100, FSM state,
     // recent burst damage, carried-ammo %.  See p_ai_director.c.
-    n += snprintf (obsbuf+n, OBSBUF-n,
+    if (n < OBSBUF) n += snprintf (obsbuf+n, OBSBUF-n,
 	",\"director\":{\"intensity\":%d,\"state\":%d,\"recent_dmg\":%d,\"ammo_pct\":%d}",
 	P_Director_Intensity(), P_Director_State(), P_Director_RecentDmg(), P_Director_AmmoPct());
 
-    n += snprintf (obsbuf+n, OBSBUF-n, "}\n");
+    if (n < OBSBUF) n += snprintf (obsbuf+n, OBSBUF-n, "}\n");
     return n;
 }
 
