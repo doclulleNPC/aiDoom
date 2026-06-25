@@ -45,7 +45,6 @@ typedef struct {
     char  name[64];
     char  src[24];	// data source for the footer ("nvidia-smi" / "macmon")
     char  model[64];	// Ollama model currently loaded on the GPU (from /api/ps)
-    float tok_s;	// loaded model's generation speed (tok/s), 0 = not measured
     char  err[160];
 } gpustat_t;
 static gpustat_t   g_stat;
@@ -307,28 +306,6 @@ static int detect_mode(void)
     return 1;
 }
 
-// Measure the loaded model's generation speed with a tiny one-off /api/generate: ask for a
-// few tokens and read Ollama's own `eval_count` / `eval_duration` (ns) -> tokens/second.
-// This is the same number `ollama run` prints.  Called THROTTLED (see fetch loop) because
-// it does real generation -- too often and it would pollute the GPU-load reading it sits
-// next to.  Returns 0 on any failure (curl missing, model unloaded, parse miss).
-static float ollama_tokrate(const char* model, const char* oh)
-{
-    char cmd[640], buf[8192];
-    double ec, ed;
-    snprintf(cmd, sizeof(cmd),
-        "curl -s --max-time 8 http://%s:11434/api/generate "
-        "-d '{\"model\":\"%s\",\"prompt\":\"Hi\",\"stream\":false,\"options\":{\"num_predict\":24}}' 2>&1",
-        oh, model);
-    if (run_raw(cmd, buf, sizeof(buf)) <= 0) return 0;
-    // eval_* is the GENERATION phase; prompt_eval_* is prompt ingest -- the leading quote in
-    // the key keeps strstr from matching "prompt_eval_count" by accident.
-    if (!json_num(buf, "\"eval_count\"", &ec) || !json_num(buf, "\"eval_duration\"", &ed))
-        return 0;
-    if (ec <= 0 || ed <= 0) return 0;
-    return (float)(ec * 1e9 / ed);
-}
-
 // ----------------------------------------------------------------- worker
 static int fetch_thread(void* unused)
 {
@@ -426,26 +403,6 @@ static int fetch_thread(void* unused)
                     s.model[i] = 0;
                 }
             }
-
-            // Generation speed (tok/s).  Throttled: re-measure only when the loaded model
-            // changes or roughly every 30 s -- benchmarking does real generation, so doing
-            // it every 2 s poll would both add load and skew the GPU-load bar.  Cached
-            // between measurements.  (Skipped entirely when no model is loaded.)
-            static char  bench_model[64] = "";
-            static float bench_rate = 0.0f;
-            static int   bench_ttl = 0;
-            if (s.model[0]) {
-                if (strcmp(s.model, bench_model) != 0) bench_ttl = 0;   // model changed -> now
-                if (bench_ttl <= 0) {
-                    float r = ollama_tokrate(s.model, ohost[0] ? ohost : host);
-                    if (r > 0) { bench_rate = r; snprintf(bench_model, sizeof(bench_model), "%s", s.model); }
-                    bench_ttl = 30 / (POLL_SECS > 0 ? POLL_SECS : 2);   // ~30 s between measures
-                }
-                bench_ttl--;
-                s.tok_s = bench_rate;
-            } else {
-                bench_model[0] = 0; bench_rate = 0.0f;   // unloaded -> forget the stale rate
-            }
         }
 
         SDL_LockMutex(g_lock); g_stat = s; SDL_UnlockMutex(g_lock);
@@ -514,12 +471,6 @@ static void draw(void)
 
     snprintf(buf,sizeof(buf),"%.0f W", s.power);
     bar(206, "Power", s.power / (s.pmax > 0 ? s.pmax : 350.0f), buf);
-
-    // Loaded model's generation speed (only when a model is loaded + measured).
-    if (s.model[0] && s.tok_s > 0) {
-        snprintf(buf,sizeof(buf),"inference: %.1f tok/s", s.tok_s);
-        text(16, 240, buf, 130,210,150);
-    }
 
     snprintf(buf,sizeof(buf),"live (%s%s) -- Esc to quit",
              s.src[0] ? s.src : "?", host_is_local() ? "" : " over ssh");

@@ -260,6 +260,7 @@ static volatile int g_quit;
 // status line fields (drawn in the header)
 static char g_status[160] = "starting ...";
 static char g_sub[160]    = "";
+static double g_tokps     = 0;   // Ollama generation speed (tok/s), smoothed; 0 = none yet
 
 static void logln (const char* fmt, ...)
 {
@@ -276,6 +277,18 @@ static void logln (const char* fmt, ...)
 
 static void setstatus (const char* s) { SDL_LockMutex (g_lock); snprintf (g_status, sizeof g_status, "%s", s); SDL_UnlockMutex (g_lock); }
 static void setsub    (const char* s) { SDL_LockMutex (g_lock); snprintf (g_sub,    sizeof g_sub,    "%s", s); SDL_UnlockMutex (g_lock); }
+
+// Update the live tok/s readout from one Ollama reply's eval_count / eval_duration (ns).
+// Free: the numbers ride in the response the director already fetched -- no extra request.
+// Lightly smoothed (EMA) so the header figure doesn't jitter round to round.
+static void set_tokps (double eval_count, double eval_duration_ns)
+{
+    if (eval_count <= 0 || eval_duration_ns <= 0) return;
+    double tps = eval_count * 1e9 / eval_duration_ns;
+    SDL_LockMutex (g_lock);
+    g_tokps = (g_tokps > 0) ? (0.6 * g_tokps + 0.4 * tps) : tps;
+    SDL_UnlockMutex (g_lock);
+}
 
 // ===========================================================================
 //  Sockets
@@ -650,6 +663,13 @@ reconnect:
         json* content = message ? json_get (message, "content") : NULL;
         int   issued  = 0;
 
+        // Live generation speed: Ollama reports eval_count + eval_duration (ns) on every
+        // non-streamed reply, so the tok/s figure is free -- no extra benchmark request.
+        json* ec = json_get (outer, "eval_count");
+        json* ed = json_get (outer, "eval_duration");
+        if (ec && ec->t == JNUM && ed && ed->t == JNUM)
+            set_tokps (ec->num, ed->num);
+
         if (content && content->t == JSTR)
         {
             json* plan = json_parse (content->str);    // {"commands":[{order,ids}]}
@@ -940,6 +960,7 @@ int main (int argc, char** argv)
         char status[160], sub[160];
         snprintf (status, sizeof status, "%s", g_status);
         snprintf (sub,    sizeof sub,    "%s", g_sub);
+        double tokps = g_tokps;
         int n = g_log_n;
         SDL_UnlockMutex (g_lock);
 
@@ -956,6 +977,11 @@ int main (int argc, char** argv)
         text (WINW - (int)strlen (mem) * FONT_CW - 10, 8, mem, mr, mg, mb);
 
         text (10, 26, status, 230, 230, 120);
+        // live Ollama generation speed, right-aligned on the status row (green)
+        if (tokps > 0) {
+            char tk[48]; snprintf (tk, sizeof tk, "%.1f tok/s", tokps);
+            text (WINW - (int)strlen (tk) * FONT_CW - 10, 26, tk, 130, 210, 150);
+        }
         text (10, 42, sub,    180, 200, 180);
         SDL_SetRenderDrawColor (ren, 60, 64, 80, 255);
         { SDL_FRect ln = { 8, 60, WINW - 16, 1 }; SDL_RenderFillRect (ren, &ln); }
