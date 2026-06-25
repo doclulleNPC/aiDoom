@@ -924,7 +924,14 @@ void G_PlayerReborn (int player)
     // reborn would strip them back to fist+pistol with no keys.  When the buddy is active
     // we carry each reborn player's weapons, ammo (+ caps/backpack) and keys across the
     // wipe -- so a death doesn't undo the run's progress.
-    boolean	keepgear = P_AICoop_Active ();
+    //
+    // BUT only carry a loadout that actually EXISTS: on the very first spawn (new game,
+    // or the buddy's first appearance) the player struct is freshly zeroed, so maxammo
+    // is 0.  Carrying that would overwrite the fist+pistol+50 defaults below with zeros,
+    // leaving the marine with no ammo AND maxammo 0 -- which also blocks every ammo
+    // pickup (P_GiveAmmo bails when ammo == maxammo, i.e. 0 == 0).  maxammo[am_clip] is
+    // 0 only before a player has ever been initialised, so it's the reliable tell.
+    boolean	keepgear = P_AICoop_Active () && players[player].maxammo[am_clip] > 0;
     boolean	owned[NUMWEAPONS];
     int		ammo[NUMAMMO];
     int		ammomax[NUMAMMO];
