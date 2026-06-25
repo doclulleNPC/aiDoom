@@ -41,7 +41,9 @@ static char ohost[128] = "";	// Ollama host for the model query (defaults to `ho
 typedef struct {
     int   valid, util, mem_used, mem_total, temp;
     float power;
+    float pmax;		// power-bar full scale in W (nvidia ~350, Apple ~60)
     char  name[64];
+    char  src[24];	// data source for the footer ("nvidia-smi" / "macmon")
     char  model[64];	// Ollama model currently loaded on the GPU (from /api/ps)
     char  err[160];
 } gpustat_t;
@@ -121,11 +123,12 @@ static void bar(float y, const char* label, float frac, const char* valstr)
     text(bx+6, y+1, valstr, 235,235,240);              // value (readable on track + fill)
 }
 
-// Run a shell command and capture its first output line.  gpumon is a GUI app,
-// so _popen/system would flash a console window on every poll -- on Windows we
-// use CreateProcess with CREATE_NO_WINDOW instead.  Returns 1 if a line was read.
+// Run a shell command and capture its FULL combined stdout+stderr into `buf`.
+// gpumon is a GUI app, so _popen/system would flash a console window on every
+// poll -- on Windows we use CreateProcess with CREATE_NO_WINDOW instead.
+// Returns the number of bytes captured (0 on failure).
 #ifdef _WIN32
-static int run_query(const char* cmd, char* line, int n)
+static int run_raw(const char* cmd, char* buf, int n)
 {
     SECURITY_ATTRIBUTES sa = { sizeof(sa), NULL, TRUE };
     HANDLE rd = NULL, wr = NULL;
@@ -137,25 +140,44 @@ static int run_query(const char* cmd, char* line, int n)
     si.hStdOutput = wr; si.hStdError = wr; si.wShowWindow = SW_HIDE;
     PROCESS_INFORMATION pi; memset(&pi, 0, sizeof(pi));
 
-    char cl[600]; snprintf(cl, sizeof(cl), "cmd /c %s", cmd);
+    char cl[1100]; snprintf(cl, sizeof(cl), "cmd /c %s", cmd);
     BOOL ok = CreateProcessA(NULL, cl, NULL, NULL, TRUE,
                              CREATE_NO_WINDOW, NULL, NULL, &si, &pi);
     CloseHandle(wr);
     if (!ok) { CloseHandle(rd); return 0; }
 
-    char buf[1024]; DWORD got = 0; int total = 0;
-    while (total < (int)sizeof(buf)-1 &&
-           ReadFile(rd, buf+total, sizeof(buf)-1-total, &got, NULL) && got > 0)
+    DWORD got = 0; int total = 0;
+    while (total < n-1 &&
+           ReadFile(rd, buf+total, n-1-total, &got, NULL) && got > 0)
         total += (int)got;
     buf[total] = 0;
     CloseHandle(rd);
     WaitForSingleObject(pi.hProcess, INFINITE);
     CloseHandle(pi.hProcess); CloseHandle(pi.hThread);
+    return total;
+}
+#else
+static int run_raw(const char* cmd, char* buf, int n)
+{
+    FILE* p = popen(cmd, "r");
+    int total = 0, got;
+    if (!p) return 0;
+    while (total < n-1 && (got = (int)fread(buf+total, 1, n-1-total, p)) > 0)
+        total += got;
+    buf[total] = 0;
+    pclose(p);
+    return total;
+}
+#endif
 
-    if (total <= 0) return 0;
-    // Pick the stats line (starts with a digit), skipping shell noise like the WSL
-    // fallback's "bash: nvidia-smi: command not found"; keep the first line as a
-    // fallback so a real ssh/connection error still shows.
+// Run `cmd` and return its most relevant single line in `line`: the first line
+// that starts with a digit (the nvidia-smi/CSV stats line, skipping shell noise
+// like "bash: nvidia-smi: command not found"), else the first line so a real
+// ssh/connection error still surfaces.  Returns 1 if any output was captured.
+static int run_query(const char* cmd, char* line, int n)
+{
+    char buf[2048];
+    if (run_raw(cmd, buf, sizeof(buf)) <= 0) return 0;
     char* best = NULL; char* p = buf;
     while (*p)
     {
@@ -169,32 +191,115 @@ static int run_query(const char* cmd, char* line, int n)
     line[i] = 0;
     return 1;
 }
-#else
-static int run_query(const char* cmd, char* line, int n)
+
+// ----------------------------------------------------------------- backends
+//
+// gpumon auto-detects which monitoring tool the target exposes, so the same
+// binary works against an NVIDIA box, an Apple-Silicon Mac (Ollama via Metal),
+// etc.  Supported sources:
+//   - nvidia-smi  (NVIDIA GPUs; Linux/Windows/WSL)         -> CSV
+//   - macmon      (Apple Silicon, `brew install macmon`)   -> JSON, no sudo
+// See GPUMON.md.
+//
+enum { GM_DETECT = 0, GM_NVIDIA, GM_MACMON, GM_MACOS_NOMACMON, GM_NONE };
+static int  g_mode = GM_DETECT;	// cached after the first successful probe
+static char g_gpuname[64] = "";	// GPU/chip name learned during detection
+
+static int host_is_local(void)
 {
-    FILE* p = popen(cmd, "r");
-    char buf[1024];
-    int  got = 0;
-    if (!p) return 0;
-    line[0] = 0;
-    // Pick the stats line (starts with a digit), skipping shell noise like the WSL
-    // fallback's "bash: nvidia-smi: command not found".  Keep the first line as a
-    // fallback so a real ssh/connection error still gets displayed.
-    while (fgets(buf, sizeof(buf), p))
-    {
-        if (!line[0]) { strncpy(line, buf, n-1); line[n-1] = 0; got = 1; }
-        if (buf[0] >= '0' && buf[0] <= '9') { strncpy(line, buf, n-1); line[n-1] = 0; got = 1; break; }
-    }
-    pclose(p);
-    return got;
+    return (!host[0] || !strcmp(host,"localhost") || !strcmp(host,"127.0.0.1"));
 }
+
+// Wrap a POSIX-sh `inner` command to run on the target: directly for localhost,
+// else over SSH.  `inner` must not contain double quotes (it rides inside ssh "...").
+//
+// Two portability fixes baked in for the macmon/Apple path:
+//  - Homebrew (Apple Silicon /opt/homebrew/bin, Intel /usr/local/bin) is NOT on a
+//    non-interactive shell's PATH, so `macmon` wouldn't be found -- prepend it.
+//  - StrictHostKeyChecking=accept-new lets the very first SSH connection trust the
+//    host key under BatchMode (which otherwise aborts on an unknown host).
+static void wrap_cmd(char* out, int n, const char* inner)
+{
+    if (host_is_local())
+#ifdef _WIN32
+        snprintf(out, n, "%s 2>&1", inner);	// (Windows-local uses the nvidia Sysnative path, not this)
+#else
+        snprintf(out, n, "PATH=/opt/homebrew/bin:/usr/local/bin:$PATH; %s 2>&1", inner);
 #endif
+    else
+        snprintf(out, n,
+            "ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=5 "
+            "-o ServerAliveInterval=3 -o ServerAliveCountMax=2 -p %d %s@%s "
+            "\"PATH=/opt/homebrew/bin:/usr/local/bin:$PATH; %s\" 2>&1",
+            sshport, user, host, inner);
+}
+
+// --- tiny JSON scrapers for macmon's `pipe` output (no JSON lib needed) ------
+// Number right after the first `"key":` (handles ints and floats).
+static int json_num(const char* buf, const char* key, double* out)
+{
+    const char* p = strstr(buf, key);
+    if (!p) return 0;
+    p += strlen(key);
+    while (*p == ':' || *p == ' ' || *p == '\t') p++;
+    if (*p == '"' || *p == '[' || *p == '{') return 0;
+    char* end; double v = strtod(p, &end);
+    if (end == p) return 0;
+    *out = v; return 1;
+}
+// Second element of the array after `"key":` (macmon's [freq, usage] tuples).
+static int json_arr1(const char* buf, const char* key, double* out)
+{
+    const char* p = strstr(buf, key);
+    if (!p) return 0;
+    p = strchr(p, '['); if (!p) return 0;
+    p = strchr(p, ','); if (!p) return 0;	// skip element 0 (the frequency)
+    char* end; double v = strtod(p+1, &end);
+    if (end == p+1) return 0;
+    *out = v; return 1;
+}
+
+// Probe the target once for which tool is present (+ the GPU/chip name).
+// Sets g_mode and g_gpuname.  Returns 0 only if the probe itself failed (e.g.
+// ssh down), so the caller can show a connection error and let the user retry.
+static int detect_mode(void)
+{
+#ifdef _WIN32
+    if (host_is_local()) { g_mode = GM_NVIDIA; return 1; }	// Windows-local: NVIDIA via Sysnative
+#endif
+    // One marker line ("GMTOOL=<tool> NAME=<gpu>") so we can find the verdict even
+    // if the SSH login prints an MOTD/banner first.  No double quotes in here -- it
+    // rides inside ssh "...".
+    static const char* probe =
+        "if command -v nvidia-smi >/dev/null 2>&1; then "
+          "echo GMTOOL=NVIDIA NAME=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -n1); "
+        "elif command -v macmon >/dev/null 2>&1; then "
+          "echo GMTOOL=MACMON NAME=$(sysctl -n machdep.cpu.brand_string 2>/dev/null); "
+        "elif [ $(uname -s 2>/dev/null) = Darwin ]; then echo GMTOOL=MACOS; "
+        "else echo GMTOOL=NONE; fi";
+    char cmd[1024], buf[1024];
+    wrap_cmd(cmd, sizeof(cmd), probe);
+    if (run_raw(cmd, buf, sizeof(buf)) <= 0) return 0;		// ssh/exec failed
+
+    char* t = strstr(buf, "GMTOOL=");
+    if (!t) return 0;						// no verdict (ssh error/garble) -> retry
+    t += 7;
+    if      (!strncmp(t,"NVIDIA",6)) g_mode = GM_NVIDIA;
+    else if (!strncmp(t,"MACMON",6)) g_mode = GM_MACMON;
+    else if (!strncmp(t,"MACOS",5))  g_mode = GM_MACOS_NOMACMON;
+    else if (!strncmp(t,"NONE",4))   g_mode = GM_NONE;
+    else return 0;
+    g_gpuname[0] = 0;
+    char* nm = strstr(buf, "NAME=");
+    if (nm) sscanf(nm + 5, " %63[^\r\n]", g_gpuname);
+    return 1;
+}
 
 // ----------------------------------------------------------------- worker
 static int fetch_thread(void* unused)
 {
     (void)unused;
-    char cmd[1024], line[256];
+    char cmd[1024];
     const char* smiargs =
         "--query-gpu=utilization.gpu,memory.used,memory.total,"
         "temperature.gpu,power.draw,name --format=csv,noheader,nounits";
@@ -202,48 +307,75 @@ static int fetch_thread(void* unused)
         // Paused after an error -- wait for the user to hit Reconnect.
         if (SDL_GetAtomicInt(&g_paused)) { SDL_Delay(100); continue; }
 
-        // localhost runs nvidia-smi directly (no SSH/key needed); otherwise SSH.
-        int is_local = (!host[0] || !strcmp(host,"localhost") || !strcmp(host,"127.0.0.1"));
-        if (is_local) {
-#ifdef _WIN32
-            // This is a 32-bit process, so the PATH's C:\Windows\System32 is
-            // redirected to SysWOW64 -- where nvidia-smi.exe isn't.  Reach the
-            // real System32 via the Sysnative alias; fall back to PATH otherwise.
-            const char* root = getenv("SystemRoot"); if (!root) root = "C:\\Windows";
-            char smi[320];
-            snprintf(smi, sizeof(smi), "%s\\Sysnative\\nvidia-smi.exe", root);
-            if (_access(smi, 0) != 0) snprintf(smi, sizeof(smi), "nvidia-smi");
-            snprintf(cmd, sizeof(cmd), "\"%s\" %s 2>&1", smi, smiargs);
-#else
-            snprintf(cmd, sizeof(cmd), "nvidia-smi %s 2>&1", smiargs);
-#endif
-        }
-        else
-            // Try nvidia-smi on PATH first (Windows OpenSSH / Linux host), then
-            // nvidia-smi.exe (WSL with the Windows PATH appended), then the explicit
-            // WSL System32 path -- so it works whether the SSH lands in cmd/PowerShell
-            // or a WSL shell where nvidia-smi.exe is at /mnt/c/Windows/System32.
-            snprintf(cmd, sizeof(cmd),
-                // ConnectTimeout bounds the initial connect; ServerAliveInterval/
-                // CountMax give a SESSION timeout -- if the link drops mid-query ssh
-                // gives up in ~6 s and exits (EOF), so the worker never blocks forever
-                // in fgets (the reason the window couldn't be closed when the GPU box
-                // went away).
-                "ssh -o BatchMode=yes -o ConnectTimeout=5 "
-                "-o ServerAliveInterval=3 -o ServerAliveCountMax=2 -p %d %s@%s "
-                "\"nvidia-smi %s || nvidia-smi.exe %s || /mnt/c/Windows/System32/nvidia-smi.exe %s\" 2>&1",
-                sshport, user, host, smiargs, smiargs, smiargs);
-
+        int is_local = host_is_local();
         gpustat_t s; memset(&s, 0, sizeof(s));
-        if (run_query(cmd, line, sizeof(line))) {
-            if (sscanf(line, "%d, %d, %d, %d, %f, %63[^\r\n]",
-                       &s.util,&s.mem_used,&s.mem_total,&s.temp,&s.power,s.name) >= 5)
-                s.valid = 1;
-            else { line[sizeof(s.err)-1]=0; snprintf(s.err,sizeof(s.err),"%s",line); }
-        } else if (is_local) {
-            snprintf(s.err, sizeof(s.err), "nvidia-smi failed (local)");
-        } else {
-            snprintf(s.err, sizeof(s.err), "ssh/nvidia-smi failed (%s@%s)", user, host);
+
+        // 1) Detect which monitoring tool the target has (cached after success).
+        if (g_mode == GM_DETECT && !detect_mode()) {
+            snprintf(s.err, sizeof(s.err),
+                     is_local ? "probe failed (local)" : "ssh failed (%s@%s)", user, host);
+            SDL_LockMutex(g_lock); g_stat = s; SDL_UnlockMutex(g_lock);
+            SDL_SetAtomicInt(&g_paused, 1); continue;
+        }
+        if (g_mode == GM_NONE || g_mode == GM_MACOS_NOMACMON) {
+            snprintf(s.err, sizeof(s.err), g_mode == GM_MACOS_NOMACMON
+                     ? "macmon not installed -- run: brew install macmon"
+                     : "no GPU tool found (need nvidia-smi or macmon)");
+            SDL_LockMutex(g_lock); g_stat = s; SDL_UnlockMutex(g_lock);
+            SDL_SetAtomicInt(&g_paused, 1); continue;
+        }
+
+        // 2) Build + run the per-tool data query and parse it into `s`.
+        if (g_mode == GM_NVIDIA) {
+            char line[256];
+            strcpy(s.src, "nvidia-smi"); s.pmax = 350.0f;
+            if (is_local) {
+#ifdef _WIN32
+                // 32-bit process: PATH's System32 is redirected to SysWOW64 (no
+                // nvidia-smi there) -- reach real System32 via the Sysnative alias.
+                const char* root = getenv("SystemRoot"); if (!root) root = "C:\\Windows";
+                char smi[320];
+                snprintf(smi, sizeof(smi), "%s\\Sysnative\\nvidia-smi.exe", root);
+                if (_access(smi, 0) != 0) snprintf(smi, sizeof(smi), "nvidia-smi");
+                snprintf(cmd, sizeof(cmd), "\"%s\" %s 2>&1", smi, smiargs);
+#else
+                snprintf(cmd, sizeof(cmd), "nvidia-smi %s 2>&1", smiargs);
+#endif
+            } else {
+                // nvidia-smi on PATH, then nvidia-smi.exe (WSL), then the explicit
+                // WSL System32 path -- works whether ssh lands in a unix or WSL shell.
+                char inner[640];
+                snprintf(inner, sizeof(inner),
+                    "nvidia-smi %s || nvidia-smi.exe %s || /mnt/c/Windows/System32/nvidia-smi.exe %s",
+                    smiargs, smiargs, smiargs);
+                wrap_cmd(cmd, sizeof(cmd), inner);
+            }
+            if (run_query(cmd, line, sizeof(line))) {
+                if (sscanf(line, "%d, %d, %d, %d, %f, %63[^\r\n]",
+                           &s.util,&s.mem_used,&s.mem_total,&s.temp,&s.power,s.name) >= 5)
+                    s.valid = 1;
+                else snprintf(s.err, sizeof(s.err), "%.159s", line);
+            } else snprintf(s.err, sizeof(s.err), is_local
+                     ? "nvidia-smi failed (local)" : "ssh/nvidia-smi failed (%s@%s)", user, host);
+        }
+        else if (g_mode == GM_MACMON) {
+            char buf[2048]; const char* j;
+            strcpy(s.src, "macmon"); s.pmax = 60.0f;
+            strncpy(s.name, g_gpuname[0] ? g_gpuname : "Apple GPU", sizeof(s.name)-1);
+            // macmon `pipe` emits one JSON sample (no sudo needed -- it uses IOReport).
+            wrap_cmd(cmd, sizeof(cmd), "macmon pipe -s 1 -i 400");
+            if (run_raw(cmd, buf, sizeof(buf)) > 0 && (j = strchr(buf, '{'))) {
+                double v;
+                // unified memory -> "VRAM"; gpu_usage is a 0..1 ratio.
+                if (json_arr1(j, "\"gpu_usage\"",    &v)) s.util      = (int)(v*100.0 + 0.5);
+                if (json_num (j, "\"ram_total\"",    &v)) s.mem_total = (int)(v/1048576.0);
+                if (json_num (j, "\"ram_usage\"",    &v)) s.mem_used  = (int)(v/1048576.0);
+                if (json_num (j, "\"gpu_temp_avg\"", &v)) s.temp      = (int)(v + 0.5);
+                if (json_num (j, "\"gpu_power\"",    &v)) s.power     = (float)v;
+                if (s.mem_total > 0) s.valid = 1;
+                else snprintf(s.err, sizeof(s.err), "macmon: could not parse output");
+            } else snprintf(s.err, sizeof(s.err), is_local
+                     ? "macmon failed (local)" : "ssh/macmon failed (%s@%s)", user, host);
         }
 
         // Ask Ollama which model is loaded -- a direct HTTP GET (no SSH); /api/ps returns
@@ -280,6 +412,7 @@ static void do_reconnect(void)
     SDL_LockMutex(g_lock);
     g_stat.err[0] = 0; g_stat.valid = 0;
     SDL_UnlockMutex(g_lock);
+    g_mode = GM_DETECT;		// re-probe (host may have gained nvidia-smi/macmon)
     SDL_SetAtomicInt(&g_paused, 0);
 }
 
@@ -317,16 +450,20 @@ static void draw(void)
     snprintf(buf,sizeof(buf),"%d%%", s.util);
     bar(98,  "GPU load", s.util/100.0f, buf);
 
+    // Apple Silicon has unified memory (no dedicated VRAM) -- label it "RAM".
+    int is_apple = !strcmp(s.src, "macmon");
     snprintf(buf,sizeof(buf),"%d / %d MiB", s.mem_used, s.mem_total);
-    bar(134, "VRAM", s.mem_total ? (float)s.mem_used/s.mem_total : 0, buf);
+    bar(134, is_apple ? "RAM" : "VRAM", s.mem_total ? (float)s.mem_used/s.mem_total : 0, buf);
 
     snprintf(buf,sizeof(buf),"%d C", s.temp);
     bar(170, "Temp", s.temp/100.0f, buf);
 
     snprintf(buf,sizeof(buf),"%.0f W", s.power);
-    bar(206, "Power", s.power/350.0f, buf);
+    bar(206, "Power", s.power / (s.pmax > 0 ? s.pmax : 350.0f), buf);
 
-    text(16, WINH-22, "live (nvidia-smi over ssh) -- Esc to quit", 110,110,122);
+    snprintf(buf,sizeof(buf),"live (%s%s) -- Esc to quit",
+             s.src[0] ? s.src : "?", host_is_local() ? "" : " over ssh");
+    text(16, WINH-22, buf, 110,110,122);
     SDL_RenderPresent(ren);
 }
 
