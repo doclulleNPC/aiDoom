@@ -928,24 +928,28 @@ static void build_command(char* out, int n, const char* iwad_path)
     if (opt_noff)    off += snprintf(out + off, n - off, " -nofriendlyfire");
     if (opt_infight) off += snprintf(out + off, n - off, " -infight");
 
-    // Extra-monster WADs (only -file if the PWAD is actually present, so a checked
-    // box with a missing wad can't crash the engine on startup).
+    // ALL extra wads ride under ONE "-file": the engine reads files after the FIRST -file
+    // until the next "-arg" (d_main.c), so a SECOND "-file" is silently ignored -- which is
+    // why a PWAD picked alongside a monster-pack checkbox never loaded.  Collect every wad
+    // (only if present, so a checked box with a missing wad can't crash startup), then emit
+    // them space-separated under a single -file.
+    char files[640]; int fn = 0; files[0] = 0;
     if (opt_freedoom && wad_present("freedoomstuff.wad"))
-        off += snprintf(out + off, n - off, " -file freedoomstuff.wad");
+        fn += snprintf(files + fn, sizeof files - fn, " freedoomstuff.wad");
     if (opt_heretic && wad_present("hereticstuff.wad"))
-        off += snprintf(out + off, n - off, " -file hereticstuff.wad");
+        fn += snprintf(files + fn, sizeof files - fn, " hereticstuff.wad");
     if (opt_hexen && wad_present("hexenstuff.wad"))
-        off += snprintf(out + off, n - off, " -file hexenstuff.wad");
-
-    // Extra PWAD picked in the PWAD dropdown (skip if a checkbox already loaded it).
+        fn += snprintf(files + fn, sizeof files - fn, " hexenstuff.wad");
     if (pwad_sel > 0 && pwad_sel < pwad_count) {
         const char* pw = pwads[pwad_sel];
         int dup = (opt_freedoom && !strcasecmp(pw, "freedoomstuff.wad"))
                || (opt_heretic  && !strcasecmp(pw, "hereticstuff.wad"))
                || (opt_hexen    && !strcasecmp(pw, "hexenstuff.wad"));
         if (!dup)
-            off += snprintf(out + off, n - off, " -file %s", pw);
+            fn += snprintf(files + fn, sizeof files - fn, " %s", pw);
     }
+    if (files[0])
+        off += snprintf(out + off, n - off, " -file%s", files);
 
     // Always land in a level, never the title screen.  If a PWAD is loaded, warp to ITS
     // first map (custom maps rarely sit on MAP01/E1M1); else the IWAD's first map.
