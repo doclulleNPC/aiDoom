@@ -494,7 +494,7 @@ static void pwad_add(const char* fname)
     size_t L = fname ? strlen(fname) : 0;
     if (pwad_count >= MAX_PWADS || L < 5 || L >= 60) return;
     if (strcasecmp(fname + L - 4, ".wad") != 0)  return;    // .wad only
-    if (is_known_iwad(fname))                     return;   // IWADs are the OTHER dropdown
+    if (is_known_iwad(fname) >= 0)                return;   // IWADs are the OTHER dropdown
     if (strcasecmp(fname, "aidoom.wad") == 0)     return;   // our voice PWAD -- never list it
     for (int i=1; i<pwad_count; i++)                        // de-dupe (same name in two dirs)
         if (strcasecmp(pwads[i], fname) == 0) return;
