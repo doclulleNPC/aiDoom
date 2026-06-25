@@ -58,6 +58,7 @@ const char*	P_AICoop_Report (void);		// "where"  -- distance/dir/HP/doing
 int		P_AICoop_Summon (void);		// "come"   -- run to the player
 const char*	P_AICoop_Wait (void);		// "wait"/"stay" -- toggle hold
 const char*	P_AICoop_Attack (void);		// "attack" -- charge nearest monster
+const char*	P_AICoop_ToggleMode (void);	// (F) cycle attacking/following -> stay -> follow
 const char*	P_AICoop_StatusReport (void);	// "report" -- HP/armor/weapon/ammo
 const char*	P_AICoop_God (void);		// "buddygod" -- toggle buddy god mode
 const char*	P_AICoop_GiveAll (void);	// "buddyarm" -- buddy all weapons + ammo + armor

@@ -183,6 +183,7 @@ extern int	key_jump;
 extern int	key_buddy_come;
 extern int	key_buddy_attack;
 extern int	key_buddy_stay;
+extern int	key_buddy_mode;
 extern int	autorun;
 extern int	key_console;
 extern int	key_spy;
@@ -261,6 +262,7 @@ default_t	defaults[] =
     {"key_buddy_come",&key_buddy_come, ','},
     {"key_buddy_attack",&key_buddy_attack, '.'},
     {"key_buddy_stay",&key_buddy_stay, KEY_MINUS},
+    {"key_buddy_mode",&key_buddy_mode, KEY_MOUSE2},	// (F) cycle stay/follow; default RIGHT mouse
 
     {"key_fire",&key_fire, KEY_RCTRL},
     {"key_use",&key_use, ' '},
@@ -280,7 +282,7 @@ default_t	defaults[] =
     {"use_mouse",&usemouse, 1},
     {"mouseb_fire",&mousebfire,0},
     {"mouseb_strafe",&mousebstrafe,1},
-    {"mouseb_forward",&mousebforward,2},
+    {"mouseb_forward",&mousebforward,-1},	// unbound by default (was the RIGHT button -> moved you forward)
 
     {"use_joystick",&usejoystick, 0},
     {"joyb_fire",&joybfire,0},

@@ -56,6 +56,7 @@ static int	react_timer;		// tics left before firing a freshly-sighted target
 static mobj_t*	react_last;		// the target the reaction timer is counting for
 
 #define COOP_BLAST_SAFE	(176*FRACUNIT)	// don't fire rocket/BFG at a target closer than this (splash)
+#define COOP_BARREL_SAFE (141*FRACUNIT)	// barrel blast (A_Explode radius 128) + 10%, rounded up = ceil(128*1.1)
 #define COOP_DODGE_RANGE (256*FRACUNIT)	// react to incoming missiles within this range
 
 // Breadcrumb trail: the human's recent walkable positions.  When the buddy can't
@@ -859,6 +860,31 @@ const char* P_AICoop_Wait (void)
     if (user_hold) { summon = 0; forceaggro = 0; forcetarget = NULL; ai_goto = 0; }
     return user_hold ? "[Buddy] Holding position -- staying put until you say otherwise."
 		     : "[Buddy] Moving out.";
+}
+
+// (F) One-button buddy mode cycle (default: right mouse button).  attacking OR following
+// -> STAY (hold position); STAY -> FOLLOW (run to + tail the human).  A single flick the
+// player can hit mid-fight without opening the console.
+const char* P_AICoop_ToggleMode (void)
+{
+    if (!AICoop_Mo ())
+	return "[Buddy] (no companion -- launch with -coop)";
+    if (netgame)
+	return "[Buddy] (orders unavailable in netplay)";
+    if (user_hold)
+    {
+	// currently holding -> resume following the human
+	P_AICoop_Summon ();			// summon + tether (clears user_hold)
+	P_AICoop_VoiceTag ("summon_ok");
+	return "[Buddy] Following you.";
+    }
+    // attacking or following -> hold position
+    user_hold = 1;
+    summon = summon_stay = forceaggro = 0;
+    forcetarget = NULL;
+    ai_goto = 0;
+    P_AICoop_VoiceTag ("wait_hold");
+    return "[Buddy] Holding position.";
 }
 
 const char* P_AICoop_Attack (void)
@@ -1712,30 +1738,35 @@ static boolean AICoop_JumpableStep (mobj_t* mo, fixed_t gx, fixed_t gy)
 	&& tmceilingz - tmfloorz >= mo->height;			// fits above the step
 }
 
-// (D) A live explosive barrel within blast range of the buddy?  If so it holds fire --
-// its own shot could detonate a point-blank barrel and gib it (cf. the rocket/BFG guard).
-// A barrel close enough that OUR shot at `tgt` could detonate it and catch us in the
-// blast.  Only counts barrels our shot could actually hit: within blast range, roughly
-// in the firing direction toward the target, AND in line of sight -- a barrel behind a
-// wall (or behind us) is harmless and must not stop the buddy shooting the monster.
+// (D) Would the buddy's shot at `tgt` detonate an explosive barrel that's dangerously
+// close to a SURVIVOR -- the buddy itself OR the human?  Hold fire if so.  Only counts
+// barrels the shot could actually hit (roughly in the firing direction toward the target,
+// AND in line of sight -- a barrel behind a wall or behind us is harmless), and only when
+// the buddy or the player stands within the barrel blast radius +10% (rounded up), so a
+// distant barrel near nobody never stops the buddy from shooting the monster.
 static boolean AICoop_BarrelNear (mobj_t* mo, mobj_t* tgt)
 {
     thinker_t*	th;
+    mobj_t*	pl = (playeringame[0] && players[0].mo) ? players[0].mo : NULL;
     angle_t	at = tgt ? R_PointToAngle2 (mo->x, mo->y, tgt->x, tgt->y) : 0;
     for (th = thinkercap.next; th != &thinkercap; th = th->next)
     {
 	mobj_t* m;
+	fixed_t	db, dp;
 	if (th->function.acp1 != (actionf_p1)P_MobjThinker) continue;
 	m = (mobj_t*)th;
 	if (m->type != MT_BARREL || m->health <= 0) continue;
-	if (P_AproxDistance (m->x - mo->x, m->y - mo->y) >= COOP_BLAST_SAFE) continue;
+	// Both the buddy AND the player outside blast+10% -> detonating it harms no one -> ok.
+	db = P_AproxDistance (m->x - mo->x, m->y - mo->y);
+	dp = pl ? P_AproxDistance (m->x - pl->x, m->y - pl->y) : COOP_BARREL_SAFE;
+	if (db >= COOP_BARREL_SAFE && dp >= COOP_BARREL_SAFE) continue;
 	if (tgt)
 	{
 	    angle_t d = R_PointToAngle2 (mo->x, mo->y, m->x, m->y) - at;
 	    if (d > ANG90 && d < ANG270) continue;	// >90 deg off the firing line -> won't hit it
 	}
 	if (!P_CheckSight (mo, m)) continue;		// behind a wall -> our shot can't reach it
-	return true;
+	return true;					// our shot could blow it up next to a survivor
     }
     return false;
 }

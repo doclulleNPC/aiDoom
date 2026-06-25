@@ -76,6 +76,7 @@ static setting_t settings[] = {
     {"Buddy keys","Buddy: come",    "key_buddy_come",   T_KEY,0,0,F_DOOMRC},
     {"Buddy keys","Buddy: attack",  "key_buddy_attack", T_KEY,0,0,F_DOOMRC},
     {"Buddy keys","Buddy: stay",    "key_buddy_stay",   T_KEY,0,0,F_DOOMRC},
+    {"Buddy keys","Buddy: mode (stay/follow)","key_buddy_mode",T_KEY,0,0,F_DOOMRC},
     {"Buddy keys","Buddy: view (spy)","key_spy",        T_KEY,0,0,F_DOOMRC},
 
     {"Video / mouse","Mouse sensitivity","mouse_sensitivity",T_INT,0,9,F_DOOMRC},
