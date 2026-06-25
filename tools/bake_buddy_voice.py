@@ -202,6 +202,10 @@ EVENTS = [
     ("DSREV01", "Back in the fight!"),
     ("DSREV02", "Thanks -- I owe you one."),
     ("DSREV03", "Let's finish this."),
+    # -- teleport / regroup home (buddyhome command + auto-recall off a hazard)
+    ("DSHOME01", "Regrouping on you!"),
+    ("DSHOME02", "Beam me back, baby!"),
+    ("DSHOME03", "Miss me? I'm back!"),
 ]
 for _n, _p in EVENTS:
     _lump(_n)   # enforce the 8-char Doom lump limit at import time

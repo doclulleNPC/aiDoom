@@ -1044,7 +1044,7 @@ const char* P_AICoop_Home (void)
     mo->angle = coop_home_angle;
     mo->momx = mo->momy = mo->momz = 0;
     forcetarget = NULL; forceaggro = 0; user_hold = 0;
-    P_AICoop_VoiceTag ("summon_ok");		// "On my way!"
+    AICoop_Callout ("home:", 3);		// (C) "Regrouping on you!" / "Beam me back, baby!"
     return "[Buddy] Teleporting back to start.";
 }
 
@@ -2525,7 +2525,7 @@ void P_AICoop_BuildCmd (void)
 	    mo->momx = mo->momy = mo->momz = 0;
 	    nukagetics = 0;
 	    cmd->angleturn = 0;
-	    AICoop_Callout ("stuck:", 3);
+	    AICoop_Callout ("home:", 3);	// (C) teleport-home voice (recalled off a hazard)
 	    return;
 	}
 	// Standing in nukage/lava -- get OUT.  Bolt to the nearest human (on safe
