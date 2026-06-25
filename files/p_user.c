@@ -33,6 +33,7 @@ rcsid[] = "$Id: p_user.c,v 1.3 1997/01/28 22:08:29 b1 Exp $";
 
 #include "p_local.h"
 #include "p_ai_coop.h"		// P_AICoop_RevivePress -- USE revives a downed buddy
+#include "revmarine.h"		// P_ReviveMarineNear -- USE revives a dead marine into a friendly ally
 
 #include "doomstat.h"
 #include "s_sound.h"
@@ -359,7 +360,12 @@ void P_PlayerThink (player_t* player)
     {
 	if (!player->usedown)
 	{
-	    if (!P_AICoop_RevivePress (player))	// revive a downed buddy (donate 10 HP) first
+	    const char* rev;
+	    if (P_AICoop_RevivePress (player))		// revive a downed buddy (donate 10 HP) first
+		;
+	    else if ((rev = P_ReviveMarineNear (player)) != NULL)
+		player->message = (char*) rev;		// (G) stand a dead marine up as a friendly ally
+	    else
 		P_UseLines (player);
 	    player->usedown = true;
 	}

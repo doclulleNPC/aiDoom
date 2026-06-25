@@ -1275,6 +1275,13 @@ typedef enum
     S_XETT_ATK1, S_XETT_ATK2, S_XETT_ATK3,
     S_XETT_DIE1, S_XETT_DIE2, S_XETT_DIE3, S_XETT_DIE4, S_XETT_DIE5,
     S_XETT_DIE6, S_XETT_DIE7, S_XETT_DIE8, S_XETT_DIE9,
+    // (G) revived friendly marine -- PLAY sprite, zombieman-style AI (files/revmarine.c)
+    S_REVMAR_STND,
+    S_REVMAR_RUN1, S_REVMAR_RUN2, S_REVMAR_RUN3, S_REVMAR_RUN4,
+    S_REVMAR_ATK1, S_REVMAR_ATK2,
+    S_REVMAR_PAIN,
+    S_REVMAR_DIE1, S_REVMAR_DIE2, S_REVMAR_DIE3, S_REVMAR_DIE4,
+    S_REVMAR_DIE5, S_REVMAR_DIE6, S_REVMAR_DIE7,
     NUMSTATES
 } statenum_t;
 
@@ -1468,6 +1475,7 @@ typedef enum {
     MT_FD_WOLFSS,	// wolfenstein SS
     MT_FD_KEEN,		// commander keen
     MT_XETTIN,		// Hexen ettin (melee brute)
+    MT_REVMARINE,	// (G) revived friendly marine (files/revmarine.c)
     NUMMOBJTYPES
 
 } mobjtype_t;
