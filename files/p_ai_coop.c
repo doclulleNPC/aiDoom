@@ -1851,6 +1851,23 @@ static void P_AICoop_Revive (int hp)
     bot->deltaviewheight = 0;
     P_SetMobjState (mo, mo->info->spawnstate);	// stand up (S_PLAY)
     bot->pendingweapon = bot->readyweapon;	// raise the weapon again
+
+    // The reviver had to stand within 96u of the DOWNED corpse, which isn't solid -- so
+    // the human is often standing right on top of it.  Now that the buddy is solid again
+    // they overlap and both wedge (two solids can't separate).  If the buddy stood up
+    // inside something, shove it to the nearest free spot (away from whatever it hit).
+    if (!P_CheckPosition (mo, mo->x, mo->y))
+    {
+	extern boolean P_TryMove (mobj_t* thing, fixed_t x, fixed_t y);
+	static const int ox[8] = { 1, 1, 0, -1, -1, -1,  0,  1 };
+	static const int oy[8] = { 0, 1, 1,  1,  0, -1, -1, -1 };
+	fixed_t step = mo->radius * 2 + 8*FRACUNIT;	// clear of the reviver (r_buddy + r_human)
+	int k;
+	for (k = 0; k < 8; k++)
+	    if (P_TryMove (mo, mo->x + ox[k]*step, mo->y + oy[k]*step))
+		break;
+    }
+
     AICoop_Callout ("revived:", 3);
 }
 
@@ -1934,6 +1951,14 @@ void P_AICoop_BuildCmd (void)
     // for a few seconds, and it gets back up where it fell.
     if (bot->playerstate == PST_DEAD)
     {
+	// If the downed body fell on (or slid into) a damaging floor -- nukage/lava/etc. --
+	// the human can't safely reach it to revive, and the corpse just keeps cooking.
+	// Pull the body back to its recorded spawn point so it can be revived on safe ground.
+	if (bot->mo && coop_home_set && AICoop_DamagingFloor (bot->mo->x, bot->mo->y))
+	{
+	    P_TeleportMove (bot->mo, coop_home_x, coop_home_y);
+	    bot->mo->momx = bot->mo->momy = bot->mo->momz = 0;
+	}
 	memset (cmd, 0, sizeof(*cmd));		// never tap USE -> stays down (no reborn)
 	AICoop_Callout ("help:", 5);		// scream for help (4s cooldown gates it)
 	return;					// revived by the human's USE (P_AICoop_RevivePress)
