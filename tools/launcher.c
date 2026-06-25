@@ -489,13 +489,29 @@ static void scan_iwads(void)
 // Every .wad in the wad dirs that ISN'T a known IWAD and isn't our own aidoom.wad
 // voice asset -- offered as an optional extra "-file" load (freedoomstuff,
 // hereticstuff, hexenstuff, or any user PWAD dropped into run/ID0).
-static void pwad_add(const char* fname)
+
+// A WAD's 4-byte magic tells PWAD from IWAD.  A full IWAD (a stand-alone game like
+// hexen.wad / heretic.wad / strife1.wad) makes no sense as an extra "-file" load, so we
+// drop it from the PWAD list even when its name isn't in KNOWN_IWADS.  Unreadable/odd files
+// default to "not an IWAD" (kept), so a real PWAD is never hidden by an I/O hiccup.
+static int wad_is_iwad(const char* dir, const char* fname)
+{
+    char path[1024]; char magic[4] = {0}; FILE* f; size_t n;
+    snprintf(path, sizeof path, "%s/%s", dir, fname);
+    if (!(f = fopen(path, "rb"))) return 0;
+    n = fread(magic, 1, 4, f);
+    fclose(f);
+    return n == 4 && memcmp(magic, "IWAD", 4) == 0;
+}
+
+static void pwad_add(const char* dir, const char* fname)
 {
     size_t L = fname ? strlen(fname) : 0;
     if (pwad_count >= MAX_PWADS || L < 5 || L >= 60) return;
     if (strcasecmp(fname + L - 4, ".wad") != 0)  return;    // .wad only
-    if (is_known_iwad(fname) >= 0)                return;   // IWADs are the OTHER dropdown
+    if (is_known_iwad(fname) >= 0)                return;   // known DOOM IWADs are the OTHER dropdown
     if (strcasecmp(fname, "aidoom.wad") == 0)     return;   // our voice PWAD -- never list it
+    if (wad_is_iwad(dir, fname))                  return;   // a full IWAD (hexen/heretic/...) -> not a PWAD
     for (int i=1; i<pwad_count; i++)                        // de-dupe (same name in two dirs)
         if (strcasecmp(pwads[i], fname) == 0) return;
     snprintf(pwads[pwad_count], sizeof pwads[0], "%s", fname);
@@ -516,7 +532,7 @@ static void scan_pwads(void)
             int count = 0;
             char** files = SDL_GlobDirectory(dirs[d], pats[p], 0, &count);
             if (!files) continue;
-            for (int i = 0; i < count; i++) pwad_add(files[i]);
+            for (int i = 0; i < count; i++) pwad_add(dirs[d], files[i]);
             SDL_free(files);
         }
     if (pwad_sel >= pwad_count) pwad_sel = 0;
