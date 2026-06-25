@@ -22,6 +22,7 @@
 #include "doomstat.h"			// players[], thinkercap
 #include "info.h"
 #include "m_fixed.h"
+#include "m_random.h"			// P_Random -- pick a random gib decoration on death
 #include "tables.h"
 #include "sounds.h"
 #include "p_local.h"
@@ -43,6 +44,19 @@ extern mobj_t*	P_SpawnMobj (fixed_t x, fixed_t y, fixed_t z, mobjtype_t type);
 extern void	P_RemoveMobj (mobj_t*);
 extern boolean	P_TryMove (mobj_t* thing, fixed_t x, fixed_t y);
 extern boolean	P_CheckPosition (mobj_t* thing, fixed_t x, fixed_t y);
+extern void	S_StartSound (void* origin, int sfx_id);
+
+// On death the revived marine GIBS into a permanent bloody mess instead of leaving a
+// clean (re-revivable) corpse: spawn a random gib decoration -- DOOM thing 10
+// (MT_MISC68, "bloody mess") or 24 (MT_MISC71, "pool of guts") -- and squelch.  The
+// marine mobj itself is then removed by its death state chaining to S_NULL, so it can
+// never be raised again (it is NOT a thing-15 dead marine).
+void A_RevMarineGib (mobj_t* actor)
+{
+    mobjtype_t t = (P_Random () & 1) ? MT_MISC68 : MT_MISC71;
+    P_SpawnMobj (actor->x, actor->y, actor->z, t);
+    S_StartSound (actor, sfx_slop);
+}
 
 #define BRIGHT		32768			// FF_FULLBRIGHT frame bit
 #define REVMAR_RANGE	(96*FRACUNIT)		// human must be this close (and press USE) to revive
@@ -69,13 +83,16 @@ void RevMarine_Init (void)
     ST (S_REVMAR_ATK1, 4,         8, (actionf_p1)A_FaceTarget, S_REVMAR_ATK2);
     ST (S_REVMAR_ATK2, BRIGHT|5,  8, (actionf_p1)A_PosAttack,  S_REVMAR_RUN1);	// pistol shot (hitscan)
     ST (S_REVMAR_PAIN, 6,         6, (actionf_p1)A_Pain,       S_REVMAR_RUN1);
-    ST (S_REVMAR_DIE1, 7,        10, NULL,                     S_REVMAR_DIE2);
-    ST (S_REVMAR_DIE2, 8,        10, (actionf_p1)A_Scream,     S_REVMAR_DIE3);
-    ST (S_REVMAR_DIE3, 9,        10, (actionf_p1)A_Fall,       S_REVMAR_DIE4);
-    ST (S_REVMAR_DIE4, 10,       10, NULL,                     S_REVMAR_DIE5);
-    ST (S_REVMAR_DIE5, 11,       10, NULL,                     S_REVMAR_DIE6);
-    ST (S_REVMAR_DIE6, 12,       10, NULL,                     S_REVMAR_DIE7);
-    ST (S_REVMAR_DIE7, 13,       -1, NULL,                     S_NULL);
+    // Death: collapse, then GIB into a permanent bloody mess (A_RevMarineGib at DIE6)
+    // and remove the marine (DIE7 -> S_NULL) so it leaves a thing-10/24 gib, NOT a
+    // re-revivable thing-15 corpse.
+    ST (S_REVMAR_DIE1, 7,         5, (actionf_p1)A_Scream,        S_REVMAR_DIE2);
+    ST (S_REVMAR_DIE2, 8,         5, (actionf_p1)A_Fall,          S_REVMAR_DIE3);
+    ST (S_REVMAR_DIE3, 9,         5, NULL,                        S_REVMAR_DIE4);
+    ST (S_REVMAR_DIE4, 10,        5, NULL,                        S_REVMAR_DIE5);
+    ST (S_REVMAR_DIE5, 11,        5, NULL,                        S_REVMAR_DIE6);
+    ST (S_REVMAR_DIE6, 12,        4, (actionf_p1)A_RevMarineGib,  S_REVMAR_DIE7);
+    ST (S_REVMAR_DIE7, 13,        4, NULL,                        S_NULL);
 
     m = &mobjinfo[MT_REVMARINE];
     m->doomednum   = -1;			// never map-placed; only spawned by a revive
