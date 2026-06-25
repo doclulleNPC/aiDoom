@@ -813,7 +813,17 @@ reconnect:
         }
         else
         {
-            logln ("round %d: ollama returned no content (llm=%.1fs)", round, dt);
+            // No usable message.content -- surface WHY.  Ollama puts failures in a top-level
+            // {"error":"..."} (most often: the model isn't pulled on this host), which the old
+            // generic "no content" hid.  Else log a raw snippet so the real reply is visible.
+            json* err = json_get (outer, "error");
+            if (err && err->t == JSTR)
+                logln ("round %d: ollama error: %.150s", round, err->str);
+            else {
+                char snip[200]; snprintf (snip, sizeof snip, "%.180s", resp ? resp : "(null)");
+                for (char* q = snip; *q; q++) if (*q == '\n' || *q == '\r' || *q == '\t') *q = ' ';
+                logln ("round %d: ollama returned no content (llm=%.1fs): %s", round, dt, snip);
+            }
         }
 
         char s2[160];
