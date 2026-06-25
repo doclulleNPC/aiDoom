@@ -1875,6 +1875,28 @@ boolean P_AICoop_RevivePress (player_t* presser)
     return true;
 }
 
+static boolean AICoop_PlayerInLine (mobj_t* mo, mobj_t* tgt)
+{
+    int i;
+    for (i = 0; i < MAXPLAYERS; i++)
+    {
+	mobj_t* pl;
+	int txi, tyi, pxi, pyi, dti, perp;
+	if (i == coop_slot || !playeringame[i]) continue;
+	if (players[i].playerstate != PST_LIVE || !players[i].mo) continue;
+	pl = players[i].mo;
+	txi = (tgt->x - mo->x) >> FRACBITS; tyi = (tgt->y - mo->y) >> FRACBITS;
+	pxi = (pl->x  - mo->x) >> FRACBITS; pyi = (pl->y  - mo->y) >> FRACBITS;
+	dti = P_AproxDistance (tgt->x - mo->x, tgt->y - mo->y) >> FRACBITS;
+	if (dti < 1)                         continue;
+	if (pxi*txi + pyi*tyi <= 0)          continue;	// player is behind/beside the buddy
+	if (pxi*pxi + pyi*pyi >= dti*dti)    continue;	// player is farther than the target
+	perp = abs (pxi*tyi - pyi*txi) / dti;		// player's distance from the shot line
+	if (perp < 40) return true;
+    }
+    return false;
+}
+
 void P_AICoop_BuildCmd (void)
 {
     player_t*	bot;
@@ -1986,30 +2008,40 @@ void P_AICoop_BuildCmd (void)
 	    angle_t base_ang = R_PointToAngle2 (pl->x, pl->y, mo->x, mo->y);
 	    fixed_t step = 32*FRACUNIT;
 	    angle_t choose_ang = base_ang;
+	    boolean choose_set = false;
 	    
 
-
-	    // Check if directly away is clear
-	    fixed_t tx = mo->x + FixedMul (step, finecosine[base_ang >> ANGLETOFINESHIFT]);
-	    fixed_t ty = mo->y + FixedMul (step, finesine[base_ang >> ANGLETOFINESHIFT]);
-	    if (!AICoop_CanReach (mo, tx, ty, false))
+	    
+	    // Prefer stepping sideways (left 90 deg or right -90 deg) to clear the path
+	    // Try stepping left (90 deg)
+	    fixed_t tx = mo->x + FixedMul (step, finecosine[(base_ang + ANG90) >> ANGLETOFINESHIFT]);
+	    fixed_t ty = mo->y + FixedMul (step, finesine[(base_ang + ANG90) >> ANGLETOFINESHIFT]);
+	    if (AICoop_CanReach (mo, tx, ty, false))
 	    {
-		// Try stepping left (90 deg)
-		tx = mo->x + FixedMul (step, finecosine[(base_ang + ANG90) >> ANGLETOFINESHIFT]);
-		ty = mo->y + FixedMul (step, finesine[(base_ang + ANG90) >> ANGLETOFINESHIFT]);
+		choose_ang = base_ang + ANG90;
+		choose_set = true;
+	    }
+	    else
+	    {
+		// Try stepping right (-90 deg)
+		tx = mo->x + FixedMul (step, finecosine[(base_ang - ANG90) >> ANGLETOFINESHIFT]);
+		ty = mo->y + FixedMul (step, finesine[(base_ang - ANG90) >> ANGLETOFINESHIFT]);
 		if (AICoop_CanReach (mo, tx, ty, false))
 		{
-		    choose_ang = base_ang + ANG90;
+		    choose_ang = base_ang - ANG90;
+		    choose_set = true;
 		}
-		else
+	    }
+
+	    if (!choose_set)
+	    {
+		// Fallback: step directly away from the player
+		tx = mo->x + FixedMul (step, finecosine[base_ang >> ANGLETOFINESHIFT]);
+		ty = mo->y + FixedMul (step, finesine[base_ang >> ANGLETOFINESHIFT]);
+		if (AICoop_CanReach (mo, tx, ty, false))
 		{
-		    // Try stepping right (-90 deg)
-		    tx = mo->x + FixedMul (step, finecosine[(base_ang - ANG90) >> ANGLETOFINESHIFT]);
-		    ty = mo->y + FixedMul (step, finesine[(base_ang - ANG90) >> ANGLETOFINESHIFT]);
-		    if (AICoop_CanReach (mo, tx, ty, false))
-		    {
-			choose_ang = base_ang - ANG90;
-		    }
+		    choose_ang = base_ang;
+		    choose_set = true;
 		}
 	    }
 
@@ -2378,7 +2410,7 @@ void P_AICoop_BuildCmd (void)
 	{
 	    angle_t	aang = R_PointToAngle2 (mo->x, mo->y, aimmon->x, aimmon->y);
 	    P_AimLineAttack (mo, aang, COOP_SIGHT);
-	    if (linetarget && linetarget->player)
+	    if ((linetarget && linetarget->player) || AICoop_PlayerInLine (mo, aimmon))
 	    {
 		// Friendly fire guard: the autoaim trace hits a PLAYER (the human is
 		// between us and the monster) -- DON'T shoot.  Strafe a little to clear
