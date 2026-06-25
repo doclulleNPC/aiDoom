@@ -245,6 +245,18 @@ static void wrap_cmd(char* out, int n, const char* inner)
             sshport, user, host, inner);
 }
 
+// nvidia-smi with its fallbacks, so the SAME command resolves on every target: bare
+// nvidia-smi (Linux, and cmd.exe which appends .exe), then nvidia-smi.exe (WSL on PATH),
+// then the explicit Windows path via WSL interop (WSL where neither is on the
+// NON-interactive SSH PATH -- the usual case, and why detect must use this too, not just
+// the per-poll query).
+static void nvidia_chain(char* out, int n, const char* args)
+{
+    snprintf(out, n,
+        "nvidia-smi %s || nvidia-smi.exe %s || /mnt/c/Windows/System32/nvidia-smi.exe %s",
+        args, args, args);
+}
+
 // Like wrap_cmd but PLAIN: no homebrew PATH prefix and double-quoted, so it works on a
 // Windows target whose SSH shell is cmd.exe / PowerShell (which can't parse the POSIX
 // `PATH=...;` prefix or `if/fi`).  Use this for nvidia-smi -- it's on the system PATH on
@@ -305,14 +317,14 @@ static int detect_mode(void)
 #ifdef _WIN32
     if (host_is_local()) { g_mode = GM_NVIDIA; return 1; }	// Windows-local: NVIDIA via Sysnative
 #endif
-    char cmd[1024], buf[2048];
+    char cmd[1024], buf[2048], inner[640];
 
-    // 1) NVIDIA first, SHELL-AGNOSTIC: a bare nvidia-smi name query works on a Windows SSH
-    //    shell (cmd.exe / PowerShell), on WSL bash and on Linux -- no POSIX `if/fi`, no
-    //    homebrew PATH prefix (which a Windows shell can't parse).  A GPU name back -> NVIDIA.
-    wrap_plain(cmd, sizeof(cmd),
-        "nvidia-smi --query-gpu=name --format=csv,noheader "
-        "|| nvidia-smi.exe --query-gpu=name --format=csv,noheader");
+    // 1) NVIDIA first, SHELL-AGNOSTIC: the nvidia-smi name query (+ WSL fallbacks) works on a
+    //    Windows SSH shell (cmd.exe / PowerShell), on WSL bash and on Linux -- no POSIX
+    //    `if/fi`, no homebrew PATH prefix (which a Windows shell can't parse).  Uses the SAME
+    //    fallback chain as the per-poll query so detect can't fail where the query would work.
+    nvidia_chain(inner, sizeof(inner), "--query-gpu=name --format=csv,noheader");
+    wrap_plain(cmd, sizeof(cmd), inner);
     if (run_raw(cmd, buf, sizeof(buf)) > 0) {
         for (char* p = buf; *p; ) {
             while (*p==' '||*p=='\t'||*p=='\r'||*p=='\n') p++;
@@ -396,14 +408,10 @@ static int fetch_thread(void* unused)
                 snprintf(cmd, sizeof(cmd), "nvidia-smi %s 2>&1", smiargs);
 #endif
             } else {
-                // nvidia-smi on PATH, then nvidia-smi.exe (WSL), then the explicit
-                // WSL System32 path -- works whether ssh lands in a Windows (cmd/PowerShell),
-                // WSL or unix shell.  wrap_PLAIN: no homebrew PATH prefix, which a Windows
-                // shell can't parse (that prefix is only for the macmon/Mac path).
+                // Same nvidia-smi fallback chain as detect; wrap_PLAIN (no homebrew PATH
+                // prefix, which a Windows shell can't parse -- that prefix is macmon-only).
                 char inner[640];
-                snprintf(inner, sizeof(inner),
-                    "nvidia-smi %s || nvidia-smi.exe %s || /mnt/c/Windows/System32/nvidia-smi.exe %s",
-                    smiargs, smiargs, smiargs);
+                nvidia_chain(inner, sizeof(inner), smiargs);
                 wrap_plain(cmd, sizeof(cmd), inner);
             }
             if (run_query(cmd, line, sizeof(line))) {
