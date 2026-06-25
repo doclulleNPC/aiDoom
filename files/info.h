@@ -205,6 +205,10 @@ typedef enum
     SPR_FAPB,		// arachnotron plasma blast(APBX)
     // Hexen monsters (renamed sprites from hexenstuff.wad, X* namespace)
     SPR_XETT,		// ettin (XETT)
+    SPR_XCEN,		// centaur / slaughtaur (XCEN)
+    SPR_XCTF,		// slaughtaur reflective bolt (XCTF)
+    SPR_XDEM,		// chaos serpent / demon (XDEM)
+    SPR_XDMF,		// chaos serpent fireball (XDMF)
     NUMSPRITES
 
 } spritenum_t;
@@ -1275,6 +1279,28 @@ typedef enum
     S_XETT_ATK1, S_XETT_ATK2, S_XETT_ATK3,
     S_XETT_DIE1, S_XETT_DIE2, S_XETT_DIE3, S_XETT_DIE4, S_XETT_DIE5,
     S_XETT_DIE6, S_XETT_DIE7, S_XETT_DIE8, S_XETT_DIE9,
+    // Centaur / Slaughtaur (melee brute; the leader also lobs a bolt)
+    S_XCEN_LOOK1, S_XCEN_LOOK2,
+    S_XCEN_WALK1, S_XCEN_WALK2, S_XCEN_WALK3, S_XCEN_WALK4,
+    S_XCEN_ATK1, S_XCEN_ATK2, S_XCEN_ATK3,
+    S_XCEN_MIS1, S_XCEN_MIS2, S_XCEN_MIS3, S_XCEN_MIS4,
+    S_XCEN_PAIN1, S_XCEN_PAIN2,
+    S_XCEN_DIE1, S_XCEN_DIE2, S_XCEN_DIE3, S_XCEN_DIE4, S_XCEN_DIE5,
+    S_XCEN_DIE6, S_XCEN_DIE7, S_XCEN_DIE8, S_XCEN_DIE9, S_XCEN_DIE10,
+    // Slaughtaur reflective bolt projectile
+    S_XCTF_MOVE1,
+    S_XCTF_X1, S_XCTF_X2, S_XCTF_X3, S_XCTF_X4, S_XCTF_X5,
+    // Chaos Serpent / Demon (melee + fire-breath fireball)
+    S_XDEM_LOOK1, S_XDEM_LOOK2,
+    S_XDEM_CHASE1, S_XDEM_CHASE2, S_XDEM_CHASE3, S_XDEM_CHASE4,
+    S_XDEM_ATK1_1, S_XDEM_ATK1_2, S_XDEM_ATK1_3,
+    S_XDEM_ATK2_1, S_XDEM_ATK2_2, S_XDEM_ATK2_3,
+    S_XDEM_PAIN1, S_XDEM_PAIN2,
+    S_XDEM_DIE1, S_XDEM_DIE2, S_XDEM_DIE3, S_XDEM_DIE4, S_XDEM_DIE5,
+    S_XDEM_DIE6, S_XDEM_DIE7, S_XDEM_DIE8, S_XDEM_DIE9,
+    // Chaos Serpent fireball projectile
+    S_XDMF_MOVE1, S_XDMF_MOVE2, S_XDMF_MOVE3,
+    S_XDMF_BOOM1, S_XDMF_BOOM2, S_XDMF_BOOM3, S_XDMF_BOOM4, S_XDMF_BOOM5,
     // (G) revived friendly marine -- PLAY sprite, zombieman-style AI (files/revmarine.c)
     S_REVMAR_STND,
     S_REVMAR_RUN1, S_REVMAR_RUN2, S_REVMAR_RUN3, S_REVMAR_RUN4,
@@ -1476,6 +1502,11 @@ typedef enum {
     MT_FD_KEEN,		// commander keen
     MT_XETTIN,		// Hexen ettin (melee brute)
     MT_REVMARINE,	// (G) revived friendly marine (files/revmarine.c)
+    MT_XCENTAUR,	// Hexen centaur (melee brute)
+    MT_XSLAUGHTAUR,	// Hexen slaughtaur (melee + lobbed bolt)
+    MT_XCENTAUR_FX,	// slaughtaur bolt projectile
+    MT_XDEMON,		// Hexen chaos serpent (melee + fire-breath)
+    MT_XDEMON_FX,	// chaos serpent fireball projectile
     NUMMOBJTYPES
 
 } mobjtype_t;

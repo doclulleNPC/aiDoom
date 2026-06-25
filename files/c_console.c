@@ -434,7 +434,7 @@ static void C_Execute (char* line)
     {
 	int t = C_MobjByName (args);
 	if (t < 0)
-	    C_Printf ("usage: summon <imp|demon|spectre|baron|zombie|shotgunner|lostsoul|barrel|mummy|clink|gargoyle>");
+	    C_Printf ("usage: summon <imp|demon|spectre|baron|zombie|shotgunner|lostsoul|barrel|mummy|clink|gargoyle|ettin|centaur|slaughtaur|serpent>");
 	else if (pl->mo)
 	{
 	    unsigned	an = pl->mo->angle >> ANGLETOFINESHIFT;

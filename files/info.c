@@ -63,7 +63,8 @@ char *sprnames[NUMSPRITES] = {
     "HSR2","HSRB",				// d'sparil (phase 2) + blue bolt
     "FSKE","FFAT","FVIL","FBSP","FCPO","FBO2","FPAI","FSSW","FKEE",	// Freedoom monsters
     "FFAB","FFBX","FMAN","FFIR","FAPL","FAPB",				// Freedoom projectiles
-    "XETT"								// Hexen ettin
+    "XETT",								// Hexen ettin
+    "XCEN","XCTF","XDEM","XDMF"						// Hexen centaur/serpent + projectiles
 };
 
 

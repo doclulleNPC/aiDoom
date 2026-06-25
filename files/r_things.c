@@ -227,14 +227,22 @@ void R_InitSpriteDefs (char** namelist)
         if (W_GetNumForName (lumpinfo[l].name) != l)
           continue;
 
+        // A renamed-asset PWAD (extract_hexen.py et al.) can leave junk lumps in
+        // the sprite namespace that share a real sprite's 4-char prefix but aren't
+        // valid frames (e.g. "XCENHIT2"/"XCEN2" for SPR_XCEN -- frame/rot chars out
+        // of the A-Z / 0-8 range).  Skip them instead of I_Error'ing the whole game.
         frame = lumpinfo[l].name[4] - 'A';
         rotation = lumpinfo[l].name[5] - '0';
+        if ((unsigned)frame >= 29 || (unsigned)rotation > 8)
+          continue;
         R_InstallSpriteLump (idx, frame, rotation, false);
 
         if (lumpinfo[l].name[6])
         {
           frame = lumpinfo[l].name[6] - 'A';
           rotation = lumpinfo[l].name[7] - '0';
+          if ((unsigned)frame >= 29 || (unsigned)rotation > 8)
+            continue;
           R_InstallSpriteLump (idx, frame, rotation, true);
         }
       }
