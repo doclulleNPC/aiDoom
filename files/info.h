@@ -1308,6 +1308,8 @@ typedef enum
     S_REVMAR_PAIN,
     S_REVMAR_DIE1, S_REVMAR_DIE2, S_REVMAR_DIE3, S_REVMAR_DIE4,
     S_REVMAR_DIE5, S_REVMAR_DIE6, S_REVMAR_DIE7,
+    // (J) artifact inventory pickups -- reuse existing DOOM sprites (files/p_invent.c)
+    S_ARTI_FLASK, S_ARTI_CHAOS, S_ARTI_TORCH,
     NUMSTATES
 } statenum_t;
 
@@ -1507,6 +1509,9 @@ typedef enum {
     MT_XCENTAUR_FX,	// slaughtaur bolt projectile
     MT_XDEMON,		// Hexen chaos serpent (melee + fire-breath)
     MT_XDEMON_FX,	// chaos serpent fireball projectile
+    MT_ARTI_FLASK,	// (J) Quartz Flask pickup (files/p_invent.c)
+    MT_ARTI_CHAOS,	// (J) Chaos Device pickup
+    MT_ARTI_TORCH,	// (J) Torch pickup
     NUMMOBJTYPES
 
 } mobjtype_t;

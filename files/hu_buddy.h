@@ -44,6 +44,11 @@ void HU_Buddy_SetRes (void);
 // Current on/off state, exposed for the console / Options menu.
 extern int show_buddy_hud;
 
+// (J) Heretic-style artifact inventory readout (bottom-centre): the selected
+// artifact + held count.  No-op if nothing is selected/held or `show_inventory_hud`
+// is off.  Same GS_LEVEL gate as HU_Buddy_Drawer.
+void HU_Inventory_Drawer (void);
+
 #endif
 //-----------------------------------------------------------------------------
 //

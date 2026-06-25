@@ -496,6 +496,10 @@ void HU_Drawer(void)
     // or the user disabled it via `show_buddy_hud`).
     HU_Buddy_Drawer ();
 
+    // (J) Artifact inventory readout, bottom-centre (no-op if nothing held/
+    // selected or `show_inventory_hud` is off).
+    HU_Inventory_Drawer ();
+
 }
 
 void HU_Erase(void)

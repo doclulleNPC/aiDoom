@@ -50,6 +50,23 @@
 //
 // Player states.
 //
+//
+// (J) Heretic-style artifact inventory.  arti_none is slot 0 (the empty/no
+// selection sentinel); the real artifacts follow.  NUMARTIFACTS terminates.
+//
+typedef enum
+{
+    arti_none,
+    arti_flask,			// Quartz Flask  -- +25 HP (cap 100)
+    arti_chaosdevice,		// Chaos Device  -- teleport back to the level start
+    arti_torch,			// Torch         -- temporary infrared light
+    NUMARTIFACTS
+
+} artitype_t;
+
+#define MAXARTICOUNT	16	// per-artifact carry cap (like Heretic)
+
+
 typedef enum
 {
     // Playing or camping.
@@ -167,6 +184,11 @@ typedef struct player_s
 
     // MOD: free-look pitch in BASE-resolution horizon-shift pixels (0 = level).
     int			lookdir;
+
+    // (J) Heretic-style artifact inventory: a held count per artifact and the
+    // currently-selected slot (an artitype_t; arti_none = nothing selected).
+    int			inventory[NUMARTIFACTS];
+    int			invslot;
 
 } player_t;
 

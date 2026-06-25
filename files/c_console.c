@@ -43,6 +43,7 @@
 
 #include "c_console.h"
 #include "p_ai_coop.h"		// companion commands (where/come/wait/attack/report)
+#include "p_invent.h"		// (J) givearti console command
 #include "p_ai_llm.h"		// director on/off toggle
 
 extern patch_t*		hu_font[HU_FONTSIZE];
@@ -298,6 +299,7 @@ static void C_Execute (char* line)
     {
 	C_Printf ("cheats: god  noclip  allmap  kill  health <n>  armor <n>");
 	C_Printf ("give:   all|weapons|ammo|keys|armor|health|<weapon>|<key>");
+	C_Printf ("arti:   givearti flask|chaosdevice|torch");
 	C_Printf ("world:  spawn <thing>  skill <1-5>  map <e> <m> / warp <m>");
 	C_Printf ("view:   crosshair 0..3");
 	C_Printf ("keys:   bind <key> <command> | unbind <key> | bind (list)");
@@ -353,6 +355,23 @@ static void C_Execute (char* line)
 	      C_Printf ("gave %s.", args); }
 	else if ((k = C_CardByName(args)) >= 0) { pl->cards[k]=true; C_Printf("gave %s.", args); }
 	else C_Printf ("give: unknown '%s'", args);
+    }
+    else if (!strcmp(cmd, "givearti"))
+    {
+	// (J) drop an artifact into the inventory: givearti flask|chaosdevice|torch
+	int i; artitype_t a = arti_none;
+	for (i = 0 ; args[i] ; i++) args[i] = tolower(args[i]);
+	if      (!strcmp(args,"flask"))       a = arti_flask;
+	else if (!strcmp(args,"chaosdevice")) a = arti_chaosdevice;
+	else if (!strcmp(args,"torch"))       a = arti_torch;
+	if (a == arti_none)
+	    C_Printf ("usage: givearti flask|chaosdevice|torch");
+	else
+	{
+	    if (pl->inventory[a] < MAXARTICOUNT) pl->inventory[a]++;
+	    if (pl->invslot == arti_none) pl->invslot = a;
+	    C_Printf ("gave %s (x%d).", P_ArtifactName(a), pl->inventory[a]);
+	}
     }
     else if (!strcmp(cmd, "map") || !strcmp(cmd, "warp"))
     {

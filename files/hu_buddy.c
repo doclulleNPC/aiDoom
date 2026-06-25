@@ -31,6 +31,7 @@
 #include "z_zone.h"                 // PU_STATIC
 
 #include "hu_stuff.h"               // HU_FONTSTART / HU_FONTSIZE + the small Doom HUD font
+#include "st_stuff.h"               // ST_HEIGHT (position the inventory line above the status bar)
 
 #include "hu_buddy.h"
 #include "p_ai_coop.h"
@@ -41,6 +42,9 @@ extern patch_t* hu_font[HU_FONTSIZE];
 // On/off (persisted as config key `show_buddy_hud`).  Default ON; the Drawer is a
 // no-op when no co-op buddy is active anyway.
 int show_buddy_hud = 1;
+
+// (J) On/off for the artifact-inventory readout (config key `show_inventory_hud`).
+int show_inventory_hud = 1;
 
 // Weapon names (readyweapon index -> label) for the readout.
 static const char* weapon_short[] = {
@@ -395,4 +399,43 @@ void HU_Buddy_Drawer (void)
     }
 
     HU_Buddy_DrawStrip (bot);
+}
+
+
+// ===========================================================================
+//  (J) Heretic-style artifact inventory readout.
+//
+//  A simple bottom-centre line showing the currently-selected artifact and how
+//  many of it the player holds, e.g. "QUARTZ FLASK x3".  Drawn in the same small
+//  HUD message font (so it scales with the hi-res renderer via V_DrawPatch) and
+//  authored in BASE / wide-base coordinates, just above the status bar.
+//  Reuses the static text helpers above (HU_Buddy_Text / HU_Buddy_TextW).
+// ===========================================================================
+
+void HU_Inventory_Drawer (void)
+{
+    extern const char* P_ArtifactName (artitype_t a);
+    player_t*   pl = &players[consoleplayer];
+    artitype_t  sel;
+    char        line[48];
+    int         wb, tx;
+
+    if (!show_inventory_hud) return;
+    if (menuactive || paused) return;
+    {
+	extern gamestate_t wipegamestate;
+	if (wipegamestate != GS_LEVEL) return;
+    }
+
+    sel = (artitype_t) pl->invslot;
+    if (sel <= arti_none || sel >= NUMARTIFACTS || pl->inventory[sel] <= 0)
+	return;					// nothing selected/held -> draw nothing
+
+    snprintf (line, sizeof line, "%s X%d", P_ArtifactName (sel), pl->inventory[sel]);
+
+    wb = SCREENWIDTH / hires;			// wide-base width = the V_ coordinate space
+    tx = (wb - HU_Buddy_TextW (line)) / 2;	// centre horizontally
+    if (tx < 0) tx = 0;
+    // Just above the status bar (BASE_HEIGHT - ST_HEIGHT), one line up.
+    HU_Buddy_Text (tx, BASE_HEIGHT - ST_HEIGHT - 10, line);
 }

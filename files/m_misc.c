@@ -184,6 +184,9 @@ extern int	key_buddy_come;
 extern int	key_buddy_attack;
 extern int	key_buddy_stay;
 extern int	key_buddy_mode;
+extern int	key_inv_left;
+extern int	key_inv_right;
+extern int	key_inv_use;
 extern int	autorun;
 extern int	key_console;
 extern int	key_spy;
@@ -211,6 +214,7 @@ extern int	viewheight;
 extern int	mouseSensitivity;
 extern int	showMessages;
 extern int	show_buddy_hud;	// hu_buddy.c -- companion top-of-screen HUD
+extern int	show_inventory_hud;	// hu_buddy.c -- (J) artifact inventory readout
 
 extern int	detailLevel;
 
@@ -247,6 +251,7 @@ default_t	defaults[] =
     {"music_volume",&snd_MusicVolume, 8},
     {"show_messages",&showMessages, 1},
     {"show_buddy_hud",&show_buddy_hud, 1},
+    {"show_inventory_hud",&show_inventory_hud, 1},	// (J) artifact inventory readout
     
 
     {"key_right",&key_right, KEY_RIGHTARROW},
@@ -263,6 +268,9 @@ default_t	defaults[] =
     {"key_buddy_attack",&key_buddy_attack, '.'},
     {"key_buddy_stay",&key_buddy_stay, KEY_MINUS},
     {"key_buddy_mode",&key_buddy_mode, KEY_MOUSE2},	// (F) cycle stay/follow; default RIGHT mouse
+    {"key_inv_left",&key_inv_left, '['},		// (J) inventory: select prev artifact
+    {"key_inv_right",&key_inv_right, ']'},		// (J) inventory: select next artifact
+    {"key_inv_use",&key_inv_use, KEY_ENTER},		// (J) inventory: use selected artifact
 
     {"key_fire",&key_fire, KEY_RCTRL},
     {"key_use",&key_use, ' '},

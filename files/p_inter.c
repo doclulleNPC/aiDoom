@@ -41,6 +41,7 @@ rcsid[] = "$Id: p_inter.c,v 1.4 1997/02/03 22:45:11 b1 Exp $";
 #include "p_local.h"
 #include "p_ai_coop.h"		// P_AICoop_IsBuddy -- buddy must not pocket keys
 #include "p_ai_director.h"	// L4D stress director (-director)
+#include "p_invent.h"		// (J) artifact inventory pickups/use
 
 #include "s_sound.h"
 
@@ -670,6 +671,10 @@ P_TouchSpecialThing
 	break;
 		
       default:
+	// (J) artifact inventory pickups (MT_ARTI_*) are matched by mobjtype,
+	// not sprite (they reuse existing DOOM sprites as placeholder icons).
+	if (P_TouchArtifact (player, special))
+	    break;
 	I_Error ("P_SpecialThing: Unknown gettable thing");
     }
 	
