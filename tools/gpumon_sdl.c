@@ -525,7 +525,7 @@ static void draw(void)
     snprintf(buf,sizeof(buf),"%.0f W", s.power);
     bar(206, "Power", s.power / (s.pmax > 0 ? s.pmax : 350.0f), buf);
 
-    snprintf(buf,sizeof(buf),"live (%s%s) -- Esc to quit",
+    snprintf(buf,sizeof(buf),"live (%s%s)",
              s.src[0] ? s.src : "?", host_is_local() ? "" : " over ssh");
     text(16, WINH-22, buf, 110,110,122);
     SDL_RenderPresent(ren);
@@ -568,8 +568,7 @@ int main(int argc, char** argv)
         // fall through and redraw (~30 Hz) so the live bars stay smooth.
         if (SDL_WaitEventTimeout(&e, 33)) {
             do {
-                if (e.type == SDL_EVENT_QUIT) run = 0;
-                else if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_ESCAPE) run = 0;
+                if (e.type == SDL_EVENT_QUIT) run = 0;	// only the window-close button quits (Esc is ignored)
                 else if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN && e.button.button == SDL_BUTTON_LEFT) {
                     int err; SDL_LockMutex(g_lock); err = (g_stat.err[0]!=0); SDL_UnlockMutex(g_lock);
                     float mx=e.button.x, my=e.button.y;
