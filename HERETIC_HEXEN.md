@@ -84,20 +84,39 @@ and weapons** (sprites palette-converted to the DOOM palette, plus their DMX sou
   palette).  Verified: the wad loads under DOOM with no crash and the sprites render
   correctly (ettin / serpent / fighter-axe checked).
 
-#### Hexen monster port -- STARTED (`files/hexen.c` + `hexen.h`)
+#### Hexen monster port -- 10 monsters in (`files/hexen.c` + `hexen.h`)
 
 Same additive mechanism as `files/heretic.c`: `Hexen_Init()` (called from `D_DoomMain`)
-appends the Hexen monsters' states/mobjinfo at runtime; enums (`SPR_XETT`, `S_XETT_*`,
-`MT_XETTIN`) live at the end of `spritenum_t`/`statenum_t`/`mobjtype_t`; `"XETT"` added to
-`sprnames[]`.  Sprites come from `hexenstuff.wad` (the `X*` codes in `hexen_sprite_map.txt`);
-sounds reuse DOOM SFX for now.  Gated by `Hexen_Available()` (sprite present), safe without
-the wad.
-- **Ettin DONE** (first monster): a melee brute (`A_EttinAttack`, HITDICE(2)), hp 175.
-  Spawn via `summon ettin`.  Verified: spawns, chases, hits, dies with no crash.
-- Launcher: a **Hexen** checkbox (next to FreeDoom/Heretic) adds `-file hexenstuff.wad`.
-- Remaining (each follows the Ettin pattern; bigger ones need projectile actors + Hexen
-  `special1/2`/teleport/summon): centaur/slaughtaur, chaos serpent, reiver, afrit, wendigo,
-  stalker, dark bishop, death wyvern, then the bosses (heresiarch, korax).
+appends the Hexen monsters' states/mobjinfo at runtime; enums (`SPR_X*`, `S_X*_*`, `MT_X*`)
+live at the end of `spritenum_t`/`statenum_t`/`mobjtype_t`; the `X*` codes are added to
+`sprnames[]` in lock-step (the count of SPR_* enum entries MUST equal the sprnames[] strings).
+Sprites come from `hexenstuff.wad` (the `X*` codes in `hexen_sprite_map.txt`); sounds reuse
+DOOM SFX for now.  Gated by `Hexen_Available()` (probes `SPR_XETT`), safe without the wad.
+
+**10 monsters DONE** (all verified: spawn / chase / attack / die, no crash; each ranged one
+has its own projectile actor; multi-stage rituals / homing / teleports were simplified to a
+clean single death + straight projectile, no `mobj_t` special1/2):
+
+| Monster | Type | Behaviour | Summon |
+|---|---|---|---|
+| Ettin | `MT_XETTIN` | melee brute, HITDICE(2) | `ettin` |
+| Centaur | `MT_XCENTAUR` | melee brute | `centaur` |
+| Slaughtaur | `MT_XSLAUGHTAUR` | melee + lobbed bolt | `slaughtaur` |
+| Chaos Serpent | `MT_XDEMON` | melee + fire breath | `serpent` |
+| Fire Demon / Afrit | `MT_XFIREDEMON` | flying, fireballs | `afrit` |
+| Reiver / Wraith | `MT_XWRAITH` | floating, drain melee + bolt | `reiver` |
+| Dark Bishop | `MT_XBISHOP` | floating caster | `bishop` |
+| Wendigo / Ice Guy | `MT_XICEGUY` | floating, ice shard | `wendigo` |
+| Stalker | `MT_XSTALKER` | ambusher, melee + spit | `stalker` |
+| Death Wyvern | `MT_XDRAGON` | flying boss (640 hp), fireball | `dragon` |
+
+- **Director:** all 10 are in `dir_hexen[]` (`p_ai_director.c`), mixed into the director's
+  trash tier (~30%) when the Hexen pack is loaded; the Death Wyvern is also a rare exit guard
+  (`P_Director_PickGuard`).  Gated by `P_Director_HexenAvailable()`.
+- **Launcher:** the **Hexen** checkbox (next to FreeDoom/Heretic) adds `-file hexenstuff.wad`.
+- Remaining: the **bosses** Heresiarch + Korax (need Hexen `special1/2` / teleport / summon
+  mechanics), and the **pig** morph target (the generic morph subsystem from the Heretic egg
+  is ready — see `INVENTORY.md`).
 - Authentic Heretic **sounds DONE**: `extract_heretic_monsters.py` now copies the Heretic
   SFX with a `DS` prefix (so the engine's `ds%s` lookup finds them); 51 `sfx_h_*` rows in
   sounds.h/.c, and every Heretic monster's see/attack/pain/death/active sounds are wired to
