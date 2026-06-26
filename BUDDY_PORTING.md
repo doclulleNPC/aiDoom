@@ -132,7 +132,21 @@ verifiziert begehbarer Sprung Richtung Spieler.
   (kein USE → kein Reborn), ruft `help:`.
 - Der Mensch revived ihn, indem er **nah** (`COOP_REVIVE_RANGE` 96u) **steht und USE
   drückt** — `P_AICoop_RevivePress` überträgt 10 HP vom Menschen (geht nicht, wenn der
-  Mensch ≤ 10 HP hätte) und stellt den Buddy in-place wieder auf.
+  Mensch ≤ 10 HP hätte) und stellt den Buddy in-place wieder auf. Steht der Buddy dabei im
+  Menschen, wird er **weggeschoben** (kein Klemmen). Beim Revive **bedankt** er sich
+  zuverlässig (`thanks:`, VP_COMMAND).
+- **Nukage-Recall:** geht der Buddy auf einem Schadens-Boden (Nukage/Lava) down — wo der
+  Mensch ihn nicht sicher erreichen kann — wird der Körper zum Map-Spawn teleportiert **und
+  direkt mit 100 HP wieder aufgestellt**.
+- **Auto-Heal:** unter `COOP_HEAL_HP` gibt der Buddy ein gehaltenes **Heil-Artefakt** aus
+  (`AICoop_AutoHeal`, Reihenfolge Medikit → Flask → Stimpack → Urn → Health-Bonus), bevor er
+  eine Med-Pack im Level sucht. Siehe **`INVENTORY.md`**.
+- **Second Wind (Mensch, nur mit Buddy):** ein sonst tödlicher Treffer am Menschen wird durch
+  ein gehaltenes Medikit/Stimpack abgefangen (`P_InventorySecondWind`) — er bleibt mit 25/10
+  HP stehen statt zu sterben.
+- **Friendly:** Buddy, wiederbelebte Marines und gerufene Verbündete (`MF_FRIEND`) greifen den
+  Menschen **nie** an, selbst wenn er sie versehentlich trifft (Retaliation-Guard in
+  `P_DamageMobj`).
 
 ---
 
@@ -163,11 +177,13 @@ Regelverhalten zurück.
 | `where` | Distanz/Richtung/HP/Tätigkeit melden |
 | `report` | HP/Rüstung/Waffe/Munition |
 | `buddygod` | Buddy-Gott-Modus |
+| `buddyheal` (`buddyhp`) | Buddy auf 100 HP heilen (revived, falls down) |
 | `buddyarm` | alle Waffen + Munition + Rüstung |
 | `buddyhome` | Buddy zum Map-Spawn teleportieren |
 
 Tasten-Binds (`m_misc.c`): `key_buddy_come` (`,`), `key_buddy_attack` (`.`),
-`key_buddy_stay` (`-`) — rebindbar.
+`key_buddy_stay` (`-`), und `key_buddy_mode` (**rechte Maustaste**) = Ein-Tasten-Toggle
+„attacking/following → stay → follow" — alle rebindbar (auch im `aidoom_config`-Tool).
 
 ---
 

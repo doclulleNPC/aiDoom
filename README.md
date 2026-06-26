@@ -41,6 +41,23 @@ a language model drive monster tactics in real time.
   or via a built-in scripted `-aidemo` director. A ready-to-run native **Ollama**
   client is included (`tools/director.c`, a small SDL3 app — no Python). Off unless
   `-aidirector`/`-aidemo` is passed.
+- **L4D-style AI Director** (`files/p_ai_director.c`, `-director`) — an offline, rule-based
+  director that tracks player stress and spawns monsters out of sight behind you in a
+  build-up → peak → relax cycle, drops emergency items when you're hurting, guards the level
+  exit, and can **resurrect dead monsters** (Arch-Vile style). A spoken game-master persona
+  narrates spawns/phases/your death. See [`DIRECTOR_MODES.md`](DIRECTOR_MODES.md).
+- **Artifact inventory** — a Heretic/Hexen-style held-item inventory (scroll `[` `]`, use
+  `Enter`, drop `d`): a **buddy-only DOOM "overflow"** set (the excess health/ammo/armor you
+  pocket at the cap, with a **second wind** that spends a stored medikit to survive a lethal
+  hit), the full **Heretic artifacts** (flask, urn, tome, torch, time bomb, ring, shadowsphere,
+  chaos device, wings of flight, morph ovum), plus generic flight + monster-morph subsystems
+  and true invisibility. See [`INVENTORY.md`](INVENTORY.md).
+- **Heretic & Hexen monsters** (`files/heretic.c`, `files/hexen.c`) — the full Heretic roster
+  and a growing set of Hexen monsters are appended to the engine at runtime from their IWAD
+  art (`tools/extract_*`), summonable from the console and mixed into the director's spawns
+  when their pack is loaded (launcher checkboxes). See [`HERETIC_HEXEN.md`](HERETIC_HEXEN.md).
+- **Revived dead marines** — pressing USE on a "dead marine" map decoration (in co-op) stands
+  it up as a friendly marine ally that hunts monsters for you (gibs permanently on death).
 - Native **Windows build** with Visual Studio 2019 (MSVC) + SDL3; the legacy autotools
   Linux build is still present.
 
@@ -257,6 +274,11 @@ writes one on exit; the editor shows those defaults too.
 
 ## Documentation
 
+- `INVENTORY.md` — the artifact / item inventory systems (DOOM overflow, Heretic artifacts, flight/morph)
+- `BUDDY_PORTING.md` — how the AI co-op buddy behaves (decision tree, revive, auto-heal, voice)
+- `BUDDY_HUD.md` / `BUDDY_VOICE.md` — the buddy's HUD strip and spoken-line catalogue
+- `DIRECTOR_MODES.md` — the AI director(s): rule-based L4D, LLM, demo
+- `HERETIC_HEXEN.md` — the Heretic/Hexen monster & asset ports
 - `AGENT_CONTROL.md` — full player- and monster-control API & TCP protocol
 - `MONSTER_AGENT_GUIDE.md` — guide to directing monsters with an LLM
 - `GPUMON.md` — the GPU monitor (`gpumon`, SDL3)

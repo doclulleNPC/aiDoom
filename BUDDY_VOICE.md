@@ -15,8 +15,13 @@ the priority tiers change.
 
 | Kind | Count | Notes |
 |------|------:|-------|
-| `DS*` buddy voice clips (OGG/Vorbis) | 156 | the spoken lines below — ElevenLabs **Joker-HL** |
-| `DD*` AI-Director voice clips (OGG/Vorbis) | 49 | the game-master persona — ElevenLabs **UT** (see below) |
+| `DS*` buddy voice clips (OGG/Vorbis) | 162 | the spoken lines below — ElevenLabs **Joker-HL** |
+| `DD*` AI-Director voice clips (OGG/Vorbis) | 52 | the game-master persona — ElevenLabs **UT** (see below) |
+
+Recently added tags: **buddy** `home:` (`DSHOME*` — teleported back to spawn) and `thanks:`
+(`DSTHX*` — the human revived it, VP_COMMAND so it always plays); **director** `dir:death:`
+(`DDDEATH*` — taunts a survivor's death). Re-run `tools/bake_buddy_voice.py` after editing the
+phrase list (it caches unchanged clips, only generating the new ones).
 | `BUF*` HUD face graphics | 42 | the buddy's status-bar face (see `BUDDY_HUD.md`) |
 | `VOICEMAP` | 1 | text lump: lump↔phrase map (also `run/aidoom_voice_manifest.txt`; columns lump·persona·voice·phrase·src·bytes) |
 
