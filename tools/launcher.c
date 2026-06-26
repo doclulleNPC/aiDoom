@@ -74,8 +74,8 @@
 #define OPTS_Y    240			// toggle row; centre 248 (Skill-Options gap kept as a separator)
 #define CHK_BOX   16			// checkbox square size
 #define OPT_NOFF_X (PAD + 90)		// "No friendly fire" checkbox
-#define OPT_INF_X  (PAD + 300)		// "Monster infight" checkbox
-#define MONSTERS_Y 268			// extra-monster WAD toggles (FreeDoom / Heretic)
+#define OPT_INF_X  (PAD + 300)		// "All Monster infight" checkbox
+#define MONSTERS_Y 278			// extra-monster WAD toggles (FreeDoom / Heretic) -- a bit of space below the Monster+ row
 #define MON_FD_X   (PAD + 70)		// "FreeDoom" checkbox
 #define MON_HER_X  (PAD + 250)		// "Heretic" checkbox
 #define MON_HEX_X  (PAD + 410)		// "Hexen" checkbox
@@ -1221,7 +1221,7 @@ int main(int argc, char** argv)
                         // Options row: toggle the two checkboxes.
                         if (hit_checkbox(OPT_NOFF_X, OPTS_Y, "No friendly fire", mouse_x, mouse_y))
                             opt_noff = !opt_noff;
-                        if (hit_checkbox(OPT_INF_X, OPTS_Y, "Monster infight", mouse_x, mouse_y))
+                        if (hit_checkbox(OPT_INF_X, OPTS_Y, "All Monster infight", mouse_x, mouse_y))
                             opt_infight = !opt_infight;
 
                         // Monsters row: toggle the extra-monster WAD checkboxes
@@ -1271,7 +1271,7 @@ int main(int argc, char** argv)
         // Monster row
         {
             static const char* mon_opts[] = { "Vanilla", "L4D", "AI Director" };
-            draw_mode_row(MON_Y, "Monster",
+            draw_mode_row(MON_Y, "Monster+ ",
                           mon_opts, 3, mon_mode, 110, NULL);
         }
         // Skill row (5 pills; default Ultra-Violence)
@@ -1284,7 +1284,7 @@ int main(int argc, char** argv)
         {
             text(PAD, OPTS_Y + (CHK_BOX - FONT_CH)/2, "Options", COL_DIM);
             draw_checkbox(OPT_NOFF_X, OPTS_Y, opt_noff,    "No friendly fire");
-            draw_checkbox(OPT_INF_X,  OPTS_Y, opt_infight, "Monster infight");
+            draw_checkbox(OPT_INF_X,  OPTS_Y, opt_infight, "All Monster infight");
 
             text(PAD, MONSTERS_Y + (CHK_BOX - FONT_CH)/2, "Monsters", COL_DIM);
             if (wad_present("freedoomstuff.wad"))
