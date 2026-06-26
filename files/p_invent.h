@@ -18,6 +18,10 @@ boolean		P_UseArtifact (player_t* player, artitype_t which);
 // Inventory navigation (skips empty slots, wraps).  dir = -1 left, +1 right.
 void		P_InvScroll (player_t* player, int dir);
 
+// DROP the selected artifact: spawn its pickup item on the ground in front of the
+// player (re-pickable) and take it out of the inventory.  Returns true if dropped.
+boolean		P_DropArtifact (player_t* player);
+
 // Store overflow into an inventory slot.  `amount` is 1 for the item artifacts
 // (stimpack..bluearmor) and the ammo amount for the arti_ammo_* slots.  Returns
 // false if it can't be stored (item count at MAXARTICOUNT / ammo store at cap),

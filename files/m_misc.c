@@ -187,6 +187,7 @@ extern int	key_buddy_mode;
 extern int	key_inv_left;
 extern int	key_inv_right;
 extern int	key_inv_use;
+extern int	key_inv_drop;
 extern int	autorun;
 extern int	key_console;
 extern int	key_spy;
@@ -271,6 +272,7 @@ default_t	defaults[] =
     {"key_inv_left",&key_inv_left, '['},		// (J) inventory: select prev artifact
     {"key_inv_right",&key_inv_right, ']'},		// (J) inventory: select next artifact
     {"key_inv_use",&key_inv_use, KEY_ENTER},		// (J) inventory: use selected artifact
+    {"key_inv_drop",&key_inv_drop, 'd'},		// (J) inventory: drop selected artifact
 
     {"key_fire",&key_fire, KEY_RCTRL},
     {"key_use",&key_use, ' '},

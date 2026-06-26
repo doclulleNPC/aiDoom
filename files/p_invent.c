@@ -283,3 +283,65 @@ boolean P_UseArtifact (player_t* player, artitype_t which)
 	P_InvScroll (player, +1);
     return true;
 }
+
+
+// ---------------------------------------------------------------------------
+// DROP the currently selected artifact: spawn its pickup item on the ground a
+// little in front of the player (tossed, so they don't instantly re-grab it)
+// and take it out of the inventory.  Works for DOOM overflow items and the
+// Heretic artifacts alike.
+// ---------------------------------------------------------------------------
+extern mobj_t*	P_SpawnMobj (fixed_t x, fixed_t y, fixed_t z, mobjtype_t type);
+extern boolean	P_TryMove (mobj_t* thing, fixed_t x, fixed_t y);
+
+boolean P_DropArtifact (player_t* player)
+{
+    artitype_t	a = (artitype_t) player->invslot;
+    mobjtype_t	t;
+    int		amount = 1;		// inventory units consumed by the drop
+    mobj_t*	drop;
+    mobj_t*	mo = player->mo;
+    unsigned	an;
+    fixed_t	dx, dy;
+
+    if (a <= arti_none || a >= NUMARTIFACTS || player->inventory[a] <= 0 || !mo)
+    {
+	player->message = "NOTHING TO DROP";
+	return false;
+    }
+
+    if (a >= h_arti_flask)		// Heretic artifacts map 1:1 to MT_HARTI_*
+	t = (mobjtype_t)(MT_HARTI_FLASK + (a - h_arti_flask));
+    else switch (a)			// DOOM overflow items -> their stock pickups
+    {
+      case arti_stimpack:     t = MT_MISC10; break;	// stimpack
+      case arti_medikit:      t = MT_MISC11; break;	// medikit
+      case arti_healthbonus:  t = MT_MISC2;  break;	// health bonus
+      case arti_armorbonus:   t = MT_MISC3;  break;	// armor bonus
+      case arti_greenarmor:   t = MT_MISC0;  break;	// green armor
+      case arti_bluearmor:    t = MT_MISC1;  break;	// blue armor
+      case arti_ammo_bullets: t = MT_CLIP;   amount = 10; break;	// a clip
+      case arti_ammo_shells:  t = MT_MISC22; amount = 4;  break;	// 4 shells
+      case arti_ammo_rockets: t = MT_MISC18; amount = 1;  break;	// 1 rocket
+      case arti_ammo_cells:   t = MT_MISC20; amount = 20; break;	// a cell
+      default: player->message = "CAN'T DROP THAT"; return false;
+    }
+
+    // Place it ~40u ahead so it lands in front; if that's inside a wall, drop at the feet.
+    an = mo->angle >> ANGLETOFINESHIFT;
+    dx = mo->x + FixedMul (40*FRACUNIT, finecosine[an]);
+    dy = mo->y + FixedMul (40*FRACUNIT, finesine[an]);
+    drop = P_SpawnMobj (mo->x, mo->y, mo->z, t);	// spawn at the feet...
+    P_TryMove (drop, dx, dy);				// ...slide it ahead (relinks; stays put if a wall blocks)
+    drop->flags |= MF_DROPPED;				// a dropped item (no deathmatch respawn)
+    drop->momx = FixedMul (6*FRACUNIT, finecosine[an]);	// toss it forward + up
+    drop->momy = FixedMul (6*FRACUNIT, finesine[an]);
+    drop->momz = 4*FRACUNIT;
+
+    player->inventory[a] -= amount;
+    if (player->inventory[a] < 0) player->inventory[a] = 0;
+    if (player->inventory[a] <= 0) P_InvScroll (player, +1);	// emptied -> reselect
+
+    player->message = "DROPPED ITEM";
+    return true;
+}

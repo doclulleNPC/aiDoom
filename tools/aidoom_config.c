@@ -81,6 +81,7 @@ static setting_t settings[] = {
     {"Inventory keys","Inventory: previous item","key_inv_left", T_KEY,0,0,F_DOOMRC},
     {"Inventory keys","Inventory: next item","key_inv_right",T_KEY,0,0,F_DOOMRC},
     {"Inventory keys","Inventory: use item","key_inv_use",  T_KEY,0,0,F_DOOMRC},
+    {"Inventory keys","Inventory: drop item","key_inv_drop",T_KEY,0,0,F_DOOMRC},
 
     {"Video / mouse","Mouse sensitivity","mouse_sensitivity",T_INT,0,9,F_DOOMRC},
     {"Video / mouse","Resolution (1-6)", "screen_resolution",T_INT,1,6,F_DOOMRC},
@@ -219,6 +220,7 @@ static void set_default_int(setting_t* s)
     else if (!strcmp(n,"key_inv_left"))     v = '[';
     else if (!strcmp(n,"key_inv_right"))    v = ']';
     else if (!strcmp(n,"key_inv_use"))      v = K_ENTER;
+    else if (!strcmp(n,"key_inv_drop"))     v = 'd';
     else if (!strcmp(n,"mouse_sensitivity"))v = 5;
     else if (!strcmp(n,"screen_resolution"))v = 1;
     else if (!strcmp(n,"screenblocks"))     v = 9;
