@@ -964,19 +964,17 @@ static void build_command(char* out, int n, const char* iwad_path)
     if (files[0])
         off += snprintf(out + off, n - off, " -file%s", files);
 
-    // Always land in a level, never the title screen.  If a PWAD is loaded, warp to ITS
-    // first map (custom maps rarely sit on MAP01/E1M1); else the IWAD's first map.
-    char warp[32] = "1 1";
+    // Start the game NORMALLY (title screen -> menu) so the player picks the episode + skill
+    // himself -- we only auto-warp when a PWAD is loaded (custom maps rarely sit on E1M1/MAP01).
+    // NOTE: both -warp AND -skill set the engine's autostart flag, so for a normal start we pass
+    // NEITHER, otherwise the game skips the title and drops straight into E1M1.
+    char warp[32] = "";
     if (pwad_sel > 0 && pwad_sel < pwad_count) {
         char w[32]; pwad_first_map_warp(pwads[pwad_sel], w, sizeof w);
         if (w[0]) snprintf(warp, sizeof warp, "%s", w);
     }
-    // No PWAD: if the IWAD is the Ultimate DOOM (all 4 episodes -> it has E4M1), start in
-    // E4M1 rather than E1M1.  Registered (3 episodes) / shareware (1) fall back to E1M1.
-    else if (iwad_sel >= 0 && iwad_sel < iwad_count
-             && wad_has_lump("", iwads[iwad_sel].path, "E4M1"))
-        snprintf(warp, sizeof warp, "4 1");
-    off += snprintf(out + off, n - off, " -warp %s -skill %d", warp, opt_skill + 1);
+    if (warp[0])
+        off += snprintf(out + off, n - off, " -warp %s -skill %d", warp, opt_skill + 1);
 
     (void)n;
 }

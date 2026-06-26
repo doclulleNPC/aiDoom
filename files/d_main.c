@@ -679,6 +679,33 @@ static int IWAD_ModeFromName (const char* path)
     return commercial;
 }
 
+// Does the IWAD file contain a lump with this (<=8 char, uppercase) name?  Reads the WAD
+// directory straight off disk -- IdentifyVersion runs before W_Init, so W_CheckNumForName
+// isn't available yet.  Used to tell the Ultimate Doom (has E4M1) from the registered
+// doom.wad (doesn't): same filename, only the content differs.
+static int IWAD_FileHasLump (const char* path, const char* lump)
+{
+    FILE* f = fopen (path, "rb");
+    unsigned char hdr[12]; int found = 0;
+    if (!f) return 0;
+    if (fread (hdr, 1, 12, f) == 12)
+    {
+	unsigned numl = hdr[4] | hdr[5]<<8 | hdr[6]<<16 | (unsigned)hdr[7]<<24;
+	unsigned ofs  = hdr[8] | hdr[9]<<8 | hdr[10]<<16 | (unsigned)hdr[11]<<24;
+	if (numl && numl <= 100000 && fseek (f, (long)ofs, SEEK_SET) == 0)
+	{
+	    unsigned char e[16]; unsigned i;
+	    for (i = 0; i < numl && !found; i++)
+	    {
+		if (fread (e, 1, 16, f) != 16) break;
+		if (strncmp ((char*)e + 8, lump, 8) == 0) found = 1;
+	    }
+	}
+    }
+    fclose (f);
+    return found;
+}
+
 //
 // IdentifyVersion
 // Locate an IWAD and set the game mode.  Search order:
@@ -813,6 +840,14 @@ void IdentifyVersion (void)
     if (found)
     {
 	printf ("IWAD: %s\n", found);
+	// doom.wad is BOTH the registered (3-episode) and the Ultimate/retail (4-episode) IWAD --
+	// same filename, only the content differs.  If a "registered" doom.wad actually has an
+	// E4M1 map it's the Ultimate Doom -> upgrade to retail so the 4th episode shows in the menu.
+	if (mode == registered && IWAD_FileHasLump (found, "E4M1"))
+	{
+	    mode = retail;
+	    printf ("IWAD contains E4M1 -> Ultimate Doom (retail): 4 episodes\n");
+	}
 	gamemode = mode;
 	D_AddFile (found);
 	// DOOM1 + a doom2stuff.wad on hand -> auto-overlay it so the director can spawn
