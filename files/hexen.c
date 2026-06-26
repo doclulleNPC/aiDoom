@@ -310,7 +310,7 @@ void Hexen_Init (void)
     m->attacksound = sfx_None;   m->painstate = S_NULL;    m->painchance = 0;
     m->painsound = sfx_None;     m->meleestate = S_NULL;   m->missilestate = S_NULL;
     m->deathstate = S_XCTF_X1;   m->xdeathstate = S_NULL;  m->deathsound = sfx_firxpl;
-    m->speed = 20*FRACUNIT; m->radius = 10*FRACUNIT; m->height = 8*FRACUNIT; m->mass = 100;
+    m->speed = 20*FRACUNIT; m->radius = 20*FRACUNIT; m->height = 16*FRACUNIT; m->mass = 100;
     m->damage = 4; m->activesound = sfx_None;
     m->flags = MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY; m->raisestate = S_NULL;
 
@@ -684,7 +684,7 @@ void Hexen_Init (void)
     m->attacksound = sfx_None;   m->painstate = S_NULL;    m->painchance = 0;
     m->painsound = sfx_None;     m->meleestate = S_NULL;   m->missilestate = S_NULL;
     m->deathstate = S_XDRF_BOOM1; m->xdeathstate = S_NULL; m->deathsound = sfx_firxpl;
-    m->speed = 20*FRACUNIT; m->radius = 12*FRACUNIT; m->height = 10*FRACUNIT; m->mass = 100;
+    m->speed = 24*FRACUNIT; m->radius = 12*FRACUNIT; m->height = 10*FRACUNIT; m->mass = 100;
     m->damage = 6; m->activesound = sfx_None;
     m->flags = MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY; m->raisestate = S_NULL;
 }

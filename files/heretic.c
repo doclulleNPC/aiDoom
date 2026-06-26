@@ -744,10 +744,15 @@ void Heretic_Init (void)
     ST (S_HSR2_ATK3,  SPR_HSR2, 19, 20, (actionf_p1)A_DsparilAttack, S_HSR2_WALK1);
     ST (S_HSR2_PAIN1, SPR_HSR2, 16, 3, NULL,                       S_HSR2_PAIN2);
     ST (S_HSR2_PAIN2, SPR_HSR2, 16, 6, (actionf_p1)A_Pain,         S_HSR2_WALK1);
+    // No SDTH death sprite was extracted, so the death animates with the SOR2
+    // teleport-fade poses (frames 6..11 = the sorcerer dematerialising) -- a real
+    // multi-frame death that walks through distinct frames and ends as a corpse.
     ST (S_HSR2_DIE1,  SPR_HSR2, 16, 8, (actionf_p1)A_Scream,       S_HSR2_DIE2);
-    ST (S_HSR2_DIE2,  SPR_HSR2, 16, 8, NULL,                       S_HSR2_DIE3);
-    ST (S_HSR2_DIE3,  SPR_HSR2, 16, 8, (actionf_p1)A_Fall,         S_HSR2_DIE4);
-    ST (S_HSR2_DIE4,  SPR_HSR2, 16, -1, NULL,                      S_NULL);
+    ST (S_HSR2_DIE2,  SPR_HSR2,  6, 7, NULL,                       S_HSR2_DIE3);
+    ST (S_HSR2_DIE3,  SPR_HSR2,  7, 7, (actionf_p1)A_Fall,         S_HSR2_DIE4);
+    ST (S_HSR2_DIE4,  SPR_HSR2,  8, 7, NULL,                       S_HSR2_DIE5);
+    ST (S_HSR2_DIE5,  SPR_HSR2,  9, 7, NULL,                       S_HSR2_DIE6);
+    ST (S_HSR2_DIE6,  SPR_HSR2, 10, -1, NULL,                      S_NULL);
     ST (S_HSRB1, SPR_HSRB, 32768, 3, NULL, S_HSRB2);
     ST (S_HSRB2, SPR_HSRB, 32769, 3, NULL, S_HSRB3);
     ST (S_HSRB3, SPR_HSRB, 32770, 3, NULL, S_HSRB1);
@@ -764,7 +769,7 @@ void Heretic_Init (void)
     m->attacksound = sfx_h_sorzap; m->painstate = S_HSR2_PAIN1; m->painchance = 32;
     m->painsound = sfx_dmpain; m->meleestate = S_HSR2_ATK1;  m->missilestate = S_HSR2_ATK1;
     m->deathstate = S_HSR2_DIE1; m->xdeathstate = S_NULL;    m->deathsound = sfx_bosdth;
-    m->speed = 14; m->radius = 22*FRACUNIT; m->height = 72*FRACUNIT; m->mass = 150;
+    m->speed = 14; m->radius = 16*FRACUNIT; m->height = 70*FRACUNIT; m->mass = 150;
     m->damage = 0; m->activesound = sfx_dmact;
     m->flags = MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL|MF_FLOAT|MF_NOGRAVITY; m->raisestate = S_NULL;
 
@@ -774,7 +779,7 @@ void Heretic_Init (void)
     m->attacksound = sfx_None;   m->painstate = S_NULL;      m->painchance = 0;
     m->painsound = sfx_None;     m->meleestate = S_NULL;     m->missilestate = S_NULL;
     m->deathstate = S_HSRBX1;    m->xdeathstate = S_NULL;    m->deathsound = sfx_firxpl;
-    m->speed = 20*FRACUNIT; m->radius = 12*FRACUNIT; m->height = 8*FRACUNIT; m->mass = 100;
+    m->speed = 20*FRACUNIT; m->radius = 10*FRACUNIT; m->height = 6*FRACUNIT; m->mass = 100;
     m->damage = 2; m->activesound = sfx_None;
     m->flags = MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY; m->raisestate = S_NULL;
 }

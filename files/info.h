@@ -1290,7 +1290,7 @@ typedef enum
     S_HSR2_WALK1, S_HSR2_WALK2, S_HSR2_WALK3, S_HSR2_WALK4,
     S_HSR2_ATK1, S_HSR2_ATK2, S_HSR2_ATK3,
     S_HSR2_PAIN1, S_HSR2_PAIN2,
-    S_HSR2_DIE1, S_HSR2_DIE2, S_HSR2_DIE3, S_HSR2_DIE4,
+    S_HSR2_DIE1, S_HSR2_DIE2, S_HSR2_DIE3, S_HSR2_DIE4, S_HSR2_DIE5, S_HSR2_DIE6,
     S_HSRB1, S_HSRB2, S_HSRB3,
     S_HSRBX1, S_HSRBX2, S_HSRBX3, S_HSRBX4, S_HSRBX5, S_HSRBX6,
     // Freedoom: a reserved block of state slots that freedoom.c fills at runtime by
