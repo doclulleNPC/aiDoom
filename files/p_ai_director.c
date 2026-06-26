@@ -25,6 +25,7 @@
 #include "m_argv.h"
 #include "m_random.h"
 #include "tables.h"
+#include "sounds.h"			// sfx_slop -- the resurrection squelch
 #include "p_local.h"
 #include "r_state.h"
 #include "info.h"
@@ -644,11 +645,68 @@ static boolean P_Director_Stressed (void)
     return false;
 }
 
+// Arch-Vile-style resurrection: raise a DEAD monster back into the fight instead of
+// spawning a fresh one.  Scans for a raisable corpse (MF_CORPSE, at rest, has a raisestate,
+// room to stand up) that's out of sight of every survivor and within the spawn band, then
+// resurrects the nearest -- mirroring the Vile's raise in p_enemy.c -- and sends it after a
+// survivor.  Returns true if one got up.  Counts toward the live-monster cap.
+extern void S_StartSound (void* origin, int sfx_id);
+static boolean P_Director_ReviveCorpse (void)
+{
+    thinker_t*	th;
+    mobj_t*	sv   = P_Director_RandomSurvivor ();
+    mobj_t*	best = NULL;
+    fixed_t	bestd = 0x7fffffff;
+
+    if (!sv || P_Director_LiveMonsters () >= DIR_MAXMON)
+	return false;
+
+    for (th = thinkercap.next; th != &thinkercap; th = th->next)
+    {
+	mobj_t*	m;
+	fixed_t	d;
+	boolean	room, seen = false;
+	int	i;
+	if (th->function.acp1 != (actionf_p1)P_MobjThinker) continue;
+	m = (mobj_t*)th;
+	if (!(m->flags & MF_CORPSE))			continue;	// not a corpse
+	if (m->tics != -1)				continue;	// still in the death animation
+	if (!m->info || m->info->raisestate == S_NULL)	continue;	// can't be raised (vile/skull/boss/...)
+	d = P_AproxDistance (m->x - sv->x, m->y - sv->y);
+	if (d > DIR_FAR)				continue;	// too far from the action
+	for (i = 0; i < MAXPLAYERS; i++)				// must be hidden (L4D: out of sight)
+	    if (playeringame[i] && players[i].mo && P_CheckSight (players[i].mo, m)) { seen = true; break; }
+	if (seen)					continue;
+	m->height <<= 2;						// un-squash to test standing room
+	room = P_CheckPosition (m, m->x, m->y);
+	m->height >>= 2;
+	if (!room)					continue;
+	if (d < bestd) { bestd = d; best = m; }
+    }
+    if (!best) return false;
+
+    // Resurrect (cf. A_VileChase): restore the living actor, then send it at the survivor.
+    S_StartSound (best, sfx_slop);
+    P_SetMobjState (best, best->info->raisestate);
+    best->height <<= 2;
+    best->flags   = best->info->flags;
+    best->health  = best->info->spawnhealth;
+    best->target  = sv;
+    P_Director_Announce ("Something dead just got back up...");
+    return true;
+}
+
 static void P_Director_SpawnMonster (void)
 {
-    mobjtype_t	mt = P_Director_SafeType (P_Director_PickType ());
+    mobjtype_t	mt;
     fixed_t	cx, cy;
     boolean	ok;
+    // Some of the time, raise a corpse (Arch-Vile style) instead of spawning a new monster
+    // -- recycles the battlefield's dead into the assault.  Falls through to a fresh spawn
+    // when no raisable corpse is in reach.
+    if (P_Random () % 100 < 35 && P_Director_ReviveCorpse ())
+	return;
+    mt = P_Director_SafeType (P_Director_PickType ());
     // Center the spawn behind the player OR out of sight in the room toward the
     // nearest objective (exit/key) -- P_Director_SpawnCenter decides.
     P_Director_SpawnCenter (&cx, &cy);
