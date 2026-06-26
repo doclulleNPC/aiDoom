@@ -64,7 +64,9 @@ char *sprnames[NUMSPRITES] = {
     "FSKE","FFAT","FVIL","FBSP","FCPO","FBO2","FPAI","FSSW","FKEE",	// Freedoom monsters
     "FFAB","FFBX","FMAN","FFIR","FAPL","FAPB",				// Freedoom projectiles
     "XETT",								// Hexen ettin
-    "XCEN","XCTF","XDEM","XDMF"						// Hexen centaur/serpent + projectiles
+    "XCEN","XCTF","XDEM","XDMF",						// Hexen centaur/serpent + projectiles
+    // (H) Heretic artifact pickup sprites -- lock-step with spritenum_t (info.h)
+    "PTN1","SPHL","PWBK","TRCH","FBMB","INVU","INVS","ATLP"
 };
 
 

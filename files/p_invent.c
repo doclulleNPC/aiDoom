@@ -29,6 +29,7 @@
 #include "s_sound.h"
 #include "p_local.h"
 #include "p_invent.h"
+#include "p_inv_heretic.h"		// (H) ApplyHereticArtifact for the Heretic slots
 
 // P_GiveBody / P_GiveArmor (p_inter.c) reuse DOOM's at-cap semantics.
 extern boolean	P_GiveBody  (player_t* player, int num);
@@ -67,6 +68,15 @@ const char* P_ArtifactName (artitype_t a)
       case arti_ammo_shells:	return "Shells";
       case arti_ammo_rockets:	return "Rockets";
       case arti_ammo_cells:	return "Cells";
+      // (H) Heretic artifacts (files/p_inv_heretic.c)
+      case h_arti_flask:	return "Quartz Flask";
+      case h_arti_urn:		return "Mystic Urn";
+      case h_arti_tome:		return "Tome of Power";
+      case h_arti_torch:	return "Torch";
+      case h_arti_bomb:		return "Time Bomb";
+      case h_arti_ring:		return "Ring of Invincibility";
+      case h_arti_shadow:	return "Shadowsphere";
+      case h_arti_chaos:	return "Chaos Device";
       default:			return "";
     }
 }
@@ -151,6 +161,11 @@ void P_InvScroll (player_t* player, int dir)
 static int ApplyArtifact (player_t* player, artitype_t a)
 {
     mobj_t*	mo = player->mo;
+
+    // (H) Heretic artifacts: effects live in files/p_inv_heretic.c.  They consume
+    // exactly one on success (it sets ->message either way).
+    if (a >= h_arti_flask)
+	return ApplyHereticArtifact (player, a) ? 1 : 0;
 
     switch (a)
     {

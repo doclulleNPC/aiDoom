@@ -76,6 +76,18 @@ typedef enum
     arti_ammo_shells,		// overflow shells
     arti_ammo_rockets,		// overflow rockets
     arti_ammo_cells,		// overflow cells
+    // (H) Heretic artifacts -- effects + pickups live in files/p_inv_heretic.c.
+    // Appended AFTER the DOOM overflow slots; do NOT reorder the entries above
+    // (savegames index this enum).  Wings of Wrath / Morph Ovum are deferred
+    // (they need flight / chicken subsystems we don't have yet).
+    h_arti_flask,		// Quartz Flask  (+25 HP)
+    h_arti_urn,			// Mystic Urn    (+100 HP)
+    h_arti_tome,		// Tome of Power (simplified to a Berserk: pw_strength)
+    h_arti_torch,		// Torch         (pw_infrared)
+    h_arti_bomb,		// Time Bomb of the Ancients (spawns a fusing bomb)
+    h_arti_ring,		// Ring of Invincibility (pw_invulnerability)
+    h_arti_shadow,		// Shadowsphere  (pw_invisibility + MF_SHADOW)
+    h_arti_chaos,		// Chaos Device  (teleport to player start)
     NUMARTIFACTS
 
 } artitype_t;

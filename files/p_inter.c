@@ -42,6 +42,7 @@ rcsid[] = "$Id: p_inter.c,v 1.4 1997/02/03 22:45:11 b1 Exp $";
 #include "p_ai_coop.h"		// P_AICoop_IsBuddy -- buddy must not pocket keys
 #include "p_ai_director.h"	// L4D stress director (-director)
 #include "p_invent.h"		// (J) artifact inventory pickups/use
+#include "p_inv_heretic.h"	// (H) Heretic artifact pickups
 
 #include "s_sound.h"
 
@@ -383,6 +384,20 @@ P_TouchSpecialThing
 	  default:
 	    break;
 	}
+    }
+
+    // (H) Heretic artifact pickup (MT_HARTI_*): pocket it into the inventory.
+    // Done by mobjtype before the sprite switch -- these reuse Heretic sprites
+    // with no DOOM-sprite case, so they'd otherwise hit the I_Error default.
+    if (P_TouchHereticArtifact (player, special))
+    {
+	if (special->flags & MF_COUNTITEM)
+	    player->itemcount++;
+	P_RemoveMobj (special);
+	player->bonuscount += BONUSADD;
+	if (player == &players[consoleplayer])
+	    S_StartSound (NULL, sound);
+	return;
     }
 
     // Identify by sprite.

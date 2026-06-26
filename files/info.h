@@ -209,6 +209,17 @@ typedef enum
     SPR_XCTF,		// slaughtaur reflective bolt (XCTF)
     SPR_XDEM,		// chaos serpent / demon (XDEM)
     SPR_XDMF,		// chaos serpent fireball (XDMF)
+    // (H) Heretic artifact pickup sprites (hereticstuff.wad, 4-char Heretic codes).
+    // MUST stay in lock-step with sprnames[] in info.c -- a mismatch shifts every
+    // later sprite.  files/p_inv_heretic.c registers the pickup actors that use them.
+    SPR_PTN1,		// Quartz Flask  (PTN1)
+    SPR_SPHL,		// Mystic Urn    (SPHL)
+    SPR_PWBK,		// Tome of Power (PWBK)
+    SPR_TRCH,		// Torch         (TRCH)
+    SPR_FBMB,		// Time Bomb     (FBMB)
+    SPR_INVU,		// Ring of Invincibility (INVU)
+    SPR_INVS,		// Shadowsphere  (INVS)
+    SPR_ATLP,		// Chaos Device  (ATLP)
     NUMSPRITES
 
 } spritenum_t;
@@ -1308,8 +1319,14 @@ typedef enum
     S_REVMAR_PAIN,
     S_REVMAR_DIE1, S_REVMAR_DIE2, S_REVMAR_DIE3, S_REVMAR_DIE4,
     S_REVMAR_DIE5, S_REVMAR_DIE6, S_REVMAR_DIE7,
-    // (J) artifact inventory pickups -- reuse existing DOOM sprites (files/p_invent.c)
-    S_ARTI_FLASK, S_ARTI_CHAOS, S_ARTI_TORCH,
+    // (H) Heretic artifact pickup spinning-icon states (files/p_inv_heretic.c).
+    // One spawnstate per artifact (looping); filled in HereticInv_Init.
+    S_HARTI_FLASK, S_HARTI_URN, S_HARTI_TOME, S_HARTI_TORCH,
+    S_HARTI_BOMB,  S_HARTI_RING, S_HARTI_SHADOW, S_HARTI_CHAOS,
+    // (H) Time Bomb of the Ancients actor: fuse frames then A_Explode (reusing the
+    // DOOM barrel-blast sprite SPR_BEXP for the boom, since SPR_XPL1 isn't extracted).
+    S_HFIREBOMB1, S_HFIREBOMB2, S_HFIREBOMB3, S_HFIREBOMB4, S_HFIREBOMB5,
+    S_HFIREBOMB6, S_HFIREBOMB7, S_HFIREBOMB8, S_HFIREBOMB9, S_HFIREBOMB10,
     NUMSTATES
 } statenum_t;
 
@@ -1509,9 +1526,17 @@ typedef enum {
     MT_XCENTAUR_FX,	// slaughtaur bolt projectile
     MT_XDEMON,		// Hexen chaos serpent (melee + fire-breath)
     MT_XDEMON_FX,	// chaos serpent fireball projectile
-    MT_ARTI_FLASK,	// (J) Quartz Flask pickup (files/p_invent.c)
-    MT_ARTI_CHAOS,	// (J) Chaos Device pickup
-    MT_ARTI_TORCH,	// (J) Torch pickup
+    // (H) Heretic artifact pickup actors (files/p_inv_heretic.c) -- console-give
+    // only for now (doomednum -1) so their real Heretic doomednums don't collide.
+    MT_HARTI_FLASK,	// Quartz Flask
+    MT_HARTI_URN,	// Mystic Urn
+    MT_HARTI_TOME,	// Tome of Power
+    MT_HARTI_TORCH,	// Torch
+    MT_HARTI_BOMB,	// Time Bomb of the Ancients (pickup)
+    MT_HARTI_RING,	// Ring of Invincibility
+    MT_HARTI_SHADOW,	// Shadowsphere
+    MT_HARTI_CHAOS,	// Chaos Device
+    MT_HFIREBOMB,	// the fusing Time Bomb actor spawned on use
     NUMMOBJTYPES
 
 } mobjtype_t;

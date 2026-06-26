@@ -300,6 +300,7 @@ static void C_Execute (char* line)
 	C_Printf ("cheats: god  noclip  allmap  kill  health <n>  armor <n>");
 	C_Printf ("give:   all|weapons|ammo|keys|armor|health|<weapon>|<key>");
 	C_Printf ("arti:   givearti stimpack|medikit|healthbonus|armorbonus|greenarmor|bluearmor|bullets|shells|rockets|cells");
+	C_Printf ("heretic arti: givearti flask|urn|tome|torch|bomb|ring|shadow|chaos");
 	C_Printf ("world:  spawn <thing>  skill <1-5>  map <e> <m> / warp <m>");
 	C_Printf ("view:   crosshair 0..3");
 	C_Printf ("keys:   bind <key> <command> | unbind <key> | bind (list)");
@@ -371,8 +372,17 @@ static void C_Execute (char* line)
 	else if (!strcmp(args,"shells"))    { a = arti_ammo_shells;  amt = 20; }
 	else if (!strcmp(args,"rockets"))   { a = arti_ammo_rockets; amt = 5;  }
 	else if (!strcmp(args,"cells"))     { a = arti_ammo_cells;   amt = 100; }
+	// (H) Heretic artifacts (files/p_inv_heretic.c)
+	else if (!strcmp(args,"flask"))     a = h_arti_flask;
+	else if (!strcmp(args,"urn"))       a = h_arti_urn;
+	else if (!strcmp(args,"tome"))      a = h_arti_tome;
+	else if (!strcmp(args,"torch"))     a = h_arti_torch;
+	else if (!strcmp(args,"bomb"))      a = h_arti_bomb;
+	else if (!strcmp(args,"ring"))      a = h_arti_ring;
+	else if (!strcmp(args,"shadow"))    a = h_arti_shadow;
+	else if (!strcmp(args,"chaos"))     a = h_arti_chaos;
 	if (a == arti_none)
-	    C_Printf ("usage: givearti stimpack|medikit|healthbonus|armorbonus|greenarmor|bluearmor|bullets|shells|rockets|cells");
+	    C_Printf ("usage: givearti stimpack|medikit|healthbonus|armorbonus|greenarmor|bluearmor|bullets|shells|rockets|cells|flask|urn|tome|torch|bomb|ring|shadow|chaos");
 	else
 	{
 	    P_StoreOverflow (pl, a, amt);
