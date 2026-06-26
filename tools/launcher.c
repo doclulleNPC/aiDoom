@@ -361,6 +361,18 @@ static void try_add_iwad(const char* dir, const char* filename, int from_steam)
     for (int i=0; i<iwad_count; i++)
         if (same_path(iwads[i].path, full)) return;
 
+    // De-dupe by FILENAME too: the same IWAD (e.g. doom.wad) sitting in more than one wad
+    // dir (run/ and run/ID0) should appear ONCE -- keep the first (highest-priority) copy,
+    // not list "DOOM1: Registered / Ultimate" twice.
+    for (int i=0; i<iwad_count; i++) {
+        const char* p = iwads[i].path;
+        const char* fs = strrchr(p, '/');
+        const char* bs = strrchr(p, '\\');
+        const char* base = (fs > bs ? fs : bs);
+        base = base ? base + 1 : p;
+        if (strcasecmp(base, filename) == 0) return;
+    }
+
     iwad_t* e = &iwads[iwad_count];
     int known = is_known_iwad(filename);
     if (known >= 0) {
@@ -514,7 +526,8 @@ static int wad_is_iwad(const char* dir, const char* fname)
 static int wad_has_lump(const char* dir, const char* fname, const char* lump)
 {
     char path[1024]; unsigned char hdr[12]; FILE* f; int found = 0;
-    snprintf(path, sizeof path, "%s/%s", dir, fname);
+    if (dir && dir[0]) snprintf(path, sizeof path, "%s/%s", dir, fname);
+    else               snprintf(path, sizeof path, "%s", fname);	// fname is already a full path
     if (!(f = fopen(path, "rb"))) return 0;
     if (fread(hdr, 1, 12, f) == 12) {
         unsigned n  = hdr[4] | hdr[5]<<8 | hdr[6]<<16 | (unsigned)hdr[7]<<24;
@@ -958,6 +971,11 @@ static void build_command(char* out, int n, const char* iwad_path)
         char w[32]; pwad_first_map_warp(pwads[pwad_sel], w, sizeof w);
         if (w[0]) snprintf(warp, sizeof warp, "%s", w);
     }
+    // No PWAD: if the IWAD is the Ultimate DOOM (all 4 episodes -> it has E4M1), start in
+    // E4M1 rather than E1M1.  Registered (3 episodes) / shareware (1) fall back to E1M1.
+    else if (iwad_sel >= 0 && iwad_sel < iwad_count
+             && wad_has_lump("", iwads[iwad_sel].path, "E4M1"))
+        snprintf(warp, sizeof warp, "4 1");
     off += snprintf(out + off, n - off, " -warp %s -skill %d", warp, opt_skill + 1);
 
     (void)n;
