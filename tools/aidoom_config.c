@@ -30,7 +30,7 @@
 // both column-relative).  Wider + shorter so it fits a normal-height screen.
 #define COLW 580
 #define WINW (2*COLW)
-#define WINH 780
+#define WINH 700
 #define ROWH 26
 #define HEADH 30
 #define LABELX 28
@@ -139,6 +139,7 @@ static void rect(float x,float y,float w,float h, Uint8 r,Uint8 g,Uint8 b)
 // ----------------------------------------------------------------- key names
 static void keyname(int k, char* out, int n)
 {
+    if (k <= 0) { if (n) out[0] = 0; return; }	// unbound (cleared) -> empty field, not "key 0"
     switch (k) {
       case K_LEFT: snprintf(out,n,"Left"); return;
       case K_RIGHT:snprintf(out,n,"Right");return;
