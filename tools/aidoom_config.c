@@ -30,7 +30,7 @@
 // both column-relative).  Wider + shorter so it fits a normal-height screen.
 #define COLW 580
 #define WINW (2*COLW)
-#define WINH 600
+#define WINH 780
 #define ROWH 26
 #define HEADH 30
 #define LABELX 28

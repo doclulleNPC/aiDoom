@@ -1942,6 +1942,21 @@ const char* P_AICoop_Heal (void)
     return "[Buddy] Patched up to 100 HP.";
 }
 
+// (auto-heal) When the buddy is hurt, spend a held HEALTH artifact -- instant, and it beats
+// hunting around the level for a med-pack.  One per call (called each tic while hurt), in a
+// value order that doesn't burn the big Mystic Urn or the trivial +1 health bonuses first.
+// P_UseArtifact applies the effect + consumes one, and refuses (no-op) at full health.
+extern boolean P_UseArtifact (player_t* player, artitype_t which);
+static void AICoop_AutoHeal (player_t* bot)
+{
+    static const artitype_t healers[] =
+	{ arti_medikit, h_arti_flask, arti_stimpack, h_arti_urn, arti_healthbonus };
+    int i;
+    for (i = 0; i < (int)(sizeof(healers)/sizeof(healers[0])); i++)
+	if (bot->inventory[healers[i]] > 0 && P_UseArtifact (bot, healers[i]))
+	    return;			// used one this tic
+}
+
 static boolean AICoop_PlayerInLine (mobj_t* mo, mobj_t* tgt)
 {
     int i;
@@ -2133,6 +2148,8 @@ void P_AICoop_BuildCmd (void)
     }
 
     tgt  = AICoop_FindTarget (mo);
+    if (bot->health < COOP_HEAL_HP)
+	AICoop_AutoHeal (bot);		// spend a held heal-artifact first (instant; beats hunting a med-pack)
     heal = (bot->health < COOP_HEAL_HP) ? AICoop_FindHealth (mo) : NULL;
 
     // "Stay close" to the player when hurt (<50% HP -> cautious, less kamikaze) OR
