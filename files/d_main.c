@@ -80,6 +80,7 @@ static int access(char *file, int mode)
 #include "hexen.h"		// Hexen_Init   -- additive Hexen monsters
 #include "freedoom.h"		// Freedoom_Init -- cloned DOOM2 monsters (free art)
 #include "revmarine.h"		// RevMarine_Init -- (G) revived friendly marine actor
+#include "p_morph.h"		// Morph_Init -- (M) generic morph creature (chicken)
 #include "p_inv_heretic.h"	// HereticInv_Init -- (H) Heretic artifact pickups
 #include "g_agent.h"		// G_AgentInit -- full agent/LLM player control (-aiplayer)
 
@@ -425,8 +426,8 @@ void D_DoomLoop (void)
     while (1)
     {
 	// frame syncronous IO operations
-	I_StartFrame ();                
-	
+	I_StartFrame ();
+
 	// process one or more tics
 	if (singletics)
 	{
@@ -1308,6 +1309,7 @@ printf("added\n");
     Hexen_Init ();		// fill the appended Hexen monster states/mobjinfo
     Freedoom_Init ();		// clone the DOOM2 monsters into the MT_FD_* slots
     RevMarine_Init ();		// (G) fill the revived-friendly-marine states/mobjinfo
+    Morph_Init ();		// (M) fill the generic morph creature (chicken) states/mobjinfo
     HereticInv_Init ();		// (H) fill the Heretic artifact pickup states/mobjinfo
 
     printf ("I_Init: Setting up machine state.\n");

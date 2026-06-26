@@ -40,6 +40,10 @@ rcsid[] = "$Id: p_inter.c,v 1.4 1997/02/03 22:45:11 b1 Exp $";
 
 #include "p_local.h"
 #include "p_ai_coop.h"		// P_AICoop_IsBuddy -- buddy must not pocket keys
+#include "p_morph.h"		// (M) P_MorphMonster -- Morph Ovum egg morphs on impact
+
+// (M) Morph Ovum: how long a monster stays a chicken (crispy CHICKENTICS).
+#define CHICKENTICS	(40*TICRATE)
 #include "p_ai_director.h"	// L4D stress director (-director)
 #include "p_invent.h"		// (J) artifact inventory pickups/use
 #include "p_inv_heretic.h"	// (H) Heretic artifact pickups
@@ -867,6 +871,16 @@ P_DamageMobj
 		
     if (target->health <= 0)
 	return;
+
+    // (M) Morph Ovum: the egg projectile (MT_HEGGFX) morphs the struck monster
+    // into a chicken instead of damaging it.  Mirrors crispy's special-damage
+    // switch in P_DamageMobj.  If the morph is refused (boss / player / already
+    // morphed) the egg just fizzles -- it does 0 damage either way, so return.
+    if (inflictor && inflictor->type == MT_HEGGFX)
+    {
+	P_MorphMonster (target, MT_CHICKEN, CHICKENTICS);
+	return;
+    }
 
     // -nofriendlyfire: the human player and the AI buddy can't hurt each other
     // (default off = vanilla co-op, where they can).  Bail before any thrust,

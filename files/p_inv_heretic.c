@@ -45,6 +45,7 @@ extern mobjinfo_t	mobjinfo[];
 extern boolean	P_GiveBody (player_t* player, int num);
 extern void	A_Scream (mobj_t*);
 extern void	A_Explode (mobj_t*);
+extern void	P_SpawnPlayerMissile (mobj_t* source, mobjtype_t type);
 
 #define BRIGHT		32768		// FF_FULLBRIGHT frame bit
 
@@ -151,6 +152,24 @@ boolean ApplyHereticArtifact (player_t* player, artitype_t a)
 	return true;
       }
 
+      case h_arti_wings:
+	// Wings of Wrath: grant the GENERIC timed flight power (p_user.c does the
+	// float/climb/descend; this just sets the timer, so any inventory can do it).
+	player->powers[pw_flight] = FLIGHTTICS;
+	if (mo) mo->flags |= MF_NOGRAVITY;	// take off immediately
+	player->message = "USED WINGS OF WRATH";
+	return true;
+
+      case h_arti_egg:
+	// Morph Ovum: fire an egg missile (MT_HEGGFX).  On impact P_DamageMobj
+	// morphs the struck monster into a chicken (generic morph subsystem).
+	// P_SpawnPlayerMissile is void here, so we fire the single straight shot
+	// (crispy's 4 spread eggs need a P_SPMAngle we don't have; one is fine).
+	if (!mo) { player->message = "CANNOT USE MORPH OVUM"; return false; }
+	P_SpawnPlayerMissile (mo, MT_HEGGFX);
+	player->message = "USED MORPH OVUM";
+	return true;
+
       default:
 	return false;
     }
@@ -200,6 +219,8 @@ void HereticInv_Init (void)
     ST (S_HARTI_RING,   SPR_INVU, BRIGHT|0, 6, NULL, S_HARTI_RING);
     ST (S_HARTI_SHADOW, SPR_INVS, BRIGHT|0, 6, NULL, S_HARTI_SHADOW);
     ST (S_HARTI_CHAOS,  SPR_ATLP, BRIGHT|0, 6, NULL, S_HARTI_CHAOS);
+    ST (S_HARTI_WINGS,  SPR_SOAR, BRIGHT|0, 6, NULL, S_HARTI_WINGS);
+    ST (S_HARTI_EGG,    SPR_EGGC, BRIGHT|0, 6, NULL, S_HARTI_EGG);
 
     PickupItem (MT_HARTI_FLASK,  S_HARTI_FLASK);
     PickupItem (MT_HARTI_URN,    S_HARTI_URN);
@@ -209,6 +230,8 @@ void HereticInv_Init (void)
     PickupItem (MT_HARTI_RING,   S_HARTI_RING);
     PickupItem (MT_HARTI_SHADOW, S_HARTI_SHADOW);
     PickupItem (MT_HARTI_CHAOS,  S_HARTI_CHAOS);
+    PickupItem (MT_HARTI_WINGS,  S_HARTI_WINGS);
+    PickupItem (MT_HARTI_EGG,    S_HARTI_EGG);
 
     // ---- Time Bomb of the Ancients actor (crispy MT_FIREBOMB) ----
     // A few FBMB fuse frames (A_Scream just before the boom), then A_Explode
@@ -235,6 +258,29 @@ void HereticInv_Init (void)
     m->speed = 0; m->radius = 8*FRACUNIT; m->height = 16*FRACUNIT; m->mass = 100;
     m->damage = 0; m->activesound = sfx_None;
     m->flags = MF_NOGRAVITY;			// sits where dropped, harmless until A_Explode
+    m->raisestate = S_NULL;
+
+    // ---- Morph Ovum egg projectile (crispy MT_EGGFX) ----
+    // A small no-gravity missile that does 0 damage; the morph happens in
+    // P_DamageMobj when inflictor->type == MT_HEGGFX (p_inter.c).  Reuses the
+    // EGGC pickup sprite for the in-flight frames; no special boom (explodes to
+    // S_NULL, which P_ExplodeMissile chains to harmlessly).
+    ST (S_HEGGFX1, SPR_EGGC, BRIGHT|0, 4, NULL, S_HEGGFX2);
+    ST (S_HEGGFX2, SPR_EGGC, BRIGHT|0, 4, NULL, S_HEGGFX3);
+    ST (S_HEGGFX3, SPR_EGGC, BRIGHT|0, 4, NULL, S_HEGGFX4);
+    ST (S_HEGGFX4, SPR_EGGC, BRIGHT|0, 4, NULL, S_HEGGFX5);
+    ST (S_HEGGFX5, SPR_EGGC, BRIGHT|0, 4, NULL, S_HEGGFX1);
+
+    m = &mobjinfo[MT_HEGGFX];
+    m->doomednum   = -1;
+    m->spawnstate  = S_HEGGFX1; m->spawnhealth = 1000;
+    m->seestate    = S_NULL;  m->seesound    = sfx_None; m->reactiontime = 8;
+    m->attacksound = sfx_None; m->painstate  = S_NULL;   m->painchance = 0;
+    m->painsound   = sfx_None; m->meleestate = S_NULL;   m->missilestate = S_NULL;
+    m->deathstate  = S_NULL;  m->xdeathstate = S_NULL;   m->deathsound = sfx_None;
+    m->speed = 18*FRACUNIT; m->radius = 8*FRACUNIT; m->height = 8*FRACUNIT; m->mass = 100;
+    m->damage = 0; m->activesound = sfx_None;
+    m->flags = MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY;
     m->raisestate = S_NULL;
 }
 
@@ -263,6 +309,8 @@ boolean P_TouchHereticArtifact (player_t* player, mobj_t* special)
       case MT_HARTI_RING:   a = h_arti_ring;   player->message = "PICKED UP A RING OF INVINCIBILITY"; break;
       case MT_HARTI_SHADOW: a = h_arti_shadow; player->message = "PICKED UP A SHADOWSPHERE";  break;
       case MT_HARTI_CHAOS:  a = h_arti_chaos;  player->message = "PICKED UP A CHAOS DEVICE";  break;
+      case MT_HARTI_WINGS:  a = h_arti_wings;  player->message = "PICKED UP THE WINGS OF WRATH"; break;
+      case MT_HARTI_EGG:    a = h_arti_egg;    player->message = "PICKED UP A MORPH OVUM";    break;
       default:
 	return false;				// not ours
     }

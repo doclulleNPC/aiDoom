@@ -88,6 +88,8 @@ typedef enum
     h_arti_ring,		// Ring of Invincibility (pw_invulnerability)
     h_arti_shadow,		// Shadowsphere  (pw_invisibility + MF_SHADOW)
     h_arti_chaos,		// Chaos Device  (teleport to player start)
+    h_arti_wings,		// Wings of Wrath (generic flight: pw_flight)
+    h_arti_egg,			// Morph Ovum     (fires egg missiles -> morph to chicken)
     NUMARTIFACTS
 
 } artitype_t;

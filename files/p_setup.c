@@ -42,6 +42,7 @@ rcsid[] = "$Id: p_setup.c,v 1.5 1997/02/03 22:45:12 b1 Exp $";
 #include "p_local.h"
 #include "p_ai_director.h"
 #include "p_ai_llm.h"
+#include "p_morph.h"		// (M) P_MorphReset -- clear morphs on level load
 
 #include "s_sound.h"
 
@@ -593,7 +594,7 @@ P_SetupLevel
     int		i;
     char	lumpname[9];
     int		lumpnum;
-	
+
     totalkills = totalitems = totalsecret = wminfo.maxfrags = 0;
     wminfo.partime = 180;
     for (i=0 ; i<MAXPLAYERS ; i++)
@@ -698,6 +699,7 @@ P_SetupLevel
     // LLM AI Director: drop any monster directives from the previous level
     P_AI_Reset ();
     P_Director_Reset ();		// reset L4D intensity/FSM for the new level
+    P_MorphReset ();			// (M) drop any morphs from the previous level
 
     // Co-op buddy: -coop/-aicoop requested Player 2 to spawn on this map.
     // If the map has no Player_2_Start (only Player_1_Start), the buddy has

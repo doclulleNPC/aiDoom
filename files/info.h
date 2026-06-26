@@ -220,6 +220,9 @@ typedef enum
     SPR_INVU,		// Ring of Invincibility (INVU)
     SPR_INVS,		// Shadowsphere  (INVS)
     SPR_ATLP,		// Chaos Device  (ATLP)
+    SPR_SOAR,		// Wings of Wrath pickup (SOAR)
+    SPR_EGGC,		// Morph Ovum pickup + egg projectile (EGGC)
+    SPR_HCHK,		// morph chicken (HCHK) -- generic morph creature (files/p_morph.c)
     NUMSPRITES
 
 } spritenum_t;
@@ -1327,6 +1330,16 @@ typedef enum
     // DOOM barrel-blast sprite SPR_BEXP for the boom, since SPR_XPL1 isn't extracted).
     S_HFIREBOMB1, S_HFIREBOMB2, S_HFIREBOMB3, S_HFIREBOMB4, S_HFIREBOMB5,
     S_HFIREBOMB6, S_HFIREBOMB7, S_HFIREBOMB8, S_HFIREBOMB9, S_HFIREBOMB10,
+    // (H) Wings of Wrath + Morph Ovum pickup spinning-icon states (p_inv_heretic.c).
+    S_HARTI_WINGS, S_HARTI_EGG,
+    // Egg projectile (MT_HEGGFX) flight states (files/p_inv_heretic.c).
+    S_HEGGFX1, S_HEGGFX2, S_HEGGFX3, S_HEGGFX4, S_HEGGFX5,
+    // (M) generic morph creature -- the Heretic chicken (files/p_morph.c).
+    S_CHIC_LOOK1, S_CHIC_LOOK2,
+    S_CHIC_WALK1, S_CHIC_WALK2,
+    S_CHIC_ATK1, S_CHIC_ATK2,
+    S_CHIC_PAIN1, S_CHIC_PAIN2,
+    S_CHIC_DIE1, S_CHIC_DIE2, S_CHIC_DIE3, S_CHIC_DIE4, S_CHIC_DIE5,
     NUMSTATES
 } statenum_t;
 
@@ -1537,6 +1550,10 @@ typedef enum {
     MT_HARTI_SHADOW,	// Shadowsphere
     MT_HARTI_CHAOS,	// Chaos Device
     MT_HFIREBOMB,	// the fusing Time Bomb actor spawned on use
+    MT_HARTI_WINGS,	// Wings of Wrath (flight) pickup
+    MT_HARTI_EGG,	// Morph Ovum pickup
+    MT_HEGGFX,		// Morph Ovum egg projectile (morphs on impact)
+    MT_CHICKEN,		// (M) generic morph creature -- the Heretic chicken (files/p_morph.c)
     NUMMOBJTYPES
 
 } mobjtype_t;

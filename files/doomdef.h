@@ -30,7 +30,7 @@
 // Global parameters/defines.
 //
 // DOOM version
-enum { VERSION_NUM =  113 };
+enum { VERSION_NUM =  114 };
 
 
 // Game mode handling - identify IWAD version
@@ -234,8 +234,12 @@ typedef enum
     pw_ironfeet,
     pw_allmap,
     pw_infrared,
+    // MOD: generic timed flight power (Heretic Wings of Wrath grants it; any
+    // inventory can set powers[pw_flight] = FLIGHTTICS).  While > 0 the player
+    // floats (MF_NOGRAVITY) and climbs/descends by look pitch -- see p_user.c.
+    pw_flight,
     NUMPOWERS
-    
+
 } powertype_t;
 
 
@@ -250,8 +254,9 @@ typedef enum
     INVULNTICS	= (30*TICRATE),
     INVISTICS	= (60*TICRATE),
     INFRATICS	= (120*TICRATE),
-    IRONTICS	= (60*TICRATE)
-    
+    IRONTICS	= (60*TICRATE),
+    FLIGHTTICS	= (60*TICRATE)		// MOD: Wings of Wrath flight (crispy: 60*35)
+
 } powerduration_t;
 
 

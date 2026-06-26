@@ -77,6 +77,8 @@ const char* P_ArtifactName (artitype_t a)
       case h_arti_ring:		return "Ring of Invincibility";
       case h_arti_shadow:	return "Shadowsphere";
       case h_arti_chaos:	return "Chaos Device";
+      case h_arti_wings:	return "Wings of Wrath";
+      case h_arti_egg:		return "Morph Ovum";
       default:			return "";
     }
 }

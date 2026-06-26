@@ -177,9 +177,13 @@ void P_MovePlayer (player_t* player)
     //  if not onground.
     onground = (player->mo->z <= player->mo->floorz);
 
-    // Fly cheat (console `fly`): float, thrust freely in the air, climb/descend by
-    // looking up/down while moving forward, and jump to rise.
-    if (player->cheats & CF_FLY)
+    // MOD: GENERIC FLIGHT.  Active for the `fly` cheat (CF_FLY) OR while the
+    // timed pw_flight power is up (granted by the Heretic Wings of Wrath, but any
+    // inventory can set it).  While flying: float (MF_NOGRAVITY), thrust freely
+    // off the ground, climb/descend by the look pitch while moving forward, and
+    // jump to rise.  When neither source is active the power-counter (ticked down
+    // in P_PlayerThink) clears MF_NOGRAVITY again so the player falls.
+    if ((player->cheats & CF_FLY) || player->powers[pw_flight] > 0)
     {
 	player->mo->flags |= MF_NOGRAVITY;
 	onground = true;					// allow thrust off the ground
@@ -188,7 +192,8 @@ void P_MovePlayer (player_t* player)
     }
 
     // MOD: jump -- an upward impulse while on the ground, with an "oof" grunt.
-    if ((cmd->buttons & BT_JUMP) && onground && !(player->cheats & CF_FLY))
+    if ((cmd->buttons & BT_JUMP) && onground
+	&& !(player->cheats & CF_FLY) && player->powers[pw_flight] <= 0)
     {
 	player->mo->momz = JUMPVELOCITY;
 	S_StartSound (player->mo, sfx_oof);
@@ -394,6 +399,15 @@ void P_PlayerThink (player_t* player)
 		
     if (player->powers[pw_ironfeet])
 	player->powers[pw_ironfeet]--;
+
+    // MOD: generic flight power expiry.  When the counter runs out (and the
+    // `fly` cheat isn't holding flight on) drop MF_NOGRAVITY so the player falls
+    // -- mirrors Heretic dropping you when the Wings wear off.
+    if (player->powers[pw_flight])
+    {
+	if (! --player->powers[pw_flight] && !(player->cheats & CF_FLY))
+	    player->mo->flags &= ~MF_NOGRAVITY;
+    }
 		
     if (player->damagecount)
 	player->damagecount--;

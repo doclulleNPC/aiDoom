@@ -300,7 +300,7 @@ static void C_Execute (char* line)
 	C_Printf ("cheats: god  noclip  allmap  kill  health <n>  armor <n>");
 	C_Printf ("give:   all|weapons|ammo|keys|armor|health|<weapon>|<key>");
 	C_Printf ("arti:   givearti stimpack|medikit|healthbonus|armorbonus|greenarmor|bluearmor|bullets|shells|rockets|cells");
-	C_Printf ("heretic arti: givearti flask|urn|tome|torch|bomb|ring|shadow|chaos");
+	C_Printf ("heretic arti: givearti flask|urn|tome|torch|bomb|ring|shadow|chaos|wings|egg");
 	C_Printf ("world:  spawn <thing>  skill <1-5>  map <e> <m> / warp <m>");
 	C_Printf ("view:   crosshair 0..3");
 	C_Printf ("keys:   bind <key> <command> | unbind <key> | bind (list)");
@@ -381,8 +381,10 @@ static void C_Execute (char* line)
 	else if (!strcmp(args,"ring"))      a = h_arti_ring;
 	else if (!strcmp(args,"shadow"))    a = h_arti_shadow;
 	else if (!strcmp(args,"chaos"))     a = h_arti_chaos;
+	else if (!strcmp(args,"wings"))     a = h_arti_wings;
+	else if (!strcmp(args,"egg"))       a = h_arti_egg;
 	if (a == arti_none)
-	    C_Printf ("usage: givearti stimpack|medikit|healthbonus|armorbonus|greenarmor|bluearmor|bullets|shells|rockets|cells|flask|urn|tome|torch|bomb|ring|shadow|chaos");
+	    C_Printf ("usage: givearti stimpack|medikit|healthbonus|armorbonus|greenarmor|bluearmor|bullets|shells|rockets|cells|flask|urn|tome|torch|bomb|ring|shadow|chaos|wings|egg");
 	else
 	{
 	    P_StoreOverflow (pl, a, amt);
