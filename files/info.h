@@ -209,6 +209,12 @@ typedef enum
     SPR_XCTF,		// slaughtaur reflective bolt (XCTF)
     SPR_XDEM,		// chaos serpent / demon (XDEM)
     SPR_XDMF,		// chaos serpent fireball (XDMF)
+    SPR_XFDM,		// fire demon / afrit (XFDM)
+    SPR_XFDB,		// fire demon fireball (XFDB)
+    SPR_XWRT,		// reiver / wraith (XWRT)
+    SPR_XWRB,		// reiver bolt (XWRB)
+    SPR_XBIS,		// dark bishop (XBIS)
+    SPR_XBPF,		// dark bishop missile (XBPF)
     // (H) Heretic artifact pickup sprites (hereticstuff.wad, 4-char Heretic codes).
     // MUST stay in lock-step with sprnames[] in info.c -- a mismatch shifts every
     // later sprite.  files/p_inv_heretic.c registers the pickup actors that use them.
@@ -1315,6 +1321,36 @@ typedef enum
     // Chaos Serpent fireball projectile
     S_XDMF_MOVE1, S_XDMF_MOVE2, S_XDMF_MOVE3,
     S_XDMF_BOOM1, S_XDMF_BOOM2, S_XDMF_BOOM3, S_XDMF_BOOM4, S_XDMF_BOOM5,
+    // Fire Demon / Afrit (flying; lobs fireballs -- ranged only)
+    S_XFDM_LOOK1, S_XFDM_LOOK2, S_XFDM_LOOK3,
+    S_XFDM_WALK1, S_XFDM_WALK2, S_XFDM_WALK3,
+    S_XFDM_ATK1, S_XFDM_ATK2, S_XFDM_ATK3, S_XFDM_ATK4,
+    S_XFDM_PAIN1,
+    S_XFDM_DIE1, S_XFDM_DIE2, S_XFDM_DIE3, S_XFDM_DIE4,
+    // Fire Demon fireball projectile
+    S_XFDB_MOVE1, S_XFDB_MOVE2, S_XFDB_MOVE3,
+    S_XFDB_BOOM1, S_XFDB_BOOM2, S_XFDB_BOOM3, S_XFDB_BOOM4, S_XFDB_BOOM5,
+    // Reiver / Wraith (floating; melee + ranged bolt)
+    S_XWRT_LOOK1, S_XWRT_LOOK2,
+    S_XWRT_CHASE1, S_XWRT_CHASE2, S_XWRT_CHASE3, S_XWRT_CHASE4,
+    S_XWRT_ATK1_1, S_XWRT_ATK1_2, S_XWRT_ATK1_3,
+    S_XWRT_ATK2_1, S_XWRT_ATK2_2, S_XWRT_ATK2_3,
+    S_XWRT_PAIN1, S_XWRT_PAIN2,
+    S_XWRT_DIE1, S_XWRT_DIE2, S_XWRT_DIE3, S_XWRT_DIE4, S_XWRT_DIE5,
+    S_XWRT_DIE6, S_XWRT_DIE7, S_XWRT_DIE8, S_XWRT_DIE9, S_XWRT_DIE10,
+    // Reiver bolt projectile
+    S_XWRB_MOVE1, S_XWRB_MOVE2, S_XWRB_MOVE3,
+    S_XWRB_BOOM1, S_XWRB_BOOM2, S_XWRB_BOOM3, S_XWRB_BOOM4, S_XWRB_BOOM5, S_XWRB_BOOM6,
+    // Dark Bishop (floating caster; melee + ranged missile -- homing/blur simplified away)
+    S_XBIS_LOOK1,
+    S_XBIS_WALK1, S_XBIS_WALK2, S_XBIS_WALK3,
+    S_XBIS_ATK1, S_XBIS_ATK2, S_XBIS_ATK3, S_XBIS_ATK4, S_XBIS_ATK5,
+    S_XBIS_PAIN1,
+    S_XBIS_DIE1, S_XBIS_DIE2, S_XBIS_DIE3, S_XBIS_DIE4, S_XBIS_DIE5,
+    S_XBIS_DIE6, S_XBIS_DIE7,
+    // Dark Bishop missile projectile
+    S_XBPF_MOVE1, S_XBPF_MOVE2,
+    S_XBPF_BOOM1, S_XBPF_BOOM2, S_XBPF_BOOM3, S_XBPF_BOOM4, S_XBPF_BOOM5,
     // (G) revived friendly marine -- PLAY sprite, zombieman-style AI (files/revmarine.c)
     S_REVMAR_STND,
     S_REVMAR_RUN1, S_REVMAR_RUN2, S_REVMAR_RUN3, S_REVMAR_RUN4,
@@ -1539,6 +1575,12 @@ typedef enum {
     MT_XCENTAUR_FX,	// slaughtaur bolt projectile
     MT_XDEMON,		// Hexen chaos serpent (melee + fire-breath)
     MT_XDEMON_FX,	// chaos serpent fireball projectile
+    MT_XFIREDEMON,	// Hexen fire demon / afrit (flying, lobs fireballs)
+    MT_XFIREDEMON_FX,	// fire demon fireball projectile
+    MT_XWRAITH,		// Hexen reiver / wraith (floating, melee + bolt)
+    MT_XWRAITH_FX,	// reiver bolt projectile
+    MT_XBISHOP,		// Hexen dark bishop (floating caster, melee + missile)
+    MT_XBISHOP_FX,	// dark bishop missile projectile
     // (H) Heretic artifact pickup actors (files/p_inv_heretic.c) -- console-give
     // only for now (doomednum -1) so their real Heretic doomednums don't collide.
     MT_HARTI_FLASK,	// Quartz Flask

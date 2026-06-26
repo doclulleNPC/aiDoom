@@ -106,7 +106,8 @@ static const mobjtype_t dir_guards[]   = { MT_UNDEAD, MT_VILE, MT_FATSO, MT_KNIG
 static const mobjtype_t dir_heretic[]  = { MT_HMUMMY, MT_HCLINK, MT_HIMP, MT_HBEAST, MT_HWIZARD, MT_HSNAKE };
 // Hexen monsters (hexenstuff.wad overlaid -- the launcher's Hexen checkbox).  Same idea:
 // mixed into the director's trash tier when the Hexen pack is loaded.
-static const mobjtype_t dir_hexen[]    = { MT_XETTIN, MT_XCENTAUR, MT_XSLAUGHTAUR, MT_XDEMON };
+static const mobjtype_t dir_hexen[]    = { MT_XETTIN, MT_XCENTAUR, MT_XSLAUGHTAUR, MT_XDEMON,
+					   MT_XFIREDEMON, MT_XWRAITH, MT_XBISHOP };
 
 #define DIR_TRACK	(dir_on || dir_llm)	// intensity is tracked in either mode
 
@@ -334,6 +335,7 @@ static boolean P_Director_IsSpecial (mobjtype_t mt)
     if (mt >= MT_FD_UNDEAD && mt <= MT_FD_KEEN) return true;	// Freedoom clones
     if (mt == MT_HKNIGHT) return true;				// Heretic miniboss
     if (mt == MT_XSLAUGHTAUR || mt == MT_XDEMON) return true;	// Hexen ranged (slaughtaur / chaos serpent)
+    if (mt == MT_XFIREDEMON || mt == MT_XWRAITH || mt == MT_XBISHOP) return true;	// Hexen ranged (afrit / reiver / bishop)
     return false;
 }
 

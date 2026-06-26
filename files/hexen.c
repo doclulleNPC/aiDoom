@@ -103,6 +103,57 @@ void A_DemonAttack2 (mobj_t* actor)
     }
 }
 
+// Fire Demon / Afrit ranged fireball (crispy A_FiredAttack; rock-throw variants
+// simplified away -- it just lobs the MT_XFIREDEMON_FX missile).
+void A_FiredAttack (mobj_t* actor)
+{
+    mobj_t* mo;
+    if (!actor->target)
+	return;
+    mo = P_SpawnMissile (actor, actor->target, MT_XFIREDEMON_FX);
+    if (mo)
+	S_StartSound (actor, actor->info->attacksound);
+}
+
+// Reiver / Wraith melee: drains health (crispy A_WraithMelee).  HITDICE(2)=2..16.
+void A_WraithMelee (mobj_t* actor)
+{
+    int amount;
+    if (!actor->target)
+	return;
+    if (P_CheckMeleeRange (actor) && (P_Random () < 220))
+    {
+	amount = HITDICE (2);
+	P_DamageMobj (actor->target, actor, actor, amount);
+	actor->health += amount;	// steal life
+    }
+}
+
+// Reiver / Wraith ranged bolt (crispy A_WraithMissile).
+void A_WraithMissile (mobj_t* actor)
+{
+    if (!actor->target)
+	return;
+    if (P_SpawnMissile (actor, actor->target, MT_XWRAITH_FX))
+	S_StartSound (actor, actor->info->attacksound);
+}
+
+// Dark Bishop attack (crispy A_BishopAttack/A_BishopAttack2 merged + simplified:
+// no special1 burst counter, no homing -- melee swing in range, else a plain
+// (non-seeking) missile).  HITDICE(4) = 4..32 in melee.
+void A_BishopAttack (mobj_t* actor)
+{
+    if (!actor->target)
+	return;
+    S_StartSound (actor, actor->info->attacksound);
+    if (P_CheckMeleeRange (actor))
+    {
+	P_DamageMobj (actor->target, actor, actor, HITDICE (4));
+	return;
+    }
+    P_SpawnMissile (actor, actor->target, MT_XBISHOP_FX);
+}
+
 // ---------------------------------------------------------------------------
 // Table fill
 // ---------------------------------------------------------------------------
@@ -276,6 +327,165 @@ void Hexen_Init (void)
     m->speed = 15*FRACUNIT; m->radius = 10*FRACUNIT; m->height = 6*FRACUNIT; m->mass = 100;
     m->damage = 5; m->activesound = sfx_None;
     m->flags = MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY; m->raisestate = S_NULL;
+
+    // ---- Fire Demon / Afrit (crispy S_FIRED_*; the multi-stage spawn/look ritual
+    //      and rock-throw "split" deaths are simplified to a plain flyer that lobs
+    //      a fireball, like a flying Slaughtaur).  Sprite frames are fullbright. ----
+    ST (S_XFDM_LOOK1, SPR_XFDM, 32768, 10, (actionf_p1)A_Look,        S_XFDM_LOOK2);
+    ST (S_XFDM_LOOK2, SPR_XFDM, 32769, 10, (actionf_p1)A_Look,        S_XFDM_LOOK3);
+    ST (S_XFDM_LOOK3, SPR_XFDM, 32770, 10, (actionf_p1)A_Look,        S_XFDM_LOOK1);
+    ST (S_XFDM_WALK1, SPR_XFDM, 32768,  5, (actionf_p1)A_Chase,       S_XFDM_WALK2);
+    ST (S_XFDM_WALK2, SPR_XFDM, 32769,  5, (actionf_p1)A_Chase,       S_XFDM_WALK3);
+    ST (S_XFDM_WALK3, SPR_XFDM, 32770,  5, (actionf_p1)A_Chase,       S_XFDM_WALK1);
+    ST (S_XFDM_ATK1,  SPR_XFDM, 32778,  3, (actionf_p1)A_FaceTarget,  S_XFDM_ATK2);
+    ST (S_XFDM_ATK2,  SPR_XFDM, 32778,  5, (actionf_p1)A_FiredAttack, S_XFDM_ATK3);
+    ST (S_XFDM_ATK3,  SPR_XFDM, 32778,  5, (actionf_p1)A_FiredAttack, S_XFDM_ATK4);
+    ST (S_XFDM_ATK4,  SPR_XFDM, 32778,  5, (actionf_p1)A_FiredAttack, S_XFDM_WALK1);
+    ST (S_XFDM_PAIN1, SPR_XFDM, 32771,  6, (actionf_p1)A_Pain,        S_XFDM_WALK1);
+    ST (S_XFDM_DIE1,  SPR_XFDM, 32771,  4, (actionf_p1)A_FaceTarget,  S_XFDM_DIE2);
+    ST (S_XFDM_DIE2,  SPR_XFDM, 32779,  4, (actionf_p1)A_Scream,      S_XFDM_DIE3);
+    ST (S_XFDM_DIE3,  SPR_XFDM, 32779,  4, (actionf_p1)A_Fall,        S_XFDM_DIE4);
+    ST (S_XFDM_DIE4,  SPR_XFDM, 32779, -1, NULL,                      S_NULL);
+
+    // Fire Demon fireball (crispy S_FIRED_FX6_*).
+    ST (S_XFDB_MOVE1, SPR_XFDB, 32768, 5, NULL,                       S_XFDB_MOVE2);
+    ST (S_XFDB_MOVE2, SPR_XFDB, 32768, 5, NULL,                       S_XFDB_MOVE3);
+    ST (S_XFDB_MOVE3, SPR_XFDB, 32768, 5, NULL,                       S_XFDB_MOVE1);
+    ST (S_XFDB_BOOM1, SPR_XFDB, 32769, 4, NULL,                       S_XFDB_BOOM2);
+    ST (S_XFDB_BOOM2, SPR_XFDB, 32770, 4, NULL,                       S_XFDB_BOOM3);
+    ST (S_XFDB_BOOM3, SPR_XFDB, 32771, 4, NULL,                       S_XFDB_BOOM4);
+    ST (S_XFDB_BOOM4, SPR_XFDB, 32772, 4, NULL,                       S_XFDB_BOOM5);
+    ST (S_XFDB_BOOM5, SPR_XFDB, 32772, 3, NULL,                       S_NULL);
+
+    m = &mobjinfo[MT_XFIREDEMON];
+    m->doomednum = -1;        m->spawnstate  = S_XFDM_LOOK1; m->spawnhealth = 80;
+    m->seestate  = S_XFDM_WALK1; m->seesound  = sfx_bgsit1; m->reactiontime = 8;
+    m->attacksound = sfx_firsht;  m->painstate = S_XFDM_PAIN1; m->painchance = 1;
+    m->painsound = sfx_popain;    m->meleestate = S_NULL;     m->missilestate = S_XFDM_ATK1;
+    m->deathstate = S_XFDM_DIE1;  m->xdeathstate = S_NULL;    m->deathsound = sfx_firxpl;
+    m->speed = 13; m->radius = 20*FRACUNIT; m->height = 68*FRACUNIT; m->mass = 75;
+    m->damage = 1; m->activesound = sfx_bgact;
+    m->flags = MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL|MF_FLOAT|MF_NOGRAVITY; m->raisestate = S_NULL;
+
+    m = &mobjinfo[MT_XFIREDEMON_FX];
+    m->doomednum = -1;        m->spawnstate  = S_XFDB_MOVE1; m->spawnhealth = 1000;
+    m->seestate  = S_NULL;       m->seesound  = sfx_None;  m->reactiontime = 8;
+    m->attacksound = sfx_None;   m->painstate = S_NULL;    m->painchance = 0;
+    m->painsound = sfx_None;     m->meleestate = S_NULL;   m->missilestate = S_NULL;
+    m->deathstate = S_XFDB_BOOM1; m->xdeathstate = S_NULL; m->deathsound = sfx_firxpl;
+    m->speed = 10*FRACUNIT; m->radius = 10*FRACUNIT; m->height = 6*FRACUNIT; m->mass = 15;
+    m->damage = 4; m->activesound = sfx_None;
+    m->flags = MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY; m->raisestate = S_NULL;
+
+    // ---- Reiver / Wraith (crispy S_WRAITH_*; the rise-from-ground init and ice
+    //      death are simplified away).  Floating undead: melee drains health, also
+    //      lobs a bolt at range.  Sprite: XWRT (A-D walk, E-G attack, H pain, I-R die). ----
+    ST (S_XWRT_LOOK1,  SPR_XWRT,  0, 15, (actionf_p1)A_Look,         S_XWRT_LOOK2);
+    ST (S_XWRT_LOOK2,  SPR_XWRT,  1, 15, (actionf_p1)A_Look,         S_XWRT_LOOK1);
+    ST (S_XWRT_CHASE1, SPR_XWRT,  0,  4, (actionf_p1)A_Chase,        S_XWRT_CHASE2);
+    ST (S_XWRT_CHASE2, SPR_XWRT,  1,  4, (actionf_p1)A_Chase,        S_XWRT_CHASE3);
+    ST (S_XWRT_CHASE3, SPR_XWRT,  2,  4, (actionf_p1)A_Chase,        S_XWRT_CHASE4);
+    ST (S_XWRT_CHASE4, SPR_XWRT,  3,  4, (actionf_p1)A_Chase,        S_XWRT_CHASE1);
+    ST (S_XWRT_ATK1_1, SPR_XWRT,  4,  6, (actionf_p1)A_FaceTarget,   S_XWRT_ATK1_2);
+    ST (S_XWRT_ATK1_2, SPR_XWRT,  5,  6, (actionf_p1)A_FaceTarget,   S_XWRT_ATK1_3);
+    ST (S_XWRT_ATK1_3, SPR_XWRT,  6,  6, (actionf_p1)A_WraithMelee,  S_XWRT_CHASE1);
+    ST (S_XWRT_ATK2_1, SPR_XWRT,  4,  6, (actionf_p1)A_FaceTarget,   S_XWRT_ATK2_2);
+    ST (S_XWRT_ATK2_2, SPR_XWRT,  5,  6, (actionf_p1)A_FaceTarget,   S_XWRT_ATK2_3);
+    ST (S_XWRT_ATK2_3, SPR_XWRT,  6,  6, (actionf_p1)A_WraithMissile,S_XWRT_CHASE1);
+    ST (S_XWRT_PAIN1,  SPR_XWRT,  7,  2, NULL,                       S_XWRT_PAIN2);
+    ST (S_XWRT_PAIN2,  SPR_XWRT,  7,  6, (actionf_p1)A_Pain,         S_XWRT_CHASE1);
+    ST (S_XWRT_DIE1,   SPR_XWRT,  8,  4, NULL,                       S_XWRT_DIE2);
+    ST (S_XWRT_DIE2,   SPR_XWRT,  9,  4, (actionf_p1)A_Scream,       S_XWRT_DIE3);
+    ST (S_XWRT_DIE3,   SPR_XWRT, 10,  4, NULL,                       S_XWRT_DIE4);
+    ST (S_XWRT_DIE4,   SPR_XWRT, 11,  4, (actionf_p1)A_Fall,         S_XWRT_DIE5);
+    ST (S_XWRT_DIE5,   SPR_XWRT, 12,  4, NULL,                       S_XWRT_DIE6);
+    ST (S_XWRT_DIE6,   SPR_XWRT, 13,  4, NULL,                       S_XWRT_DIE7);
+    ST (S_XWRT_DIE7,   SPR_XWRT, 14,  4, NULL,                       S_XWRT_DIE8);
+    ST (S_XWRT_DIE8,   SPR_XWRT, 15,  5, NULL,                       S_XWRT_DIE9);
+    ST (S_XWRT_DIE9,   SPR_XWRT, 16,  5, NULL,                       S_XWRT_DIE10);
+    ST (S_XWRT_DIE10,  SPR_XWRT, 17, -1, NULL,                       S_NULL);
+
+    // Reiver bolt (crispy S_WRTHFX_MOVE*/BOOM*).
+    ST (S_XWRB_MOVE1, SPR_XWRB, 32768, 3, NULL,                      S_XWRB_MOVE2);
+    ST (S_XWRB_MOVE2, SPR_XWRB, 32769, 3, NULL,                      S_XWRB_MOVE3);
+    ST (S_XWRB_MOVE3, SPR_XWRB, 32770, 3, NULL,                      S_XWRB_MOVE1);
+    ST (S_XWRB_BOOM1, SPR_XWRB, 32771, 4, NULL,                      S_XWRB_BOOM2);
+    ST (S_XWRB_BOOM2, SPR_XWRB, 32772, 4, NULL,                      S_XWRB_BOOM3);
+    ST (S_XWRB_BOOM3, SPR_XWRB, 32773, 4, NULL,                      S_XWRB_BOOM4);
+    ST (S_XWRB_BOOM4, SPR_XWRB, 32774, 3, NULL,                      S_XWRB_BOOM5);
+    ST (S_XWRB_BOOM5, SPR_XWRB, 32775, 3, NULL,                      S_XWRB_BOOM6);
+    ST (S_XWRB_BOOM6, SPR_XWRB, 32776, 3, NULL,                      S_NULL);
+
+    m = &mobjinfo[MT_XWRAITH];
+    m->doomednum = -1;        m->spawnstate  = S_XWRT_LOOK1; m->spawnhealth = 150;
+    m->seestate  = S_XWRT_CHASE1; m->seesound  = sfx_bgsit1; m->reactiontime = 8;
+    m->attacksound = sfx_firsht;  m->painstate = S_XWRT_PAIN1; m->painchance = 25;
+    m->painsound = sfx_popain;    m->meleestate = S_XWRT_ATK1_1; m->missilestate = S_XWRT_ATK2_1;
+    m->deathstate = S_XWRT_DIE1;  m->xdeathstate = S_NULL;    m->deathsound = sfx_bgdth1;
+    m->speed = 11; m->radius = 20*FRACUNIT; m->height = 55*FRACUNIT; m->mass = 75;
+    m->damage = 0; m->activesound = sfx_bgact;
+    m->flags = MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL|MF_FLOAT|MF_NOGRAVITY; m->raisestate = S_NULL;
+
+    m = &mobjinfo[MT_XWRAITH_FX];
+    m->doomednum = -1;        m->spawnstate  = S_XWRB_MOVE1; m->spawnhealth = 1000;
+    m->seestate  = S_NULL;       m->seesound  = sfx_None;  m->reactiontime = 8;
+    m->attacksound = sfx_None;   m->painstate = S_NULL;    m->painchance = 0;
+    m->painsound = sfx_None;     m->meleestate = S_NULL;   m->missilestate = S_NULL;
+    m->deathstate = S_XWRB_BOOM1; m->xdeathstate = S_NULL; m->deathsound = sfx_firxpl;
+    m->speed = 14*FRACUNIT; m->radius = 10*FRACUNIT; m->height = 6*FRACUNIT; m->mass = 5;
+    m->damage = 5; m->activesound = sfx_None;
+    m->flags = MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY; m->raisestate = S_NULL;
+
+    // ---- Dark Bishop (crispy S_BISHOP_*; the teleport-blur evasion + homing
+    //      missile + special1 burst counter are simplified away).  Floating caster:
+    //      melee swing in range, else a plain missile.  Sprite XBIS (A-F frames
+    //      0-5 rotated, attack/death frames fullbright). ----
+    ST (S_XBIS_LOOK1, SPR_XBIS,  0, 10, (actionf_p1)A_Look,          S_XBIS_LOOK1);
+    ST (S_XBIS_WALK1, SPR_XBIS,  0,  3, (actionf_p1)A_Chase,         S_XBIS_WALK2);
+    ST (S_XBIS_WALK2, SPR_XBIS,  1,  3, (actionf_p1)A_Chase,         S_XBIS_WALK3);
+    ST (S_XBIS_WALK3, SPR_XBIS,  2,  3, (actionf_p1)A_Chase,         S_XBIS_WALK1);
+    ST (S_XBIS_ATK1,  SPR_XBIS,  0,  3, (actionf_p1)A_FaceTarget,    S_XBIS_ATK2);
+    ST (S_XBIS_ATK2,  SPR_XBIS, 32771, 3, (actionf_p1)A_FaceTarget,  S_XBIS_ATK3);
+    ST (S_XBIS_ATK3,  SPR_XBIS, 32772, 3, (actionf_p1)A_FaceTarget,  S_XBIS_ATK4);
+    ST (S_XBIS_ATK4,  SPR_XBIS, 32773, 3, (actionf_p1)A_BishopAttack,S_XBIS_ATK5);
+    ST (S_XBIS_ATK5,  SPR_XBIS, 32773, 5, (actionf_p1)A_FaceTarget,  S_XBIS_WALK1);
+    ST (S_XBIS_PAIN1, SPR_XBIS,  2,  6, (actionf_p1)A_Pain,          S_XBIS_WALK1);
+    ST (S_XBIS_DIE1,  SPR_XBIS,  6,  6, NULL,                        S_XBIS_DIE2);
+    ST (S_XBIS_DIE2,  SPR_XBIS, 32775, 6, (actionf_p1)A_Scream,      S_XBIS_DIE3);
+    ST (S_XBIS_DIE3,  SPR_XBIS, 32776, 5, (actionf_p1)A_Fall,        S_XBIS_DIE4);
+    ST (S_XBIS_DIE4,  SPR_XBIS, 32777, 5, NULL,                      S_XBIS_DIE5);
+    ST (S_XBIS_DIE5,  SPR_XBIS, 32778, 5, NULL,                      S_XBIS_DIE6);
+    ST (S_XBIS_DIE6,  SPR_XBIS, 32779, 4, NULL,                      S_XBIS_DIE7);
+    ST (S_XBIS_DIE7,  SPR_XBIS, 32780, 4, NULL,                      S_NULL);
+
+    // Dark Bishop missile (crispy S_BISHFX*; seeking dropped -- straight flight).
+    ST (S_XBPF_MOVE1, SPR_XBPF, 32768, 2, NULL,                      S_XBPF_MOVE2);
+    ST (S_XBPF_MOVE2, SPR_XBPF, 32769, 2, NULL,                      S_XBPF_MOVE1);
+    ST (S_XBPF_BOOM1, SPR_XBPF, 32770, 4, NULL,                      S_XBPF_BOOM2);
+    ST (S_XBPF_BOOM2, SPR_XBPF, 32771, 4, NULL,                      S_XBPF_BOOM3);
+    ST (S_XBPF_BOOM3, SPR_XBPF, 32772, 4, NULL,                      S_XBPF_BOOM4);
+    ST (S_XBPF_BOOM4, SPR_XBPF, 32773, 3, NULL,                      S_XBPF_BOOM5);
+    ST (S_XBPF_BOOM5, SPR_XBPF, 32774, 3, NULL,                      S_NULL);
+
+    m = &mobjinfo[MT_XBISHOP];
+    m->doomednum = -1;        m->spawnstate  = S_XBIS_LOOK1; m->spawnhealth = 130;
+    m->seestate  = S_XBIS_WALK1; m->seesound  = sfx_bgsit2; m->reactiontime = 8;
+    m->attacksound = sfx_firsht;  m->painstate = S_XBIS_PAIN1; m->painchance = 110;
+    m->painsound = sfx_popain;    m->meleestate = S_NULL;     m->missilestate = S_XBIS_ATK1;
+    m->deathstate = S_XBIS_DIE1;  m->xdeathstate = S_NULL;    m->deathsound = sfx_bgdth2;
+    m->speed = 10; m->radius = 22*FRACUNIT; m->height = 65*FRACUNIT; m->mass = 100;
+    m->damage = 0; m->activesound = sfx_bgact;
+    m->flags = MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL|MF_FLOAT|MF_NOGRAVITY|MF_NOBLOOD; m->raisestate = S_NULL;
+
+    m = &mobjinfo[MT_XBISHOP_FX];
+    m->doomednum = -1;        m->spawnstate  = S_XBPF_MOVE1; m->spawnhealth = 1000;
+    m->seestate  = S_NULL;       m->seesound  = sfx_None;  m->reactiontime = 8;
+    m->attacksound = sfx_None;   m->painstate = S_NULL;    m->painchance = 0;
+    m->painsound = sfx_None;     m->meleestate = S_NULL;   m->missilestate = S_NULL;
+    m->deathstate = S_XBPF_BOOM1; m->xdeathstate = S_NULL; m->deathsound = sfx_firxpl;
+    m->speed = 10*FRACUNIT; m->radius = 10*FRACUNIT; m->height = 6*FRACUNIT; m->mass = 100;
+    m->damage = 4; m->activesound = sfx_None;
+    m->flags = MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY; m->raisestate = S_NULL;
 }
 
 // ---------------------------------------------------------------------------
@@ -295,6 +505,9 @@ int Hexen_TypeByName (const char* name)
     if (!strcmp (name, "slaughtaur")) return MT_XSLAUGHTAUR;
     // "demon" stays the DOOM pinky (resolved earlier in C_MobjByName); use "serpent".
     if (!strcmp (name, "serpent") || !strcmp (name, "chaosserpent")) return MT_XDEMON;
+    if (!strcmp (name, "afrit") || !strcmp (name, "firedemon")) return MT_XFIREDEMON;
+    if (!strcmp (name, "reiver") || !strcmp (name, "wraith")) return MT_XWRAITH;
+    if (!strcmp (name, "bishop") || !strcmp (name, "darkbishop")) return MT_XBISHOP;
     return -1;
 }
 

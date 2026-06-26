@@ -65,6 +65,7 @@ char *sprnames[NUMSPRITES] = {
     "FFAB","FFBX","FMAN","FFIR","FAPL","FAPB",				// Freedoom projectiles
     "XETT",								// Hexen ettin
     "XCEN","XCTF","XDEM","XDMF",						// Hexen centaur/serpent + projectiles
+    "XFDM","XFDB","XWRT","XWRB","XBIS","XBPF",				// Hexen fire demon / reiver / bishop + projectiles
     // (H) Heretic artifact pickup sprites -- lock-step with spritenum_t (info.h)
     "PTN1","SPHL","PWBK","TRCH","FBMB","INVU","INVS","ATLP",
     "SOAR","EGGC","HCHK"			// Wings / Morph Ovum / morph chicken
