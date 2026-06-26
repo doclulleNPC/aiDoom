@@ -1920,7 +1920,26 @@ boolean P_AICoop_RevivePress (player_t* presser)
     presser->health -= 10;			// transfer 10 HP human -> buddy
     if (presser->mo) presser->mo->health = presser->health;
     P_AICoop_Revive (10);			// buddy back up with the donated 10 HP
+    // Thank the human, reliably: VP_COMMAND preempts the rate-limited "help!" screams the
+    // downed buddy was making (an ambient "revived" line would be gated out right after them).
+    AICoop_CalloutP ("thanks:", 3, VP_COMMAND);
     return true;
+}
+
+// Console "buddyheal": patch the companion up to 100 HP -- and stand it up first if it's
+// currently downed (so it doubles as a remote revive).
+const char* P_AICoop_Heal (void)
+{
+    player_t* bot = &players[coop_slot];
+    if (!AICoop_Mo ()) return "[Buddy] (no companion -- launch with -coop)";
+    if (bot->playerstate == PST_DEAD)
+    {
+	P_AICoop_Revive (100);			// downed -> stand it back up at full health
+	return "[Buddy] Revived and patched up to 100 HP.";
+    }
+    bot->health = 100;
+    if (bot->mo) bot->mo->health = 100;
+    return "[Buddy] Patched up to 100 HP.";
 }
 
 static boolean AICoop_PlayerInLine (mobj_t* mo, mobj_t* tgt)

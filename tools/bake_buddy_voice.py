@@ -202,6 +202,10 @@ EVENTS = [
     ("DSREV01", "Back in the fight!"),
     ("DSREV02", "Thanks -- I owe you one."),
     ("DSREV03", "Let's finish this."),
+    # -- player picked the downed buddy back up: thank them (reliable, VP_COMMAND)
+    ("DSTHX01", "Thanks, I owe you one!"),
+    ("DSTHX02", "You saved my hide -- cheers!"),
+    ("DSTHX03", "I won't forget this, marine!"),
     # -- teleport / regroup home (buddyhome command + auto-recall off a hazard)
     ("DSHOME01", "Regrouping on you!"),
     ("DSHOME02", "Beam me back, baby!"),

@@ -191,6 +191,7 @@ static const voicemap_t VOICE_MAP[] =
     { "help:0","DSHELP01" },{ "help:1","DSHELP02" },{ "help:2","DSHELP03" },
     { "help:3","DSHELP04" },{ "help:4","DSHELP05" },
     { "revived:0","DSREV01" },{ "revived:1","DSREV02" },{ "revived:2","DSREV03" },
+    { "thanks:0","DSTHX01" },{ "thanks:1","DSTHX02" },{ "thanks:2","DSTHX03" },
     { "home:0","DSHOME01" },{ "home:1","DSHOME02" },{ "home:2","DSHOME03" },
 
     // ---- AI Director persona (DD* lumps, separate voice; see bake_buddy_voice.py
