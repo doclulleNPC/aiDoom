@@ -1011,7 +1011,8 @@ P_DamageMobj
 
     if ( (!target->threshold || target->type == MT_VILE)
 	 && source && source != target
-	 && source->type != MT_VILE)
+	 && source->type != MT_VILE
+	 && !((target->flags & MF_FRIEND) && source->player) )	// a friendly (revived marine / summon) never turns on the human
     {
 	// if not intent on another player,
 	// chase after this one

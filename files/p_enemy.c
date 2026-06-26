@@ -560,6 +560,9 @@ P_LookForPlayers
 	if (player->health <= 0)
 	    continue;		// dead
 
+	if (player->powers[pw_invisibility])
+	    continue;		// (mod) true invisibility -- monsters can't acquire an invisible player/buddy
+
 	if (!P_CheckSight (actor, player->mo))
 	    continue;		// out of sight
 			
@@ -819,7 +822,20 @@ void A_Chase (mobj_t*	actor)
 	else
 	    actor->threshold--;
     }
-    
+
+    // (mod) True invisibility: forget an INVISIBLE player target this monster isn't actively
+    // retaliating against (threshold==0 -> it hasn't been hurt by the player recently) and go
+    // back to wandering.  Shooting a monster sets its threshold (P_DamageMobj), so THAT one
+    // keeps hunting -- "only once you shoot it does it come after you".
+    if (actor->target && actor->target->player
+	&& actor->target->player->powers[pw_invisibility]
+	&& actor->threshold == 0)
+    {
+	actor->target = NULL;
+	P_SetMobjState (actor, actor->info->spawnstate);
+	return;
+    }
+
     // turn towards movement direction if not there yet
     if (actor->movedir < 8)
     {
