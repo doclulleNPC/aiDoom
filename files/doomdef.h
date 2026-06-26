@@ -32,6 +32,13 @@
 // DOOM version
 enum { VERSION_NUM =  114 };
 
+// Demo format version -- DECOUPLED from VERSION_NUM (which auto-bumps for savegame struct
+// changes).  The stock IWAD attract demos are version 109 (DOOM 1.9); keeping the demo
+// version pinned there lets them play instead of being rejected as "a different game
+// version" every time a struct change bumps VERSION_NUM.  Our own recorded demos use this
+// too, so they stay self-consistent.
+enum { DEMOVERSION = 109 };
+
 
 // Game mode handling - identify IWAD version
 //  to handle IWAD dependend animations etc.

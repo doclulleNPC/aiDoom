@@ -164,6 +164,29 @@ void A_IceGuyAttack (mobj_t* actor)
 	S_StartSound (actor, actor->info->attacksound);
 }
 
+// Ice Guy death = the Hexen ICE SHATTER (crispy A_IceGuyDie/A_FreezeDeathChunks, simplified):
+// the floater bursts into a scatter of the shard's ice-shatter puffs and then vanishes (it
+// leaves no corpse).  Fixes the death that used to freeze on one frame floating mid-air.
+void A_IceGuyShatter (mobj_t* actor)
+{
+    int		i;
+    int		hsteps = (actor->height >> FRACBITS) > 1 ? (actor->height >> FRACBITS) : 1;
+    actor->momx = actor->momy = actor->momz = 0;
+    for (i = 0; i < 8; i++)
+    {
+	fixed_t	dx = (P_Random () - 128) * (actor->radius >> 7);
+	fixed_t	dy = (P_Random () - 128) * (actor->radius >> 7);
+	fixed_t	dz = (fixed_t)(P_Random () % hsteps) << FRACBITS;
+	mobj_t*	sh = P_SpawnMobj (actor->x + dx, actor->y + dy, actor->z + dz, MT_XICEGUY_FX);
+	if (sh)
+	{
+	    sh->momx = sh->momy = sh->momz = 0;
+	    sh->flags &= ~MF_MISSILE;			// harmless ice debris, not an attack
+	    P_SetMobjState (sh, S_XICP_BOOM1);		// the ice-shatter puff frames
+	}
+    }
+}
+
 // Stalker / Serpent melee (crispy A_SerpentMeleeAttack; the re-check-for-attack
 // chain dropped).  HITDICE(5) = 5..40.
 void A_StalkerMelee (mobj_t* actor)
@@ -532,7 +555,8 @@ void Hexen_Init (void)
     // ---- Wendigo / Ice Guy (crispy S_ICEGUY_*; the dormant spawn, wisp/bit
     //      spawns and dual-missile fan are simplified to a plain floating caster
     //      that lobs one straight ice shard).  Sprite XICE (A-D walk, E-G attack
-    //      fullbright, H death).  Death is a clean fall (no shatter chunks). ----
+    //      fullbright).  Death = the ice SHATTER (frame A like crispy, then burst into
+    //      ice-shatter puffs and vanish -- A_IceGuyShatter). ----
     ST (S_XICE_LOOK1, SPR_XICE,  0, 10, (actionf_p1)A_Look,         S_XICE_LOOK2);
     ST (S_XICE_LOOK2, SPR_XICE,  0, 10, (actionf_p1)A_Look,         S_XICE_LOOK1);
     ST (S_XICE_WALK1, SPR_XICE,  0,  4, (actionf_p1)A_Chase,        S_XICE_WALK2);
@@ -544,9 +568,9 @@ void Hexen_Init (void)
     ST (S_XICE_ATK3,  SPR_XICE, 32774, 8,(actionf_p1)A_IceGuyAttack,S_XICE_ATK4);
     ST (S_XICE_ATK4,  SPR_XICE,  5,  4, (actionf_p1)A_FaceTarget,   S_XICE_WALK1);
     ST (S_XICE_PAIN1, SPR_XICE,  0,  2, (actionf_p1)A_Pain,         S_XICE_WALK1);
-    ST (S_XICE_DIE1,  SPR_XICE,  7,  6, (actionf_p1)A_Scream,       S_XICE_DIE2);
-    ST (S_XICE_DIE2,  SPR_XICE,  7,  6, (actionf_p1)A_Fall,         S_XICE_DIE3);
-    ST (S_XICE_DIE3,  SPR_XICE,  7, -1, NULL,                       S_NULL);
+    ST (S_XICE_DIE1,  SPR_XICE,  0,  5, (actionf_p1)A_Scream,         S_XICE_DIE2);
+    ST (S_XICE_DIE2,  SPR_XICE,  0,  5, (actionf_p1)A_Fall,           S_XICE_DIE3);
+    ST (S_XICE_DIE3,  SPR_XICE,  0,  3, (actionf_p1)A_IceGuyShatter,  S_NULL);
 
     // Wendigo ice shard (crispy S_ICEGUY_FX*/FX_X*).
     ST (S_XICP_MOVE1, SPR_XICP, 32768, 3, NULL,                     S_XICP_MOVE2);

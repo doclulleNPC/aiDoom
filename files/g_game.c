@@ -1750,10 +1750,10 @@ void G_BeginRecording (void)
 		
     demo_p = demobuffer;
 	
-    *demo_p++ = VERSION_NUM;
-    *demo_p++ = gameskill; 
-    *demo_p++ = gameepisode; 
-    *demo_p++ = gamemap; 
+    *demo_p++ = DEMOVERSION;
+    *demo_p++ = gameskill;
+    *demo_p++ = gameepisode;
+    *demo_p++ = gamemap;
     *demo_p++ = deathmatch; 
     *demo_p++ = respawnparm;
     *demo_p++ = fastparm;
@@ -1784,7 +1784,7 @@ void G_DoPlayDemo (void)
 	 
     gameaction = ga_nothing; 
     demobuffer = demo_p = W_CacheLumpName (defdemoname, PU_STATIC); 
-    if ( *demo_p++ != VERSION_NUM)
+    if ( *demo_p++ != DEMOVERSION)
     {
       fprintf( stderr, "Demo is from a different game version!\n");
       gameaction = ga_nothing;
