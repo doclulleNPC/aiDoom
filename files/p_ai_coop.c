@@ -1983,12 +1983,15 @@ void P_AICoop_BuildCmd (void)
     if (bot->playerstate == PST_DEAD)
     {
 	// If the downed body fell on (or slid into) a damaging floor -- nukage/lava/etc. --
-	// the human can't safely reach it to revive, and the corpse just keeps cooking.
-	// Pull the body back to its recorded spawn point so it can be revived on safe ground.
+	// the human can't safely reach it to revive and it would just keep cooking until it
+	// dies for good.  So recall it to the recorded spawn point AND stand it straight back
+	// up at full health -- P_AICoop_Revive un-downs it (100 HP) and nudges it clear.
 	if (bot->mo && coop_home_set && AICoop_DamagingFloor (bot->mo->x, bot->mo->y))
 	{
 	    P_TeleportMove (bot->mo, coop_home_x, coop_home_y);
 	    bot->mo->momx = bot->mo->momy = bot->mo->momz = 0;
+	    P_AICoop_Revive (100);		// patched up to 100 HP, back on its feet at home
+	    return;
 	}
 	memset (cmd, 0, sizeof(*cmd));		// never tap USE -> stays down (no reborn)
 	AICoop_Callout ("help:", 5);		// scream for help (4s cooldown gates it)
