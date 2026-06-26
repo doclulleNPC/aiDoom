@@ -202,6 +202,7 @@ static const voicemap_t VOICE_MAP[] =
     { "dir:horde:0","DDHORDE0" },{ "dir:horde:1","DDHORDE1" },{ "dir:horde:2","DDHORDE2" },
     { "dir:peak:0","DDPEAK0" },{ "dir:peak:1","DDPEAK1" },{ "dir:peak:2","DDPEAK2" },
     { "dir:big:0","DDBIG0" },{ "dir:big:1","DDBIG1" },{ "dir:big:2","DDBIG2" },
+    { "dir:death:0","DDDEATH0" },{ "dir:death:1","DDDEATH1" },{ "dir:death:2","DDDEATH2" },
     { "dir:relax:0","DDRELAX0" },{ "dir:relax:1","DDRELAX1" },{ "dir:relax:2","DDRELAX2" },
     { "dir:gift:0","DDGIFT0" },{ "dir:gift:1","DDGIFT1" },{ "dir:gift:2","DDGIFT2" },
     { "dir:heal:0","DDHEAL0" },{ "dir:heal:1","DDHEAL1" },{ "dir:heal:2","DDHEAL2" },

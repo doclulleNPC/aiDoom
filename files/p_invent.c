@@ -91,10 +91,14 @@ const char* P_ArtifactName (artitype_t a)
 // ammo store already at its cap) -- the caller then leaves the item on the
 // ground.  On success the slot is auto-selected if nothing was selected.
 // ---------------------------------------------------------------------------
+extern int	P_AICoop_Active (void);		// the DOOM overflow inventory is a buddy-mode feature
+
 boolean P_StoreOverflow (player_t* player, artitype_t a, int amount)
 {
     ammotype_t	at;
 
+    if (!P_AICoop_Active ())			// no buddy -> no DOOM inventory; pickup stays vanilla
+	return false;
     if (a <= arti_none || a >= NUMARTIFACTS)
 	return false;
 
@@ -343,5 +347,26 @@ boolean P_DropArtifact (player_t* player)
     if (player->inventory[a] <= 0) P_InvScroll (player, +1);	// emptied -> reselect
 
     player->message = "DROPPED ITEM";
+    return true;
+}
+
+
+// ---------------------------------------------------------------------------
+// (buddy mode) Second wind: when a hit would be lethal, spend a stored medikit or
+// stimpack to stay on your feet instead of dying.  Sets the player's health to the
+// item's heal value (medikit 25, stimpack 10) and returns true if it saved them.
+// ---------------------------------------------------------------------------
+boolean P_InventorySecondWind (player_t* player)
+{
+    int	heal;
+    if      (player->inventory[arti_medikit]  > 0) { player->inventory[arti_medikit]--;  heal = 25; }
+    else if (player->inventory[arti_stimpack] > 0) { player->inventory[arti_stimpack]--; heal = 10; }
+    else return false;
+
+    player->health = heal;
+    if (player->mo) player->mo->health = heal;
+    player->message = "PATCHED YOURSELF UP -- still standing!";
+    if (player->invslot != arti_none && player->inventory[player->invslot] <= 0)
+	P_InvScroll (player, +1);
     return true;
 }

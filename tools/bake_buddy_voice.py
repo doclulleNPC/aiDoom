@@ -289,6 +289,10 @@ DIRECTOR = [
     ("DDDOWN0", "Pathetic."),
     ("DDDOWN1", "Was that all?"),
     ("DDDOWN2", "Get up."),
+    # -- a survivor DIED (dir:death)
+    ("DDDEATH0", "And that's a wrap."),
+    ("DDDEATH1", "One less marine."),
+    ("DDDEATH2", "I expected more."),
     # -- level clear (dir:clear)
     ("DDCLEAR0", "You survived. For now."),
     ("DDCLEAR1", "Until next time."),
