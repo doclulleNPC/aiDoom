@@ -154,6 +154,48 @@ void A_BishopAttack (mobj_t* actor)
     P_SpawnMissile (actor, actor->target, MT_XBISHOP_FX);
 }
 
+// Wendigo / Ice Guy ranged ice shard (crispy A_IceGuyAttack; the symmetric
+// dual-missile fan + wisp spawns are simplified to a single straight shard).
+void A_IceGuyAttack (mobj_t* actor)
+{
+    if (!actor->target)
+	return;
+    if (P_SpawnMissile (actor, actor->target, MT_XICEGUY_FX))
+	S_StartSound (actor, actor->info->attacksound);
+}
+
+// Stalker / Serpent melee (crispy A_SerpentMeleeAttack; the re-check-for-attack
+// chain dropped).  HITDICE(5) = 5..40.
+void A_StalkerMelee (mobj_t* actor)
+{
+    if (!actor->target)
+	return;
+    if (P_CheckMeleeRange (actor))
+    {
+	P_DamageMobj (actor->target, actor, actor, HITDICE (5));
+	S_StartSound (actor, actor->info->attacksound);
+    }
+}
+
+// Stalker / Serpent spit (crispy A_SerpentMissileAttack).
+void A_StalkerMissile (mobj_t* actor)
+{
+    if (!actor->target)
+	return;
+    if (P_SpawnMissile (actor, actor->target, MT_XSTALKER_FX))
+	S_StartSound (actor, actor->info->attacksound);
+}
+
+// Death Wyvern / Dragon fireball (crispy A_DragonAttack; the homing FX2 trails
+// are simplified to a single straight fireball).
+void A_DragonAttack (mobj_t* actor)
+{
+    if (!actor->target)
+	return;
+    if (P_SpawnMissile (actor, actor->target, MT_XDRAGON_FX))
+	S_StartSound (actor, actor->info->attacksound);
+}
+
 // ---------------------------------------------------------------------------
 // Table fill
 // ---------------------------------------------------------------------------
@@ -486,6 +528,165 @@ void Hexen_Init (void)
     m->speed = 10*FRACUNIT; m->radius = 10*FRACUNIT; m->height = 6*FRACUNIT; m->mass = 100;
     m->damage = 4; m->activesound = sfx_None;
     m->flags = MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY; m->raisestate = S_NULL;
+
+    // ---- Wendigo / Ice Guy (crispy S_ICEGUY_*; the dormant spawn, wisp/bit
+    //      spawns and dual-missile fan are simplified to a plain floating caster
+    //      that lobs one straight ice shard).  Sprite XICE (A-D walk, E-G attack
+    //      fullbright, H death).  Death is a clean fall (no shatter chunks). ----
+    ST (S_XICE_LOOK1, SPR_XICE,  0, 10, (actionf_p1)A_Look,         S_XICE_LOOK2);
+    ST (S_XICE_LOOK2, SPR_XICE,  0, 10, (actionf_p1)A_Look,         S_XICE_LOOK1);
+    ST (S_XICE_WALK1, SPR_XICE,  0,  4, (actionf_p1)A_Chase,        S_XICE_WALK2);
+    ST (S_XICE_WALK2, SPR_XICE,  1,  4, (actionf_p1)A_Chase,        S_XICE_WALK3);
+    ST (S_XICE_WALK3, SPR_XICE,  2,  4, (actionf_p1)A_Chase,        S_XICE_WALK4);
+    ST (S_XICE_WALK4, SPR_XICE,  3,  4, (actionf_p1)A_Chase,        S_XICE_WALK1);
+    ST (S_XICE_ATK1,  SPR_XICE,  4,  3, (actionf_p1)A_FaceTarget,   S_XICE_ATK2);
+    ST (S_XICE_ATK2,  SPR_XICE,  5,  3, (actionf_p1)A_FaceTarget,   S_XICE_ATK3);
+    ST (S_XICE_ATK3,  SPR_XICE, 32774, 8,(actionf_p1)A_IceGuyAttack,S_XICE_ATK4);
+    ST (S_XICE_ATK4,  SPR_XICE,  5,  4, (actionf_p1)A_FaceTarget,   S_XICE_WALK1);
+    ST (S_XICE_PAIN1, SPR_XICE,  0,  2, (actionf_p1)A_Pain,         S_XICE_WALK1);
+    ST (S_XICE_DIE1,  SPR_XICE,  7,  6, (actionf_p1)A_Scream,       S_XICE_DIE2);
+    ST (S_XICE_DIE2,  SPR_XICE,  7,  6, (actionf_p1)A_Fall,         S_XICE_DIE3);
+    ST (S_XICE_DIE3,  SPR_XICE,  7, -1, NULL,                       S_NULL);
+
+    // Wendigo ice shard (crispy S_ICEGUY_FX*/FX_X*).
+    ST (S_XICP_MOVE1, SPR_XICP, 32768, 3, NULL,                     S_XICP_MOVE2);
+    ST (S_XICP_MOVE2, SPR_XICP, 32769, 3, NULL,                     S_XICP_MOVE3);
+    ST (S_XICP_MOVE3, SPR_XICP, 32770, 3, NULL,                     S_XICP_MOVE1);
+    ST (S_XICP_BOOM1, SPR_XICP, 32771, 4, NULL,                     S_XICP_BOOM2);
+    ST (S_XICP_BOOM2, SPR_XICP, 32772, 4, NULL,                     S_XICP_BOOM3);
+    ST (S_XICP_BOOM3, SPR_XICP, 32773, 4, NULL,                     S_XICP_BOOM4);
+    ST (S_XICP_BOOM4, SPR_XICP, 32774, 4, NULL,                     S_XICP_BOOM5);
+    ST (S_XICP_BOOM5, SPR_XICP, 32775, 3, NULL,                     S_NULL);
+
+    m = &mobjinfo[MT_XICEGUY];
+    m->doomednum = -1;        m->spawnstate  = S_XICE_LOOK1; m->spawnhealth = 120;
+    m->seestate  = S_XICE_WALK1; m->seesound  = sfx_bgsit2; m->reactiontime = 8;
+    m->attacksound = sfx_firsht;  m->painstate = S_XICE_PAIN1; m->painchance = 144;
+    m->painsound = sfx_popain;    m->meleestate = S_NULL;     m->missilestate = S_XICE_ATK1;
+    m->deathstate = S_XICE_DIE1;  m->xdeathstate = S_NULL;    m->deathsound = sfx_bgdth2;
+    m->speed = 14; m->radius = 22*FRACUNIT; m->height = 75*FRACUNIT; m->mass = 150;
+    m->damage = 0; m->activesound = sfx_bgact;
+    m->flags = MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL|MF_FLOAT|MF_NOGRAVITY|MF_NOBLOOD; m->raisestate = S_NULL;
+
+    m = &mobjinfo[MT_XICEGUY_FX];
+    m->doomednum = -1;        m->spawnstate  = S_XICP_MOVE1; m->spawnhealth = 1000;
+    m->seestate  = S_NULL;       m->seesound  = sfx_None;  m->reactiontime = 8;
+    m->attacksound = sfx_None;   m->painstate = S_NULL;    m->painchance = 0;
+    m->painsound = sfx_None;     m->meleestate = S_NULL;   m->missilestate = S_NULL;
+    m->deathstate = S_XICP_BOOM1; m->xdeathstate = S_NULL; m->deathsound = sfx_firxpl;
+    m->speed = 14*FRACUNIT; m->radius = 8*FRACUNIT; m->height = 10*FRACUNIT; m->mass = 100;
+    m->damage = 3; m->activesound = sfx_None;
+    m->flags = MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY; m->raisestate = S_NULL;
+
+    // ---- Stalker / Serpent (crispy S_SERPENT_*; the underwater hide/dive/surface
+    //      ritual is simplified away -- a plain ground ambusher that chases, then
+    //      swings in melee or spits at range).  Sprite XSSP (8-9 walk, 10-13 attack,
+    //      14-25 die). ----
+    ST (S_XSSP_LOOK1, SPR_XSSP,  7, 10, (actionf_p1)A_Look,         S_XSSP_LOOK2);
+    ST (S_XSSP_LOOK2, SPR_XSSP,  7, 10, (actionf_p1)A_Look,         S_XSSP_LOOK1);
+    ST (S_XSSP_WALK1, SPR_XSSP,  8,  5, (actionf_p1)A_Chase,        S_XSSP_WALK2);
+    ST (S_XSSP_WALK2, SPR_XSSP,  9,  5, (actionf_p1)A_Chase,        S_XSSP_WALK3);
+    ST (S_XSSP_WALK3, SPR_XSSP,  8,  5, (actionf_p1)A_Chase,        S_XSSP_WALK4);
+    ST (S_XSSP_WALK4, SPR_XSSP,  9,  5, (actionf_p1)A_Chase,        S_XSSP_WALK1);
+    ST (S_XSSP_ATK1,  SPR_XSSP, 10,  6, (actionf_p1)A_FaceTarget,   S_XSSP_ATK2);
+    ST (S_XSSP_ATK2,  SPR_XSSP, 11,  5, (actionf_p1)A_FaceTarget,   S_XSSP_MEL1);
+    ST (S_XSSP_MEL1,  SPR_XSSP, 13,  5, (actionf_p1)A_StalkerMelee, S_XSSP_WALK1);
+    ST (S_XSSP_MIS1,  SPR_XSSP, 13,  5, (actionf_p1)A_StalkerMissile,S_XSSP_WALK1);
+    ST (S_XSSP_PAIN1, SPR_XSSP, 11,  5, NULL,                       S_XSSP_PAIN2);
+    ST (S_XSSP_PAIN2, SPR_XSSP, 11,  5, (actionf_p1)A_Pain,         S_XSSP_WALK1);
+    ST (S_XSSP_DIE1,  SPR_XSSP, 14,  4, NULL,                       S_XSSP_DIE2);
+    ST (S_XSSP_DIE2,  SPR_XSSP, 15,  4, (actionf_p1)A_Scream,       S_XSSP_DIE3);
+    ST (S_XSSP_DIE3,  SPR_XSSP, 16,  4, (actionf_p1)A_Fall,         S_XSSP_DIE4);
+    ST (S_XSSP_DIE4,  SPR_XSSP, 17,  4, NULL,                       S_XSSP_DIE5);
+    ST (S_XSSP_DIE5,  SPR_XSSP, 18,  4, NULL,                       S_XSSP_DIE6);
+    ST (S_XSSP_DIE6,  SPR_XSSP, 19,  4, NULL,                       S_XSSP_DIE7);
+    ST (S_XSSP_DIE7,  SPR_XSSP, 20,  4, NULL,                       S_XSSP_DIE8);
+    ST (S_XSSP_DIE8,  SPR_XSSP, 21,  4, NULL,                       S_XSSP_DIE9);
+    ST (S_XSSP_DIE9,  SPR_XSSP, 22, -1, NULL,                       S_NULL);
+
+    // Stalker spit (crispy S_SERPENT_FX*/FX_X*).
+    ST (S_XSSF_MOVE1, SPR_XSSF, 32768, 3, NULL,                     S_XSSF_MOVE2);
+    ST (S_XSSF_MOVE2, SPR_XSSF, 32769, 3, NULL,                     S_XSSF_MOVE3);
+    ST (S_XSSF_MOVE3, SPR_XSSF, 32768, 3, NULL,                     S_XSSF_MOVE4);
+    ST (S_XSSF_MOVE4, SPR_XSSF, 32769, 3, NULL,                     S_XSSF_MOVE1);
+    ST (S_XSSF_BOOM1, SPR_XSSF, 32770, 4, NULL,                     S_XSSF_BOOM2);
+    ST (S_XSSF_BOOM2, SPR_XSSF, 32771, 4, NULL,                     S_XSSF_BOOM3);
+    ST (S_XSSF_BOOM3, SPR_XSSF, 32772, 4, NULL,                     S_XSSF_BOOM4);
+    ST (S_XSSF_BOOM4, SPR_XSSF, 32773, 4, NULL,                     S_XSSF_BOOM5);
+    ST (S_XSSF_BOOM5, SPR_XSSF, 32774, 4, NULL,                     S_XSSF_BOOM6);
+    ST (S_XSSF_BOOM6, SPR_XSSF, 32775, 4, NULL,                     S_NULL);
+
+    m = &mobjinfo[MT_XSTALKER];
+    m->doomednum = -1;        m->spawnstate  = S_XSSP_LOOK1; m->spawnhealth = 90;
+    m->seestate  = S_XSSP_WALK1; m->seesound  = sfx_bgsit1; m->reactiontime = 8;
+    m->attacksound = sfx_claw;    m->painstate = S_XSSP_PAIN1; m->painchance = 96;
+    m->painsound = sfx_popain;    m->meleestate = S_XSSP_ATK1; m->missilestate = S_XSSP_MIS1;
+    m->deathstate = S_XSSP_DIE1;  m->xdeathstate = S_NULL;    m->deathsound = sfx_bgdth1;
+    m->speed = 12; m->radius = 32*FRACUNIT; m->height = 70*FRACUNIT; m->mass = 200;
+    m->damage = 0; m->activesound = sfx_bgact;
+    m->flags = MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL; m->raisestate = S_NULL;
+
+    m = &mobjinfo[MT_XSTALKER_FX];
+    m->doomednum = -1;        m->spawnstate  = S_XSSF_MOVE1; m->spawnhealth = 1000;
+    m->seestate  = S_NULL;       m->seesound  = sfx_None;  m->reactiontime = 8;
+    m->attacksound = sfx_None;   m->painstate = S_NULL;    m->painchance = 0;
+    m->painsound = sfx_None;     m->meleestate = S_NULL;   m->missilestate = S_NULL;
+    m->deathstate = S_XSSF_BOOM1; m->xdeathstate = S_NULL; m->deathsound = sfx_firxpl;
+    m->speed = 15*FRACUNIT; m->radius = 8*FRACUNIT; m->height = 10*FRACUNIT; m->mass = 100;
+    m->damage = 4; m->activesound = sfx_None;
+    m->flags = MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY; m->raisestate = S_NULL;
+
+    // ---- Death Wyvern / Dragon (crispy S_DRAGON_*; the take-off flight ritual,
+    //      A_DragonFlight steering and crash sequence are simplified to a plain
+    //      flying boss that lobs a straight fireball).  Sprite XDRA (0-3 flight,
+    //      4 attack, 5 pain, 6-12 die).  Big, high HP. ----
+    ST (S_XDRA_LOOK1, SPR_XDRA,  3, 10, (actionf_p1)A_Look,         S_XDRA_LOOK2);
+    ST (S_XDRA_LOOK2, SPR_XDRA,  3, 10, (actionf_p1)A_Look,         S_XDRA_LOOK1);
+    ST (S_XDRA_WALK1, SPR_XDRA,  0,  3, (actionf_p1)A_Chase,        S_XDRA_WALK2);
+    ST (S_XDRA_WALK2, SPR_XDRA,  1,  3, (actionf_p1)A_Chase,        S_XDRA_WALK3);
+    ST (S_XDRA_WALK3, SPR_XDRA,  2,  3, (actionf_p1)A_Chase,        S_XDRA_WALK4);
+    ST (S_XDRA_WALK4, SPR_XDRA,  3,  3, (actionf_p1)A_Chase,        S_XDRA_WALK1);
+    ST (S_XDRA_ATK1,  SPR_XDRA,  4,  8, (actionf_p1)A_DragonAttack, S_XDRA_WALK1);
+    ST (S_XDRA_PAIN1, SPR_XDRA,  5, 10, (actionf_p1)A_Pain,         S_XDRA_WALK1);
+    ST (S_XDRA_DIE1,  SPR_XDRA,  6,  5, (actionf_p1)A_Scream,       S_XDRA_DIE2);
+    ST (S_XDRA_DIE2,  SPR_XDRA,  7,  4, (actionf_p1)A_Fall,         S_XDRA_DIE3);
+    ST (S_XDRA_DIE3,  SPR_XDRA,  8,  4, NULL,                       S_XDRA_DIE4);
+    ST (S_XDRA_DIE4,  SPR_XDRA,  9,  4, NULL,                       S_XDRA_DIE5);
+    ST (S_XDRA_DIE5,  SPR_XDRA, 10, -1, NULL,                       S_NULL);
+
+    // Dragon fireball (crispy S_DRAGON_FX1_*).
+    ST (S_XDRF_MOVE1, SPR_XDRF, 32768, 4, NULL,                     S_XDRF_MOVE2);
+    ST (S_XDRF_MOVE2, SPR_XDRF, 32769, 4, NULL,                     S_XDRF_MOVE3);
+    ST (S_XDRF_MOVE3, SPR_XDRF, 32770, 4, NULL,                     S_XDRF_MOVE4);
+    ST (S_XDRF_MOVE4, SPR_XDRF, 32771, 4, NULL,                     S_XDRF_MOVE5);
+    ST (S_XDRF_MOVE5, SPR_XDRF, 32772, 4, NULL,                     S_XDRF_MOVE6);
+    ST (S_XDRF_MOVE6, SPR_XDRF, 32773, 4, NULL,                     S_XDRF_MOVE1);
+    ST (S_XDRF_BOOM1, SPR_XDRF, 32774, 4, NULL,                     S_XDRF_BOOM2);
+    ST (S_XDRF_BOOM2, SPR_XDRF, 32775, 4, NULL,                     S_XDRF_BOOM3);
+    ST (S_XDRF_BOOM3, SPR_XDRF, 32776, 4, NULL,                     S_XDRF_BOOM4);
+    ST (S_XDRF_BOOM4, SPR_XDRF, 32777, 4, NULL,                     S_XDRF_BOOM5);
+    ST (S_XDRF_BOOM5, SPR_XDRF, 32778, 3, NULL,                     S_XDRF_BOOM6);
+    ST (S_XDRF_BOOM6, SPR_XDRF, 32779, 3, NULL,                     S_NULL);
+
+    m = &mobjinfo[MT_XDRAGON];
+    m->doomednum = -1;        m->spawnstate  = S_XDRA_LOOK1; m->spawnhealth = 640;
+    m->seestate  = S_XDRA_WALK1; m->seesound  = sfx_bgsit1; m->reactiontime = 8;
+    m->attacksound = sfx_firsht;  m->painstate = S_XDRA_PAIN1; m->painchance = 128;
+    m->painsound = sfx_dmpain;    m->meleestate = S_NULL;     m->missilestate = S_XDRA_ATK1;
+    m->deathstate = S_XDRA_DIE1;  m->xdeathstate = S_NULL;    m->deathsound = sfx_bgdth1;
+    m->speed = 10; m->radius = 20*FRACUNIT; m->height = 65*FRACUNIT; m->mass = 1000;
+    m->damage = 0; m->activesound = sfx_dmact;
+    m->flags = MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL|MF_FLOAT|MF_NOGRAVITY|MF_NOBLOOD; m->raisestate = S_NULL;
+
+    m = &mobjinfo[MT_XDRAGON_FX];
+    m->doomednum = -1;        m->spawnstate  = S_XDRF_MOVE1; m->spawnhealth = 1000;
+    m->seestate  = S_NULL;       m->seesound  = sfx_None;  m->reactiontime = 8;
+    m->attacksound = sfx_None;   m->painstate = S_NULL;    m->painchance = 0;
+    m->painsound = sfx_None;     m->meleestate = S_NULL;   m->missilestate = S_NULL;
+    m->deathstate = S_XDRF_BOOM1; m->xdeathstate = S_NULL; m->deathsound = sfx_firxpl;
+    m->speed = 20*FRACUNIT; m->radius = 12*FRACUNIT; m->height = 10*FRACUNIT; m->mass = 100;
+    m->damage = 6; m->activesound = sfx_None;
+    m->flags = MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY; m->raisestate = S_NULL;
 }
 
 // ---------------------------------------------------------------------------
@@ -508,6 +709,9 @@ int Hexen_TypeByName (const char* name)
     if (!strcmp (name, "afrit") || !strcmp (name, "firedemon")) return MT_XFIREDEMON;
     if (!strcmp (name, "reiver") || !strcmp (name, "wraith")) return MT_XWRAITH;
     if (!strcmp (name, "bishop") || !strcmp (name, "darkbishop")) return MT_XBISHOP;
+    if (!strcmp (name, "wendigo") || !strcmp (name, "iceguy")) return MT_XICEGUY;
+    if (!strcmp (name, "stalker")) return MT_XSTALKER;
+    if (!strcmp (name, "wyvern") || !strcmp (name, "dragon") || !strcmp (name, "deathwyvern")) return MT_XDRAGON;
     return -1;
 }
 

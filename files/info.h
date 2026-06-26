@@ -215,6 +215,12 @@ typedef enum
     SPR_XWRB,		// reiver bolt (XWRB)
     SPR_XBIS,		// dark bishop (XBIS)
     SPR_XBPF,		// dark bishop missile (XBPF)
+    SPR_XICE,		// wendigo / ice guy (XICE)
+    SPR_XICP,		// wendigo ice-shard projectile (XICP)
+    SPR_XSSP,		// stalker / serpent (XSSP)
+    SPR_XSSF,		// stalker spit projectile (XSSF)
+    SPR_XDRA,		// death wyvern / dragon (XDRA)
+    SPR_XDRF,		// dragon fireball (XDRF)
     // (H) Heretic artifact pickup sprites (hereticstuff.wad, 4-char Heretic codes).
     // MUST stay in lock-step with sprnames[] in info.c -- a mismatch shifts every
     // later sprite.  files/p_inv_heretic.c registers the pickup actors that use them.
@@ -1351,6 +1357,34 @@ typedef enum
     // Dark Bishop missile projectile
     S_XBPF_MOVE1, S_XBPF_MOVE2,
     S_XBPF_BOOM1, S_XBPF_BOOM2, S_XBPF_BOOM3, S_XBPF_BOOM4, S_XBPF_BOOM5,
+    // Wendigo / Ice Guy (ranged ice-shard caster; wisps/bits/dual-shot simplified away)
+    S_XICE_LOOK1, S_XICE_LOOK2,
+    S_XICE_WALK1, S_XICE_WALK2, S_XICE_WALK3, S_XICE_WALK4,
+    S_XICE_ATK1, S_XICE_ATK2, S_XICE_ATK3, S_XICE_ATK4,
+    S_XICE_PAIN1,
+    S_XICE_DIE1, S_XICE_DIE2, S_XICE_DIE3,
+    // Wendigo ice-shard projectile
+    S_XICP_MOVE1, S_XICP_MOVE2, S_XICP_MOVE3,
+    S_XICP_BOOM1, S_XICP_BOOM2, S_XICP_BOOM3, S_XICP_BOOM4, S_XICP_BOOM5,
+    // Stalker / Serpent (ambusher; hide/dive/surface ritual simplified to a plain chaser)
+    S_XSSP_LOOK1, S_XSSP_LOOK2,
+    S_XSSP_WALK1, S_XSSP_WALK2, S_XSSP_WALK3, S_XSSP_WALK4,
+    S_XSSP_ATK1, S_XSSP_ATK2, S_XSSP_MEL1, S_XSSP_MIS1,
+    S_XSSP_PAIN1, S_XSSP_PAIN2,
+    S_XSSP_DIE1, S_XSSP_DIE2, S_XSSP_DIE3, S_XSSP_DIE4, S_XSSP_DIE5,
+    S_XSSP_DIE6, S_XSSP_DIE7, S_XSSP_DIE8, S_XSSP_DIE9,
+    // Stalker spit projectile
+    S_XSSF_MOVE1, S_XSSF_MOVE2, S_XSSF_MOVE3, S_XSSF_MOVE4,
+    S_XSSF_BOOM1, S_XSSF_BOOM2, S_XSSF_BOOM3, S_XSSF_BOOM4, S_XSSF_BOOM5, S_XSSF_BOOM6,
+    // Death Wyvern / Dragon (big flying ranged boss; flight ritual/crash simplified away)
+    S_XDRA_LOOK1, S_XDRA_LOOK2,
+    S_XDRA_WALK1, S_XDRA_WALK2, S_XDRA_WALK3, S_XDRA_WALK4,
+    S_XDRA_ATK1,
+    S_XDRA_PAIN1,
+    S_XDRA_DIE1, S_XDRA_DIE2, S_XDRA_DIE3, S_XDRA_DIE4, S_XDRA_DIE5,
+    // Dragon fireball projectile
+    S_XDRF_MOVE1, S_XDRF_MOVE2, S_XDRF_MOVE3, S_XDRF_MOVE4, S_XDRF_MOVE5, S_XDRF_MOVE6,
+    S_XDRF_BOOM1, S_XDRF_BOOM2, S_XDRF_BOOM3, S_XDRF_BOOM4, S_XDRF_BOOM5, S_XDRF_BOOM6,
     // (G) revived friendly marine -- PLAY sprite, zombieman-style AI (files/revmarine.c)
     S_REVMAR_STND,
     S_REVMAR_RUN1, S_REVMAR_RUN2, S_REVMAR_RUN3, S_REVMAR_RUN4,
@@ -1581,6 +1615,12 @@ typedef enum {
     MT_XWRAITH_FX,	// reiver bolt projectile
     MT_XBISHOP,		// Hexen dark bishop (floating caster, melee + missile)
     MT_XBISHOP_FX,	// dark bishop missile projectile
+    MT_XICEGUY,		// Hexen wendigo / ice guy (floating, ranged ice shards)
+    MT_XICEGUY_FX,	// wendigo ice-shard projectile
+    MT_XSTALKER,	// Hexen stalker / serpent (ambusher, melee + spit)
+    MT_XSTALKER_FX,	// stalker spit projectile
+    MT_XDRAGON,		// Hexen death wyvern / dragon (big flying ranged boss)
+    MT_XDRAGON_FX,	// dragon fireball projectile
     // (H) Heretic artifact pickup actors (files/p_inv_heretic.c) -- console-give
     // only for now (doomednum -1) so their real Heretic doomednums don't collide.
     MT_HARTI_FLASK,	// Quartz Flask

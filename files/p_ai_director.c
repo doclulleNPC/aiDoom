@@ -107,7 +107,8 @@ static const mobjtype_t dir_heretic[]  = { MT_HMUMMY, MT_HCLINK, MT_HIMP, MT_HBE
 // Hexen monsters (hexenstuff.wad overlaid -- the launcher's Hexen checkbox).  Same idea:
 // mixed into the director's trash tier when the Hexen pack is loaded.
 static const mobjtype_t dir_hexen[]    = { MT_XETTIN, MT_XCENTAUR, MT_XSLAUGHTAUR, MT_XDEMON,
-					   MT_XFIREDEMON, MT_XWRAITH, MT_XBISHOP };
+					   MT_XFIREDEMON, MT_XWRAITH, MT_XBISHOP,
+					   MT_XICEGUY, MT_XSTALKER };
 
 #define DIR_TRACK	(dir_on || dir_llm)	// intensity is tracked in either mode
 
@@ -310,6 +311,8 @@ static mobjtype_t P_Director_PickType (void)
 // NEVER guarded by mere trash.
 static mobjtype_t P_Director_PickGuard (void)
 {
+    if (P_Director_HexenAvailable () && (P_Random () % 100) < 10)
+	return MT_XDRAGON;					// Hexen death wyvern -- a flying boss guard
     if (P_Director_HereticAvailable () && (P_Random () % 100) < 6)
 	return MT_HDSPARIL;					// Heretic D'Sparil -- the ultimate guard (rare)
     if (P_Director_HereticAvailable () && (P_Random () % 100) < 12)
@@ -335,6 +338,7 @@ static boolean P_Director_IsSpecial (mobjtype_t mt)
     if (mt >= MT_FD_UNDEAD && mt <= MT_FD_KEEN) return true;	// Freedoom clones
     if (mt == MT_HKNIGHT) return true;				// Heretic miniboss
     if (mt == MT_XSLAUGHTAUR || mt == MT_XDEMON) return true;	// Hexen ranged (slaughtaur / chaos serpent)
+    if (mt == MT_XDRAGON) return true;				// Hexen death wyvern (flying boss)
     if (mt == MT_XFIREDEMON || mt == MT_XWRAITH || mt == MT_XBISHOP) return true;	// Hexen ranged (afrit / reiver / bishop)
     return false;
 }
