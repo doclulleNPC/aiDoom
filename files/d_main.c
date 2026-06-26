@@ -80,7 +80,6 @@ static int access(char *file, int mode)
 #include "hexen.h"		// Hexen_Init   -- additive Hexen monsters
 #include "freedoom.h"		// Freedoom_Init -- cloned DOOM2 monsters (free art)
 #include "revmarine.h"		// RevMarine_Init -- (G) revived friendly marine actor
-#include "p_invent.h"		// Invent_Init -- (J) artifact inventory pickups
 #include "g_agent.h"		// G_AgentInit -- full agent/LLM player control (-aiplayer)
 
 #include "hu_stuff.h"
@@ -1308,7 +1307,6 @@ printf("added\n");
     Hexen_Init ();		// fill the appended Hexen monster states/mobjinfo
     Freedoom_Init ();		// clone the DOOM2 monsters into the MT_FD_* slots
     RevMarine_Init ();		// (G) fill the revived-friendly-marine states/mobjinfo
-    Invent_Init ();		// (J) fill the artifact-inventory pickup states/mobjinfo
 
     printf ("I_Init: Setting up machine state.\n");
     I_Init ();

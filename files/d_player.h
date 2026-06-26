@@ -51,20 +51,36 @@
 // Player states.
 //
 //
-// (J) Heretic-style artifact inventory.  arti_none is slot 0 (the empty/no
-// selection sentinel); the real artifacts follow.  NUMARTIFACTS terminates.
+// (J) DOOM "overflow" inventory.  arti_none is slot 0 (the empty/no selection
+// sentinel); the real artifacts follow.  NUMARTIFACTS terminates.
+//
+// When you pick up a health/armor/ammo item but you're already AT ITS CAP (so
+// DOOM would waste it / refuse the pickup), the surplus is stored here to use
+// later.  Two storage flavours:
+//   - item artifacts (stimpack..bluearmor): inventory[a] is a COUNT of stored
+//     items; each use applies the effect once and decrements by 1.
+//   - ammo artifacts (arti_ammo_*): inventory[a] is a stored AMMO AMOUNT (the
+//     sum of overflowed rounds); use transfers as much as fits and decrements
+//     by the transferred amount.
 //
 typedef enum
 {
     arti_none,
-    arti_flask,			// Quartz Flask  -- +25 HP (cap 100)
-    arti_chaosdevice,		// Chaos Device  -- teleport back to the level start
-    arti_torch,			// Torch         -- temporary infrared light
+    arti_stimpack,		// +10 HP  (heal cap 100)
+    arti_medikit,		// +25 HP  (heal cap 100)
+    arti_healthbonus,		// +1 HP   (cap 200)
+    arti_armorbonus,		// +1 armor point (cap 200)
+    arti_greenarmor,		// green armor (100 pts / 1-3 absorb)
+    arti_bluearmor,		// blue armor  (200 pts / 1-2 absorb)
+    arti_ammo_bullets,		// overflow bullets (stores an AMOUNT, not a count)
+    arti_ammo_shells,		// overflow shells
+    arti_ammo_rockets,		// overflow rockets
+    arti_ammo_cells,		// overflow cells
     NUMARTIFACTS
 
 } artitype_t;
 
-#define MAXARTICOUNT	16	// per-artifact carry cap (like Heretic)
+#define MAXARTICOUNT	16	// per-artifact carry cap for the item artifacts
 
 
 typedef enum

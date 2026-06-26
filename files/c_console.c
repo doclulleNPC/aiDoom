@@ -299,7 +299,7 @@ static void C_Execute (char* line)
     {
 	C_Printf ("cheats: god  noclip  allmap  kill  health <n>  armor <n>");
 	C_Printf ("give:   all|weapons|ammo|keys|armor|health|<weapon>|<key>");
-	C_Printf ("arti:   givearti flask|chaosdevice|torch");
+	C_Printf ("arti:   givearti stimpack|medikit|healthbonus|armorbonus|greenarmor|bluearmor|bullets|shells|rockets|cells");
 	C_Printf ("world:  spawn <thing>  skill <1-5>  map <e> <m> / warp <m>");
 	C_Printf ("view:   crosshair 0..3");
 	C_Printf ("keys:   bind <key> <command> | unbind <key> | bind (list)");
@@ -358,19 +358,26 @@ static void C_Execute (char* line)
     }
     else if (!strcmp(cmd, "givearti"))
     {
-	// (J) drop an artifact into the inventory: givearti flask|chaosdevice|torch
-	int i; artitype_t a = arti_none;
+	// (J) drop an overflow artifact into the inventory (for testing).
+	int i, amt = 1; artitype_t a = arti_none;
 	for (i = 0 ; args[i] ; i++) args[i] = tolower(args[i]);
-	if      (!strcmp(args,"flask"))       a = arti_flask;
-	else if (!strcmp(args,"chaosdevice")) a = arti_chaosdevice;
-	else if (!strcmp(args,"torch"))       a = arti_torch;
+	if      (!strcmp(args,"stimpack"))    a = arti_stimpack;
+	else if (!strcmp(args,"medikit"))     a = arti_medikit;
+	else if (!strcmp(args,"healthbonus")) a = arti_healthbonus;
+	else if (!strcmp(args,"armorbonus"))  a = arti_armorbonus;
+	else if (!strcmp(args,"greenarmor"))  a = arti_greenarmor;
+	else if (!strcmp(args,"bluearmor"))   a = arti_bluearmor;
+	else if (!strcmp(args,"bullets"))   { a = arti_ammo_bullets; amt = 50; }
+	else if (!strcmp(args,"shells"))    { a = arti_ammo_shells;  amt = 20; }
+	else if (!strcmp(args,"rockets"))   { a = arti_ammo_rockets; amt = 5;  }
+	else if (!strcmp(args,"cells"))     { a = arti_ammo_cells;   amt = 100; }
 	if (a == arti_none)
-	    C_Printf ("usage: givearti flask|chaosdevice|torch");
+	    C_Printf ("usage: givearti stimpack|medikit|healthbonus|armorbonus|greenarmor|bluearmor|bullets|shells|rockets|cells");
 	else
 	{
-	    if (pl->inventory[a] < MAXARTICOUNT) pl->inventory[a]++;
+	    P_StoreOverflow (pl, a, amt);
 	    if (pl->invslot == arti_none) pl->invslot = a;
-	    C_Printf ("gave %s (x%d).", P_ArtifactName(a), pl->inventory[a]);
+	    C_Printf ("gave %s (%d).", P_ArtifactName(a), pl->inventory[a]);
 	}
     }
     else if (!strcmp(cmd, "map") || !strcmp(cmd, "warp"))

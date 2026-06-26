@@ -391,31 +391,55 @@ P_TouchSpecialThing
 	// armor
       case SPR_ARM1:
 	if (!P_GiveArmor (player, 1))
-	    return;
+	{
+	    // (J) overflow: already have equal-or-better armor -> pocket it.
+	    if (!P_StoreOverflow (player, arti_greenarmor, 1))
+		return;
+	}
 	player->message = GOTARMOR;
 	break;
-		
+
       case SPR_ARM2:
 	if (!P_GiveArmor (player, 2))
-	    return;
+	{
+	    if (!P_StoreOverflow (player, arti_bluearmor, 1))
+		return;
+	}
 	player->message = GOTMEGA;
 	break;
 	
 	// bonus items
       case SPR_BON1:
-	player->health++;		// can go over 100%
-	if (player->health > 200)
-	    player->health = 200;
-	player->mo->health = player->health;
+	if (player->health >= 200)
+	{
+	    // (J) overflow: at the 200 cap -> pocket the bonus instead of wasting it.
+	    if (!P_StoreOverflow (player, arti_healthbonus, 1))
+		return;
+	}
+	else
+	{
+	    player->health++;		// can go over 100%
+	    if (player->health > 200)
+		player->health = 200;
+	    player->mo->health = player->health;
+	}
 	player->message = GOTHTHBONUS;
 	break;
 	
       case SPR_BON2:
-	player->armorpoints++;		// can go over 100%
-	if (player->armorpoints > 200)
-	    player->armorpoints = 200;
-	if (!player->armortype)
-	    player->armortype = 1;
+	if (player->armorpoints >= 200)
+	{
+	    if (!P_StoreOverflow (player, arti_armorbonus, 1))
+		return;
+	}
+	else
+	{
+	    player->armorpoints++;	// can go over 100%
+	    if (player->armorpoints > 200)
+		player->armorpoints = 200;
+	    if (!player->armortype)
+		player->armortype = 1;
+	}
 	player->message = GOTARMBONUS;
 	break;
 	
@@ -491,13 +515,20 @@ P_TouchSpecialThing
 	// medikits, heals
       case SPR_STIM:
 	if (!P_GiveBody (player, 10))
-	    return;
+	{
+	    // (J) overflow: at full health -> pocket the stimpack for later.
+	    if (!P_StoreOverflow (player, arti_stimpack, 1))
+		return;
+	}
 	player->message = GOTSTIM;
 	break;
-	
+
       case SPR_MEDI:
 	if (!P_GiveBody (player, 25))
-	    return;
+	{
+	    if (!P_StoreOverflow (player, arti_medikit, 1))
+		return;
+	}
 
 	if (player->health < 25)
 	    player->message = GOTMEDINEED;
@@ -556,55 +587,65 @@ P_TouchSpecialThing
 	if (special->flags & MF_DROPPED)
 	{
 	    if (!P_GiveAmmo (player,am_clip,0))
-		return;
+		// (J) at max bullets -> pocket the half-clip (clipammo/2) overflow.
+		if (!P_StoreOverflow (player, arti_ammo_bullets, clipammo[am_clip]/2))
+		    return;
 	}
 	else
 	{
 	    if (!P_GiveAmmo (player,am_clip,1))
-		return;
+		if (!P_StoreOverflow (player, arti_ammo_bullets, clipammo[am_clip]*1))
+		    return;
 	}
 	player->message = GOTCLIP;
 	break;
-	
+
       case SPR_AMMO:
 	if (!P_GiveAmmo (player, am_clip,5))
-	    return;
+	    if (!P_StoreOverflow (player, arti_ammo_bullets, clipammo[am_clip]*5))
+		return;
 	player->message = GOTCLIPBOX;
 	break;
-	
+
       case SPR_ROCK:
 	if (!P_GiveAmmo (player, am_misl,1))
-	    return;
+	    if (!P_StoreOverflow (player, arti_ammo_rockets, clipammo[am_misl]*1))
+		return;
 	player->message = GOTROCKET;
 	break;
-	
+
       case SPR_BROK:
 	if (!P_GiveAmmo (player, am_misl,5))
-	    return;
+	    if (!P_StoreOverflow (player, arti_ammo_rockets, clipammo[am_misl]*5))
+		return;
 	player->message = GOTROCKBOX;
 	break;
-	
+
       case SPR_CELL:
 	if (!P_GiveAmmo (player, am_cell,1))
-	    return;
+	    if (!P_StoreOverflow (player, arti_ammo_cells, clipammo[am_cell]*1))
+		return;
 	player->message = GOTCELL;
 	break;
-	
+
       case SPR_CELP:
 	if (!P_GiveAmmo (player, am_cell,5))
-	    return;
+	    if (!P_StoreOverflow (player, arti_ammo_cells, clipammo[am_cell]*5))
+		return;
 	player->message = GOTCELLBOX;
 	break;
-	
+
       case SPR_SHEL:
 	if (!P_GiveAmmo (player, am_shell,1))
-	    return;
+	    if (!P_StoreOverflow (player, arti_ammo_shells, clipammo[am_shell]*1))
+		return;
 	player->message = GOTSHELLS;
 	break;
-	
+
       case SPR_SBOX:
 	if (!P_GiveAmmo (player, am_shell,5))
-	    return;
+	    if (!P_StoreOverflow (player, arti_ammo_shells, clipammo[am_shell]*5))
+		return;
 	player->message = GOTSHELLBOX;
 	break;
 	
@@ -671,10 +712,6 @@ P_TouchSpecialThing
 	break;
 		
       default:
-	// (J) artifact inventory pickups (MT_ARTI_*) are matched by mobjtype,
-	// not sprite (they reuse existing DOOM sprites as placeholder icons).
-	if (P_TouchArtifact (player, special))
-	    break;
 	I_Error ("P_SpecialThing: Unknown gettable thing");
     }
 	

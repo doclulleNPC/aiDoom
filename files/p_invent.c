@@ -2,19 +2,20 @@
 //-----------------------------------------------------------------------------
 //
 // DESCRIPTION:
-//	(J) Simple Heretic-style artifact inventory.
+//	(J) DOOM "overflow" inventory.
 //
-//	Three collectible / stackable / usable artifacts:
-//	  - Quartz Flask : +25 HP, capped at 100 (like Heretic).
-//	  - Chaos Device : teleport back to this level's player-1 start spot,
-//	                   with the teleport fog + sound.
-//	  - Torch        : temporary infrared-style brightening (reuses the
-//	                   pw_infrared powerup mechanism).
+//	When the player picks up a health / armor / ammo item while ALREADY at
+//	that item's cap (so vanilla DOOM would refuse the pickup and leave it on
+//	the ground), the surplus is pocketed here instead and can be spent later
+//	with the inventory use key.
 //
-//	The pickup mobjtypes (MT_ARTI_*) reuse existing DOOM sprites as
-//	placeholder icons and are appended to the engine state/mobjinfo tables
-//	at runtime (Invent_Init), the same additive mechanism as
-//	files/revmarine.c.  Held counts + the selected slot live in player_t
+//	  - Health/armor artifacts store a COUNT of items; each use applies the
+//	    effect once and decrements the count by 1.
+//	  - Ammo artifacts store an AMMO AMOUNT (sum of overflowed rounds); each
+//	    use transfers as much as fits into the live ammo store and decrements
+//	    the held amount by the transferred quantity.
+//
+//	The held counts/amounts + the selected slot live in player_t
 //	(inventory[]/invslot) so they ride along in the savegame automatically.
 //
 //-----------------------------------------------------------------------------
@@ -29,57 +30,26 @@
 #include "p_local.h"
 #include "p_invent.h"
 
-extern state_t		states[];
-extern mobjinfo_t	mobjinfo[];
+// P_GiveBody / P_GiveArmor (p_inter.c) reuse DOOM's at-cap semantics.
+extern boolean	P_GiveBody  (player_t* player, int num);
+extern boolean	P_GiveArmor (player_t* player, int armortype);
 
-// the level's player start spots (p_setup.c); player 1's is index consoleplayer.
-extern mapthing_t	playerstarts[MAXPLAYERS];
-
-extern boolean		P_TeleportMove (mobj_t* thing, fixed_t x, fixed_t y);
-extern mobj_t*		P_SpawnMobj (fixed_t x, fixed_t y, fixed_t z, mobjtype_t type);
-
-#define ARTI_TORCHTICS	(20*TICRATE)	// ~20s of infrared light per Torch
+// maxammo[] (p_inter.c) is the base (no-backpack) ammo cap; the live per-player
+// cap is player->maxammo[] (doubled with a backpack).
+extern int	maxammo[NUMAMMO];
 
 
-// One spawnstate per artifact: a static (-1 tic) frame showing a reused DOOM
-// sprite.  No animation -- these are simple floor pickups.
-static void ST (statenum_t s, spritenum_t spr, int frame, statenum_t next)
+// Map an ammo artifact slot to its ammotype_t (and back, for the store cap).
+static ammotype_t ArtiToAmmo (artitype_t a)
 {
-    states[s].sprite      = spr;
-    states[s].frame       = frame;
-    states[s].tics        = -1;
-    states[s].action.acp1 = NULL;
-    states[s].nextstate   = next;
-    states[s].misc1 = states[s].misc2 = 0;
-}
-
-static void MakeItem (mobjtype_t t, statenum_t spawn)
-{
-    mobjinfo_t* m = &mobjinfo[t];
-    m->doomednum   = -1;			// not map-placed by default; given via console/pickup
-    m->spawnstate  = spawn;  m->spawnhealth = 1000;
-    m->seestate    = S_NULL; m->seesound    = 0;  m->reactiontime = 8;
-    m->attacksound = 0;      m->painstate   = S_NULL; m->painchance = 0;
-    m->painsound   = 0;      m->meleestate  = S_NULL; m->missilestate = S_NULL;
-    m->deathstate  = S_NULL; m->xdeathstate = S_NULL; m->deathsound = 0;
-    m->speed = 0;  m->radius = 20*FRACUNIT;  m->height = 16*FRACUNIT;  m->mass = 100;
-    m->damage = 0; m->activesound = 0;
-    m->flags = MF_SPECIAL;			// touched -> P_TouchSpecialThing
-    m->raisestate = S_NULL;
-}
-
-void Invent_Init (void)
-{
-    // Placeholder icons (Heretic artifact art isn't in any wad): flask -> the
-    // stimpack sprite, chaos device -> the invisibility-sphere sprite, torch ->
-    // the tall techlamp.  The 32768 bit is FF_FULLBRIGHT.
-    ST (S_ARTI_FLASK, SPR_STIM, 0,         S_NULL);
-    ST (S_ARTI_CHAOS, SPR_PINS, 32768,     S_NULL);
-    ST (S_ARTI_TORCH, SPR_TLMP, 32768,     S_NULL);
-
-    MakeItem (MT_ARTI_FLASK, S_ARTI_FLASK);
-    MakeItem (MT_ARTI_CHAOS, S_ARTI_CHAOS);
-    MakeItem (MT_ARTI_TORCH, S_ARTI_TORCH);
+    switch (a)
+    {
+      case arti_ammo_bullets:	return am_clip;
+      case arti_ammo_shells:	return am_shell;
+      case arti_ammo_rockets:	return am_misl;
+      case arti_ammo_cells:	return am_cell;
+      default:			return am_noammo;
+    }
 }
 
 
@@ -87,41 +57,59 @@ const char* P_ArtifactName (artitype_t a)
 {
     switch (a)
     {
-      case arti_flask:		return "Quartz Flask";
-      case arti_chaosdevice:	return "Chaos Device";
-      case arti_torch:		return "Torch";
+      case arti_stimpack:	return "Stimpack";
+      case arti_medikit:	return "Medikit";
+      case arti_healthbonus:	return "Health Bonus";
+      case arti_armorbonus:	return "Armor Bonus";
+      case arti_greenarmor:	return "Green Armor";
+      case arti_bluearmor:	return "Blue Armor";
+      case arti_ammo_bullets:	return "Bullets";
+      case arti_ammo_shells:	return "Shells";
+      case arti_ammo_rockets:	return "Rockets";
+      case arti_ammo_cells:	return "Cells";
       default:			return "";
     }
 }
 
 
 // ---------------------------------------------------------------------------
-// Pickup: map a touched item's mobjtype to an artifact slot and pocket it.
-// Returns true if it was an artifact (caller removes the mobj + plays sound).
+// Store overflow into an inventory slot.  `amount` is 1 for the item artifacts
+// (stimpack..bluearmor) and the ammo amount for the arti_ammo_* slots.
+// Returns false if it can't be stored (item count already at MAXARTICOUNT, or
+// ammo store already at its cap) -- the caller then leaves the item on the
+// ground.  On success the slot is auto-selected if nothing was selected.
 // ---------------------------------------------------------------------------
-boolean P_TouchArtifact (player_t* player, mobj_t* special)
+boolean P_StoreOverflow (player_t* player, artitype_t a, int amount)
 {
-    artitype_t a;
+    ammotype_t	at;
 
-    switch (special->type)
+    if (a <= arti_none || a >= NUMARTIFACTS)
+	return false;
+
+    at = ArtiToAmmo (a);
+    if (at != am_noammo)
     {
-      case MT_ARTI_FLASK:	a = arti_flask;       break;
-      case MT_ARTI_CHAOS:	a = arti_chaosdevice; break;
-      case MT_ARTI_TORCH:	a = arti_torch;       break;
-      default:			return false;
+	// Ammo artifact: cap the stored amount at this ammo type's max (the live
+	// per-player cap, so a backpack lets you stockpile more).
+	int cap = player->maxammo[at];
+	if (player->inventory[a] >= cap)
+	    return false;			// store full
+	player->inventory[a] += amount;
+	if (player->inventory[a] > cap)
+	    player->inventory[a] = cap;
+    }
+    else
+    {
+	// Item artifact: a simple carry count.
+	if (player->inventory[a] >= MAXARTICOUNT)
+	    return false;			// can't hold any more
+	player->inventory[a] += amount;
+	if (player->inventory[a] > MAXARTICOUNT)
+	    player->inventory[a] = MAXARTICOUNT;
     }
 
-    if (player->inventory[a] < MAXARTICOUNT)
-	player->inventory[a]++;
-    // Auto-select the first artifact picked up so the use key works right away.
     if (player->invslot == arti_none)
 	player->invslot = a;
-
-    {
-	static char msg[64];
-	snprintf (msg, sizeof msg, "PICKED UP %s", P_ArtifactName (a));
-	player->message = msg;
-    }
     return true;
 }
 
@@ -156,71 +144,109 @@ void P_InvScroll (player_t* player, int dir)
 
 
 // ---------------------------------------------------------------------------
-// Apply an artifact's effect to the player.  Returns true if it was consumed.
+// Apply an artifact's effect to the player.  Returns the amount consumed: for
+// item artifacts that's 1 on success / 0 on refusal; for ammo artifacts it's
+// the number of rounds transferred (0 if already full).  Sets player->message.
 // ---------------------------------------------------------------------------
-static boolean ApplyArtifact (player_t* player, artitype_t a)
+static int ApplyArtifact (player_t* player, artitype_t a)
 {
     mobj_t*	mo = player->mo;
 
     switch (a)
     {
-      case arti_flask:
-	if (player->health >= MAXHEALTH)
+      case arti_stimpack:
+	if (!P_GiveBody (player, 10))
 	{
-	    player->message = "YOU ARE ALREADY AT FULL HEALTH";
-	    return false;			// don't waste it
+	    player->message = "ALREADY AT FULL HEALTH";
+	    return 0;
 	}
-	player->health += 25;
-	if (player->health > MAXHEALTH) player->health = MAXHEALTH;
-	if (mo) mo->health = player->health;
-	player->message = "QUARTZ FLASK -- HEALED";
-	return true;
+	player->message = "USED STIMPACK";
+	return 1;
 
-      case arti_chaosdevice:
-      {
-	mapthing_t*	start = &playerstarts[consoleplayer];
-	fixed_t		nx = start->x << FRACBITS;
-	fixed_t		ny = start->y << FRACBITS;
-	fixed_t		ox, oy, oz;
-	angle_t		an;
-	if (!mo) return false;
-	ox = mo->x; oy = mo->y; oz = mo->z;
-	if (!P_TeleportMove (mo, nx, ny))
+      case arti_medikit:
+	if (!P_GiveBody (player, 25))
 	{
-	    player->message = "CHAOS DEVICE -- START BLOCKED";
-	    return false;
+	    player->message = "ALREADY AT FULL HEALTH";
+	    return 0;
 	}
-	// Teleport fog + sound at the departure and arrival spots (like p_telept.c).
-	S_StartSound (P_SpawnMobj (ox, oy, oz, MT_TFOG), sfx_telept);
-	an = ANG45 * (start->angle / 45);
-	mo->angle = an;
-	an >>= ANGLETOFINESHIFT;
-	S_StartSound (P_SpawnMobj (mo->x + 20*finecosine[an],
-				   mo->y + 20*finesine[an], mo->z, MT_TFOG),
-		      sfx_telept);
-	mo->momx = mo->momy = mo->momz = 0;
-	player->message = "CHAOS DEVICE -- RECALLED TO START";
-	return true;
+	player->message = "USED MEDIKIT";
+	return 1;
+
+      case arti_healthbonus:
+	if (player->health >= 200)
+	{
+	    player->message = "ALREADY AT FULL HEALTH";
+	    return 0;
+	}
+	player->health++;
+	if (mo) mo->health = player->health;
+	player->message = "USED HEALTH BONUS";
+	return 1;
+
+      case arti_armorbonus:
+	if (player->armorpoints >= 200)
+	{
+	    player->message = "ALREADY AT FULL ARMOR";
+	    return 0;
+	}
+	player->armorpoints++;
+	if (!player->armortype)
+	    player->armortype = 1;
+	player->message = "USED ARMOR BONUS";
+	return 1;
+
+      case arti_greenarmor:
+	if (!P_GiveArmor (player, 1))
+	{
+	    player->message = "ALREADY HAVE BETTER ARMOR";
+	    return 0;
+	}
+	player->message = "USED GREEN ARMOR";
+	return 1;
+
+      case arti_bluearmor:
+	if (!P_GiveArmor (player, 2))
+	{
+	    player->message = "ALREADY HAVE BETTER ARMOR";
+	    return 0;
+	}
+	player->message = "USED BLUE ARMOR";
+	return 1;
+
+      case arti_ammo_bullets:
+      case arti_ammo_shells:
+      case arti_ammo_rockets:
+      case arti_ammo_cells:
+      {
+	ammotype_t at = ArtiToAmmo (a);
+	int room  = player->maxammo[at] - player->ammo[at];
+	int give;
+	if (room <= 0)
+	{
+	    player->message = "AMMO ALREADY FULL";
+	    return 0;
+	}
+	give = player->inventory[a];
+	if (give > room) give = room;
+	player->ammo[at] += give;
+	player->message = "TRANSFERRED AMMO";
+	return give;				// consume the transferred amount
       }
 
-      case arti_torch:
-	player->powers[pw_infrared] = ARTI_TORCHTICS;	// drives fixedcolormap in P_PlayerThink
-	player->message = "TORCH -- LIT";
-	return true;
-
       default:
-	return false;
+	return 0;
     }
 }
 
 
 // ---------------------------------------------------------------------------
 // USE the selected artifact (or `which` when given explicitly, e.g. for tests).
-// Consumes one of it on success.  Always sets player->message.
+// Consumes per ApplyArtifact's semantics on success.  Always sets ->message.
 // ---------------------------------------------------------------------------
 boolean P_UseArtifact (player_t* player, artitype_t which)
 {
-    artitype_t a = (which != arti_none) ? which : (artitype_t) player->invslot;
+    artitype_t	a = (which != arti_none) ? which : (artitype_t) player->invslot;
+    int		used;
 
     if (a <= arti_none || a >= NUMARTIFACTS || player->inventory[a] <= 0)
     {
@@ -228,11 +254,14 @@ boolean P_UseArtifact (player_t* player, artitype_t which)
 	return false;
     }
 
-    if (!ApplyArtifact (player, a))
+    used = ApplyArtifact (player, a);
+    if (used <= 0)
 	return false;				// effect refused (message already set)
 
-    player->inventory[a]--;
-    // If that was the last one, hop to another held artifact (or empty).
+    player->inventory[a] -= used;
+    if (player->inventory[a] < 0)
+	player->inventory[a] = 0;
+    // If that emptied the slot, hop to another held artifact (or empty).
     if (player->inventory[a] <= 0)
 	P_InvScroll (player, +1);
     return true;
