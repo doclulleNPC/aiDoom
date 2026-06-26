@@ -104,6 +104,9 @@ static const mobjtype_t dir_guards[]   = { MT_UNDEAD, MT_VILE, MT_FATSO, MT_KNIG
 // Heretic monsters (hereticstuff.wad overlaid) mixed into the spawn pools so the
 // director uses them too -- a melee trash tier + the Knight as a ranged miniboss.
 static const mobjtype_t dir_heretic[]  = { MT_HMUMMY, MT_HCLINK, MT_HIMP, MT_HBEAST, MT_HWIZARD, MT_HSNAKE };
+// Hexen monsters (hexenstuff.wad overlaid -- the launcher's Hexen checkbox).  Same idea:
+// mixed into the director's trash tier when the Hexen pack is loaded.
+static const mobjtype_t dir_hexen[]    = { MT_XETTIN, MT_XCENTAUR, MT_XSLAUGHTAUR, MT_XDEMON };
 
 #define DIR_TRACK	(dir_on || dir_llm)	// intensity is tracked in either mode
 
@@ -270,6 +273,12 @@ static boolean P_Director_HereticAvailable (void)
     return sprites && sprites[SPR_HMUM].numframes > 0;
 }
 
+// Hexen monsters loaded (hexenstuff.wad -- the launcher's Hexen checkbox)?  Probe the ettin.
+static boolean P_Director_HexenAvailable (void)
+{
+    return sprites && sprites[SPR_XETT].numframes > 0;
+}
+
 static mobjtype_t P_Director_PickType (void)
 {
     boolean		doom2 = P_Director_Doom2Available ();
@@ -288,6 +297,8 @@ static mobjtype_t P_Director_PickType (void)
 	    return MT_HKNIGHT;					// Heretic ranged miniboss
 	return spec[P_Random () % nspec];
     }
+    if (P_Director_HexenAvailable () && (P_Random () % 100) < 30)	// ~30% Hexen trash (when the pack is loaded)
+	return dir_hexen[P_Random () % (int)(sizeof(dir_hexen)/sizeof(dir_hexen[0]))];
     if (P_Director_HereticAvailable () && (P_Random () % 100) < 35)	// ~35% Heretic trash
 	return dir_heretic[P_Random () % (int)(sizeof(dir_heretic)/sizeof(dir_heretic[0]))];
     return dir_common[P_Random () % (int)(sizeof(dir_common)/sizeof(dir_common[0]))];
@@ -322,6 +333,7 @@ static boolean P_Director_IsSpecial (mobjtype_t mt)
 	if (dir_special2[i] == mt) return true;
     if (mt >= MT_FD_UNDEAD && mt <= MT_FD_KEEN) return true;	// Freedoom clones
     if (mt == MT_HKNIGHT) return true;				// Heretic miniboss
+    if (mt == MT_XSLAUGHTAUR || mt == MT_XDEMON) return true;	// Hexen ranged (slaughtaur / chaos serpent)
     return false;
 }
 
