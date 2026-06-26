@@ -640,6 +640,24 @@ static void AI_Apply (int order, const char* ids,
 
 static void AI_HandleLine (char* line, int client)
 {
+    // No level loaded (title screen / intermission / finale): the world structures
+    // (thinkers, BSP, blockmap, the player mobj) aren't valid, so NO command that walks
+    // them is safe.  This path runs every gametic in every gamestate (P_AI_NetService),
+    // so a director that connects + sends `observe` at the title would otherwise crash.
+    // Answer `observe` with a minimal "no level" snapshot and ack the rest, keeping the
+    // director connected until the game actually enters a map.
+    if (gamestate != GS_LEVEL)
+    {
+	if (client >= 0)
+	{
+	    static const char nolvl[] = "{\"nolevel\":true,\"monsters\":[]}\n";
+	    if (!strncmp (line, "observe", 7))
+		(void)!write (client, nolvl, sizeof(nolvl) - 1);
+	    else
+		(void)!write (client, "ok\n", 3);
+	}
+	return;
+    }
     if (!strncmp(line, "observe", 7))
     {
 	int len = AI_Serialize();
