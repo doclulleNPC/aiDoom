@@ -352,20 +352,33 @@ boolean P_DropArtifact (player_t* player)
 
 
 // ---------------------------------------------------------------------------
-// (buddy mode) Second wind: when a hit would be lethal, spend a stored medikit or
-// stimpack to stay on your feet instead of dying.  Sets the player's health to the
-// item's heal value (medikit 25, stimpack 10) and returns true if it saved them.
+// (buddy mode) Self-revive: a DOWNED human spends a stored medikit/stimpack to get
+// back up himself (NOT automatic -- triggered by the inventory-use key while dead).
+// Mirrors the buddy's revive: un-corpse the body, restore health to the item's heal
+// value, stand up, raise the weapon.  Returns true if it had an item and revived.
 // ---------------------------------------------------------------------------
-boolean P_InventorySecondWind (player_t* player)
+boolean P_InventorySelfRevive (player_t* player)
 {
-    int	heal;
+    mobj_t*	mo = player->mo;
+    int		heal;
+    if (!mo) return false;
     if      (player->inventory[arti_medikit]  > 0) { player->inventory[arti_medikit]--;  heal = 25; }
     else if (player->inventory[arti_stimpack] > 0) { player->inventory[arti_stimpack]--; heal = 10; }
     else return false;
 
+    mo->flags |=  (MF_SOLID | MF_SHOOTABLE);
+    mo->flags &= ~(MF_CORPSE | MF_DROPOFF);
+    mo->height = mo->info->height;		// un-squash the corpse
+    mo->health = heal;
     player->health = heal;
-    if (player->mo) player->mo->health = heal;
-    player->message = "PATCHED YOURSELF UP -- still standing!";
+    player->playerstate = PST_LIVE;
+    player->damagecount = 0;
+    player->attacker = NULL;
+    player->viewheight = VIEWHEIGHT;
+    player->deltaviewheight = 0;
+    P_SetMobjState (mo, mo->info->spawnstate);	// stand up (S_PLAY)
+    player->pendingweapon = player->readyweapon;	// raise the weapon again
+    player->message = "PATCHED YOURSELF UP -- back in the fight!";
     if (player->invslot != arti_none && player->inventory[player->invslot] <= 0)
 	P_InvScroll (player, +1);
     return true;

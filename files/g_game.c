@@ -675,7 +675,16 @@ boolean G_Responder (event_t* ev)
 	    if (ev->data1 == key_inv_right)
 	    { P_InvScroll (&players[consoleplayer], +1); return true; }
 	    if (ev->data1 == key_inv_use)
-	    { P_UseArtifact (&players[consoleplayer], arti_none); return true; }
+	    {
+		player_t* ip = &players[consoleplayer];
+		// Downed in buddy mode -> spend a stored health item to get back up yourself
+		// (not automatic); otherwise just use the selected artifact.
+		if (ip->playerstate == PST_DEAD && P_AICoop_Active ())
+		    P_InventorySelfRevive (ip);
+		else
+		    P_UseArtifact (ip, arti_none);
+		return true;
+	    }
 	    if (ev->data1 == key_inv_drop)
 	    { P_DropArtifact (&players[consoleplayer]); return true; }
 	}

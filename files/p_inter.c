@@ -989,26 +989,23 @@ P_DamageMobj
     target->health -= damage;
     if (target->health <= 0)
     {
-	// (buddy mode) Second wind: a human about to die spends a stored stimpack/medikit to
-	// stay on its feet instead of dying.  Only with a buddy, and not for the buddy itself.
-	if (target->player && !P_AICoop_IsBuddy (target->player) && P_AICoop_Active ()
-	    && P_InventorySecondWind (target->player))
-	{
-	    // saved -- fall through to the pain/awake handling below, no death.
-	}
-	else
-	{
-	    P_AICoop_NoteKill (target, source);	// buddy kill-quip / spree / "nice" callout
-	    P_Director_NoteKill (target, source);	// L4D stress: close-quarters kill credit
-	    if (target->player && !P_AICoop_IsBuddy (target->player))
-		P_Director_Say ("dir:death", 3, 1);	// (voice) the director taunts a survivor's death
-	    P_KillMobj (source, target);
-	    // Downed buddy: snap to the type-15 dead-marine lying pose (no gib), so it reads
-	    // as a revivable body on the ground (gray via its player colour translation).
-	    if (target->player && P_AICoop_IsBuddy (target->player))
-		P_SetMobjState (target, S_PLAY_DIE7);
-	    return;
-	}
+	P_AICoop_NoteKill (target, source);	// buddy kill-quip / spree / "nice" callout
+	P_Director_NoteKill (target, source);	// L4D stress: close-quarters kill credit
+	if (target->player && !P_AICoop_IsBuddy (target->player))
+	    P_Director_Say ("dir:death", 3, 1);	// (voice) the director taunts a survivor's death
+	P_KillMobj (source, target);
+	// Downed buddy: snap to the type-15 dead-marine lying pose (no gib), so it reads
+	// as a revivable body on the ground (gray via its player colour translation).
+	if (target->player && P_AICoop_IsBuddy (target->player))
+	    P_SetMobjState (target, S_PLAY_DIE7);
+	// (buddy mode) A human that has a stored stimpack/medikit is NOT auto-patched -- it
+	// dies, but can spend the item itself to get back up (the inventory-use key while
+	// dead -> P_InventorySelfRevive).  Hint at it.
+	else if (target->player && P_AICoop_Active ()
+		 && (target->player->inventory[arti_medikit] > 0
+		     || target->player->inventory[arti_stimpack] > 0))
+	    target->player->message = "USE a health item to patch yourself up!";
+	return;
     }
 
     if ( (P_Random () < target->info->painchance)

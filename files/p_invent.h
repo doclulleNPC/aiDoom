@@ -22,9 +22,9 @@ void		P_InvScroll (player_t* player, int dir);
 // player (re-pickable) and take it out of the inventory.  Returns true if dropped.
 boolean		P_DropArtifact (player_t* player);
 
-// (buddy mode) Spend a stored medikit/stimpack to survive an otherwise-lethal hit.
-// Returns true (and restores health to the heal value) if it saved the player.
-boolean		P_InventorySecondWind (player_t* player);
+// (buddy mode) A DOWNED human spends a stored medikit/stimpack to get back up himself
+// (bound to the inventory-use key while dead).  Returns true if it revived the player.
+boolean		P_InventorySelfRevive (player_t* player);
 
 // Store overflow into an inventory slot.  `amount` is 1 for the item artifacts
 // (stimpack..bluearmor) and the ammo amount for the arti_ammo_* slots.  Returns
