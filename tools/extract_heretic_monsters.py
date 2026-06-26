@@ -51,6 +51,20 @@ SPRITE_RENAME = {
     "SOR2": "HSR2",   # d'sparil (on foot)
     "FX16": "HSRB",   # sorcerer fx
     "CHKN": "HCHK",   # chicken (morph target)
+    # --- Heretic ARTIFACTS (inventory items).  These 4-char codes don't collide with any
+    #     DOOM sprite, so they're kept as-is; the (future) Heretic inventory C code uses the
+    #     SAME SPR_ codes as crispy-doom/src/heretic.  See HERETIC_HEXEN.md.
+    "PTN1": "PTN1",   # Quartz Flask    (heal +25)
+    "PTN2": "PTN2",   # Quartz Flask, alternate frames
+    "SPHL": "SPHL",   # Mystic Urn      (super heal)
+    "PWBK": "PWBK",   # Tome of Power
+    "TRCH": "TRCH",   # Torch
+    "FBMB": "FBMB",   # Time Bomb of the Ancients
+    "EGGC": "EGGC",   # Morph Ovum      (egg)
+    "SOAR": "SOAR",   # Wings of Wrath  (fly)
+    "INVU": "INVU",   # Ring of Invincibility
+    "INVS": "INVS",   # Shadowsphere    (invisibility)
+    "ATLP": "ATLP",   # Chaos Device    (teleport)
 }
 
 
