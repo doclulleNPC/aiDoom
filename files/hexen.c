@@ -260,12 +260,12 @@ void Hexen_Init (void)
 
     m = &mobjinfo[MT_XETTIN];
     m->doomednum = -1;        m->spawnstate  = S_XETT_LOOK1; m->spawnhealth = 175;
-    m->seestate  = S_XETT_CHASE1; m->seesound  = sfx_bgsit1; m->reactiontime = 8;
-    m->attacksound = sfx_claw;    m->painstate = S_XETT_PAIN1; m->painchance = 60;
-    m->painsound = sfx_popain;    m->meleestate = S_XETT_ATK1; m->missilestate = S_NULL;
-    m->deathstate = S_XETT_DIE1;  m->xdeathstate = S_NULL;    m->deathsound = sfx_bgdth1;
+    m->seestate  = S_XETT_CHASE1; m->seesound  = sfx_x_etsit; m->reactiontime = 8;
+    m->attacksound = sfx_x_etatk; m->painstate = S_XETT_PAIN1; m->painchance = 60;
+    m->painsound = sfx_x_etpai;   m->meleestate = S_XETT_ATK1; m->missilestate = S_NULL;
+    m->deathstate = S_XETT_DIE1;  m->xdeathstate = S_NULL;    m->deathsound = sfx_x_etdth;
     m->speed = 13; m->radius = 25*FRACUNIT; m->height = 68*FRACUNIT; m->mass = 175;
-    m->damage = 0; m->activesound = sfx_bgact;
+    m->damage = 0; m->activesound = sfx_x_etsit;
     m->flags = MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL; m->raisestate = S_NULL;
 
     // ---- Centaur / Slaughtaur (crispy S_CENTAUR_*; reflect-shield + ice/sword
@@ -307,23 +307,23 @@ void Hexen_Init (void)
     // Centaur: pure melee.  doomednum 107 in Hexen but -1 here (summon-only).
     m = &mobjinfo[MT_XCENTAUR];
     m->doomednum = -1;        m->spawnstate  = S_XCEN_LOOK1; m->spawnhealth = 200;
-    m->seestate  = S_XCEN_WALK1; m->seesound  = sfx_bgsit2; m->reactiontime = 8;
-    m->attacksound = sfx_claw;   m->painstate = S_XCEN_PAIN1; m->painchance = 135;
-    m->painsound = sfx_popain;   m->meleestate = S_XCEN_ATK1; m->missilestate = S_NULL;
-    m->deathstate = S_XCEN_DIE1; m->xdeathstate = S_NULL;    m->deathsound = sfx_bgdth2;
+    m->seestate  = S_XCEN_WALK1; m->seesound  = sfx_x_cesit; m->reactiontime = 8;
+    m->attacksound = sfx_x_ceatk;m->painstate = S_XCEN_PAIN1; m->painchance = 135;
+    m->painsound = sfx_x_cepai;  m->meleestate = S_XCEN_ATK1; m->missilestate = S_NULL;
+    m->deathstate = S_XCEN_DIE1; m->xdeathstate = S_NULL;    m->deathsound = sfx_x_cedth;
     m->speed = 13; m->radius = 20*FRACUNIT; m->height = 64*FRACUNIT; m->mass = 120;
-    m->damage = 0; m->activesound = sfx_bgact;
+    m->damage = 0; m->activesound = sfx_x_ceact;
     m->flags = MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL; m->raisestate = S_NULL;
 
     // Slaughtaur: tougher, also lobs a bolt at range.
     m = &mobjinfo[MT_XSLAUGHTAUR];
     m->doomednum = -1;        m->spawnstate  = S_XCEN_LOOK1; m->spawnhealth = 250;
-    m->seestate  = S_XCEN_WALK1; m->seesound  = sfx_bgsit2; m->reactiontime = 8;
-    m->attacksound = sfx_claw;   m->painstate = S_XCEN_PAIN1; m->painchance = 96;
-    m->painsound = sfx_popain;   m->meleestate = S_XCEN_ATK1; m->missilestate = S_XCEN_MIS1;
-    m->deathstate = S_XCEN_DIE1; m->xdeathstate = S_NULL;    m->deathsound = sfx_bgdth2;
+    m->seestate  = S_XCEN_WALK1; m->seesound  = sfx_x_cesit; m->reactiontime = 8;
+    m->attacksound = sfx_x_slatk;m->painstate = S_XCEN_PAIN1; m->painchance = 96;
+    m->painsound = sfx_x_cepai;  m->meleestate = S_XCEN_ATK1; m->missilestate = S_XCEN_MIS1;
+    m->deathstate = S_XCEN_DIE1; m->xdeathstate = S_NULL;    m->deathsound = sfx_x_cedth;
     m->speed = 10; m->radius = 20*FRACUNIT; m->height = 64*FRACUNIT; m->mass = 120;
-    m->damage = 0; m->activesound = sfx_bgact;
+    m->damage = 0; m->activesound = sfx_x_ceact;
     m->flags = MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL; m->raisestate = S_NULL;
 
     // Slaughtaur bolt.
@@ -375,12 +375,12 @@ void Hexen_Init (void)
 
     m = &mobjinfo[MT_XDEMON];
     m->doomednum = -1;        m->spawnstate  = S_XDEM_LOOK1; m->spawnhealth = 250;
-    m->seestate  = S_XDEM_CHASE1; m->seesound = sfx_bgsit1; m->reactiontime = 8;
-    m->attacksound = sfx_claw;   m->painstate = S_XDEM_PAIN1; m->painchance = 50;
-    m->painsound = sfx_dmpain;   m->meleestate = S_XDEM_ATK1_1; m->missilestate = S_XDEM_ATK2_1;
-    m->deathstate = S_XDEM_DIE1; m->xdeathstate = S_NULL;    m->deathsound = sfx_bgdth1;
+    m->seestate  = S_XDEM_CHASE1; m->seesound = sfx_x_desit; m->reactiontime = 8;
+    m->attacksound = sfx_x_deatk;m->painstate = S_XDEM_PAIN1; m->painchance = 50;
+    m->painsound = sfx_x_depai;  m->meleestate = S_XDEM_ATK1_1; m->missilestate = S_XDEM_ATK2_1;
+    m->deathstate = S_XDEM_DIE1; m->xdeathstate = S_NULL;    m->deathsound = sfx_x_dedth;
     m->speed = 13; m->radius = 32*FRACUNIT; m->height = 64*FRACUNIT; m->mass = 220;
-    m->damage = 0; m->activesound = sfx_dmact;
+    m->damage = 0; m->activesound = sfx_x_desit;
     m->flags = MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL; m->raisestate = S_NULL;
 
     m = &mobjinfo[MT_XDEMON_FX];
@@ -424,12 +424,12 @@ void Hexen_Init (void)
 
     m = &mobjinfo[MT_XFIREDEMON];
     m->doomednum = -1;        m->spawnstate  = S_XFDM_LOOK1; m->spawnhealth = 80;
-    m->seestate  = S_XFDM_WALK1; m->seesound  = sfx_bgsit1; m->reactiontime = 8;
-    m->attacksound = sfx_firsht;  m->painstate = S_XFDM_PAIN1; m->painchance = 1;
-    m->painsound = sfx_popain;    m->meleestate = S_NULL;     m->missilestate = S_XFDM_ATK1;
-    m->deathstate = S_XFDM_DIE1;  m->xdeathstate = S_NULL;    m->deathsound = sfx_firxpl;
+    m->seestate  = S_XFDM_WALK1; m->seesound  = sfx_x_fdact; m->reactiontime = 8;
+    m->attacksound = sfx_x_fdatk; m->painstate = S_XFDM_PAIN1; m->painchance = 1;
+    m->painsound = sfx_x_fdpai;   m->meleestate = S_NULL;     m->missilestate = S_XFDM_ATK1;
+    m->deathstate = S_XFDM_DIE1;  m->xdeathstate = S_NULL;    m->deathsound = sfx_x_fddth;
     m->speed = 13; m->radius = 20*FRACUNIT; m->height = 68*FRACUNIT; m->mass = 75;
-    m->damage = 1; m->activesound = sfx_bgact;
+    m->damage = 1; m->activesound = sfx_x_fdact;
     m->flags = MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL|MF_FLOAT|MF_NOGRAVITY; m->raisestate = S_NULL;
 
     m = &mobjinfo[MT_XFIREDEMON_FX];
@@ -437,7 +437,7 @@ void Hexen_Init (void)
     m->seestate  = S_NULL;       m->seesound  = sfx_None;  m->reactiontime = 8;
     m->attacksound = sfx_None;   m->painstate = S_NULL;    m->painchance = 0;
     m->painsound = sfx_None;     m->meleestate = S_NULL;   m->missilestate = S_NULL;
-    m->deathstate = S_XFDB_BOOM1; m->xdeathstate = S_NULL; m->deathsound = sfx_firxpl;
+    m->deathstate = S_XFDB_BOOM1; m->xdeathstate = S_NULL; m->deathsound = sfx_x_fdhit;
     m->speed = 10*FRACUNIT; m->radius = 10*FRACUNIT; m->height = 6*FRACUNIT; m->mass = 15;
     m->damage = 4; m->activesound = sfx_None;
     m->flags = MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY; m->raisestate = S_NULL;
@@ -483,12 +483,12 @@ void Hexen_Init (void)
 
     m = &mobjinfo[MT_XWRAITH];
     m->doomednum = -1;        m->spawnstate  = S_XWRT_LOOK1; m->spawnhealth = 150;
-    m->seestate  = S_XWRT_CHASE1; m->seesound  = sfx_bgsit1; m->reactiontime = 8;
-    m->attacksound = sfx_firsht;  m->painstate = S_XWRT_PAIN1; m->painchance = 25;
-    m->painsound = sfx_popain;    m->meleestate = S_XWRT_ATK1_1; m->missilestate = S_XWRT_ATK2_1;
-    m->deathstate = S_XWRT_DIE1;  m->xdeathstate = S_NULL;    m->deathsound = sfx_bgdth1;
+    m->seestate  = S_XWRT_CHASE1; m->seesound  = sfx_x_wrsit; m->reactiontime = 8;
+    m->attacksound = sfx_x_wratk; m->painstate = S_XWRT_PAIN1; m->painchance = 25;
+    m->painsound = sfx_x_wrpai;   m->meleestate = S_XWRT_ATK1_1; m->missilestate = S_XWRT_ATK2_1;
+    m->deathstate = S_XWRT_DIE1;  m->xdeathstate = S_NULL;    m->deathsound = sfx_x_wrdth;
     m->speed = 11; m->radius = 20*FRACUNIT; m->height = 55*FRACUNIT; m->mass = 75;
-    m->damage = 0; m->activesound = sfx_bgact;
+    m->damage = 0; m->activesound = sfx_x_wract;
     m->flags = MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL|MF_FLOAT|MF_NOGRAVITY; m->raisestate = S_NULL;
 
     m = &mobjinfo[MT_XWRAITH_FX];
@@ -534,12 +534,12 @@ void Hexen_Init (void)
 
     m = &mobjinfo[MT_XBISHOP];
     m->doomednum = -1;        m->spawnstate  = S_XBIS_LOOK1; m->spawnhealth = 130;
-    m->seestate  = S_XBIS_WALK1; m->seesound  = sfx_bgsit2; m->reactiontime = 8;
-    m->attacksound = sfx_firsht;  m->painstate = S_XBIS_PAIN1; m->painchance = 110;
-    m->painsound = sfx_popain;    m->meleestate = S_NULL;     m->missilestate = S_XBIS_ATK1;
-    m->deathstate = S_XBIS_DIE1;  m->xdeathstate = S_NULL;    m->deathsound = sfx_bgdth2;
+    m->seestate  = S_XBIS_WALK1; m->seesound  = sfx_x_bisit; m->reactiontime = 8;
+    m->attacksound = sfx_x_biatk; m->painstate = S_XBIS_PAIN1; m->painchance = 110;
+    m->painsound = sfx_x_bipai;   m->meleestate = S_NULL;     m->missilestate = S_XBIS_ATK1;
+    m->deathstate = S_XBIS_DIE1;  m->xdeathstate = S_NULL;    m->deathsound = sfx_x_bidth;
     m->speed = 10; m->radius = 22*FRACUNIT; m->height = 65*FRACUNIT; m->mass = 100;
-    m->damage = 0; m->activesound = sfx_bgact;
+    m->damage = 0; m->activesound = sfx_x_biact;
     m->flags = MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL|MF_FLOAT|MF_NOGRAVITY|MF_NOBLOOD; m->raisestate = S_NULL;
 
     m = &mobjinfo[MT_XBISHOP_FX];
@@ -547,7 +547,7 @@ void Hexen_Init (void)
     m->seestate  = S_NULL;       m->seesound  = sfx_None;  m->reactiontime = 8;
     m->attacksound = sfx_None;   m->painstate = S_NULL;    m->painchance = 0;
     m->painsound = sfx_None;     m->meleestate = S_NULL;   m->missilestate = S_NULL;
-    m->deathstate = S_XBPF_BOOM1; m->xdeathstate = S_NULL; m->deathsound = sfx_firxpl;
+    m->deathstate = S_XBPF_BOOM1; m->xdeathstate = S_NULL; m->deathsound = sfx_x_bihit;
     m->speed = 10*FRACUNIT; m->radius = 10*FRACUNIT; m->height = 6*FRACUNIT; m->mass = 100;
     m->damage = 4; m->activesound = sfx_None;
     m->flags = MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY; m->raisestate = S_NULL;
@@ -584,12 +584,12 @@ void Hexen_Init (void)
 
     m = &mobjinfo[MT_XICEGUY];
     m->doomednum = -1;        m->spawnstate  = S_XICE_LOOK1; m->spawnhealth = 120;
-    m->seestate  = S_XICE_WALK1; m->seesound  = sfx_bgsit2; m->reactiontime = 8;
-    m->attacksound = sfx_firsht;  m->painstate = S_XICE_PAIN1; m->painchance = 144;
-    m->painsound = sfx_popain;    m->meleestate = S_NULL;     m->missilestate = S_XICE_ATK1;
-    m->deathstate = S_XICE_DIE1;  m->xdeathstate = S_NULL;    m->deathsound = sfx_bgdth2;
+    m->seestate  = S_XICE_WALK1; m->seesound  = sfx_x_icsit; m->reactiontime = 8;
+    m->attacksound = sfx_x_icatk; m->painstate = S_XICE_PAIN1; m->painchance = 144;
+    m->painsound = sfx_None;      m->meleestate = S_NULL;     m->missilestate = S_XICE_ATK1;
+    m->deathstate = S_XICE_DIE1;  m->xdeathstate = S_NULL;    m->deathsound = sfx_None;
     m->speed = 14; m->radius = 22*FRACUNIT; m->height = 75*FRACUNIT; m->mass = 150;
-    m->damage = 0; m->activesound = sfx_bgact;
+    m->damage = 0; m->activesound = sfx_x_icsit;
     m->flags = MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL|MF_FLOAT|MF_NOGRAVITY|MF_NOBLOOD; m->raisestate = S_NULL;
 
     m = &mobjinfo[MT_XICEGUY_FX];
@@ -597,7 +597,7 @@ void Hexen_Init (void)
     m->seestate  = S_NULL;       m->seesound  = sfx_None;  m->reactiontime = 8;
     m->attacksound = sfx_None;   m->painstate = S_NULL;    m->painchance = 0;
     m->painsound = sfx_None;     m->meleestate = S_NULL;   m->missilestate = S_NULL;
-    m->deathstate = S_XICP_BOOM1; m->xdeathstate = S_NULL; m->deathsound = sfx_firxpl;
+    m->deathstate = S_XICP_BOOM1; m->xdeathstate = S_NULL; m->deathsound = sfx_x_ichit;
     m->speed = 14*FRACUNIT; m->radius = 8*FRACUNIT; m->height = 10*FRACUNIT; m->mass = 100;
     m->damage = 3; m->activesound = sfx_None;
     m->flags = MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY; m->raisestate = S_NULL;
@@ -642,12 +642,12 @@ void Hexen_Init (void)
 
     m = &mobjinfo[MT_XSTALKER];
     m->doomednum = -1;        m->spawnstate  = S_XSSP_LOOK1; m->spawnhealth = 90;
-    m->seestate  = S_XSSP_WALK1; m->seesound  = sfx_bgsit1; m->reactiontime = 8;
-    m->attacksound = sfx_claw;    m->painstate = S_XSSP_PAIN1; m->painchance = 96;
-    m->painsound = sfx_popain;    m->meleestate = S_XSSP_ATK1; m->missilestate = S_XSSP_MIS1;
-    m->deathstate = S_XSSP_DIE1;  m->xdeathstate = S_NULL;    m->deathsound = sfx_bgdth1;
+    m->seestate  = S_XSSP_WALK1; m->seesound  = sfx_x_stsit; m->reactiontime = 8;
+    m->attacksound = sfx_x_statk; m->painstate = S_XSSP_PAIN1; m->painchance = 96;
+    m->painsound = sfx_x_stpai;   m->meleestate = S_XSSP_ATK1; m->missilestate = S_XSSP_MIS1;
+    m->deathstate = S_XSSP_DIE1;  m->xdeathstate = S_NULL;    m->deathsound = sfx_x_stdth;
     m->speed = 12; m->radius = 32*FRACUNIT; m->height = 70*FRACUNIT; m->mass = 200;
-    m->damage = 0; m->activesound = sfx_bgact;
+    m->damage = 0; m->activesound = sfx_x_stact;
     m->flags = MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL; m->raisestate = S_NULL;
 
     m = &mobjinfo[MT_XSTALKER_FX];
@@ -655,7 +655,7 @@ void Hexen_Init (void)
     m->seestate  = S_NULL;       m->seesound  = sfx_None;  m->reactiontime = 8;
     m->attacksound = sfx_None;   m->painstate = S_NULL;    m->painchance = 0;
     m->painsound = sfx_None;     m->meleestate = S_NULL;   m->missilestate = S_NULL;
-    m->deathstate = S_XSSF_BOOM1; m->xdeathstate = S_NULL; m->deathsound = sfx_firxpl;
+    m->deathstate = S_XSSF_BOOM1; m->xdeathstate = S_NULL; m->deathsound = sfx_x_sthit;
     m->speed = 15*FRACUNIT; m->radius = 8*FRACUNIT; m->height = 10*FRACUNIT; m->mass = 100;
     m->damage = 4; m->activesound = sfx_None;
     m->flags = MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY; m->raisestate = S_NULL;
@@ -694,12 +694,12 @@ void Hexen_Init (void)
 
     m = &mobjinfo[MT_XDRAGON];
     m->doomednum = -1;        m->spawnstate  = S_XDRA_LOOK1; m->spawnhealth = 640;
-    m->seestate  = S_XDRA_WALK1; m->seesound  = sfx_bgsit1; m->reactiontime = 8;
-    m->attacksound = sfx_firsht;  m->painstate = S_XDRA_PAIN1; m->painchance = 128;
-    m->painsound = sfx_dmpain;    m->meleestate = S_NULL;     m->missilestate = S_XDRA_ATK1;
-    m->deathstate = S_XDRA_DIE1;  m->xdeathstate = S_NULL;    m->deathsound = sfx_bgdth1;
+    m->seestate  = S_XDRA_WALK1; m->seesound  = sfx_x_drsit; m->reactiontime = 8;
+    m->attacksound = sfx_x_dratk; m->painstate = S_XDRA_PAIN1; m->painchance = 128;
+    m->painsound = sfx_x_drpai;   m->meleestate = S_NULL;     m->missilestate = S_XDRA_ATK1;
+    m->deathstate = S_XDRA_DIE1;  m->xdeathstate = S_NULL;    m->deathsound = sfx_x_drdth;
     m->speed = 10; m->radius = 20*FRACUNIT; m->height = 65*FRACUNIT; m->mass = 1000;
-    m->damage = 0; m->activesound = sfx_dmact;
+    m->damage = 0; m->activesound = sfx_x_drsit;
     m->flags = MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL|MF_FLOAT|MF_NOGRAVITY|MF_NOBLOOD; m->raisestate = S_NULL;
 
     m = &mobjinfo[MT_XDRAGON_FX];
@@ -707,7 +707,7 @@ void Hexen_Init (void)
     m->seestate  = S_NULL;       m->seesound  = sfx_None;  m->reactiontime = 8;
     m->attacksound = sfx_None;   m->painstate = S_NULL;    m->painchance = 0;
     m->painsound = sfx_None;     m->meleestate = S_NULL;   m->missilestate = S_NULL;
-    m->deathstate = S_XDRF_BOOM1; m->xdeathstate = S_NULL; m->deathsound = sfx_firxpl;
+    m->deathstate = S_XDRF_BOOM1; m->xdeathstate = S_NULL; m->deathsound = sfx_x_drhit;
     m->speed = 24*FRACUNIT; m->radius = 12*FRACUNIT; m->height = 10*FRACUNIT; m->mass = 100;
     m->damage = 6; m->activesound = sfx_None;
     m->flags = MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY; m->raisestate = S_NULL;

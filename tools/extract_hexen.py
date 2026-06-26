@@ -66,8 +66,46 @@ WEAPON_SPRITES = [
 ]
 
 # ---------------------------------------------------------------------------
+# Hexen MONSTER sounds wired into files/hexen.c.  The engine looks a sound up as
+# "ds<sfxname>" (i_sound.c), so each chosen Hexen DMX lump is copied under a NEW
+# name "DS"+<short>, where <short> (<=6 chars, so DS+short <= the 8-byte lump cap)
+# is the sfx tag in files/sounds.c / sounds.h (sfx_x_*).  Mapping below is:
+#     short-sfx-name -> source Hexen lump (from hexen.wad SNDINFO / crispy-doom).
+# Mirror these names exactly in files/sounds.{c,h} and files/hexen.c.
+MONSTER_SOUNDS = {
+    # Ettin (EttinSight/Active=cent2, Pain=cent1, Attack=ethit1, Death=cntdth1)
+    "xetsit": "cent2",   "xetpai": "cent1",   "xetatk": "ethit1",  "xetdth": "cntdth1",
+    # Centaur (taur1/taur2/taur4/centhit2/cntdth1)
+    "xcesit": "taur1",   "xceact": "taur2",   "xcepai": "taur4",
+    "xceatk": "centhit2","xcedth": "cntdth1",
+    # Slaughtaur (centaur leader): leader attack = cntshld4
+    "xslatk": "cntshld4",
+    # Chaos Serpent / Demon (sbtsit5 sight+active, minact1 pain, dematk2 atk, sbtdth3 death)
+    "xdesit": "sbtsit5", "xdepai": "minact1", "xdeatk": "dematk2", "xdedth": "sbtdth3",
+    # Fire Demon / Afrit (active=fired5, pain=fired2, attack=spit6, death=fired3; FX hit=firedhit)
+    "xfdact": "fired5",  "xfdpai": "fired2",  "xfdatk": "spit6",
+    "xfddth": "fired3",  "xfdhit": "firedhit",
+    # Wraith / Reiver (raith5a/raith3/raith4a/raith1b/rathdth2)
+    "xwrsit": "raith5a", "xwract": "raith3",  "xwrpai": "raith4a",
+    "xwratk": "raith1b", "xwrdth": "rathdth2",
+    # Dark Bishop (sight=syab2d, active=stb1d, pain=bshpn1, attack=pop, death=bishdth1; FX=bshhit2)
+    "xbisit": "syab2d",  "xbiact": "stb1d",   "xbipai": "bshpn1",
+    "xbiatk": "pop",     "xbidth": "bishdth1","xbihit": "bshhit2",
+    # Ice Guy / Wendigo (sight+active=frosty1, attack=frosty2; FX explode=shards1b; no pain/death sfx)
+    "xicsit": "frosty1", "xicatk": "frosty2", "xichit": "shards1b",
+    # Stalker / Serpent (sight=wtrcrt7, active=srfc3, pain=serppn1, attack=wtrswip, death=srpdth1; FX hit=glbhit4)
+    "xstsit": "wtrcrt7", "xstact": "srfc3",   "xstpai": "serppn1",
+    "xstatk": "wtrswip", "xstdth": "srpdth1", "xsthit": "glbhit4",
+    # Death Wyvern / Dragon (sight+active=dragsit1, pain=dragpn2, attack=mage4, death=dragdie2; FX=mageball)
+    "xdrsit": "dragsit1","xdrpai": "dragpn2", "xdratk": "mage4",
+    "xdrdth": "dragdie2","xdrhit": "mageball",
+}
+
+# ---------------------------------------------------------------------------
 # Hexen monster/weapon SOUND lump-name keywords (Hexen SFX names are descriptive,
-# not <thing><action>).  A DMX lump whose name contains any of these is copied.
+# not <thing><action>).  A DMX lump whose name contains any of these is copied
+# VERBATIM (kept for reference / future weapon work; the wired-up monster sounds
+# go through MONSTER_SOUNDS above as DS* lumps).
 # ---------------------------------------------------------------------------
 SOUND_KEYWORDS = (
     # monsters
@@ -216,7 +254,22 @@ def main():
             n_spr += 1
     out.append(("S_END", b""))
 
-    # monster / weapon sounds (DMX), copied verbatim.
+    # WIRED-UP monster sounds: copy each chosen Hexen DMX lump under "DS"+<short>
+    # so the engine's "ds%s" lookup (i_sound.c) finds it for sfx_x_* (files/sounds.c).
+    by_name = {nm.upper(): (fp, sz) for nm, fp, sz in hent}
+    n_ds = 0
+    ds_missing = []
+    for short, srclump in MONSTER_SOUNDS.items():
+        key = srclump.upper()
+        if key not in by_name:
+            ds_missing.append(srclump); continue
+        fp, sz = by_name[key]
+        raw = hdata[fp:fp+sz]
+        if not is_dmx(raw):
+            ds_missing.append(srclump + "(not-dmx)"); continue
+        out.append(("DS" + short.upper()[:6], raw)); n_ds += 1
+
+    # monster / weapon sounds (DMX), copied verbatim (reference, not wired up).
     n_snd = 0
     snd_names = []
     seen = set()
@@ -245,7 +298,10 @@ def main():
     print(f"extract_hexen: wrote {op}")
     print(f"  base palette: {sb.name}")
     print(f"  monster/weapon sprites (converted+renamed): {n_spr}  ({len(wanted)} codes)")
-    print(f"  monster/weapon sounds (verbatim): {n_snd}")
+    print(f"  WIRED monster sounds (DS* lumps for sfx_x_*): {n_ds}")
+    if ds_missing:
+        print(f"    WARNING: missing source lumps for DS sounds: {', '.join(ds_missing)}")
+    print(f"  monster/weapon sounds (verbatim, reference): {n_snd}")
     print(f"  total: {len(out)} lumps, {total/1024/1024:.1f} MB")
     print(f"  sprite rename map -> {mapfile.relative_to(here)}")
     if missing:

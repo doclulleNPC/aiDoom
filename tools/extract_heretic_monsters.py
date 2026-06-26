@@ -181,7 +181,9 @@ def main():
     # (sounds.c sfx_h_*).  Heretic names are <=6 chars, so "DS"+name stays within 8.
     n_snd = 0
     want = ("imp", "mum", "bst", "clk", "snk", "kgt", "wiz", "hed", "minsit",
-            "minat", "mindth", "minact", "minpai", "sbtsit", "sorzap")
+            "minat", "mindth", "minact", "minpai", "sbtsit",
+            # D'Sparil (sorcerer-2): zap + the see/attack/pain/active lumps
+            "sorzap", "sorsit", "soratk", "sorpai", "soract")
     for nm, fp, sz in hent:
         raw = hdata[fp:fp+sz]
         if is_dmx(raw) and any(k in nm.lower() for k in want):
