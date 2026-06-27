@@ -1281,13 +1281,13 @@ int main(int argc, char** argv)
         // Buddy row
         {
             static const char* buddy_opts[] = { "Off", "Buddy", "AI Buddy" };
-            draw_mode_row(BUDDY_Y, "Buddy",
+            draw_mode_row(BUDDY_Y, "BuddyMode",
                           buddy_opts, 3, buddy_mode, 110, NULL);
         }
         // Monster row
         {
             static const char* mon_opts[] = { "Vanilla", "L4D", "AI Director" };
-            draw_mode_row(MON_Y, "Monster+ ",
+            draw_mode_row(MON_Y, "MonsterMode",
                           mon_opts, 3, mon_mode, 110, NULL);
         }
         // Skill row (5 pills; default Ultra-Violence)

@@ -439,7 +439,7 @@ void Hexen_Init (void)
     m->painsound = sfx_None;     m->meleestate = S_NULL;   m->missilestate = S_NULL;
     m->deathstate = S_XFDB_BOOM1; m->xdeathstate = S_NULL; m->deathsound = sfx_x_fdhit;
     m->speed = 10*FRACUNIT; m->radius = 10*FRACUNIT; m->height = 6*FRACUNIT; m->mass = 15;
-    m->damage = 4; m->activesound = sfx_None;
+    m->damage = 1; m->activesound = sfx_None;	// crispy MT_FIREDEMON_FX6 damage = 1
     m->flags = MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY; m->raisestate = S_NULL;
 
     // ---- Reiver / Wraith (crispy S_WRAITH_*; the rise-from-ground init and ice
@@ -599,7 +599,7 @@ void Hexen_Init (void)
     m->painsound = sfx_None;     m->meleestate = S_NULL;   m->missilestate = S_NULL;
     m->deathstate = S_XICP_BOOM1; m->xdeathstate = S_NULL; m->deathsound = sfx_x_ichit;
     m->speed = 14*FRACUNIT; m->radius = 8*FRACUNIT; m->height = 10*FRACUNIT; m->mass = 100;
-    m->damage = 3; m->activesound = sfx_None;
+    m->damage = 1; m->activesound = sfx_None;	// crispy MT_ICEGUY_FX damage = 1
     m->flags = MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY; m->raisestate = S_NULL;
 
     // ---- Stalker / Serpent (crispy S_SERPENT_*; the underwater hide/dive/surface
@@ -649,8 +649,8 @@ void Hexen_Init (void)
     m->attacksound = sfx_x_statk; m->painstate = S_XSSP_PAIN1; m->painchance = 96;
     m->painsound = sfx_x_stpai;   m->meleestate = S_XSSP_ATK1; m->missilestate = S_XSSP_MIS1;
     m->deathstate = S_XSSP_DIE1;  m->xdeathstate = S_NULL;    m->deathsound = sfx_x_stdth;
-    m->speed = 12; m->radius = 32*FRACUNIT; m->height = 70*FRACUNIT; m->mass = 200;
-    m->damage = 0; m->activesound = sfx_x_stact;
+    m->speed = 12; m->radius = 32*FRACUNIT; m->height = 70*FRACUNIT; m->mass = 0x7fffffff;
+    m->damage = 0; m->activesound = sfx_None;	// crispy serpent: immovable (INT_MAX mass), no active sound
     m->flags = MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL; m->raisestate = S_NULL;
 
     // ---- Stalker boss / Serpent Leader (crispy MT_SERPENTLEADER): same XSSP
@@ -662,8 +662,8 @@ void Hexen_Init (void)
     m->attacksound = sfx_x_statk; m->painstate = S_XSSP_PAIN1; m->painchance = 64;
     m->painsound = sfx_x_stpai;   m->meleestate = S_XSSP_MIS1; m->missilestate = S_XSSP_MIS1;
     m->deathstate = S_XSSP_DIE1;  m->xdeathstate = S_NULL;    m->deathsound = sfx_x_stdth;
-    m->speed = 12; m->radius = 32*FRACUNIT; m->height = 70*FRACUNIT; m->mass = 250;
-    m->damage = 0; m->activesound = sfx_x_stact;
+    m->speed = 12; m->radius = 32*FRACUNIT; m->height = 70*FRACUNIT; m->mass = 0x7fffffff;
+    m->damage = 0; m->activesound = sfx_None;	// crispy serpent leader: immovable mass
     m->flags = MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL; m->raisestate = S_NULL;
 
     m = &mobjinfo[MT_XSTALKER_FX];
@@ -714,7 +714,7 @@ void Hexen_Init (void)
     m->attacksound = sfx_x_dratk; m->painstate = S_XDRA_PAIN1; m->painchance = 128;
     m->painsound = sfx_x_drpai;   m->meleestate = S_NULL;     m->missilestate = S_XDRA_ATK1;
     m->deathstate = S_XDRA_DIE1;  m->xdeathstate = S_NULL;    m->deathsound = sfx_x_drdth;
-    m->speed = 10; m->radius = 20*FRACUNIT; m->height = 65*FRACUNIT; m->mass = 1000;
+    m->speed = 10; m->radius = 20*FRACUNIT; m->height = 65*FRACUNIT; m->mass = 0x7fffffff;	// crispy dragon: immovable (INT_MAX)
     m->damage = 0; m->activesound = sfx_x_drsit;
     m->flags = MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL|MF_FLOAT|MF_NOGRAVITY|MF_NOBLOOD; m->raisestate = S_NULL;
 
