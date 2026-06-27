@@ -76,7 +76,7 @@
 #define OPT_NOFF_X (PAD + 90)		// "No friendly fire" checkbox
 #define OPT_INF_X  (PAD + 300)		// "All Monster infight" checkbox
 #define MONSTERS_Y 278			// extra-monster WAD toggles (FreeDoom / Heretic) -- a bit of space below the Monster+ row
-#define MON_FD_X   (PAD + 70)		// "FreeDoom" checkbox
+#define MON_FD_X   (PAD + 100)		// "FreeDoom" checkbox (space after the "+Monster" label)
 #define MON_HER_X  (PAD + 250)		// "Heretic" checkbox
 #define MON_HEX_X  (PAD + 410)		// "Hexen" checkbox
 #define IWAD_Y    310
@@ -1302,7 +1302,7 @@ int main(int argc, char** argv)
             draw_checkbox(OPT_NOFF_X, OPTS_Y, opt_noff,    "No friendly fire");
             draw_checkbox(OPT_INF_X,  OPTS_Y, opt_infight, "All Monster infight");
 
-            text(PAD, MONSTERS_Y + (CHK_BOX - FONT_CH)/2, "Monsters", COL_DIM);
+            text(PAD, MONSTERS_Y + (CHK_BOX - FONT_CH)/2, "+Monster", COL_DIM);
             if (wad_present("freedoomstuff.wad"))
                 draw_checkbox(MON_FD_X, MONSTERS_Y, opt_freedoom, "FreeDoom");
             else
