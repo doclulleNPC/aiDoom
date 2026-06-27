@@ -76,7 +76,12 @@ rcsid[] = "$Id: g_game.c,v 1.8 1997/02/03 22:45:09 b1 Exp $";
 #include "p_ai_director.h"	// P_Director_Say (level-clear voice line)
 
 
-#define SAVEGAMESIZE	0x2c000
+// Savegame scratch buffer = screens[1]+0x4000.  screens[0..3] are one contiguous
+// MAXWIDTH*MAXHEIGHT*4 allocation (v_video.c), so from screens[1]+0x4000 there are
+// ~6.6 MB of contiguous space (screens[1]+[2]+[3]).  The old vanilla 0x2c000 (180 KB)
+// overran on big maps (~800+ mobjs @ 224 B each -> "Savegame buffer overrun" crash);
+// 4 MB (~18k mobjs) fits comfortably within that contiguous span.
+#define SAVEGAMESIZE	0x400000
 #define SAVESTRINGSIZE	24
 
 
