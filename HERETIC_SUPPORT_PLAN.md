@@ -2,6 +2,18 @@
 
 Where we are vs. where "full Heretic" is, and a phased path between them.
 
+## Status
+- **Phase 1 — DONE** (commit `557a620`): `heretic.wad` is detected (`heretic_mode`), and a
+  Heretic level now **loads and runs without crashing** — `P_SpawnMapThing` resolves the
+  Heretic doomednums of our 10 ported monsters + 10 artifacts (`P_HereticThingType`) and
+  skips unported things instead of `I_Error`-ing, plus a chain of `heretic_mode`-gated
+  boot-survival guards (missing DOOM sfx → silence, missing music/switch/HUD/status-bar/
+  sprite lumps → skip). 39 monsters spawn on E1M1; **DOOM is byte-for-byte unaffected**.
+  *Caveat:* the Heretic content is still **invisible/silent** — the native Heretic sprites,
+  palette, weapons, status bar, keys, specials, sound and music are not wired yet (below).
+- **Phases 2–9 — TODO.** Next highest-value: make the content visible (Phase 2 data tables:
+  native Heretic sprite names + the Heretic palette) and the player armed (Phase 3 weapons).
+
 ## Where we are now (the additive pack)
 aiDoom plays **DOOM**; Heretic content is bolted on as an optional *pack* over the DOOM engine
 (approach A in `HERETIC_HEXEN.md`):
