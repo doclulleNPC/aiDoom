@@ -49,6 +49,7 @@ static void I_CrashHandler (int sig)
 {
     void* bt[64];
     int   n = backtrace (bt, 64);
+    fflush (NULL);				// flush buffered [INVIS]/debug logs before the backtrace
     static const char hdr[] = "\n*** aiDoom CRASH (signal ";
     char  num[4] = { (char)('0' + (sig/10)%10), (char)('0' + sig%10), ')', '\n' };
     write (2, hdr, sizeof hdr - 1);
@@ -59,10 +60,23 @@ static void I_CrashHandler (int sig)
 }
 static void I_InstallCrashHandler (void)
 {
-    signal (SIGSEGV, I_CrashHandler);
-    signal (SIGABRT, I_CrashHandler);
-    signal (SIGFPE,  I_CrashHandler);
-    signal (SIGBUS,  I_CrashHandler);
+    // Run the handler on a dedicated ALTERNATE signal stack: a STACK-OVERFLOW (runaway
+    // recursion) faults with SIGSEGV but leaves no usable stack, so a normal handler can't
+    // run and the process dies silently with NO backtrace -- exactly what we saw on the
+    // invis-pickup crash.  SA_ONSTACK + sigaltstack lets the backtrace still print, naming
+    // the recursive function.
+    static char altstk[64*1024];
+    stack_t ss;
+    struct sigaction sa;
+    ss.ss_sp = altstk; ss.ss_size = sizeof altstk; ss.ss_flags = 0;
+    sigaltstack (&ss, NULL);
+    sa.sa_handler = I_CrashHandler;
+    sigemptyset (&sa.sa_mask);
+    sa.sa_flags = SA_ONSTACK;
+    sigaction (SIGSEGV, &sa, NULL);
+    sigaction (SIGABRT, &sa, NULL);
+    sigaction (SIGFPE,  &sa, NULL);
+    sigaction (SIGBUS,  &sa, NULL);
 }
 #else
 static void I_InstallCrashHandler (void) {}

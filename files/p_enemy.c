@@ -730,12 +730,19 @@ void A_Look (mobj_t* actor)
     if (monster_pack)
     {
 	mobj_t* pl = P_PackNearestPlayer (actor);
-	if (pl) { actor->target = pl; goto seeyou; }
+	// (mod) true invisibility: don't pack-lock onto an invisible player either.
+	if (pl && !(pl->player && pl->player->powers[pw_invisibility]))
+	{ actor->target = pl; goto seeyou; }
     }
     targ = actor->subsector->sector->soundtarget;
 
     if (targ
-	&& (targ->flags & MF_SHOOTABLE) )
+	&& (targ->flags & MF_SHOOTABLE)
+	// (mod) true invisibility: don't acquire an invisible player through NOISE either.
+	// Without this, A_Chase forgets the invisible target -> spawnstate -> A_Look re-acquires
+	// it via soundtarget -> seestate -> A_Chase forgets -> ... = infinite P_SetMobjState
+	// recursion -> stack overflow (the invis-pickup crash).
+	&& !(targ->player && targ->player->powers[pw_invisibility]) )
     {
 	actor->target = targ;
 
