@@ -1355,6 +1355,8 @@ printf("added\n");
     printf ("M_Init: Init miscellaneous info.\n");
     M_Init ();
 
+    Heretic_RemapNativeSprites ();	// heretic_mode: point H* sprites at heretic.wad's native codes
+					//   (must run BEFORE R_Init builds sprites[] from sprnames[])
     printf ("R_Init: Init DOOM refresh daemon - ");
     R_Init ();
 

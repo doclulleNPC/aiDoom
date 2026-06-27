@@ -13,6 +13,10 @@ struct mobj_s;
 // (after the info tables exist, before any Heretic monster spawns).
 void Heretic_Init (void);
 
+// (heretic_mode) Remap the H* Heretic sprite codes to heretic.wad's native codes so the
+// monsters render from the real Heretic art.  Call BEFORE R_Init.
+void Heretic_RemapNativeSprites (void);
+
 // True if hereticstuff.wad's sprites are loaded -- spawn Heretic monsters only then,
 // else they'd render as a blank (0-frame) sprite.
 int  Heretic_Available (void);

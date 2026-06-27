@@ -126,6 +126,7 @@ getsfx
     
     // Get the sound data from the WAD, allocate lump
     //  in zone memory.
+    extern int heretic_mode;
     sprintf(name, "ds%s", sfxname);
 
     // Now, there is a severe problem with the
@@ -138,7 +139,9 @@ getsfx
     // I do not do runtime patches to that
     //  variable. Instead, we will use a
     //  default sound for replacement.
-    if ( W_CheckNumForName(name) != -1 )
+    if ( heretic_mode && W_CheckNumForName(sfxname) != -1 )
+      sfxlump = W_GetNumForName(sfxname);		// native Heretic sound (no "ds" prefix)
+    else if ( W_CheckNumForName(name) != -1 )
       sfxlump = W_GetNumForName(name);
     else if ( W_CheckNumForName("dspistol") != -1 )
       sfxlump = W_GetNumForName("dspistol");		// DOOM default replacement
@@ -397,9 +400,17 @@ void I_SetMusicVolume(int volume)
 //
 int I_GetSfxLumpNum(sfxinfo_t* sfx)
 {
+    extern int heretic_mode;
     char namebuf[9];
+    int  l;
+    // Heretic sounds live in heretic.wad under their NATIVE names (IMPSIT, MUMSIT, ...) with
+    // no "ds" prefix.  In heretic_mode try the bare name first.
+    if (heretic_mode && (l = W_CheckNumForName ((char*)sfx->name)) >= 0)
+	return l;
     sprintf(namebuf, "ds%s", sfx->name);
-    return W_GetNumForName(namebuf);
+    l = W_CheckNumForName (namebuf);
+    return (l >= 0) ? l : -1;	// missing (e.g. a DOOM sfx under heretic.wad) -> -1, never I_Error
+				//   (lumpnum isn't used to index a lump; I_GetSfx emits silence)
 }
 
 //

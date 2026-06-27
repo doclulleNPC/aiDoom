@@ -263,6 +263,32 @@ static void ST (statenum_t s, spritenum_t spr, int frame, int tics,
     states[s].misc1 = states[s].misc2 = 0;
 }
 
+// (heretic_mode) Point our palette-converted "H*" Heretic sprite codes at heretic.wad's
+// NATIVE 4-char sprite codes, so the monsters render from the real Heretic art (correct
+// colours) straight out of heretic.wad -- no hereticstuff.wad overlay needed.  MUST be
+// called BEFORE R_Init (which builds sprites[] from sprnames[]).  DOOM (heretic_mode==0)
+// is untouched.  The artifact sprites (PTN1/SPHL/...) are already native-named -> no remap.
+void Heretic_RemapNativeSprites (void)
+{
+    extern int    heretic_mode;
+    extern char*  sprnames[];
+    static const char* map[][2] = {
+	{"HIMP","IMPX"},{"HMUM","MUMM"},{"HMUF","FX15"},{"HKNI","KNIG"},{"HKAX","SPAX"},
+	{"HKRX","RAXE"},{"HBEA","BEAS"},{"HBEB","FRB1"},{"HCLK","CLNK"},{"HWIZ","WZRD"},
+	{"HWIB","FX11"},{"HSNK","SNKE"},{"HSNB","SNFX"},{"HIRO","HEAD"},{"HIRB","FX05"},
+	{"HIRW","FX06"},{"HIRX","FX07"},{"HMIN","MNTR"},{"HMNA","FX12"},{"HMNB","FX13"},
+	{"HMNC","FX14"},{"HSR1","SRCR"},{"HSR2","SOR2"},{"HSRB","FX16"},{"HCHK","CHKN"},
+    };
+    int s, k, n = (int)(sizeof(map)/sizeof(map[0]));
+    if (!heretic_mode)
+	return;
+    for (s = 0; s < NUMSPRITES; s++)
+	if (sprnames[s])
+	    for (k = 0; k < n; k++)
+		if (!strncmp (sprnames[s], map[k][0], 4))
+		{ sprnames[s] = (char*)map[k][1]; break; }
+}
+
 void Heretic_Init (void)
 {
     mobjinfo_t*	m;
