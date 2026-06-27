@@ -109,6 +109,12 @@ static const mobjtype_t dir_heretic[]  = { MT_HMUMMY, MT_HCLINK, MT_HIMP, MT_HBE
 static const mobjtype_t dir_hexen[]    = { MT_XETTIN, MT_XCENTAUR, MT_XSLAUGHTAUR, MT_XDEMON,
 					   MT_XFIREDEMON, MT_XWRAITH, MT_XBISHOP,
 					   MT_XICEGUY, MT_XSTALKER, MT_XSTALKERBOSS };
+// Freedoom monsters (freedoomstuff.wad overlaid -- the launcher's FreeDoom checkbox).  These
+// are the DOOM2 monsters cloned with free art (MT_FD_*).  Treated as their OWN pool -- like
+// Hexen/Heretic -- so they actually appear (mixed into the director's trash tier) whenever the
+// FreeDoom pack is loaded, on ANY IWAD, not only as the DOOM1 SafeType remap of dir_special2.
+static const mobjtype_t dir_freedoom[] = { MT_FD_UNDEAD, MT_FD_FATSO, MT_FD_VILE, MT_FD_BABY,
+					   MT_FD_CHAINGUY, MT_FD_KNIGHT, MT_FD_PAIN, MT_FD_WOLFSS };
 
 #define DIR_TRACK	(dir_on || dir_llm)	// intensity is tracked in either mode
 
@@ -281,6 +287,13 @@ static boolean P_Director_HexenAvailable (void)
     return sprites && sprites[SPR_XETT].numframes > 0;
 }
 
+// Freedoom clones loaded (freedoomstuff.wad overlaid)?  Probe the renamed revenant sprite.
+// Fires regardless of the IWAD (the F* sprites only exist when the pack is loaded).
+static boolean P_Director_FreedoomAvailable (void)
+{
+    return sprites && sprites[SPR_FSKE].numframes > 0;
+}
+
 static mobjtype_t P_Director_PickType (void)
 {
     boolean		doom2 = P_Director_Doom2Available ();
@@ -303,6 +316,8 @@ static mobjtype_t P_Director_PickType (void)
 	return dir_hexen[P_Random () % (int)(sizeof(dir_hexen)/sizeof(dir_hexen[0]))];
     if (P_Director_HereticAvailable () && (P_Random () % 100) < 35)	// ~35% Heretic trash
 	return dir_heretic[P_Random () % (int)(sizeof(dir_heretic)/sizeof(dir_heretic[0]))];
+    if (P_Director_FreedoomAvailable () && (P_Random () % 100) < 30)	// ~30% Freedoom DOOM2-clone monsters
+	return dir_freedoom[P_Random () % (int)(sizeof(dir_freedoom)/sizeof(dir_freedoom[0]))];
     return dir_common[P_Random () % (int)(sizeof(dir_common)/sizeof(dir_common[0]))];
 }
 
