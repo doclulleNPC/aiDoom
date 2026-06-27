@@ -1923,7 +1923,7 @@ boolean P_AICoop_RevivePress (player_t* presser)
     P_AICoop_Revive (10);			// buddy back up with the donated 10 HP
     // Thank the human, reliably: VP_COMMAND preempts the rate-limited "help!" screams the
     // downed buddy was making (an ambient "revived" line would be gated out right after them).
-    AICoop_CalloutP ("thanks:", 3, VP_COMMAND);
+    AICoop_CalloutP ("thanks:", 6, VP_COMMAND);
     return true;
 }
 
@@ -2029,7 +2029,7 @@ void P_AICoop_BuildCmd (void)
 	    return;
 	}
 	memset (cmd, 0, sizeof(*cmd));		// never tap USE -> stays down (no reborn)
-	AICoop_Callout ("help:", 5);		// scream for help (4s cooldown gates it)
+	AICoop_Callout ("help:", 8);		// scream for help (4s cooldown gates it)
 	return;					// revived by the human's USE (P_AICoop_RevivePress)
     }
     if (bot->playerstate != PST_LIVE || !bot->mo)
