@@ -37,6 +37,8 @@ rcsid[] = "$Id: p_mobj.c,v 1.5 1997/02/03 22:45:12 b1 Exp $";
 
 #include "s_sound.h"
 
+#include "heretic.h"		// P_HereticThingType (heretic_mode map-thing resolution)
+
 #include "doomstat.h"
 
 
@@ -770,14 +772,25 @@ void P_SpawnMapThing (mapthing_t* mthing)
 	return;
 	
     // find which type to spawn
-    for (i=0 ; i< NUMMOBJTYPES ; i++)
-	if (mthing->type == mobjinfo[i].doomednum)
-	    break;
-	
-    if (i==NUMMOBJTYPES)
-	I_Error ("P_SpawnMapThing: Unknown type %i at (%i, %i)",
-		 mthing->type,
-		 mthing->x, mthing->y);
+    if (heretic_mode)
+    {
+	// Heretic maps use Heretic doomednums -- resolve through the Heretic table.
+	// Unported Heretic things (-1) are silently skipped instead of I_Error'd.
+	i = P_HereticThingType (mthing->type);
+	if (i < 0)
+	    return;
+    }
+    else
+    {
+	for (i=0 ; i< NUMMOBJTYPES ; i++)
+	    if (mthing->type == mobjinfo[i].doomednum)
+		break;
+
+	if (i==NUMMOBJTYPES)
+	    I_Error ("P_SpawnMapThing: Unknown type %i at (%i, %i)",
+		     mthing->type,
+		     mthing->x, mthing->y);
+    }
 		
     // don't spawn keycards and players in deathmatch
     if (deathmatch && mobjinfo[i].flags & MF_NOTDMATCH)

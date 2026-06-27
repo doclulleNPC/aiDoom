@@ -118,6 +118,10 @@ char*		wadfiles[MAXWADFILES];
 // monsters (director) and the super shotgun even though doom.wad lacks the assets.
 int		doom2_overlay = 0;
 
+// Set when the resolved IWAD is heretic.wad (Heretic game mode -- phase 1):
+// resolves map things through the Heretic doomednum table and skips unported ones.
+int		heretic_mode = 0;
+
 
 boolean		devparm;	// started game with -devparm
 boolean         nomonsters;	// checkparm of -nomonsters
@@ -670,6 +674,7 @@ static int IWAD_ModeFromName (const char* path)
     if ((s = strrchr(b,'\\'))) b = s+1;
     for (i=0; b[i] && i<63; i++) { c = b[i]; if (c>='A'&&c<='Z') c+=32; low[i]=(char)c; }
     low[i] = 0;
+    if (strstr(low,"heretic")) return retail;		// Heretic (ExMy maps, multi-episode like retail)
     if (strstr(low,"chex")) return retail;		// Chex Quest (1/2/3): Ultimate-Doom format
     if (strstr(low,"doom2") || strstr(low,"plutonia") || strstr(low,"tnt")
 	|| strstr(low,"freedoom2") || strstr(low,"freedm")) return commercial;
@@ -840,6 +845,22 @@ void IdentifyVersion (void)
     if (found)
     {
 	printf ("IWAD: %s\n", found);
+	// Heretic game mode (phase 1): if the resolved IWAD name contains "heretic"
+	// (case-insensitive), treat it as a multi-episode game (retail's 4-episode menu
+	// is fine for now) and route map things through the Heretic doomednum table.
+	{
+	    const char* b = found; const char* s; char low[256]; int i, c;
+	    if ((s = strrchr(b,'/')))  b = s+1;
+	    if ((s = strrchr(b,'\\'))) b = s+1;
+	    for (i=0; b[i] && i<255; i++) { c=b[i]; if (c>='A'&&c<='Z') c+=32; low[i]=(char)c; }
+	    low[i] = 0;
+	    if (strstr(low, "heretic"))
+	    {
+		heretic_mode = 1;
+		mode = retail;
+		printf ("Heretic IWAD detected -- heretic mode\n");
+	    }
+	}
 	// doom.wad is BOTH the registered (3-episode) and the Ultimate/retail (4-episode) IWAD --
 	// same filename, only the content differs.  If a "registered" doom.wad actually has an
 	// E4M1 map it's the Ultimate Doom -> upgrade to retail so the 4th episode shows in the menu.
@@ -853,7 +874,7 @@ void IdentifyVersion (void)
 	// DOOM1 + a doom2stuff.wad on hand -> auto-overlay it so the director can spawn
 	// DOOM2 monsters and the super shotgun works (assets are absent from doom.wad).
 	// (W_AddFile resolves the bare name under ID0/.)
-	if (mode != commercial
+	if (mode != commercial && !heretic_mode
 	    && (!access ("ID0/doom2stuff.wad", R_OK) || !access ("doom2stuff.wad", R_OK)))
 	{
 	    D_AddFile ("doom2stuff.wad");

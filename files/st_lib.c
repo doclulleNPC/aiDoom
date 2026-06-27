@@ -41,6 +41,7 @@ rcsid[] = "$Id: st_lib.c,v 1.4 1997/02/03 16:47:56 b1 Exp $";
 #include "st_stuff.h"
 #include "st_lib.h"
 #include "r_local.h"
+#include "doomstat.h"		// heretic_mode (phase-1 status-bar lump fallback)
 
 
 // in AM_map.c
@@ -57,7 +58,11 @@ patch_t*		sttminus;
 
 void STlib_init(void)
 {
-    sttminus = (patch_t *) W_CacheLumpName("STTMINUS", PU_STATIC);
+    // heretic.wad has no STTMINUS -- substitute a present Heretic patch (phase 1).
+    const char* nm = "STTMINUS";
+    if (heretic_mode && W_CheckNumForName ("STTMINUS") < 0)
+	nm = "FONTA01";
+    sttminus = (patch_t *) W_CacheLumpName((char*)nm, PU_STATIC);
 }
 
 // Per-pixel palette translation for the next number drawn (NULL = none).  Set by

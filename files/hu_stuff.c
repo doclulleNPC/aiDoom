@@ -406,8 +406,28 @@ void HU_Init(void)
     j = HU_FONTSTART;
     for (i=0;i<HU_FONTSIZE;i++)
     {
-	sprintf(buffer, "STCFN%.3d", j++);
-	hu_font[i] = (patch_t *) W_CacheLumpName(buffer, PU_STATIC);
+	int	lump;
+
+	if (heretic_mode)
+	{
+	    // Heretic uses FONTAxx (FONTA01='!'); some punctuation glyphs are absent,
+	    // so fall back to FONTA01 for any missing one (phase 1 -- a proper Heretic
+	    // HUD font is a later phase).  Avoids W_GetNumForName I_Erroring on a miss.
+	    sprintf(buffer, "FONTA%02d", (j++ - HU_FONTSTART) + 1);
+	    lump = W_CheckNumForName(buffer);
+	    if (lump < 0)
+		lump = W_CheckNumForName("FONTA01");
+	}
+	else
+	{
+	    sprintf(buffer, "STCFN%.3d", j++);
+	    lump = W_CheckNumForName(buffer);
+	}
+
+	if (lump >= 0)
+	    hu_font[i] = (patch_t *) W_CacheLumpNum(lump, PU_STATIC);
+	else
+	    hu_font[i] = (patch_t *) W_CacheLumpName("STCFN033", PU_STATIC);
     }
 
 }

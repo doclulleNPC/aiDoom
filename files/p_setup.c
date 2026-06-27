@@ -317,8 +317,10 @@ void P_LoadThings (int lump)
     {
 	spawn = true;
 
-	// Do not spawn cool, new monsters if !commercial
-	if ( gamemode != commercial)
+	// Do not spawn cool, new monsters if !commercial.  (Skipped in heretic_mode:
+	// Heretic doomednums 64/66/68 are the Knight/Gargoyle/Mummy, NOT DOOM2 monsters,
+	// and this gate's `break` would otherwise abort the whole THINGS loop.)
+	if ( gamemode != commercial && !heretic_mode)
 	{
 	    switch(mt->type)
 	    {

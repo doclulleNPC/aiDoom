@@ -25,4 +25,9 @@ int  Heretic_TypeByName (const char* name);
 // NULL if unavailable or type<0.
 struct mobj_s* Heretic_Spawn (int type, fixed_t x, fixed_t y);
 
+// Phase 1 map loading: map a real Heretic map-thing doomednum (crispy heretic/info.c)
+// to the corresponding aiDoom mobjtype (MT_H* monsters + MT_HARTI_* artifacts, plus a
+// few trivial pickup substitutions), or -1 for an unported Heretic thing (skip it).
+int  P_HereticThingType (int doomednum);
+
 #endif

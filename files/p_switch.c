@@ -109,7 +109,18 @@ void P_InitSwitchList(void)
     int		i;
     int		index;
     int		episode;
-	
+
+    // Heretic (phase 1) has its own switch textures (SW1* names differ) -- the DOOM
+    // alphSwitchList references textures heretic.wad lacks, and R_TextureNumForName
+    // I_Errors on a miss.  Skip building the switch list until Heretic switches are
+    // ported (a later phase); animated switches just won't toggle for now.
+    if (heretic_mode)
+    {
+	numswitches = 0;
+	switchlist[0] = -1;
+	return;
+    }
+
     episode = 1;
 
     if (gamemode == registered)

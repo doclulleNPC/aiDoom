@@ -675,7 +675,16 @@ S_ChangeMusic
     if (!music->lumpnum)
     {
 	sprintf(namebuf, "d_%s", music->name);
-	music->lumpnum = W_GetNumForName(namebuf);
+	music->lumpnum = W_CheckNumForName(namebuf);
+	// Heretic (phase 1) names its music lumps differently (no "d_" prefix), so the
+	// DOOM-named lump is absent -- skip music rather than I_Error.  Proper Heretic
+	// music is a later phase.
+	if (music->lumpnum < 0)
+	{
+	    music->lumpnum = 0;
+	    mus_playing = NULL;
+	    return;
+	}
     }
 
     // load & register it

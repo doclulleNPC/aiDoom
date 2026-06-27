@@ -511,6 +511,17 @@ void R_ProjectSprite (mobj_t* thing)
     if (abs(tx)>(tz<<2))
 	return;
     
+    // Heretic (phase 1): the H* monster/artifact sprites aren't present in heretic.wad
+    // (they live in hereticstuff.wad / a later phase), so a spawned Heretic thing has no
+    // sprite frames -- skip drawing it instead of I_Erroring.  DOOM is unaffected.
+    if (heretic_mode)
+    {
+	if ((unsigned)thing->sprite >= numsprites)
+	    return;
+	if ( (thing->frame&FF_FRAMEMASK) >= sprites[thing->sprite].numframes )
+	    return;
+    }
+
     // decide which patch to use for sprite relative to player
 #ifdef RANGECHECK
     if ((unsigned)thing->sprite >= numsprites)
@@ -664,6 +675,17 @@ void R_DrawPSprite (pspdef_t* psp)
     vissprite_t*	vis;
     vissprite_t		avis;
     
+    // Heretic (phase 1): DOOM weapon sprites (PISG/SHTG/...) aren't in heretic.wad,
+    // so the player's psprite frame is invalid -- skip drawing the weapon instead of
+    // I_Erroring (Heretic weapons are a later phase).  DOOM is unaffected.
+    if (heretic_mode)
+    {
+	if ((unsigned)psp->state->sprite >= numsprites)
+	    return;
+	if ((psp->state->frame & FF_FRAMEMASK) >= sprites[psp->state->sprite].numframes)
+	    return;
+    }
+
     // decide which patch to use
 #ifdef RANGECHECK
     if ( (unsigned)psp->state->sprite >= numsprites)

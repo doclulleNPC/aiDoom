@@ -138,11 +138,27 @@ getsfx
     // I do not do runtime patches to that
     //  variable. Instead, we will use a
     //  default sound for replacement.
-    if ( W_CheckNumForName(name) == -1 )
-      sfxlump = W_GetNumForName("dspistol");
-    else
+    if ( W_CheckNumForName(name) != -1 )
       sfxlump = W_GetNumForName(name);
-    
+    else if ( W_CheckNumForName("dspistol") != -1 )
+      sfxlump = W_GetNumForName("dspistol");		// DOOM default replacement
+    else
+      sfxlump = -1;	// no DOOM SFX at all (e.g. heretic.wad) -> emit silence below
+
+    // Heretic-mode / missing-SFX safety: hand back a tiny padded silence buffer
+    // instead of W_GetNumForName I_Erroring when neither the named lump nor the
+    // dspistol fallback exists.  (Heretic SFX use different lump names; the proper
+    // Heretic sound table is a later phase.)
+    if (sfxlump < 0)
+    {
+	int		silbytes = SAMPLECOUNT;
+	unsigned char*	sil = (unsigned char*)Z_Malloc (silbytes+8, PU_STATIC, 0);
+	for (i=0 ; i<silbytes+8 ; i++)
+	    sil[i] = 128;
+	*len = silbytes;
+	return (void *) (sil + 8);
+    }
+
     size = W_LumpLength( sfxlump );
 
     // Debug.

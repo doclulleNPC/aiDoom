@@ -67,6 +67,9 @@ extern GameMission_t	gamemission;
 // 1 when playing DOOM1 with doom2stuff.wad auto-overlaid (DOOM2 monsters + SSG).
 extern int		doom2_overlay;
 
+// 1 when the resolved IWAD is heretic.wad (Heretic game mode -- phase 1).
+extern int		heretic_mode;
+
 // Set if homebrew PWAD stuff has been added.
 extern  boolean	modifiedgame;
 

@@ -812,3 +812,48 @@ mobj_t* Heretic_Spawn (int type, fixed_t x, fixed_t y)
 	return NULL;
     return P_SpawnMonsterChecked (x, y, (mobjtype_t)type);	// (C) only if it fits + fits the sector
 }
+
+// ---------------------------------------------------------------------------
+// Phase 1 map-thing resolution: real Heretic map doomednums -> our mobjtypes.
+// Doomednums are from crispy-doom's heretic/info.c.  Only the 10 ported monsters
+// + 10 artifacts (and a couple of trivial DOOM pickup substitutions so the player
+// isn't starved) resolve; everything else returns -1 so P_SpawnMapThing skips it
+// (an unported Heretic decoration/key just doesn't appear -- no crash).
+// ---------------------------------------------------------------------------
+int P_HereticThingType (int doomednum)
+{
+    switch (doomednum)
+    {
+	// ---- the 10 monsters (crispy heretic doomednums) ----
+	case 68: return MT_HMUMMY;	// Mummy / Golem
+	case 90: return MT_HCLINK;	// Sabreclaw
+	case 66: return MT_HIMP;	// Gargoyle (gold)
+	case  5: return MT_HIMP;	// Gargoyle leader -> same gargoyle
+	case 64: return MT_HKNIGHT;	// Undead Warrior (Knight)
+	case 70: return MT_HBEAST;	// Weredragon
+	case 15: return MT_HWIZARD;	// Disciple of D'Sparil
+	case 92: return MT_HSNAKE;	// Ophidian
+	case  9: return MT_HMINOTAUR;	// Maulotaur
+	case  6: return MT_HIRONLICH;	// Iron Lich
+	case  7: return MT_HDSPARIL;	// D'Sparil (final boss, phase-2 sorcerer)
+
+	// ---- the 10 artifacts (crispy heretic doomednums) ----
+	case 82: return MT_HARTI_FLASK;		// Quartz Flask
+	case 32: return MT_HARTI_URN;		// Mystic Urn
+	case 86: return MT_HARTI_TOME;		// Tome of Power
+	case 33: return MT_HARTI_TORCH;		// Torch
+	case 34: return MT_HARTI_BOMB;		// Time Bomb of the Ancients
+	case 84: return MT_HARTI_RING;		// Ring of Invincibility
+	case 75: return MT_HARTI_SHADOW;	// Shadowsphere
+	case 36: return MT_HARTI_CHAOS;		// Chaos Device
+	case 83: return MT_HARTI_WINGS;		// Wings of Wrath
+	case 30: return MT_HARTI_EGG;		// Morph Ovum
+
+	// ---- trivial DOOM pickup substitutions (obvious only) ----
+	case 81: return MT_MISC10;	// Crystal Vial (health) -> DOOM stimpack
+	case 10: return MT_CLIP;	// Wand Crystal (gold-wand ammo, wimpy) -> DOOM clip
+	case 12: return MT_CLIP;	// Crystal Geode (gold-wand ammo, hefty)  -> DOOM clip
+
+	default: return -1;		// unported Heretic thing -> skip
+    }
+}
