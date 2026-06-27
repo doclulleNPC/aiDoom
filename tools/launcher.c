@@ -71,6 +71,7 @@
 #define MON_H     60
 #define SKILL_Y   154			// difficulty row (5 pills)
 #define SKILL_H   40
+#define MAP_Y     186			// warp-map row (4 pills: 1/10/19/28), under Skill
 #define OPTS_Y    240			// toggle row; centre 248 (Skill-Options gap kept as a separator)
 #define CHK_BOX   16			// checkbox square size
 #define OPT_NOFF_X (PAD + 90)		// "No friendly fire" checkbox
@@ -191,6 +192,8 @@ static int     opt_freedoom;			// -file freedoomstuff.wad (DOOM2 monsters, free 
 static int     opt_heretic;			// -file hereticstuff.wad   (Heretic monsters)
 static int     opt_hexen;			// -file hexenstuff.wad     (Hexen monsters)
 static int     opt_skill = 3;			// difficulty 0..4 -> -skill 1..5; default 3 = Ultra-Violence
+static int     map_idx = 0;			// warp-map row index -> map_vals[]; default 0 = map 1
+static const int map_vals[4] = { 1, 10, 19, 28 };	// DOOM2: MAPnn; DOOM1/Heretic: episode starts E1M1/E2M1/E3M1/E4M1
 static int     dropdown_open;
 
 // Status line shown under the controls (e.g. a launch error).  err -> red.
@@ -964,14 +967,23 @@ static void build_command(char* out, int n, const char* iwad_path)
     if (files[0])
         off += snprintf(out + off, n - off, " -file%s", files);
 
-    // Start the game NORMALLY (title screen -> menu) so the player picks the episode + skill
-    // himself -- we only auto-warp when a PWAD is loaded (custom maps rarely sit on E1M1/MAP01).
-    // NOTE: both -warp AND -skill set the engine's autostart flag, so for a normal start we pass
-    // NEITHER, otherwise the game skips the title and drops straight into E1M1.
+    // Warp target.  A selected PWAD's own first map wins (custom maps rarely sit on E1M1/MAP01);
+    // otherwise warp to the "Map" row's value (1/10/19/28).  DOOM2 takes a flat MAPnn (-warp 10);
+    // DOOM1 / Heretic are EPISODIC (-warp E M), so the flat map number is converted to episode+map
+    // (map 10 -> E2M1 = "2 1", 19 -> E3M1, 28 -> E4M1).  DOOM2-vs-DOOM1 is detected by a MAP01 lump.
     char warp[32] = "";
     if (pwad_sel > 0 && pwad_sel < pwad_count) {
         char w[32]; pwad_first_map_warp(pwads[pwad_sel], w, sizeof w);
         if (w[0]) snprintf(warp, sizeof warp, "%s", w);
+    }
+    if (!warp[0]) {
+        int mapnum = map_vals[map_idx];
+        int is_doom2 = (iwad_sel >= 0 && iwad_sel < iwad_count
+                        && wad_has_lump("", iwads[iwad_sel].path, "MAP01"));
+        if (is_doom2)
+            snprintf(warp, sizeof warp, "%d", mapnum);				// MAPnn
+        else
+            snprintf(warp, sizeof warp, "%d %d", (mapnum-1)/9 + 1, (mapnum-1)%9 + 1);  // ExMy
     }
     if (warp[0])
         off += snprintf(out + off, n - off, " -warp %s -skill %d", warp, opt_skill + 1);
@@ -1234,6 +1246,22 @@ int main(int argc, char** argv)
                             }
                         }
 
+                        // Map row (4 pills) -- right-aligned like Skill, width 64
+                        {
+                            const float mpw = 64;
+                            float mrx = WINW - PAD - mpw*4 - gap*3;
+                            float mry = MAP_Y + (BUDDY_H - 26)/2;
+                            if (mouse_y >= mry && mouse_y <= mry + 26) {
+                                for (int i=0; i<4; i++) {
+                                    float px = mrx + i * (mpw + gap);
+                                    if (mouse_x >= px && mouse_x <= px + mpw) {
+                                        map_idx = i;
+                                        g_status[0] = 0;
+                                    }
+                                }
+                            }
+                        }
+
                         // Options row: toggle the two checkboxes.
                         if (hit_checkbox(OPT_NOFF_X, OPTS_Y, "No friendly fire", mouse_x, mouse_y))
                             opt_noff = !opt_noff;
@@ -1295,6 +1323,11 @@ int main(int argc, char** argv)
             static const char* skill_opts[] = { "ITYTD", "HNTR", "HMP", "UV", "NM" };
             draw_mode_row(SKILL_Y, "Skill",
                           skill_opts, 5, opt_skill, 64, NULL);
+        }
+        // Map row (4 pills): warp target -- 1/10/19/28 (build_command picks DOOM1/DOOM2 warp form)
+        {
+            static const char* map_opts[] = { "1", "10", "19", "28" };
+            draw_mode_row(MAP_Y, "Map", map_opts, 4, map_idx, 64, NULL);
         }
         // Options row (toggles)
         {
