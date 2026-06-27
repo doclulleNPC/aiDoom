@@ -626,7 +626,10 @@ void Hexen_Init (void)
     ST (S_XSSP_DIE6,  SPR_XSSP, 19,  4, NULL,                       S_XSSP_DIE7);
     ST (S_XSSP_DIE7,  SPR_XSSP, 20,  4, NULL,                       S_XSSP_DIE8);
     ST (S_XSSP_DIE8,  SPR_XSSP, 21,  4, NULL,                       S_XSSP_DIE9);
-    ST (S_XSSP_DIE9,  SPR_XSSP, 22, -1, NULL,                       S_NULL);
+    ST (S_XSSP_DIE9,  SPR_XSSP, 22,  4, NULL,                       S_XSSP_DIE10);
+    ST (S_XSSP_DIE10, SPR_XSSP, 23,  4, NULL,                       S_XSSP_DIE11);
+    ST (S_XSSP_DIE11, SPR_XSSP, 24,  4, NULL,                       S_XSSP_DIE12);
+    ST (S_XSSP_DIE12, SPR_XSSP, 25, -1, NULL,                       S_NULL);	// corpse
 
     // Stalker spit (crispy S_SERPENT_FX*/FX_X*).
     ST (S_XSSF_MOVE1, SPR_XSSF, 32768, 3, NULL,                     S_XSSF_MOVE2);
@@ -647,6 +650,19 @@ void Hexen_Init (void)
     m->painsound = sfx_x_stpai;   m->meleestate = S_XSSP_ATK1; m->missilestate = S_XSSP_MIS1;
     m->deathstate = S_XSSP_DIE1;  m->xdeathstate = S_NULL;    m->deathsound = sfx_x_stdth;
     m->speed = 12; m->radius = 32*FRACUNIT; m->height = 70*FRACUNIT; m->mass = 200;
+    m->damage = 0; m->activesound = sfx_x_stact;
+    m->flags = MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL; m->raisestate = S_NULL;
+
+    // ---- Stalker boss / Serpent Leader (crispy MT_SERPENTLEADER): same XSSP
+    //      states, tougher, prefers the ranged spit.  Liquid-only like the base
+    //      stalker.  Reuses every serpent state (incl. the full 12-frame death). ----
+    m = &mobjinfo[MT_XSTALKERBOSS];
+    m->doomednum = -1;        m->spawnstate  = S_XSSP_LOOK1; m->spawnhealth = 250;
+    m->seestate  = S_XSSP_WALK1; m->seesound  = sfx_x_stsit; m->reactiontime = 8;
+    m->attacksound = sfx_x_statk; m->painstate = S_XSSP_PAIN1; m->painchance = 64;
+    m->painsound = sfx_x_stpai;   m->meleestate = S_XSSP_MIS1; m->missilestate = S_XSSP_MIS1;
+    m->deathstate = S_XSSP_DIE1;  m->xdeathstate = S_NULL;    m->deathsound = sfx_x_stdth;
+    m->speed = 12; m->radius = 32*FRACUNIT; m->height = 70*FRACUNIT; m->mass = 250;
     m->damage = 0; m->activesound = sfx_x_stact;
     m->flags = MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL; m->raisestate = S_NULL;
 
@@ -734,6 +750,7 @@ int Hexen_TypeByName (const char* name)
     if (!strcmp (name, "reiver") || !strcmp (name, "wraith")) return MT_XWRAITH;
     if (!strcmp (name, "bishop") || !strcmp (name, "darkbishop")) return MT_XBISHOP;
     if (!strcmp (name, "wendigo") || !strcmp (name, "iceguy")) return MT_XICEGUY;
+    if (!strcmp (name, "stalkerboss") || !strcmp (name, "serpentleader")) return MT_XSTALKERBOSS;
     if (!strcmp (name, "stalker")) return MT_XSTALKER;
     if (!strcmp (name, "wyvern") || !strcmp (name, "dragon") || !strcmp (name, "deathwyvern")) return MT_XDRAGON;
     return -1;

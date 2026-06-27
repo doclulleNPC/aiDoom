@@ -39,6 +39,49 @@ rcsid[] = "$Id: p_maputl.c,v 1.5 1997/02/03 22:45:11 b1 Exp $";
 
 // State.
 #include "r_state.h"
+#include "w_wad.h"	// lumpinfo (flat name lookup for P_IsLiquidFloor)
+
+
+//
+// P_IsLiquidFloor
+// True when the sector's floor flat is a liquid (water/nukage/slime/lava/blood).
+// Detected by flat-name prefix -- the same liquid flats the animated/damage-floor
+// code in p_spec.c references (NUKAGE*, FWATER*, LAVA*, SLIME*, BLOOD*, FIRELAVA,
+// FIREBLU).  floorpic is (lumpnum - firstflat); resolve back to the lump name and
+// do a case-insensitive prefix compare.  Used to keep the Hexen Serpent/Stalker
+// submerged-only (liquid floors).
+//
+boolean P_IsLiquidFloor (sector_t* sec)
+{
+    int		lump;
+    const char*	nm;
+    char	up[9];
+    int		i;
+    static const char* const liquids[] =
+	{ "NUKAGE", "FWATER", "LAVA", "SLIME", "BLOOD", "FIRELAVA", "FIREBLU" };
+
+    if (!sec)
+	return false;
+    lump = firstflat + sec->floorpic;
+    if (lump < 0 || lump >= numlumps)
+	return false;
+    nm = lumpinfo[lump].name;
+
+    // 8-char, NUL-padded, upper-cased copy for a robust case-insensitive compare.
+    for (i = 0; i < 8; i++)
+    {
+	char c = nm[i];
+	if (c >= 'a' && c <= 'z') c -= 'a' - 'A';
+	up[i] = c;
+    }
+    up[8] = 0;
+
+    for (i = 0; i < (int)(sizeof(liquids)/sizeof(liquids[0])); i++)
+	if (!strncmp (up, liquids[i], strlen (liquids[i])))
+	    return true;
+    return false;
+}
+
 
 //
 // P_AproxDistance

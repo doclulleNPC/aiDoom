@@ -1373,6 +1373,7 @@ typedef enum
     S_XSSP_PAIN1, S_XSSP_PAIN2,
     S_XSSP_DIE1, S_XSSP_DIE2, S_XSSP_DIE3, S_XSSP_DIE4, S_XSSP_DIE5,
     S_XSSP_DIE6, S_XSSP_DIE7, S_XSSP_DIE8, S_XSSP_DIE9,
+    S_XSSP_DIE10, S_XSSP_DIE11, S_XSSP_DIE12,	// full 12-frame serpent death (crispy)
     // Stalker spit projectile
     S_XSSF_MOVE1, S_XSSF_MOVE2, S_XSSF_MOVE3, S_XSSF_MOVE4,
     S_XSSF_BOOM1, S_XSSF_BOOM2, S_XSSF_BOOM3, S_XSSF_BOOM4, S_XSSF_BOOM5, S_XSSF_BOOM6,
@@ -1617,7 +1618,8 @@ typedef enum {
     MT_XBISHOP_FX,	// dark bishop missile projectile
     MT_XICEGUY,		// Hexen wendigo / ice guy (floating, ranged ice shards)
     MT_XICEGUY_FX,	// wendigo ice-shard projectile
-    MT_XSTALKER,	// Hexen stalker / serpent (ambusher, melee + spit)
+    MT_XSTALKER,	// Hexen stalker / serpent (ambusher, melee + spit) -- liquid-only
+    MT_XSTALKERBOSS,	// Hexen serpent leader (ranged boss variant) -- liquid-only
     MT_XSTALKER_FX,	// stalker spit projectile
     MT_XDRAGON,		// Hexen death wyvern / dragon (big flying ranged boss)
     MT_XDRAGON_FX,	// dragon fireball projectile

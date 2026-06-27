@@ -108,7 +108,7 @@ static const mobjtype_t dir_heretic[]  = { MT_HMUMMY, MT_HCLINK, MT_HIMP, MT_HBE
 // mixed into the director's trash tier when the Hexen pack is loaded.
 static const mobjtype_t dir_hexen[]    = { MT_XETTIN, MT_XCENTAUR, MT_XSLAUGHTAUR, MT_XDEMON,
 					   MT_XFIREDEMON, MT_XWRAITH, MT_XBISHOP,
-					   MT_XICEGUY, MT_XSTALKER };
+					   MT_XICEGUY, MT_XSTALKER, MT_XSTALKERBOSS };
 
 #define DIR_TRACK	(dir_on || dir_llm)	// intensity is tracked in either mode
 
@@ -343,6 +343,13 @@ static boolean P_Director_IsSpecial (mobjtype_t mt)
     return false;
 }
 
+// The Hexen Serpent/Stalker lurks submerged -- it (and its boss variant) may only
+// spawn on a liquid floor.  Anything else spawns anywhere.
+static boolean P_Director_IsLiquidOnly (mobjtype_t mt)
+{
+    return mt == MT_XSTALKER || mt == MT_XSTALKERBOSS;
+}
+
 // DOOM2-only monsters have no sprites in a DOOM1 IWAD (-> renderer I_Error).  In
 // non-commercial gamemodes substitute a tough DOOM1 stand-in (baron); otherwise
 // pass the type through.  Guards BOTH the rule FSM and the LLM spawn path.
@@ -473,6 +480,18 @@ static boolean P_Director_SpawnMonsterNear (mobjtype_t mt, fixed_t cx, fixed_t c
 	// Fits where it landed (no wall/thing overlap, enough head room)?
 	if (!P_CheckPosition (mo, x, y) || tmceilingz - tmfloorz < mo->height)
 	    { P_RemoveMobj (mo); continue; }
+	// The Hexen Serpent/Stalker only lurks in liquid -- if it landed on dry
+	// ground, swap it for an ordinary trash monster (don't waste the spawn).
+	if (P_Director_IsLiquidOnly (mt) && !P_IsLiquidFloor (mo->subsector->sector))
+	{
+	    mobjtype_t	repl = P_Director_SafeType (
+		dir_common[P_Random () % (int)(sizeof(dir_common)/sizeof(dir_common[0]))]);
+	    P_RemoveMobj (mo);
+	    mt = repl;				// stick with the dry-land monster from here on
+	    mo = P_SpawnMobj (x, y, ONFLOORZ, mt);
+	    if (!P_CheckPosition (mo, x, y) || tmceilingz - tmfloorz < mo->height)
+		{ P_RemoveMobj (mo); continue; }
+	}
 	// Must be hidden from every survivor (L4D: spawn in the dark behind you).
 	for (i = 0; i < MAXPLAYERS; i++)
 	    if (playeringame[i] && players[i].mo && P_CheckSight (players[i].mo, mo))
