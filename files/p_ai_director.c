@@ -312,13 +312,31 @@ static mobjtype_t P_Director_PickType (void)
 	    return MT_HKNIGHT;					// Heretic ranged miniboss
 	return spec[P_Random () % nspec];
     }
-    if (P_Director_HexenAvailable () && (P_Random () % 100) < 30)	// ~30% Hexen trash (when the pack is loaded)
-	return dir_hexen[P_Random () % (int)(sizeof(dir_hexen)/sizeof(dir_hexen[0]))];
-    if (P_Director_HereticAvailable () && (P_Random () % 100) < 35)	// ~35% Heretic trash
-	return dir_heretic[P_Random () % (int)(sizeof(dir_heretic)/sizeof(dir_heretic[0]))];
-    if (P_Director_FreedoomAvailable () && (P_Random () % 100) < 30)	// ~30% Freedoom DOOM2-clone monsters
-	return dir_freedoom[P_Random () % (int)(sizeof(dir_freedoom)/sizeof(dir_freedoom[0]))];
-    return dir_common[P_Random () % (int)(sizeof(dir_common)/sizeof(dir_common[0]))];
+    // --- trash tier: FAIR pack mixing ---------------------------------------
+    // Build a weighted bag of whatever's loaded -- native DOOM trash as the base plus EACH
+    // loaded pack at the SAME weight -- and draw one pool, then a monster from it.  This
+    // replaces the old sequential mix-ins, which front-loaded the pack checked first (Hexen)
+    // and starved the one checked last (Freedoom).  Now every loaded pack gets an equal share
+    // no matter how many are active, and the native base keeps a steady presence.
+    {
+	struct { const mobjtype_t* pool; int n; int w; } bag[4];
+	int nb = 0, tot = 0, r, i;
+#define DIR_ADD(p, weight)  do { bag[nb].pool = (p); \
+	    bag[nb].n = (int)(sizeof(p)/sizeof((p)[0])); bag[nb].w = (weight); nb++; } while (0)
+	DIR_ADD (dir_common, 50);					// native base
+	if (P_Director_HexenAvailable ())    DIR_ADD (dir_hexen,    30);
+	if (P_Director_HereticAvailable ())  DIR_ADD (dir_heretic,  30);
+	if (P_Director_FreedoomAvailable ()) DIR_ADD (dir_freedoom, 30);
+#undef DIR_ADD
+	for (i = 0; i < nb; i++) tot += bag[i].w;		// tot <= 140, no P_Random() modulo bias
+	r = P_Random () % tot;
+	for (i = 0; i < nb; i++)
+	{
+	    if (r < bag[i].w) return bag[i].pool[P_Random () % bag[i].n];
+	    r -= bag[i].w;
+	}
+	return dir_common[P_Random () % (int)(sizeof(dir_common)/sizeof(dir_common[0]))];
+    }
 }
 
 // A tough miniboss to hold an objective room (the level exit).  DOOM2 miniboss when its
