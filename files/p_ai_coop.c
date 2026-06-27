@@ -1871,7 +1871,8 @@ static void P_AICoop_Revive (int hp)
     mobj_t*	mo  = bot->mo;
     if (!mo) return;
     mo->flags |= (MF_SOLID | MF_SHOOTABLE);
-    mo->flags &= ~(MF_CORPSE | MF_DROPOFF);
+    mo->flags &= ~MF_CORPSE;			// un-corpse; KEEP MF_DROPOFF (the buddy is a
+						// player -- it must still drop off ledges to follow you)
     mo->height = mo->info->height;		// un-squash the corpse
     mo->health = hp;
     bot->health = hp;

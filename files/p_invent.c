@@ -367,7 +367,9 @@ boolean P_InventorySelfRevive (player_t* player)
     else return false;
 
     mo->flags |=  (MF_SOLID | MF_SHOOTABLE);
-    mo->flags &= ~(MF_CORPSE | MF_DROPOFF);
+    mo->flags &= ~MF_CORPSE;			// un-corpse; KEEP MF_DROPOFF -- the player
+						// natively has it (lets it drop off ledges); clearing
+						// it gave the player the monster "no dropoff" block.
     mo->height = mo->info->height;		// un-squash the corpse
     mo->health = heal;
     player->health = heal;
