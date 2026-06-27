@@ -1248,7 +1248,7 @@ int main(int argc, char** argv)
 
                         // Map row (4 pills) -- right-aligned like Skill, width 64
                         {
-                            const float mpw = 64;
+                            const float mpw = 80;	// wider pills for the "10(EP2)" labels
                             float mrx = WINW - PAD - mpw*4 - gap*3;
                             float mry = MAP_Y + (BUDDY_H - 26)/2;
                             if (mouse_y >= mry && mouse_y <= mry + 26) {
@@ -1326,8 +1326,8 @@ int main(int argc, char** argv)
         }
         // Map row (4 pills): warp target -- 1/10/19/28 (build_command picks DOOM1/DOOM2 warp form)
         {
-            static const char* map_opts[] = { "1", "10", "19", "28" };
-            draw_mode_row(MAP_Y, "Map", map_opts, 4, map_idx, 64, NULL);
+            static const char* map_opts[] = { "1(EP1)", "10(EP2)", "19(EP3)", "28(EP4)" };
+            draw_mode_row(MAP_Y, "Map", map_opts, 4, map_idx, 80, NULL);
         }
         // Options row (toggles)
         {
