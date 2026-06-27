@@ -1638,11 +1638,19 @@ G_InitNew
     for (i=0 ; i<MAXPLAYERS ; i++) 
 	players[i].playerstate = PST_REBORN; 
  
-    usergame = true;                // will be set false if a demo 
-    paused = false; 
-    demoplayback = false; 
-    automapactive = false; 
-    viewactive = true; 
+    usergame = true;                // will be set false if a demo
+    paused = false;
+    demoplayback = false;
+    automapactive = false;
+    viewactive = true;
+
+    // The title-screen attract demos overwrite playeringame[] (G_DoPlayDemo reads it from the
+    // demo, which is single-player).  So a new game started from the menu -- now the default,
+    // since the launcher boots to the title instead of -warp -- would lose the AI buddy's
+    // co-op slot and start without the buddy.  Re-assert it here whenever a real game begins.
+    if (P_AICoop_Active () && P_AICoop_Slot () >= 0)
+	playeringame[P_AICoop_Slot ()] = true;
+
     gameepisode = episode; 
     gamemap = map; 
     gameskill = skill; 
