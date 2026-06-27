@@ -50,6 +50,7 @@
 // ------------------------
 // Command line parameters.
 //
+extern  int	notarget;	// (cheat) console `notarget` toggle -- monsters ignore the human player
 extern  boolean	nomonsters;	// checkparm of -nomonsters
 extern  boolean	respawnparm;	// checkparm of -respawn
 extern  boolean	fastparm;	// checkparm of -fast

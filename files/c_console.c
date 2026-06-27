@@ -297,7 +297,7 @@ static void C_Execute (char* line)
 
     if (!strcmp(cmd, "help"))
     {
-	C_Printf ("cheats: god  noclip  allmap  kill  health <n>  armor <n>");
+	C_Printf ("cheats: god  noclip  notarget  allmap  kill  health <n>  armor <n>");
 	C_Printf ("give:   all|weapons|ammo|keys|armor|health|<weapon>|<key>");
 	C_Printf ("arti:   givearti stimpack|medikit|healthbonus|armorbonus|greenarmor|bluearmor|bullets|shells|rockets|cells");
 	C_Printf ("heretic arti: givearti flask|urn|tome|torch|bomb|ring|shadow|chaos|wings|egg");
@@ -321,6 +321,11 @@ static void C_Execute (char* line)
 	pl->cheats ^= CF_GODMODE;
 	if (pl->cheats & CF_GODMODE) { pl->health = 100; if (pl->mo) pl->mo->health = 100; }
 	C_Printf ("god mode %s", (pl->cheats & CF_GODMODE) ? "ON" : "off");
+    }
+    else if (!strcmp(cmd, "notarget"))
+    {
+	notarget = !notarget;	// monsters ignore the human player; chasing ones forget you
+	C_Printf ("notarget %s", notarget ? "ON -- monsters ignore you" : "off");
     }
     else if (!strcmp(cmd, "noclip"))
     {

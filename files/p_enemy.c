@@ -48,6 +48,19 @@ rcsid[] = "$Id: p_enemy.c,v 1.5 1997/02/03 22:45:11 b1 Exp $";
 #include "sounds.h"
 
 
+// (cheat) `notarget` console toggle -- when on, the monster AI ignores the human player
+// entirely (classic Boom notarget): it can't be acquired and chasing monsters forget it.
+int	notarget;
+
+// (mod) Should the monster AI ignore this player as a target?  True for an INVISIBLE player
+// (true-invisibility) or, with `notarget` on, the human player.  Centralises the check used
+// by P_LookForPlayers + both A_Look acquisition paths + the A_Chase "forget" logic so they
+// stay consistent (and so a forgotten target isn't instantly re-acquired -> stack overflow).
+static boolean P_AI_IgnorePlayer (player_t* pl)
+{
+    return pl->powers[pw_invisibility]
+	|| (notarget && pl == &players[consoleplayer]);
+}
 
 
 typedef enum
@@ -560,8 +573,8 @@ P_LookForPlayers
 	if (player->health <= 0)
 	    continue;		// dead
 
-	if (player->powers[pw_invisibility])
-	    continue;		// (mod) true invisibility -- monsters can't acquire an invisible player/buddy
+	if (P_AI_IgnorePlayer (player))
+	    continue;		// (mod) true invisibility / notarget -- don't acquire this player
 
 	if (!P_CheckSight (actor, player->mo))
 	    continue;		// out of sight
@@ -731,7 +744,7 @@ void A_Look (mobj_t* actor)
     {
 	mobj_t* pl = P_PackNearestPlayer (actor);
 	// (mod) true invisibility: don't pack-lock onto an invisible player either.
-	if (pl && !(pl->player && pl->player->powers[pw_invisibility]))
+	if (pl && !(pl->player && P_AI_IgnorePlayer (pl->player)))
 	{ actor->target = pl; goto seeyou; }
     }
     targ = actor->subsector->sector->soundtarget;
@@ -742,7 +755,7 @@ void A_Look (mobj_t* actor)
 	// Without this, A_Chase forgets the invisible target -> spawnstate -> A_Look re-acquires
 	// it via soundtarget -> seestate -> A_Chase forgets -> ... = infinite P_SetMobjState
 	// recursion -> stack overflow (the invis-pickup crash).
-	&& !(targ->player && targ->player->powers[pw_invisibility]) )
+	&& !(targ->player && P_AI_IgnorePlayer (targ->player)) )
     {
 	actor->target = targ;
 
@@ -835,7 +848,7 @@ void A_Chase (mobj_t*	actor)
     // back to wandering.  Shooting a monster sets its threshold (P_DamageMobj), so THAT one
     // keeps hunting -- "only once you shoot it does it come after you".
     if (actor->target && actor->target->player
-	&& actor->target->player->powers[pw_invisibility]
+	&& P_AI_IgnorePlayer (actor->target->player)
 	&& actor->threshold == 0)
     {
 	actor->target = NULL;
