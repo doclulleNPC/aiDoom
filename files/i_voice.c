@@ -380,6 +380,8 @@ static void play_on_stream (SDL_AudioStream* stream, int* bound,
 void I_Voice_SayByName (const char* lumpname, int lvol, int rvol)
 {
     static int bound = 0;
+    if (I_Director_Busy ()) return;         // Director is speaking -> buddy stays silent
+    if (I_Voice_Busy ()) return;            // Already talking -> don't start a second line
     play_on_stream (voice_stream, &bound, lumpname, lvol, rvol);
 }
 
@@ -390,6 +392,7 @@ void I_Director_Say (const char* tag, int lvol, int rvol)
     static int bound = 0;
     const char* lumpname = tag_to_lumpname (tag);
     if (!lumpname) return;                  // unknown tag -> silent
+    I_Voice_Stop ();                        // Director wins! Stop any playing buddy chatter immediately.
     play_on_stream (director_stream, &bound, lumpname, lvol, rvol);
 }
 

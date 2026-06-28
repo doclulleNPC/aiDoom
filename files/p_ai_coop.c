@@ -403,6 +403,8 @@ static void AICoop_VoicePan (mobj_t* lis, mobj_t* src, int* lvol, int* rvol)
 
 static void AICoop_SayTag (const char* tag)
 {
+    extern int I_Director_Busy (void);
+    if (I_Director_Busy () || I_Voice_Busy ()) return;
     mobj_t*	src = AICoop_Mo ();				// the buddy = sound source
     mobj_t*	lis = playeringame[displayplayer] ? players[displayplayer].mo : NULL;
     int		lvol = 127, rvol = 127;
@@ -411,29 +413,19 @@ static void AICoop_SayTag (const char* tag)
 }
 
 // --- Voice priority --------------------------------------------------------
-// Lines fall into four tiers; a higher tier preempts a lower one that's still
-// playing and is rate-limited less.  This keeps low-value chatter ("I'm
-// stuck!") from burying the things the player actually needs to hear: a reply
-// to an order, then a weapon-state warning, then a kill quip, then the rest.
-//   3 VP_COMMAND  answers to come/wait/attack/grab orders  -- always, preempts
-//   2 VP_WEAPON   "out of ammo" / "down to fists"
-//   1 VP_KILL     monster kill / gib / spree / nice
-//   0 VP_AMBIENT  everything else (stuck/lost/idle/contact/hurt/door/...)
 enum { VP_AMBIENT = 0, VP_KILL = 1, VP_WEAPON = 2, VP_COMMAND = 3 };
-static const int VP_GAP[4] = { (3*TICRATE)/2, 1*TICRATE, 2*TICRATE, 0 };
+static const int VP_GAP[4] = { 5*TICRATE, 3*TICRATE, 3*TICRATE, 0 };
 static int vp_last[4];           // last gametic each tier spoke
 static int vp_cur = -1;          // tier of the line currently sounding (-1 = idle)
 
-// Decide whether a line of priority `prio` may speak right now; if so, reserve
-// the voice slot (and preempt a lower-tier line in progress) and return true.
+// Decide whether a line of priority `prio` may speak right now.
 static boolean AICoop_VoiceGate (int prio)
 {
-    boolean busy = I_Voice_Busy ();
-    if (!busy) vp_cur = -1;                       // previous line finished -> free
-    else if (prio <= vp_cur) return false;        // equal/more important still talking
-    else I_Voice_Stop ();                         // higher tier barges in
+    extern int I_Director_Busy (void);
+    if (I_Director_Busy ()) return false;         // Director is speaking -> Buddy silent!
+    if (I_Voice_Busy ()) return false;            // Only 1 line at once! Never interrupt/overlap.
 
-    if (gametic - vp_last[prio] < VP_GAP[prio])   // per-tier rate limit (cmd = 0)
+    if (gametic - vp_last[prio] < VP_GAP[prio])   // per-tier rate limit
         return false;
     vp_last[prio] = gametic;
     vp_cur        = prio;
@@ -2258,7 +2250,7 @@ void P_AICoop_BuildCmd (void)
 	    for (wi = 0 ; wi < NUMWEAPONS ; wi++)
 		if ((newmask & ~ownedmask) & (1 << wi))
 		{
-		    AICoop_SayTag (wtag[wi]);
+		    AICoop_SayTagP (wtag[wi], VP_WEAPON);
 		    snprintf (gotmsg, sizeof(gotmsg), "Buddy: got the %s!", wname[wi]);
 		    if (playeringame[displayplayer]) players[displayplayer].message = gotmsg;
 		    break;
