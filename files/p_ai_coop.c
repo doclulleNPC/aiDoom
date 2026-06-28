@@ -1303,12 +1303,34 @@ static boolean PF_LineIntersection (fixed_t a1x, fixed_t a1y, fixed_t a2x, fixed
     return false;
 }
 
-static boolean PF_LockedLineCrossed (fixed_t ax, fixed_t ay, fixed_t bx, fixed_t by)
+#define MAX_LOCKED_LINES 64
+static line_t* pf_locked_lines[MAX_LOCKED_LINES];
+static int     pf_num_locked_lines = 0;
+
+static void PF_InitLockedLines (void)
 {
     int i;
+    pf_num_locked_lines = 0;
     for (i = 0; i < numlines; i++)
     {
 	line_t* ld = &lines[i];
+	int sp = ld->special;
+	if (sp==26 || sp==32 || sp==99 || sp==133 ||
+	    sp==27 || sp==34 || sp==136 || sp==137 ||
+	    sp==28 || sp==33 || sp==134 || sp==135)
+	{
+	    if (pf_num_locked_lines < MAX_LOCKED_LINES)
+		pf_locked_lines[pf_num_locked_lines++] = ld;
+	}
+    }
+}
+
+static boolean PF_LockedLineCrossed (fixed_t ax, fixed_t ay, fixed_t bx, fixed_t by)
+{
+    int i;
+    for (i = 0; i < pf_num_locked_lines; i++)
+    {
+	line_t* ld = pf_locked_lines[i];
 	int sp = ld->special;
 	int color = 0;
 	if      (sp==26 || sp==32 || sp==99 || sp==133) color = 1;	// blue
@@ -1327,6 +1349,8 @@ static void PF_Build (mobj_t* ref)
 {
     int		i, j, s;
     int*	segss;
+
+    PF_InitLockedLines ();
 
     free (pf_cx); free (pf_cy); free (pf_nadj); free (pf_adj); free (pf_adjw);
     free (pf_adjpx); free (pf_adjpy);

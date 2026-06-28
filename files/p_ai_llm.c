@@ -451,12 +451,18 @@ static int AI_DoorKind (int sp)
 
 static int AI_Serialize (void)
 {
+    static int  last_obs_tic = -1;
+    static int  last_obs_len = 0;
     player_t*	pl = &players[consoleplayer];
     int		bs = P_AICoop_Slot ();
     mobj_t*	bmo = (P_AICoop_AIMode () && bs >= 0 && playeringame[bs]) ? players[bs].mo : NULL;
     int		n = 0;
     int		i;
     int		fx = FRACUNIT;
+
+    if (gametic - last_obs_tic < 2 && last_obs_len > 0)
+	return last_obs_len;
+    last_obs_tic = gametic;
 
     AI_BuildRegistry ();
     AI_OccReset ();
@@ -581,6 +587,7 @@ static int AI_Serialize (void)
 	P_Director_Intensity(), P_Director_State(), P_Director_RecentDmg(), P_Director_AmmoPct());
 
     if (n < OBSBUF) n += snprintf (obsbuf+n, OBSBUF-n, "}\n");
+    last_obs_len = n;
     return n;
 }
 
