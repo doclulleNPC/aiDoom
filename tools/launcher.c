@@ -55,7 +55,7 @@
 
 // --- Layout (BASE = 320x200 reference, scaled at runtime) ---
 #define WINW 560
-#define WINH 492
+#define WINH 524			// +32 for the second Options row
 #define PAD 12
 
 // Vertical bands, BASE pixels (we scale 2x for 320->640 feel on a 560px wide
@@ -72,19 +72,22 @@
 #define SKILL_Y   154			// difficulty row (5 pills)
 #define SKILL_H   40
 #define MAP_Y     186			// warp-map row (4 pills: 1/10/19/28), under Skill
-#define OPTS_Y    240			// toggle row; centre 248 (Skill-Options gap kept as a separator)
+#define OPTS_Y    240			// toggle row 1; centre 248 (Skill-Options gap kept as a separator)
 #define CHK_BOX   16			// checkbox square size
 #define OPT_NOFF_X (PAD + 90)		// "No friendly fire" checkbox
 #define OPT_INF_X  (PAD + 300)		// "All Monster infight" checkbox
-#define MONSTERS_Y 278			// extra-monster WAD toggles (FreeDoom / Heretic) -- a bit of space below the Monster+ row
+#define OPTS2_Y   272			// toggle row 2 (Autoaim / Monster over/under), Δ32 below row 1
+#define OPT_AA_X  (PAD + 90)		// "Autoaim" checkbox (aligned under "No friendly fire")
+#define OPT_OU_X  (PAD + 300)		// "Monster over/under" checkbox (under "All Monster infight")
+#define MONSTERS_Y 310			// extra-monster WAD toggles (FreeDoom / Heretic) -- shifted +32 for row 2
 #define MON_FD_X   (PAD + 100)		// "FreeDoom" checkbox (space after the "+Monster" label)
 #define MON_HER_X  (PAD + 250)		// "Heretic" checkbox
 #define MON_HEX_X  (PAD + 410)		// "Hexen" checkbox
-#define IWAD_Y    310
+#define IWAD_Y    342
 #define IWAD_H    22
 #define IWAD_DD_H 80			// dropdown open height
-#define PWAD_Y    338			// extra PWAD selector (one row below IWAD)
-#define LAUNCH_Y  442
+#define PWAD_Y    370			// extra PWAD selector (one row below IWAD)
+#define LAUNCH_Y  474
 #define LAUNCH_H  34
 
 // Colours (RGB).
@@ -188,6 +191,8 @@ static int     buddy_mode = BUDDY_RULE;	// default: buddy on (rule-based)
 static int     mon_mode   = MON_L4D;     // default: L4D pacing
 static int     opt_noff;			// -nofriendlyfire: player & buddy can't hurt each other
 static int     opt_infight;			// -infight: monster same-species infighting
+static int     opt_autoaim    = 0;		// -autoaim: vertical aim-assist (default OFF). ON also forces infinitely-tall (over/under OFF).
+static int     opt_overunder  = 1;		// over/under 3D clipping (default ON). OFF -> -infinitetall.
 static int     opt_freedoom;			// -file freedoomstuff.wad (DOOM2 monsters, free art)
 static int     opt_heretic;			// -file hereticstuff.wad   (Heretic monsters)
 static int     opt_hexen;			// -file hexenstuff.wad     (Hexen monsters)
@@ -943,6 +948,9 @@ static void build_command(char* out, int n, const char* iwad_path)
     // Toggles
     if (opt_noff)    off += snprintf(out + off, n - off, " -nofriendlyfire");
     if (opt_infight) off += snprintf(out + off, n - off, " -infight");
+    if (opt_autoaim) off += snprintf(out + off, n - off, " -autoaim");
+    // over/under is ON by default; OFF (or autoaim ON, which forces it off) -> vanilla infinitely-tall.
+    if (!opt_overunder) off += snprintf(out + off, n - off, " -infinitetall");
 
     // ALL extra wads ride under ONE "-file": the engine reads files after the FIRST -file
     // until the next "-arg" (d_main.c), so a SECOND "-file" is silently ignored -- which is
@@ -1267,6 +1275,17 @@ int main(int argc, char** argv)
                             opt_noff = !opt_noff;
                         if (hit_checkbox(OPT_INF_X, OPTS_Y, "All Monster infight", mouse_x, mouse_y))
                             opt_infight = !opt_infight;
+                        // Second options row. Autoaim ON forces vanilla "infinitely tall actors"
+                        // (over/under OFF); enabling over/under in turn clears Autoaim -- they can't
+                        // both be on, so the launched flags stay consistent.
+                        if (hit_checkbox(OPT_AA_X, OPTS2_Y, "Autoaim", mouse_x, mouse_y)) {
+                            opt_autoaim = !opt_autoaim;
+                            if (opt_autoaim) opt_overunder = 0;
+                        }
+                        if (hit_checkbox(OPT_OU_X, OPTS2_Y, "Monster over/under", mouse_x, mouse_y)) {
+                            opt_overunder = !opt_overunder;
+                            if (opt_overunder) opt_autoaim = 0;
+                        }
 
                         // Monsters row: toggle the extra-monster WAD checkboxes
                         // (ignored when greyed out -- the PWAD isn't present).
@@ -1334,6 +1353,10 @@ int main(int argc, char** argv)
             text(PAD, OPTS_Y + (CHK_BOX - FONT_CH)/2, "Options", COL_DIM);
             draw_checkbox(OPT_NOFF_X, OPTS_Y, opt_noff,    "No friendly fire");
             draw_checkbox(OPT_INF_X,  OPTS_Y, opt_infight, "All Monster infight");
+            // Second options row: vertical autoaim (off = shoot where you look) and over/under
+            // 3D clipping (on = walk under/stand on monsters).  Mutually-coupled (see click code).
+            draw_checkbox(OPT_AA_X, OPTS2_Y, opt_autoaim,   "Autoaim");
+            draw_checkbox(OPT_OU_X, OPTS2_Y, opt_overunder, "Monster over/under");
 
             text(PAD, MONSTERS_Y + (CHK_BOX - FONT_CH)/2, "+Monster", COL_DIM);
             if (wad_present("freedoomstuff.wad"))
