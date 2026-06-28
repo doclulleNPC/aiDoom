@@ -257,10 +257,10 @@ default_t	defaults[] =
 
     {"key_right",&key_right, KEY_RIGHTARROW},
     {"key_left",&key_left, KEY_LEFTARROW},
-    {"key_up",&key_up, KEY_UPARROW},
-    {"key_down",&key_down, KEY_DOWNARROW},
-    {"key_strafeleft",&key_strafeleft, ','},
-    {"key_straferight",&key_straferight, '.'},
+    {"key_up",&key_up, 'w'},
+    {"key_down",&key_down, 's'},
+    {"key_strafeleft",&key_strafeleft, 'a'},
+    {"key_straferight",&key_straferight, 'd'},
 
     // Co-op buddy order keys -- one bind each, rebind here.  Defaults ',' '.' '-'
     // take over those keys (',' / '.' are also the strafe defaults; the buddy bind
@@ -268,21 +268,21 @@ default_t	defaults[] =
     {"key_buddy_come",&key_buddy_come, ','},
     {"key_buddy_attack",&key_buddy_attack, '.'},
     {"key_buddy_stay",&key_buddy_stay, KEY_MINUS},
-    {"key_buddy_mode",&key_buddy_mode, KEY_MOUSE2},	// (F) cycle stay/follow; default RIGHT mouse
-    {"key_inv_left",&key_inv_left, '['},		// (J) inventory: select prev artifact
-    {"key_inv_right",&key_inv_right, ']'},		// (J) inventory: select next artifact
-    {"key_inv_use",&key_inv_use, KEY_ENTER},		// (J) inventory: use selected artifact
-    {"key_inv_drop",&key_inv_drop, 'd'},		// (J) inventory: drop selected artifact
+    {"key_buddy_mode",&key_buddy_mode, -1},	// unbound
+    {"key_inv_left",&key_inv_left, KEY_LEFTARROW},	// (J) inventory: select prev artifact
+    {"key_inv_right",&key_inv_right, KEY_RIGHTARROW},	// (J) inventory: select next artifact
+    {"key_inv_use",&key_inv_use, KEY_UPARROW},		// (J) inventory: use selected artifact
+    {"key_inv_drop",&key_inv_drop, KEY_DOWNARROW},	// (J) inventory: drop selected artifact
 
     {"key_fire",&key_fire, KEY_RCTRL},
-    {"key_use",&key_use, ' '},
+    {"key_use",&key_use, 'e'},
     {"key_strafe",&key_strafe, KEY_RALT},
     {"key_speed",&key_speed, KEY_RSHIFT},
     {"key_nextweapon",&key_nextweapon, KEY_MWHEELUP},
     {"key_prevweapon",&key_prevweapon, KEY_MWHEELDOWN},
     {"key_jump",&key_jump, ' '},
     {"autorun",&autorun, 1},
-    {"key_console",&key_console, KEY_F12},
+    {"key_console",&key_console, KEY_BACKQUOTE},
     {"key_spy",&key_spy, KEY_F12},	// spy mode (view the AI buddy); default F12
     {"crosshair",&crosshair, 0},
 
@@ -291,7 +291,7 @@ default_t	defaults[] =
 
     {"use_mouse",&usemouse, 1},
     {"mouseb_fire",&mousebfire,0},
-    {"mouseb_strafe",&mousebstrafe,1},
+    {"mouseb_strafe",&mousebstrafe,-1},
     {"mouseb_forward",&mousebforward,-1},	// unbound by default (was the RIGHT button -> moved you forward)
 
     {"use_joystick",&usejoystick, 0},
@@ -309,7 +309,7 @@ default_t	defaults[] =
     {"fullscreen",&fullscreen_mode, 0},
     {"antialiasing",&antialiasing, 0},		// default OFF
     {"blur",&blur, 0},				// default OFF
-    {"aspect",&aspect, 2},			// default 16:10 (0=4:3, 1=16:9, 2=16:10)
+    {"aspect",&aspect, 0},			// default 4:3 (0=4:3, 1=16:9, 2=16:10)
 
     {"snd_channels",&numChannels, 3},
 
