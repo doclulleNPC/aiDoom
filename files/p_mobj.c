@@ -978,23 +978,34 @@ P_SpawnPlayerMissile
     
     // see which target is to be aimed at
     an = source->angle;
-    slope = P_AimLineAttack (source, an, 16*64*FRACUNIT);
-    
-    if (!linetarget)
+
+    // (mod) autoaim off by default for the human -> launch straight along the free-look pitch
+    // ("shoot where you look"); -autoaim restores vanilla vertical aim-assist.  The AI buddy
+    // keeps autoaim.  See `autoaim` in p_pspr.c.
+    if (!autoaim && source->player == &players[consoleplayer])
     {
-	an += 1<<26;
+	slope = P_PlayerLookSlope (source);
+    }
+    else
+    {
 	slope = P_AimLineAttack (source, an, 16*64*FRACUNIT);
 
 	if (!linetarget)
 	{
-	    an -= 2<<26;
+	    an += 1<<26;
 	    slope = P_AimLineAttack (source, an, 16*64*FRACUNIT);
-	}
 
-	if (!linetarget)
-	{
-	    an = source->angle;
-	    slope = P_PlayerLookSlope (source);	// MOD: shoot where you look
+	    if (!linetarget)
+	    {
+		an -= 2<<26;
+		slope = P_AimLineAttack (source, an, 16*64*FRACUNIT);
+	    }
+
+	    if (!linetarget)
+	    {
+		an = source->angle;
+		slope = P_PlayerLookSlope (source);	// MOD: shoot where you look
+	    }
 	}
     }
 		

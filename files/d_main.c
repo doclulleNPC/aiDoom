@@ -1075,6 +1075,9 @@ void D_DoomMain (void)
     { extern int infight; infight = M_CheckParm ("-infight") ? 1 : 0; }
     // -infinitetall: revert to vanilla "infinitely tall actors" (no walking over/under things).
     if (M_CheckParm ("-infinitetall")) over_under = 0;
+    // -autoaim: restore vanilla vertical aim-assist (off by default -> the human shoots where
+    // they look, so shots can be placed precisely / land headshots).
+    if (M_CheckParm ("-autoaim")) autoaim = 1;
     // -nofriendlyfire (alias -noff): the player and the AI buddy can't damage each other.
     { extern int ff_protect;
       ff_protect = (M_CheckParm ("-nofriendlyfire") || M_CheckParm ("-noff")) ? 1 : 0; }

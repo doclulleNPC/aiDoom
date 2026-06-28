@@ -102,6 +102,8 @@ Vollständige Liste aller CLI-Flags die `aidoom` akzeptiert, extrahiert via
 | Flag | Parameter | Default | Wirkung |
 |------|-----------|---------|---------|
 | `-infight` | — | off | Monster-Projektile treffen auch die **eigene** Spezies → Same-Species-Infighting an. (Hieß früher `-friendlyfire`.) Default aus = Vanilla. |
+| `-autoaim` | — | off | **Stellt das vertikale Vanilla-Autoaim wieder her.** Per Default ist Autoaim für den Menschen **aus**: Schüsse (Hitscan + Projektile) gehen exakt entlang des Freelook-Pitch ("shoot where you look") — so kann man gezielt platzieren / Headshots setzen. Mit `-autoaim` rastet der Schuss wie in Vanilla vertikal auf ein Ziel ein. Der AI-Buddy behält Autoaim immer. (`autoaim` in `p_pspr.c`/`p_mobj.c`.) |
+| `-infinitetall` | — | off | **Zurück auf Vanilla "infinitely tall actors".** Per Default ist over/under-3D-Clipping **an** (`over_under`, `p_map.c`): man läuft unter fliegenden Monstern durch und kann auf Dingen stehen. `-infinitetall` schaltet das ab (jede x/y-Überlappung blockiert, egal wie hoch). |
 
 ### Hilfe
 

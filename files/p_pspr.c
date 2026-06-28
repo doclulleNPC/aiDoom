@@ -597,11 +597,24 @@ A_FirePlasma
 //
 fixed_t		bulletslope;
 
+// (mod) Vertical aim-assist for the HUMAN player.  0 (default) = off: shots go straight along
+// the free-look pitch ("shoot where you look"), so you can place shots and land headshots.
+// 1 = vanilla DOOM autoaim (snaps vertically to a target).  Set by -autoaim (d_main.c).  The AI
+// buddy is unaffected -- its bot aims only horizontally and always relies on the assist.
+int		autoaim = 0;
+
 
 void P_BulletSlope (mobj_t*	mo)
 {
     angle_t	an;
-    
+
+    // (mod) autoaim off for the human -> aim straight along the free-look pitch.
+    if (!autoaim && mo->player == &players[consoleplayer])
+    {
+	bulletslope = P_PlayerLookSlope (mo);
+	return;
+    }
+
     // see which target is to be aimed at
     an = mo->angle;
     bulletslope = P_AimLineAttack (mo, an, 16*64*FRACUNIT);

@@ -173,8 +173,11 @@ Related gameplay flags worth knowing: `-infight` (same-species infighting),
 `-nofriendlyfire`/`-noff` (player ↔ buddy don't hurt each other), `-infinitetall`
 (revert to vanilla "infinitely tall actors" — over/under 3D object clipping is **on by
 default**, `over_under` in `p_map.c` `PIT_CheckThing`: walk under flying things / stand on
-top of things), plus free-look (mouse pitch, `r_main.c`/`p_user.c`) and jump
-(`g_game.c`/`p_user.c`). Console cheats include `notarget` (monsters ignore the human).
+top of things), `-autoaim` (restore vanilla vertical aim-assist — it is **off by default**
+now, `autoaim` in `p_pspr.c`/`p_mobj.c`: the human shoots straight along the free-look pitch
+so shots can be placed/headshot; the AI buddy keeps autoaim), plus free-look (mouse pitch,
+`r_main.c`/`p_user.c`) and jump (`g_game.c`/`p_user.c`). Console cheats include `notarget`
+(monsters ignore the human).
 
 ### Other major subsystems added by the fork
 

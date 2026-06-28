@@ -52,6 +52,7 @@
 //
 extern  int	notarget;	// (cheat) console `notarget` toggle -- monsters ignore the human player
 extern  int	over_under;	// (mod) 3D over/under clipping; 0 = vanilla infinitely-tall (-infinitetall)
+extern  int	autoaim;	// (mod) human vertical aim-assist; 0 = off (shoot where you look), 1 = -autoaim
 extern  boolean	nomonsters;	// checkparm of -nomonsters
 extern  boolean	respawnparm;	// checkparm of -respawn
 extern  boolean	fastparm;	// checkparm of -fast
