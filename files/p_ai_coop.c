@@ -2069,7 +2069,7 @@ void P_AICoop_BuildCmd (void)
 
 	AICoop_CrumbAdd (pl->x, pl->y);
 
-	if (gametic - prog_tic >= 35)			// re-check ~1x/s
+	if (getenv("BUDDYDBG") && gametic - prog_tic >= 35)	// re-check ~1x/s (opt-in: BUDDYDBG=1)
 	{
 	    prog_tic = gametic;
 	    printf("Buddy Debug: pos=[%d,%d] pld=%d state=%d trail=%d stuck=%d\n",

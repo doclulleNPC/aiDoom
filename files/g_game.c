@@ -578,8 +578,8 @@ void G_CycleWeapon (int dir)
 }
 
 
-boolean G_Responder (event_t* ev) 
-{ 
+boolean G_Responder (event_t* ev)
+{
     // allow spy mode changes even during the demo
     if (gamestate == GS_LEVEL && ev->type == ev_keydown
 	&& ev->data1 == key_spy && (singledemo || !deathmatch) )

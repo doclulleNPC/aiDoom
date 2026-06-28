@@ -1544,7 +1544,7 @@ boolean M_Responder (event_t* ev)
     static  int     lasty = 0;
     static  int     mousex = 0;
     static  int     lastx = 0;
-	
+
     ch = -1;
 	
     if (ev->type == ev_joystick && joywait < I_GetTime())

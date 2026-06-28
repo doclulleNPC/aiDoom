@@ -795,6 +795,15 @@ boolean C_Responder (event_t* ev)
 {
     int c;
 
+    // The console is keyboard-only.  An ev_mouse carries a BUTTON MASK (1/2/4) in data1, NOT a
+    // keycode -- so the `ev->data1 == key_console` / `== KEY_*` comparisons below would spuriously
+    // match a mouse button and swallow the event.  With key_console==1 (a stale/bad config value)
+    // and the left button's mask also 1, EVERY motion event while the fire button was held got
+    // eaten here -> mouse-look froze the instant you pressed fire.  Swallow mouse events only while
+    // the console is actually open (so clicks don't fall through to the game); otherwise pass them.
+    if (ev->type == ev_mouse)
+	return con_open ? true : false;
+
     // Backquote: universal toggle (open and close).
     if (ev->data1 == KEY_BACKQUOTE)
     {
