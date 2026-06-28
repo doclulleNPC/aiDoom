@@ -170,8 +170,11 @@ add modern AI — keep them clearly distinct:
   Hook: `G_BuildTiccmd` (`g_game.c`). Full as-built reference: **`AIPLAYER.md`**.
 
 Related gameplay flags worth knowing: `-infight` (same-species infighting),
-`-nofriendlyfire`/`-noff` (player ↔ buddy don't hurt each other), plus free-look
-(mouse pitch, `r_main.c`/`p_user.c`) and jump (`g_game.c`/`p_user.c`).
+`-nofriendlyfire`/`-noff` (player ↔ buddy don't hurt each other), `-infinitetall`
+(revert to vanilla "infinitely tall actors" — over/under 3D object clipping is **on by
+default**, `over_under` in `p_map.c` `PIT_CheckThing`: walk under flying things / stand on
+top of things), plus free-look (mouse pitch, `r_main.c`/`p_user.c`) and jump
+(`g_game.c`/`p_user.c`). Console cheats include `notarget` (monsters ignore the human).
 
 ### Other major subsystems added by the fork
 

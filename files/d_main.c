@@ -1073,6 +1073,8 @@ void D_DoomMain (void)
     fastparm = M_CheckParm ("-fast");
     // -infight: monster same-species infighting (was -friendlyfire).
     { extern int infight; infight = M_CheckParm ("-infight") ? 1 : 0; }
+    // -infinitetall: revert to vanilla "infinitely tall actors" (no walking over/under things).
+    if (M_CheckParm ("-infinitetall")) over_under = 0;
     // -nofriendlyfire (alias -noff): the player and the AI buddy can't damage each other.
     { extern int ff_protect;
       ff_protect = (M_CheckParm ("-nofriendlyfire") || M_CheckParm ("-noff")) ? 1 : 0; }

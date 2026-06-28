@@ -58,6 +58,11 @@ fixed_t		tmfloorz;
 fixed_t		tmceilingz;
 fixed_t		tmdropoffz;
 
+// (mod) over/under -- true 3D object clipping (MBF-style).  1 = you can walk under flying
+// things and stand on top of things; 0 = vanilla "infinitely tall actors".  Default on;
+// -infinitetall sets it 0 (d_main.c).
+int		over_under = 1;
+
 // keep track of the line that lowers the ceiling,
 // so missiles don't explode against sky hack walls
 line_t*		ceilingline;
@@ -356,7 +361,29 @@ boolean PIT_CheckThing (mobj_t* thing)
 	}
 	return !solid;
     }
-	
+
+    // (mod) over/under: true 3D object clipping (MBF-style).  Default on; -infinitetall reverts
+    // to vanilla "infinitely tall actors".  When the mover is vertically clear of a solid thing,
+    // don't block its x/y -- instead let the thing's top act as a floor (stand on / drop onto it)
+    // or its bottom as a ceiling (walk under a flying thing).  A z-overlap still blocks as before.
+    // (Missiles return earlier and keep their own over/under test.)
+    if (over_under && (thing->flags & MF_SOLID))
+    {
+	if (thing->z + thing->height <= tmthing->z)
+	{
+	    if (thing->z + thing->height > tmfloorz)
+		tmfloorz = thing->z + thing->height;	// rest on its top
+	    return true;
+	}
+	if (thing->z >= tmthing->z + tmthing->height)
+	{
+	    if (thing->z < tmceilingz)
+		tmceilingz = thing->z;			// pass under it
+	    return true;
+	}
+	// z-overlap -> fall through to the normal solid block
+    }
+
     return !(thing->flags & MF_SOLID);
 }
 
