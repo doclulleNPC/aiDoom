@@ -420,7 +420,7 @@ static void AICoop_SayTag (const char* tag)
 //   1 VP_KILL     monster kill / gib / spree / nice
 //   0 VP_AMBIENT  everything else (stuck/lost/idle/contact/hurt/door/...)
 enum { VP_AMBIENT = 0, VP_KILL = 1, VP_WEAPON = 2, VP_COMMAND = 3 };
-static const int VP_GAP[4] = { 8*TICRATE, 4*TICRATE, 4*TICRATE, 0 };
+static const int VP_GAP[4] = { (3*TICRATE)/2, 1*TICRATE, 2*TICRATE, 0 };
 static int vp_last[4];           // last gametic each tier spoke
 static int vp_cur = -1;          // tier of the line currently sounding (-1 = idle)
 
@@ -528,9 +528,9 @@ void P_AICoop_NoteKill (mobj_t* victim, mobj_t* killer)
     if (killer == buddy)
     {
 	static int cnt, t;
-	if (victim->info && victim->health < -victim->info->spawnhealth && P_Random () < 96)
+	if (victim->info && victim->health < -victim->info->spawnhealth && P_Random () < 200)
 	    AICoop_CalloutP ("gib:", 3, VP_KILL);	// satisfying overkill
-	else if (P_Random () < 64)			// otherwise a rare per-type quip
+	else if (P_Random () < 180)			// frequent per-type quip
 	{
 	    int n; const char* tag = AICoop_KillTag (victim->type, &n);
 	    AICoop_CalloutP (tag, n, VP_KILL);
