@@ -701,7 +701,7 @@ void R_ExecuteSetViewSize (void)
 	// Widescreen at the largest windowed size: render the view FULL screen (width
 	// and height) so the game shows on both sides of the centred status bar, which
 	// is then drawn as an overlay (see D_Display / st_stuff WIDESCREENDELTA).
-	if (widescreen && setblocks == 10)
+	if (setblocks == 10)
 	{
 	    scaledviewwidth = SCREENWIDTH;
 	    viewheight = SCREENHEIGHT;
@@ -716,6 +716,7 @@ void R_ExecuteSetViewSize (void)
     detailshift = setdetail;
     viewwidth = scaledviewwidth>>detailshift;
     viewwidth_nonwide = scaledviewwidth_nonwide>>detailshift;
+    if (getenv("RDBG")) fprintf(stderr,"[RDBG] hires=%d SCREENWIDTH=%d SCREENHEIGHT=%d setblocks=%d detail=%d viewwidth=%d viewheight=%d scaledvw=%d\n", hires, SCREENWIDTH, SCREENHEIGHT, setblocks, detailshift, viewwidth, viewheight, scaledviewwidth);
 
     centery = viewheight/2;
     centerx = viewwidth/2;

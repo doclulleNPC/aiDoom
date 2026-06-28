@@ -355,12 +355,12 @@ short*		mfloorclip;
 short*		mceilingclip;
 
 fixed_t		spryscale;
-fixed_t		sprtopscreen;
+int64_t		sprtopscreen;
 
 void R_DrawMaskedColumn (column_t* column)
 {
-    int		topscreen;
-    int 	bottomscreen;
+    int64_t	topscreen;
+    int64_t 	bottomscreen;
     fixed_t	basetexturemid;
 	
     basetexturemid = dc_texturemid;
@@ -369,11 +369,11 @@ void R_DrawMaskedColumn (column_t* column)
     {
 	// calculate unclipped screen coordinates
 	//  for post
-	topscreen = sprtopscreen + spryscale*column->topdelta;
-	bottomscreen = topscreen + spryscale*column->length;
+	topscreen = sprtopscreen + (int64_t)spryscale*column->topdelta;
+	bottomscreen = topscreen + (int64_t)spryscale*column->length;
 
-	dc_yl = (topscreen+FRACUNIT-1)>>FRACBITS;
-	dc_yh = (bottomscreen-1)>>FRACBITS;
+	dc_yl = (int)((topscreen+FRACUNIT-1)>>FRACBITS);
+	dc_yh = (int)((bottomscreen-1)>>FRACBITS);
 		
 	if (dc_yh >= mfloorclip[dc_x])
 	    dc_yh = mfloorclip[dc_x]-1;
@@ -434,7 +434,7 @@ R_DrawVisSprite
     dc_texturemid = vis->texturemid;
     frac = vis->startfrac;
     spryscale = vis->scale;
-    sprtopscreen = centeryfrac - FixedMul(dc_texturemid,spryscale);
+    sprtopscreen = (int64_t)centeryfrac - (int64_t)FixedMul(dc_texturemid,spryscale);
 	
     for (dc_x=vis->x1 ; dc_x<=vis->x2 ; dc_x++, frac += vis->xiscale)
     {

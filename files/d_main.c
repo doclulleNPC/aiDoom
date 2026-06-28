@@ -319,10 +319,8 @@ void D_Display (void)
     {
 	extern int setblocks;
 	boolean st_minimal = (viewheight == SCREENHEIGHT)
-			     && !(widescreen && setblocks <= 10);
-	// widescreen bar overlays a full-height view that overwrites it every frame,
-	// so force a full bar redraw (background + widgets) each tic.
-	boolean ws_bar = widescreen && setblocks <= 10 && !st_minimal;
+			     && !(setblocks <= 10);
+	boolean ws_bar = setblocks <= 10 && !st_minimal;
 	ST_Drawer (st_minimal, redrawsbar || ws_bar);
 	fullscreen = st_minimal;
     }
