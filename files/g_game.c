@@ -702,14 +702,19 @@ boolean G_Responder (event_t* ev)
 	    gamekeydown[ev->data1] = false; 
 	return false;   // always let key up events filter down 
 		 
-      case ev_mouse: 
-	mousebuttons[0] = ev->data1 & 1; 
-	mousebuttons[1] = ev->data1 & 2; 
-	mousebuttons[2] = ev->data1 & 4; 
-	// mouse speed: 10% faster than the classic (mouseSensitivity+5)/10 factor
-	mousex = ev->data2*(mouseSensitivity+5)*11/100;
-	mousey = ev->data3*(mouseSensitivity+5)*11/100;
-	return true;    // eat events 
+      case ev_mouse:
+	mousebuttons[0] = ev->data1 & 1;
+	mousebuttons[1] = ev->data1 & 2;
+	mousebuttons[2] = ev->data1 & 4;
+	// mouse speed: 10% faster than the classic (mouseSensitivity+5)/10 factor.
+	// ACCUMULATE the deltas (+=) rather than overwrite: a mouse button press/release
+	// posts an ev_mouse with data2=data3=0 (just to carry the new button state), which
+	// with '=' zeroed any in-progress turn/look -- so pressing MOUSE1 to fire snapped the
+	// free-look/aim back to centre. Summing makes those 0-delta button events harmless and
+	// also stops sub-tic motion from being lost. G_BuildTiccmd zeroes mousex/mousey each tic.
+	mousex += ev->data2*(mouseSensitivity+5)*11/100;
+	mousey += ev->data3*(mouseSensitivity+5)*11/100;
+	return true;    // eat events
  
       case ev_joystick: 
 	joybuttons[0] = ev->data1 & 1; 
