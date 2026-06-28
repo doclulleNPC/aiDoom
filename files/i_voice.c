@@ -392,7 +392,6 @@ void I_Director_Say (const char* tag, int lvol, int rvol)
     static int bound = 0;
     const char* lumpname = tag_to_lumpname (tag);
     if (!lumpname) return;                  // unknown tag -> silent
-    I_Voice_Stop ();                        // Director wins! Stop any playing buddy chatter immediately.
     play_on_stream (director_stream, &bound, lumpname, lvol, rvol);
 }
 
