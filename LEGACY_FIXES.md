@@ -189,6 +189,33 @@ Rule of thumb: **a long-lived socket peer must tolerate the other side going qui
 end the session permanently. And always `SIG_IGN` SIGPIPE in anything that writes to
 a socket the peer may have closed.**
 
+## 9. Vanilla playsim bugs we deliberately KEEP (demo / map compat)
+
+These are *original* DOOM logic bugs, not age-of-the-code ones — but they belong
+here for the same reason as §6: so you don't "fix" one and silently break demo
+playback and the maps that rely on the exact 1993 behaviour. The playsim is
+tic-locked and deterministic (see `CLAUDE.md`); changing any of it desyncs demos and
+netplay. If you ever *want* the corrected behaviour, gate it behind a compatibility
+flag — this is exactly what Boom's `comp_stairs` does — and never change the default.
+
+- **The stair-builder bug** (`EV_BuildStairs`, `p_floor.c`, ~L531/L537). A staircase
+  raises the tagged sector, then walks to the next step by scanning the current step's
+  two-sided lines for a neighbour that has this step as its **front** sector *and*
+  shares the same floor flat (`floorpic`). Two genuine vanilla bugs live in that walk:
+  - **Height is bumped *before* the "already moving" check.** `height += stairsize;`
+    runs *before* `if (tsec->specialdata) continue;`. If the next candidate sector is
+    already in motion (another stair, a closing door…), vanilla skips it but has
+    **already advanced the running height** — so the *next* real step builds one
+    `stairsize` too high. Some maps exploit this to make stairs skip a level on purpose.
+  - **`secnum` is clobbered by the inner walk** (`secnum = newsecnum;`). The outer
+    `while ((secnum = P_FindSectorFromLineTag(line, secnum)) >= 0)` then resumes the
+    tag scan from the *last step's* sector index instead of the original trigger — so
+    when one tag fires **several disjoint** staircases, the later ones build from the
+    wrong place or get skipped. (Boom saves+restores `secnum` to fix this; vanilla
+    doesn't, and neither do we.)
+  aiDoom ships this code **unchanged on purpose.** Don't "tidy" the increment order or
+  the `secnum` reuse — both are load-bearing for compatibility.
+
 ## How to spot the next one
 
 - Compiler warnings `-Wpointer-to-int-cast` / `-Wint-to-pointer-cast` → §1.
@@ -199,3 +226,6 @@ a socket the peer may have closed.**
 - A crash that **only happens in the `-O2`/release build and vanishes under a
   debugger or at `/Od`** → heap corruption; suspect an OOB write or a stale zone
   `user` back-pointer (§7). Repro under cdb with `-hd` + `_NO_DEBUG_HEAP=1`.
+- **Stairs build to the wrong height, or a second staircase off the same switch is
+  wrong/missing** → that's the *vanilla* stair-builder bug (§9). It's not yours to
+  fix — it's kept for demo/map compat.
