@@ -32,7 +32,7 @@
 
 
 // Visplane related.
-extern  short*		lastopening;
+extern  int*		lastopening;
 
 
 typedef void (*planefunction_t) (int top, int bottom);
@@ -40,8 +40,8 @@ typedef void (*planefunction_t) (int top, int bottom);
 extern planefunction_t	floorfunc;
 extern planefunction_t	ceilingfunc_t;
 
-extern short		floorclip[MAXWIDTH];
-extern short		ceilingclip[MAXWIDTH];
+extern int		floorclip[MAXWIDTH];
+extern int		ceilingclip[MAXWIDTH];
 
 extern fixed_t		yslope[MAXHEIGHT];
 extern fixed_t		distscale[MAXWIDTH];

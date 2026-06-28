@@ -57,8 +57,8 @@ visplane_t*		ceilingplane;
 
 // ? (sized for the maximum internal resolution)
 #define MAXOPENINGS	MAXWIDTH*64
-short			openings[MAXOPENINGS];
-short*			lastopening;
+int			openings[MAXOPENINGS];
+int*			lastopening;
 
 
 //
@@ -66,8 +66,8 @@ short*			lastopening;
 //  floorclip starts out SCREENHEIGHT
 //  ceilingclip starts out -1
 //
-short			floorclip[MAXWIDTH];
-short			ceilingclip[MAXWIDTH];
+int			floorclip[MAXWIDTH];
+int			ceilingclip[MAXWIDTH];
 
 //
 // spanstart holds the start of a plane span
