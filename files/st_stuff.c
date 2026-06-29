@@ -1502,4 +1502,11 @@ void ST_SetRes (void)
     // status-bar redraw next frame, else it bleeds through after a resolution
     // change (see the corruption screenshot).
     st_firsttime = true;
+    // (mod) The widget X positions bake in WIDESCREENDELTA (which changes with the aspect ratio)
+    // and are cached by ST_createWidgets at level start -- so after a runtime resolution/aspect
+    // change they sit at stale offsets and look mis-aligned.  Re-create them so they snap to the
+    // new layout; a redraw alone (st_firsttime) just repaints them at the stale positions.
+    // Guard on GS_LEVEL: V_SetRes also runs at startup (-render N) before a level/plyr exists.
+    if (gamestate == GS_LEVEL)
+	ST_createWidgets();
 }
