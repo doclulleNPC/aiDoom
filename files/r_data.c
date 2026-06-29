@@ -624,7 +624,16 @@ void R_InitFlats (void)
 {
     int		i;
 	
-    firstflat = W_GetNumForName ("F_START") + 1;
+    // (mod) PWAD flat merge: a PWAD that ships its OWN F_START/F_END (e.g. SIGIL II) made
+    // W_GetNumForName("F_START") return the PWAD's marker, collapsing numflats to just its few
+    // flats -- so every IWAD-flat sector got an out-of-range picnum and crashed R_DrawPlanes
+    // (and skyflatnum went negative).  Span the FIRST F_START (the IWAD's) to the LAST F_END
+    // instead, so IWAD + PWAD flats are all in range.  In a plain IWAD the first F_START is the
+    // only one, so this is a no-op.  (Boom/crispy achieve the same by merging flats at load.)
+    { extern lumpinfo_t* lumpinfo; extern int numlumps; int k, fs = -1;
+      for (k = 0; k < numlumps; k++)
+          if (!strncasecmp (lumpinfo[k].name, "F_START", 8)) { fs = k; break; }
+      firstflat = (fs >= 0 ? fs : W_GetNumForName ("F_START")) + 1; }
     lastflat = W_GetNumForName ("F_END") - 1;
     numflats = lastflat - firstflat + 1;
 	

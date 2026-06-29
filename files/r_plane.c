@@ -430,6 +430,16 @@ void R_DrawPlanes (void)
 	    continue;
 	}
 	
+	// (mod) Guard a malformed/unsupported picnum: a PWAD using sky transfers (SIGIL II) or
+	// other Boom flat features can leave pl->picnum outside the flat range -> the
+	// flattranslation[pl->picnum] read goes OOB and feeds a garbage lump to W_CacheLumpNum.
+	{ extern int numflats;
+	  if (pl->picnum < 0 || pl->picnum >= numflats)
+	  {
+	      static int warned; if (!warned) { warned=1; fprintf(stderr,"R_DrawPlanes: skipping visplane with out-of-range flat %d (numflats=%d) -- malformed PWAD?\n", pl->picnum, numflats); }
+	      continue;	// skip rather than feed a garbage lump to W_CacheLumpNum
+	  }
+	}
 	// regular flat
 	ds_source = W_CacheLumpNum(firstflat +
 				   flattranslation[pl->picnum],
