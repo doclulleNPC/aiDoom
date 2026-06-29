@@ -1506,7 +1506,10 @@ void ST_SetRes (void)
     // and are cached by ST_createWidgets at level start -- so after a runtime resolution/aspect
     // change they sit at stale offsets and look mis-aligned.  Re-create them so they snap to the
     // new layout; a redraw alone (st_firsttime) just repaints them at the stale positions.
-    // Guard on GS_LEVEL: V_SetRes also runs at startup (-render N) before a level/plyr exists.
-    if (gamestate == GS_LEVEL)
+    // Guard on !st_stopped: the bar is only "started" inside a level (ST_Start), where plyr and
+    // the bar graphics are valid.  V_SetRes ALSO runs at startup before any level -- and gamestate
+    // defaults to 0 (== GS_LEVEL) there, so testing gamestate wrongly fired ST_createWidgets and
+    // crashed on the unspawned player.  st_stopped is true until ST_Start, so this is safe.
+    if (!st_stopped)
 	ST_createWidgets();
 }
