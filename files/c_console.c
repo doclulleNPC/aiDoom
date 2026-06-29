@@ -573,9 +573,19 @@ static void C_Execute (char* line)
     }
     else if (!strcmp(cmd, "nextmap"))
     {
-	extern void G_ExitLevel (void);
-	if (inlevel) { G_ExitLevel (); C_Printf ("exiting to the next map..."); }
-	else C_Printf ("nextmap: not in a level");
+	// Go straight to the next map and SKIP the intermission (G_ExitLevel ran the WI screen,
+	// which also crashed on episodes the IWAD has no intermission data for, e.g. SIGIL's E6).
+	extern void G_DeferedInitNew (skill_t, int, int);
+	if (!inlevel) { C_Printf ("nextmap: not in a level"); }
+	else
+	{
+	    int ep = gameepisode, mp = gamemap + 1;
+	    if (gamemode == commercial) { if (mp > 32) mp = 1; }
+	    else if (mp > 9) { mp = 1; ep++; }		// DOOM1: roll into the next episode
+	    G_DeferedInitNew (gameskill, ep, mp);
+	    con_open = 0;				// close the console for the transition
+	    C_Printf ("nextmap -> E%dM%d (intermission skipped)", ep, mp);
+	}
     }
     else if (!strcmp(cmd, "teleport") || !strcmp(cmd, "moveto"))
     {

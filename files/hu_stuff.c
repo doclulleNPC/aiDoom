@@ -469,7 +469,16 @@ void HU_Start(void)
       case shareware:
       case registered:
       case retail:
-	s = HU_TITLE;
+	{
+	    // (mod) A PWAD episode past the IWAD's 4 (SIGIL II -> E6) indexes past mapnames[]
+	    // (36 entries = 4*9) -> a garbage pointer -> crash in the title loop below.
+	    // Bounds-check and fall back to the bare "ExMy" tag for unnamed PWAD episodes.
+	    int idx = (gameepisode-1)*9 + gamemap-1;
+	    static char epname[16];
+	    if (idx >= 0 && idx < (int)(sizeof(mapnames)/sizeof(mapnames[0])))
+		s = mapnames[idx];
+	    else { snprintf (epname, sizeof epname, "E%dM%d", gameepisode, gamemap); s = epname; }
+	}
 	break;
 
 /* FIXME

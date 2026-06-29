@@ -1594,20 +1594,30 @@ G_InitNew
     if (episode < 1)
       episode = 1; 
 
-    if ( gamemode == retail )
+    // (mod) Honour extra episodes a PWAD adds past the IWAD's normal count (SIGIL -> E5,
+    // SIGIL II -> E6): only clamp when the requested map doesn't actually exist, so a bogus
+    // episode still falls back to a valid one but a real PWAD episode loads.
     {
-      if (episode > 4)
-	episode = 4;
-    }
-    else if ( gamemode == shareware )
-    {
-      if (episode > 1) 
-	   episode = 1;	// only start episode 1 on shareware
-    }  
-    else
-    {
-      if (episode > 3)
-	episode = 3;
+      char elump[16];
+      snprintf (elump, sizeof elump, "E%dM%d", episode, (map < 1) ? 1 : map);
+      if (W_CheckNumForName (elump) < 0)
+      {
+	if ( gamemode == retail )
+	{
+	  if (episode > 4)
+	    episode = 4;
+	}
+	else if ( gamemode == shareware )
+	{
+	  if (episode > 1)
+	    episode = 1;	// only start episode 1 on shareware
+	}
+	else
+	{
+	  if (episode > 3)
+	    episode = 3;
+	}
+      }
     }
     
 
@@ -1692,7 +1702,15 @@ G_InitNew
 	  case 4:	// Special Edition sky
 	    skytexture = R_TextureNumForName ("SKY4");
 	    break;
-	} 
+	  default:	// (mod) PWAD episodes past 4 (SIGIL -> SKY5, SIGIL II -> SKY6); fall back
+	    {		// to SKY1 if the pack ships no matching sky texture.
+		char sn[16];
+		snprintf (sn, sizeof sn, "SKY%d", episode);
+		skytexture = R_TextureNumForName
+		    (R_CheckTextureNumForName (sn) >= 0 ? sn : "SKY1");
+	    }
+	    break;
+	}
  
     G_DoLoadLevel (); 
 } 
