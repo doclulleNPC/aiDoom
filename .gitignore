@@ -63,7 +63,9 @@ run/doom
 # SDL3 config tool binary (built by tools/build_config.sh, copied to run/)
 tools/aidoom_config
 run/aidoom_config
-# runtime config (written by the game / config app; user-specific)
+# runtime config (written by the game / config app; user-specific).
+# NOTE: run/aidoom.cfg.local IS tracked -- it's the shipped default/template config
+# (localhost, no SSH user/keys); only the live aidoom.cfg is per-user and ignored.
 aidoom.cfg
 run/aidoom.cfg
 aidoom2.cfg
