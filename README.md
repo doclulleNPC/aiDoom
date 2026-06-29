@@ -9,7 +9,7 @@ a language model drive monster tactics in real time.
 > the new work lives in the platform layer (`files/i_*.c`) and a few self-contained
 > modules.
 
-![aiDoom — hi-res DOOM with the LLM AI Director and GPU monitor](hero.png)
+![aiDoom — hi-res DOOM with the LLM AI Director and GPU monitor](hero2.png)
 
 ## Features
 
@@ -141,6 +141,8 @@ On Linux/macOS it's the same flags, `./aidoom` (the binary `build.sh` puts in `r
 
 ### LLM-driven monsters (Ollama)
 
+![The run/launcher GUI — pick IWAD / buddy / monster / skill, then Launch](launcher.png)
+
 With a local [Ollama](https://ollama.com) running, use the **`run/launcher`** GUI
 (pick IWAD / buddy / monster / skill → Launch) — it starts the game with the AI
 director and the native director client. The old `start_*` scripts are obsolete
@@ -161,6 +163,8 @@ run/start_aidoom.sh --skill 4 --infight
 
 The director protocol (`observe` / `act` / `wake`) and design rationale are documented
 in **AGENT_CONTROL.md** §12–13 and **MONSTER_AGENT_GUIDE.md**.
+
+![The native AI Director client — talks to Ollama, drives monster tactics (no Python)](director.png)
 
 ## Networked multiplayer (Chocolate/Crispy-compatible)
 
@@ -266,6 +270,8 @@ A small **GPU monitor** shows live load / VRAM / temperature / power of the Olla
 machine via `nvidia-smi` — over SSH, or directly when the host is `localhost` (no
 SSH/key needed). It's a native `gpumon` (SDL3 window with a **Reconnect** button).
 See **GPUMON.md**.
+
+![The GPU monitor — live load / VRAM / temperature / power of the Ollama box over SSH](gpumon.png)
 
 The **game** reads/writes the same `aidoom.cfg` from its working directory, and the
 config app preserves any keys it doesn't manage (so neither side clobbers the
