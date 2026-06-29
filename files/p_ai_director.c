@@ -747,9 +747,8 @@ static boolean P_Director_ReviveCorpse (void)
 	for (i = 0; i < MAXPLAYERS; i++)				// must be hidden (L4D: out of sight)
 	    if (playeringame[i] && players[i].mo && P_CheckSight (players[i].mo, m)) { seen = true; break; }
 	if (seen)					continue;
-	m->height <<= 2;						// un-squash to test standing room
-	room = P_CheckPosition (m, m->x, m->y);
-	m->height >>= 2;
+	{ fixed_t h0 = m->height; m->height = m->info->height;		// test room at the LIVING
+	  room = P_CheckPosition (m, m->x, m->y); m->height = h0; }	// height (a crushed corpse is 0)
 	if (!room)					continue;
 	if (d < bestd) { bestd = d; best = m; }
     }
@@ -758,7 +757,12 @@ static boolean P_Director_ReviveCorpse (void)
     // Resurrect (cf. A_VileChase): restore the living actor, then send it at the survivor.
     S_StartSound (best, sfx_slop);
     P_SetMobjState (best, best->info->raisestate);
-    best->height <<= 2;
+    // (mod) Restore the LIVING height + radius from mobjinfo rather than `<<= 2`: a corpse a
+    // crusher squashed to height 0 would stay 0 (0<<2==0) and come back a "ghost monster" --
+    // immune to hitscans/projectiles (they miss the zero-height hitbox) and able to drift
+    // through walls and other things.  This is crispy-doom's ghost-monster fix.
+    best->height  = best->info->height;
+    best->radius  = best->info->radius;
     best->flags   = best->info->flags;
     best->health  = best->info->spawnhealth;
     best->target  = sv;

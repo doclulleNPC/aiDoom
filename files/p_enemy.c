@@ -1382,7 +1382,12 @@ void A_VileChase (mobj_t* actor)
 		    info = corpsehit->info;
 		    
 		    P_SetMobjState (corpsehit,info->raisestate);
-		    corpsehit->height <<= 2;
+		    // (mod) Restore the LIVING height + radius from mobjinfo instead of `<<= 2`.
+		    // A corpse a crusher squashed to height 0 stays 0 (0<<2==0) and comes back a
+		    // "ghost monster": immune to hitscans/projectiles and able to drift through walls.
+		    // This is crispy-doom's ghost-monster fix (applies to Arch-Viles + the AI director).
+		    corpsehit->height = info->height;
+		    corpsehit->radius = info->radius;
 		    corpsehit->flags = info->flags;
 		    corpsehit->health = info->spawnhealth;
 		    corpsehit->target = NULL;
