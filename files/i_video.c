@@ -523,6 +523,7 @@ static void I_CreateTexture(void)
 extern int	screenblocks;
 extern int	detailLevel;
 void		R_SetViewSize (int blocks, int detail);
+void		R_ExecuteSetViewSize (void);
 void		ST_SetRes (void);
 void		HU_Buddy_SetRes (void);
 
@@ -568,6 +569,7 @@ void V_SetRes(int scale)
     // per-resolution scratch buffers it may grow in the future.
     HU_Buddy_SetRes();
     R_SetViewSize (screenblocks, detailLevel);
+    R_ExecuteSetViewSize ();
 
     // Grow/shrink the window to match the new resolution + output aspect (windowed).
     if (window && !fullscreen_mode)

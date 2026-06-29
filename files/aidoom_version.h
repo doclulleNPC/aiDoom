@@ -3,5 +3,5 @@
 // tag (and the patch keeps counting builds from there).
 #ifndef __AIDOOM_VERSION__
 #define __AIDOOM_VERSION__
-#define AIDOOM_VERSION "0.6.50"
+#define AIDOOM_VERSION "0.6.51"
 #endif
