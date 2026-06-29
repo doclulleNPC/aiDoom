@@ -53,6 +53,7 @@
 #include "font_atlas.h"
 #include "../files/aidoom_icon.h"	// shared 64x64 RGBA window icon
 #include "hero_launcher_img.h"		// 560x100 RGBA hero banner (replaces the text banner)
+#include "md5.h"			// SIGIL PWAD checksum verification
 
 // --- Layout (BASE = 320x200 reference, scaled at runtime) ---
 #define WINW 560
@@ -921,6 +922,36 @@ static void pwad_first_map_warp(const char* name, char* warp, int wn)
     else if (mode == 2) snprintf(warp, wn, "%d %d", be, bm);
 }
 
+// --- SIGIL pack verification ------------------------------------------------------------------
+// SIGIL/SIGIL II ship their own episode (E5 / E3-compat / E6).  We accept one ONLY when its name
+// looks like SIGIL AND its MD5 matches a known release; a verified pack warps to its own E?M1.
+static const struct { const char* md5; int episode; const char* label; } SIGIL_WADS[] = {
+    { "edd5c3dfd3fb1c981cf7390c5c14454e", 5, "SIGIL (E5)"        },  // SIGIL_V1_23.wad
+    { "e4c5ab58e226bfcc8761f35204aeb3fc", 3, "SIGIL compat (E3)" },  // SIGIL_COMPAT_V1_23.wad
+    { "d0442f5a75f2faef3405c09a0c3acc58", 6, "SIGIL II (E6)"     },  // SIGIL_II_V1_0.WAD
+};
+
+// 1 = verified SIGIL (sets *ep to its episode), -1 = looks like SIGIL by name but the checksum
+// doesn't match a known release (caller must NOT load it), 0 = not a SIGIL wad (handle normally).
+static int launcher_sigil_classify(const char* fname, int* ep)
+{
+    const char* s;
+    int looks_sigil = 0;
+    for (s = fname; *s; s++)
+        if (strncasecmp(s, "sigil", 5) == 0) { looks_sigil = 1; break; }
+    if (!looks_sigil) return 0;				// not SIGIL by name -> normal pwad
+
+    char path[1024], md5[33];
+    size_t i;
+    snprintf(path, sizeof path, "%s/ID0/%s", run_dir(), fname);
+    if (!md5_file_hex(path, md5)) return -1;		// can't read it -> can't verify -> reject
+    for (i = 0; i < sizeof(SIGIL_WADS)/sizeof(SIGIL_WADS[0]); i++)
+        if (strcasecmp(md5, SIGIL_WADS[i].md5) == 0) { if (ep) *ep = SIGIL_WADS[i].episode; return 1; }
+    fprintf(stderr, "launcher: \"%s\" looks like SIGIL but its MD5 (%s) is unknown -- ignoring it.\n",
+            fname, md5);
+    return -1;						// SIGIL name + unknown checksum -> reject
+}
+
 static void build_command(char* out, int n, const char* iwad_path)
 {
     int off = 0;
@@ -967,7 +998,13 @@ static void build_command(char* out, int n, const char* iwad_path)
         fn += snprintf(files + fn, sizeof files - fn, " hereticstuff.wad");
     if (opt_hexen && wad_present("hexenstuff.wad"))
         fn += snprintf(files + fn, sizeof files - fn, " hexenstuff.wad");
-    if (pwad_sel > 0 && pwad_sel < pwad_count) {
+    // SIGIL packs are checksum-verified: a verified pack loads + warps to its own episode; a
+    // SIGIL-named file whose MD5 is unknown is rejected (the PWAD setting is silently ignored).
+    int sigil_ep = 0;
+    int sigil = (pwad_sel > 0 && pwad_sel < pwad_count)
+              ? launcher_sigil_classify(pwads[pwad_sel], &sigil_ep) : 0;
+    int load_pwad = (pwad_sel > 0 && pwad_sel < pwad_count) && (sigil != -1);
+    if (load_pwad) {
         const char* pw = pwads[pwad_sel];
         int dup = (opt_freedoom && !strcasecmp(pw, "freedoomstuff.wad"))
                || (opt_heretic  && !strcasecmp(pw, "hereticstuff.wad"))
@@ -983,7 +1020,9 @@ static void build_command(char* out, int n, const char* iwad_path)
     // DOOM1 / Heretic are EPISODIC (-warp E M), so the flat map number is converted to episode+map
     // (map 10 -> E2M1 = "2 1", 19 -> E3M1, 28 -> E4M1).  DOOM2-vs-DOOM1 is detected by a MAP01 lump.
     char warp[32] = "";
-    if (pwad_sel > 0 && pwad_sel < pwad_count) {
+    if (sigil == 1)
+        snprintf(warp, sizeof warp, "%d 1", sigil_ep);		// verified SIGIL -> E5/E3/E6 M1
+    else if (load_pwad) {
         char w[32]; pwad_first_map_warp(pwads[pwad_sel], w, sizeof w);
         if (w[0]) snprintf(warp, sizeof warp, "%s", w);
     }
