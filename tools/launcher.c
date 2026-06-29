@@ -52,42 +52,43 @@
 
 #include "font_atlas.h"
 #include "../files/aidoom_icon.h"	// shared 64x64 RGBA window icon
+#include "hero_launcher_img.h"		// 560x100 RGBA hero banner (replaces the text banner)
 
 // --- Layout (BASE = 320x200 reference, scaled at runtime) ---
 #define WINW 560
-#define WINH 524			// +32 for the second Options row
+#define WINH 544			// +32 for the second Options row
 #define PAD 12
 
 // Vertical bands, BASE pixels (we scale 2x for 320->640 feel on a 560px wide
 // window -- comfortable on a 1024-wide desktop).
-#define BANNER_H  80
+#define BANNER_H  100
 // The four AI rows are evenly spaced by their VISUAL centres (Δ64): mode rows centre
 // their content at Y+BUDDY_H/2 (=+30), the Options checkboxes at Y+CHK_BOX/2 (=+8).
 // Buddy/Monster/Skill are tightly grouped (centres 120/152/184, Δ32); Options sits
 // a row-gap below (centre 248) as a visual separator from the toggle checkboxes.
-#define BUDDY_Y   90
+#define BUDDY_Y   110
 #define BUDDY_H   60
-#define MON_Y     122
+#define MON_Y     142
 #define MON_H     60
-#define SKILL_Y   154			// difficulty row (5 pills)
+#define SKILL_Y   174			// difficulty row (5 pills)
 #define SKILL_H   40
-#define MAP_Y     186			// warp-map row (4 pills: 1/10/19/28), under Skill
-#define OPTS_Y    240			// toggle row 1; centre 248 (Skill-Options gap kept as a separator)
+#define MAP_Y     206			// warp-map row (4 pills: 1/10/19/28), under Skill
+#define OPTS_Y    260			// toggle row 1; centre 248 (Skill-Options gap kept as a separator)
 #define CHK_BOX   16			// checkbox square size
 #define OPT_NOFF_X (PAD + 90)		// "No friendly fire" checkbox
 #define OPT_INF_X  (PAD + 300)		// "All Monster infight" checkbox
-#define OPTS2_Y   272			// toggle row 2 (Autoaim / Monster over/under), Δ32 below row 1
+#define OPTS2_Y   292			// toggle row 2 (Autoaim / Monster over/under), Δ32 below row 1
 #define OPT_AA_X  (PAD + 90)		// "Autoaim" checkbox (aligned under "No friendly fire")
 #define OPT_OU_X  (PAD + 300)		// "Monster over/under" checkbox (under "All Monster infight")
-#define MONSTERS_Y 310			// extra-monster WAD toggles (FreeDoom / Heretic) -- shifted +32 for row 2
+#define MONSTERS_Y 330			// extra-monster WAD toggles (FreeDoom / Heretic) -- shifted +32 for row 2
 #define MON_FD_X   (PAD + 100)		// "FreeDoom" checkbox (space after the "+Monster" label)
 #define MON_HER_X  (PAD + 250)		// "Heretic" checkbox
 #define MON_HEX_X  (PAD + 410)		// "Hexen" checkbox
-#define IWAD_Y    342
+#define IWAD_Y    362
 #define IWAD_H    22
 #define IWAD_DD_H 80			// dropdown open height
-#define PWAD_Y    370			// extra PWAD selector (one row below IWAD)
-#define LAUNCH_Y  474
+#define PWAD_Y    390			// extra PWAD selector (one row below IWAD)
+#define LAUNCH_Y  494
 #define LAUNCH_H  34
 
 // Colours (RGB).
@@ -170,6 +171,7 @@ typedef struct {
 static SDL_Window*   win;
 static SDL_Renderer* ren;
 static SDL_Texture*  font;
+static SDL_Texture*  hero_tex;		// embedded hero banner image
 
 // IWAD list (max 16, more than enough for anyone's Steam lib).
 #define MAX_IWADS 16
@@ -249,6 +251,18 @@ static void font_init(void)
     SDL_SetTextureScaleMode(font, SDL_SCALEMODE_NEAREST);
     SDL_SetTextureScaleMode(font, SDL_SCALEMODE_LINEAR);    // smoother scaling
     SDL_DestroySurface(s); free(px);
+}
+
+// Embedded hero banner -> texture (mirrors font_init / the window icon).
+static void hero_init(void)
+{
+    SDL_Surface* s = SDL_CreateSurfaceFrom(HERO_W, HERO_H, SDL_PIXELFORMAT_RGBA32,
+                                           (void*)hero_launcher_rgba, HERO_W*4);
+    if (s) {
+        hero_tex = SDL_CreateTextureFromSurface(ren, s);
+        if (hero_tex) SDL_SetTextureScaleMode(hero_tex, SDL_SCALEMODE_LINEAR);
+        SDL_DestroySurface(s);
+    }
 }
 
 static void text(float x, float y, const char* str, Uint8 r, Uint8 g, Uint8 b)
@@ -598,26 +612,13 @@ static void scan_pwads(void)
 //
 static void draw_banner(void)
 {
-    // Background bar
-    rect(0, 0, WINW, BANNER_H, COL_BANNER);
-
-    // Inset rule
-    draw_rect_outline(2, 2, WINW-4, BANNER_H-4, 160, 32, 32);
-
-    // Title
-    text_scaled(PAD, BANNER_H/2 - FONT_CH*2,
-               4.0f, "DOOM",
-               255, 230, 100);    // yellow title
-
-    // Sub-line
-    text(PAD + FONT_CW*4*5 + 12, BANNER_H/2 - FONT_CH/2,
-         "aiDoom launcher", 200, 200, 200);
-
-    // Right-aligned hint
-    const char* hint = "ESC quits";
-    int hint_w = (int)strlen(hint) * FONT_CW;
-    text(WINW - hint_w - PAD, BANNER_H - FONT_CH - 4,
-         hint, 180, 180, 180);
+    // Embedded hero image fills the banner area (replaces the old text banner).
+    if (hero_tex) {
+        SDL_FRect dst = { 0.0f, 0.0f, (float)WINW, (float)BANNER_H };
+        SDL_RenderTexture(ren, hero_tex, NULL, &dst);
+    } else {
+        rect(0, 0, WINW, BANNER_H, COL_BANNER);
+    }
 }
 
 // ----------------------------------------------------------------- mode rows
@@ -1165,6 +1166,7 @@ int main(int argc, char** argv)
     SDL_SetRenderVSync(ren, 1);
 
     font_init();
+    hero_init();
     scan_iwads();
     scan_pwads();
 
