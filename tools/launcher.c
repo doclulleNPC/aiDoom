@@ -938,8 +938,10 @@ static void build_command(char* out, int n, const char* iwad_path)
     switch (mon_mode) {
         case MON_VANILLA: break;
         case MON_L4D:
-            // Approximate L4D via aggressive respawn + no early exit.
-            off += snprintf(out + off, n - off, " -respawn -fast");
+            // The real Left 4 Dead-style rule director: stress-driven extra spawns AND the
+            // spoken game-master "voice of god" narration (was -respawn -fast, which gave
+            // aggressive monsters but never started the director, so it stayed silent).
+            off += snprintf(out + off, n - off, " -director");
             break;
         case MON_AI:
             off += snprintf(out + off, n - off, " -aidirector 31666");
