@@ -143,7 +143,7 @@ void C_Init (void)
 {
     con_head = con_count = con_inlen = con_open = con_shift = con_scroll = 0;
     con_input[0] = '\0';
-    C_Printf ("aiDoom console.  Type 'help'.  Open with F12 or ` (backquote).");
+    C_Printf ("aiDoom console.  Type 'help'.  Open/close with ` (backquote).");
 }
 
 
@@ -796,10 +796,10 @@ static void C_Execute (char* line)
 
 // ---------------------------------------------------------------- input
 
-// Key that opens the console.  Configurable via "key_console" (m_misc.c);
-// default F12 (the only otherwise-free function key -- it was netgame spy-mode).
-// Backquote (`) is always accepted too.
-int	key_console = KEY_F12;
+// Key that opens the console.  Configurable via "key_console" (m_misc.c); default backquote.
+// Backquote (`) is ALWAYS accepted as a hard-wired toggle regardless of this value.  F12 is
+// spy-mode (key_spy -- view the AI buddy), NOT the console.
+int	key_console = KEY_BACKQUOTE;
 
 boolean C_Responder (event_t* ev)
 {
