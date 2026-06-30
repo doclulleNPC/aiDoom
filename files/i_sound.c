@@ -24,6 +24,7 @@
 static const char
 rcsid[] = "$Id: i_unix.c,v 1.5 1997/02/03 22:45:10 b1 Exp $";
 
+#include <stdlib.h>
 #include <math.h>
 
 #include <SDL3/SDL.h>
@@ -40,6 +41,14 @@ rcsid[] = "$Id: i_unix.c,v 1.5 1997/02/03 22:45:10 b1 Exp $";
 
 #include "doomdef.h"
 
+#define NUM_CHANNELS		8
+
+// Mixer configuration
+static boolean		use_old_mixer = false;
+static SDL_AudioDeviceID	audio_device = 0;
+static SDL_AudioStream*	sfx_streams[NUM_CHANNELS] = { NULL };
+static SDL_AudioStream*	music_stream = NULL;
+
 // SDL3 audio output: a stream bound to the default playback device, fed by
 // I_SDLAudioCallback below.  (SDL3 replaced the SDL1 push/pull-callback API.)
 static SDL_AudioStream*	audiostream = NULL;
@@ -55,7 +64,6 @@ static int		mixbufferbytes = 0;
 
 // Needed for calling the actual sound output.
 static int SAMPLECOUNT=		512;
-#define NUM_CHANNELS		8
 
 #define SAMPLERATE		11025	// Hz
 
@@ -226,6 +234,16 @@ addsfx
 
     int		rightvol;
     int		leftvol;
+
+    // Sweep and clear finished streams
+    if (!use_old_mixer) {
+        for (i = 0; i < NUM_CHANNELS; i++) {
+            if (channels[i] && sfx_streams[i] && SDL_GetAudioStreamQueued(sfx_streams[i]) == 0) {
+                channels[i] = 0;
+                channelhandles[i] = 0;
+            }
+        }
+    }
 
     // Chainsaw troubles.
     // Play these sound effects only one at a time.
@@ -433,41 +451,89 @@ I_StartSound
   int		pitch,
   int		priority )
 {
+    priority = 0;
 
-  // UNUSED
-  priority = 0;
-  
-    // Debug.
-    //fprintf( stderr, "starting sound %d", id );
-    
-    // Returns a handle (not used).
-    if (audiostream) SDL_LockAudioStream(audiostream);
-    id = addsfx( id, vol, steptable[pitch], sep );
-    if (audiostream) SDL_UnlockAudioStream(audiostream);
+    if (use_old_mixer)
+    {
+        if (audiostream) SDL_LockAudioStream(audiostream);
+        id = addsfx( id, vol, steptable[pitch], sep );
+        if (audiostream) SDL_UnlockAudioStream(audiostream);
+        return id;
+    }
+    else
+    {
+        int handle = addsfx( id, vol, steptable[pitch], sep );
+        if (handle < 0)
+            return -1;
 
-    // fprintf( stderr, "/handle is %d\n", id );
-    
-    return id;
+        int slot = -1;
+        int i;
+        for (i = 0; i < NUM_CHANNELS; i++) {
+            if (channelhandles[i] == handle) {
+                slot = i;
+                break;
+            }
+        }
+
+        if (slot >= 0 && sfx_streams[slot])
+        {
+            SDL_ClearAudioStream(sfx_streams[slot]);
+            SDL_SetAudioStreamFrequencyRatio(sfx_streams[slot], (float)steptable[pitch] / 65536.0f);
+
+            int len = lengths[id];
+            short* stereo_buf = malloc(len * 2 * sizeof(short));
+            if (stereo_buf)
+            {
+                unsigned char* raw = (unsigned char*) S_sfx[id].data;
+                for (i = 0; i < len; i++) {
+                    int sample = raw[i];
+                    stereo_buf[i*2] = (short)channelleftvol_lookup[slot][sample];
+                    stereo_buf[i*2+1] = (short)channelrightvol_lookup[slot][sample];
+                }
+                SDL_PutAudioStreamData(sfx_streams[slot], stereo_buf, len * 2 * sizeof(short));
+                SDL_FlushAudioStream(sfx_streams[slot]);
+                free(stereo_buf);
+            }
+        }
+        return handle;
+    }
 }
-
 
 
 void I_StopSound (int handle)
 {
-  // You need the handle returned by StartSound.
-  // Would be looping all channels,
-  //  tracking down the handle,
-  //  an setting the channel to zero.
-  
-  // UNUSED.
-  handle = 0;
+    if (use_old_mixer)
+    {
+        handle = 0;
+        return;
+    }
+
+    int i;
+    for (i = 0; i < NUM_CHANNELS; i++) {
+        if (sfx_streams[i] && channelhandles[i] == handle) {
+            SDL_ClearAudioStream(sfx_streams[i]);
+            channelhandles[i] = 0;
+            channels[i] = 0;
+            break;
+        }
+    }
 }
 
 
 int I_SoundIsPlaying(int handle)
 {
-    // Ouch.
-    return gametic < handle;
+    if (use_old_mixer)
+    {
+        return gametic < handle;
+    }
+
+    int i;
+    for (i = 0; i < NUM_CHANNELS; i++) {
+        if (sfx_streams[i] && channelhandles[i] == handle) {
+            return (SDL_GetAudioStreamQueued(sfx_streams[i]) > 0);
+        }
+    }
+    return false;
 }
 
 
@@ -582,13 +648,21 @@ I_UpdateSoundParams
   int	sep,
   int	pitch)
 {
-  // I fail too see that this is used.
-  // Would be using the handle to identify
-  //  on which channel the sound might be active,
-  //  and resetting the channel parameters.
+    if (use_old_mixer)
+    {
+        handle = vol = sep = pitch = 0;
+        return;
+    }
 
-  // UNUSED.
-  handle = vol = sep = pitch = 0;
+    int i;
+    for (i = 0; i < NUM_CHANNELS; i++) {
+        if (sfx_streams[i] && channelhandles[i] == handle) {
+            float gain = vol / 15.0f;
+            SDL_SetAudioStreamGain(sfx_streams[i], gain);
+            SDL_SetAudioStreamFrequencyRatio(sfx_streams[i], (float)steptable[pitch] / 65536.0f);
+            break;
+        }
+    }
 }
 
 
@@ -613,10 +687,35 @@ I_SDLAudioCallback (void *userdata, SDL_AudioStream *stream,
 }
 
 
+static void SDLCALL I_SDLMusicCallback(void *userdata, SDL_AudioStream *stream, int additional_amount, int total_amount);
+
 void I_ShutdownSound(void)
 {
-  if (audiostream) { SDL_DestroyAudioStream(audiostream); audiostream = NULL; }
-  if (mixbuffer)   { free(mixbuffer); mixbuffer = NULL; }
+    if (use_old_mixer)
+    {
+        if (audiostream) { SDL_DestroyAudioStream(audiostream); audiostream = NULL; }
+        if (mixbuffer)   { free(mixbuffer); mixbuffer = NULL; }
+        return;
+    }
+
+    int i;
+    for (i = 0; i < NUM_CHANNELS; i++)
+    {
+        if (sfx_streams[i]) {
+            SDL_DestroyAudioStream(sfx_streams[i]);
+            sfx_streams[i] = NULL;
+        }
+    }
+
+    if (music_stream) {
+        SDL_DestroyAudioStream(music_stream);
+        music_stream = NULL;
+    }
+
+    if (audio_device) {
+        SDL_CloseAudioDevice(audio_device);
+        audio_device = 0;
+    }
 }
 
 
@@ -628,31 +727,73 @@ I_InitSound()
   
   // Secure and configure sound device first.
   fprintf( stderr, "I_InitSound: ");
+
+  use_old_mixer = (M_CheckParm("-oldmixer") != 0);
   
-  // Open the audio device (SDL3: signed 16-bit native-endian stereo).
-  SDL_zero(wanted);
-  wanted.freq = SAMPLERATE;
-  wanted.format = SDL_AUDIO_S16;
-  wanted.channels = 2;
+  if (use_old_mixer)
+  {
+      // Open the audio device (SDL3: signed 16-bit native-endian stereo).
+      SDL_zero(wanted);
+      wanted.freq = SAMPLERATE;
+      wanted.format = SDL_AUDIO_S16;
+      wanted.channels = 2;
 
-  // One mixed slice = SAMPLECOUNT stereo S16 frames.
-  mixbufferbytes = SAMPLECOUNT * wanted.channels * (int)sizeof(Sint16);
-  mixbuffer = (Uint8 *) malloc(mixbufferbytes);
-  if ( mixbuffer == NULL ) {
-    fprintf(stderr, "couldn't allocate audio mixing buffer\n");
-    return;
+      // One mixed slice = SAMPLECOUNT stereo S16 frames.
+      mixbufferbytes = SAMPLECOUNT * wanted.channels * (int)sizeof(Sint16);
+      mixbuffer = (Uint8 *) malloc(mixbufferbytes);
+      if ( mixbuffer == NULL ) {
+        fprintf(stderr, "couldn't allocate audio mixing buffer\n");
+        return;
+      }
+
+      audiostream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK,
+                                              &wanted, I_SDLAudioCallback, NULL);
+      if ( audiostream == NULL ) {
+        fprintf(stderr, "couldn't open audio: %s\n", SDL_GetError());
+        free(mixbuffer); mixbuffer = NULL;
+        return;
+      }
+      fprintf(stderr, " configured audio device with %d samples/slice (old mixer)\n", SAMPLECOUNT);
+  }
+  else
+  {
+      audio_device = SDL_OpenAudioDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, NULL);
+      if (audio_device == 0) {
+          fprintf(stderr, "couldn't open audio device: %s\n", SDL_GetError());
+          return;
+      }
+
+      SDL_AudioSpec src_spec;
+      src_spec.freq = SAMPLERATE; // 11025
+      src_spec.format = SDL_AUDIO_S16;
+      src_spec.channels = 2; // stereo
+
+      for (i = 0; i < NUM_CHANNELS; i++)
+      {
+          sfx_streams[i] = SDL_CreateAudioStream(&src_spec, NULL);
+          if (!sfx_streams[i]) {
+              fprintf(stderr, "couldn't create sfx stream %d: %s\n", i, SDL_GetError());
+          } else {
+              SDL_BindAudioStream(audio_device, sfx_streams[i]);
+          }
+      }
+
+      SDL_AudioSpec mus_src_spec;
+      mus_src_spec.freq = SAMPLERATE; // 11025
+      mus_src_spec.format = SDL_AUDIO_S16;
+      mus_src_spec.channels = 2; // stereo
+
+      music_stream = SDL_CreateAudioStream(&mus_src_spec, NULL);
+      if (music_stream)
+      {
+          SDL_BindAudioStream(audio_device, music_stream);
+          SDL_SetAudioStreamGetCallback(music_stream, I_SDLMusicCallback, NULL);
+      }
+
+      SDL_ResumeAudioDevice(audio_device);
+      fprintf(stderr, " configured audio device (new multi-stream mixer)\n");
   }
 
-  audiostream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK,
-                                          &wanted, I_SDLAudioCallback, NULL);
-  if ( audiostream == NULL ) {
-    fprintf(stderr, "couldn't open audio: %s\n", SDL_GetError());
-    free(mixbuffer); mixbuffer = NULL;
-    return;
-  }
-  fprintf(stderr, " configured audio device with %d samples/slice\n", SAMPLECOUNT);
-
-    
   // Initialize external data (all sounds) at start, keep static.
   fprintf( stderr, "I_InitSound: ");
   
@@ -676,7 +817,8 @@ I_InitSound()
   
   // Finished initialization.
   fprintf(stderr, "I_InitSound: sound module ready\n");
-  SDL_ResumeAudioStreamDevice(audiostream);
+  if (use_old_mixer)
+      SDL_ResumeAudioStreamDevice(audiostream);
 }
 
 
@@ -759,5 +901,41 @@ int I_QrySongPlaying(int handle)
 {
     (void)handle;
     return mus_kind != 0;
+}
+
+
+static void SDLCALL
+I_SDLMusicCallback (void *userdata, SDL_AudioStream *stream,
+		    int additional_amount, int total_amount)
+{
+    (void)userdata; (void)total_amount;
+    short temp_buf[2048];
+    while (additional_amount > 0)
+    {
+	int chunk = additional_amount;
+	if (chunk > (int)sizeof(temp_buf)) chunk = sizeof(temp_buf);
+	int frames = chunk / (2 * (int)sizeof(short)); // S16 stereo -> 4 bytes per frame
+	
+	if (mus_kind == 2 && !mus_paused)
+	{
+	    MUS_Render(temp_buf, frames);
+	    // Apply volume gain (0..15)
+	    float gain = i_music_gain / 15.0f;
+	    if (gain != 1.0f)
+	    {
+		int i;
+		for (i = 0; i < frames * 2; i++)
+		    temp_buf[i] = (short)(temp_buf[i] * gain);
+	    }
+	    SDL_PutAudioStreamData(stream, temp_buf, frames * 2 * (int)sizeof(short));
+	}
+	else
+	{
+	    // If no music, put silence
+	    memset(temp_buf, 0, frames * 2 * (int)sizeof(short));
+	    SDL_PutAudioStreamData(stream, temp_buf, frames * 2 * (int)sizeof(short));
+	}
+	additional_amount -= frames * 2 * (int)sizeof(short);
+    }
 }
 
