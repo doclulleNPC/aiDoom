@@ -389,9 +389,11 @@ enum
 {
     vid_res,
     vid_fullscreen,
-    vid_widescreen,
-    vid_aa,
-    vid_blur,
+    vid_widescreen, // Aspect
+    vid_filter,     // Scaling Filter
+    vid_vsync,      // VSync
+    vid_scale,      // Presentation scale mode (Letterbox vs Integer)
+    vid_backend,    // GPU Backend
     vid_end
 } video_e;
 
@@ -400,8 +402,10 @@ menuitem_t VideoMenu[]=
     {2,"",	M_VideoRes,'r'},	// left/right changes resolution
     {1,"",	M_VideoFullscreen,'f'},
     {2,"",	M_VideoAspect,'w'},	// left/right cycles 4:3 / 16:9 / 16:10
-    {1,"",	M_VideoAntialias,'a'},
-    {1,"",	M_VideoBlur,'b'}
+    {2,"",	M_VideoFilter,'t'},	// Nearest vs Linear
+    {1,"",	M_VideoVSync,'y'},	// VSync toggle
+    {2,"",	M_VideoScale,'s'},	// Letterbox vs Integer
+    {2,"",	M_VideoBackend,'b'}	// GPU Backend
 };
 
 menu_t  VideoDef =
@@ -410,7 +414,7 @@ menu_t  VideoDef =
     &OptionsDef,
     VideoMenu,
     M_DrawVideo,
-    60,37,
+    60,45,                  // Y offset changed from 55 to 45 to fit 7 items
     0
 };
 
@@ -1020,13 +1024,20 @@ extern int	hires;			// doomdef.c
 void		V_SetRes (int scale);	// i_video.c
 void		I_SetFullscreen (int on);// i_video.c
 int		I_GetFullscreen (void);	// i_video.c
-extern int	antialiasing;		// i_video.c
-extern int	blur;			// i_video.c
+extern int	scale_mode;		// i_video.c
+extern int	vsync;			// i_video.c
+extern int	integer_scale;		// i_video.c
+extern int	render_backend;		// i_video.c
 extern int	aspect;			// doomdef.c (0=4:3, 1=16:9, 2=16:10)
 extern int	SCREENWIDTH, SCREENHEIGHT;
-void		I_ApplyVideoFilter (void);// i_video.c
+void		I_ApplyVideoFilter (void);
+void		I_ApplyLogicalPresentation (void);
+void		I_ApplyVSync (void);
 
 static char* M_AspectNames[3] = { "4:3", "16:9", "16:10" };
+static char* M_FilterNames[2] = { "Nearest", "Linear" };
+static char* M_ScaleNames[2]  = { "Letterbox", "Integer" };
+static char* M_BackendNames[7] = { "Auto", "Vulkan", "OpenGL", "D3D12", "D3D11", "Metal", "Software" };
 
 void M_DrawVideo(void)
 {
@@ -1046,13 +1057,21 @@ void M_DrawVideo(void)
     M_WriteText(VideoDef.x + 130, VideoDef.y + LINEHEIGHT*vid_widescreen,
 		M_AspectNames[(aspect>=0 && aspect<=2) ? aspect : 2]);
 
-    M_WriteText(VideoDef.x, VideoDef.y + LINEHEIGHT*vid_aa, "Antialiasing");
-    M_WriteText(VideoDef.x + 130, VideoDef.y + LINEHEIGHT*vid_aa,
-		antialiasing ? "On" : "Off");
+    M_WriteText(VideoDef.x, VideoDef.y + LINEHEIGHT*vid_filter, "Filter");
+    M_WriteText(VideoDef.x + 130, VideoDef.y + LINEHEIGHT*vid_filter,
+		M_FilterNames[(scale_mode>=0 && scale_mode<=1) ? scale_mode : 0]);
 
-    M_WriteText(VideoDef.x, VideoDef.y + LINEHEIGHT*vid_blur, "Blur");
-    M_WriteText(VideoDef.x + 130, VideoDef.y + LINEHEIGHT*vid_blur,
-		blur ? "On" : "Off");
+    M_WriteText(VideoDef.x, VideoDef.y + LINEHEIGHT*vid_vsync, "VSync");
+    M_WriteText(VideoDef.x + 130, VideoDef.y + LINEHEIGHT*vid_vsync,
+		vsync ? "On" : "Off");
+
+    M_WriteText(VideoDef.x, VideoDef.y + LINEHEIGHT*vid_scale, "Scaling");
+    M_WriteText(VideoDef.x + 130, VideoDef.y + LINEHEIGHT*vid_scale,
+		M_ScaleNames[(integer_scale>=0 && integer_scale<=1) ? integer_scale : 0]);
+
+    M_WriteText(VideoDef.x, VideoDef.y + LINEHEIGHT*vid_backend, "Backend (restart)");
+    M_WriteText(VideoDef.x + 130, VideoDef.y + LINEHEIGHT*vid_backend,
+		M_BackendNames[(render_backend>=0 && render_backend<=6) ? render_backend : 0]);
 }
 
 void M_VideoRes(int choice)
@@ -1082,16 +1101,30 @@ void M_VideoAspect(int choice)	// left/right cycles 4:3 -> 16:9 -> 16:10
     M_SaveDefaults();
 }
 
-void M_VideoAntialias(int choice)
+void M_VideoFilter(int choice)
 {
-    antialiasing = !antialiasing;
-    I_ApplyVideoFilter();	// re-apply texture scale mode live
+    scale_mode = choice ? 1 : 0;
+    I_ApplyVideoFilter();	// re-apply scaling filter live
     M_SaveDefaults();
 }
 
-void M_VideoBlur(int choice)
+void M_VideoVSync(int choice)
 {
-    blur = !blur;
+    vsync = !vsync;
+    I_ApplyVSync();		// re-apply VSync live
+    M_SaveDefaults();
+}
+
+void M_VideoScale(int choice)
+{
+    integer_scale = choice ? 1 : 0;
+    I_ApplyLogicalPresentation(); // re-apply logical presentation live
+    M_SaveDefaults();
+}
+
+void M_VideoBackend(int choice)
+{
+    render_backend = choice ? (render_backend+1)%7 : (render_backend+6)%7;
     M_SaveDefaults();
 }
 

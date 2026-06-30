@@ -46,61 +46,35 @@ static SDL_Texture*	texture = NULL;
 // Expanded 32-bit (ARGB8888) palette, rebuilt by I_SetPalette.
 static Uint32		palette[256];
 
-// Video filters (Options -> Video; default off, persisted in config).
-//  antialiasing: bilinear texture scaling (crispy-doom-style smoothing when the
-//                frame is scaled up to the window/fullscreen).
-//  blur:         a 1-2-1 separable soft blur applied to the frame each present.
-int			antialiasing = 0;
-int			blur = 0;
+// Video options (Options -> Video; persisted in config).
+int			scale_mode = 0;       // 0 = Nearest, 1 = Linear
+int			vsync = 1;            // 0 = Off, 1 = On (default On)
+int			integer_scale = 0;    // 0 = Letterbox, 1 = Integer Scale
+int			render_backend = 0;   // 0 = Auto, 1 = Vulkan, 2 = OpenGL, 3 = D3D12, 4 = D3D11, 5 = Metal, 6 = Software
 
-// Average two ARGB pixels, all four channels at once (SWAR) -- no per-channel
-// extraction, so it's ~2-3x faster than the naive blur.  The &0xfefefefe masks
-// the low bit of each byte before the >>1 so channels don't bleed into each other.
-#define PP_AVG(a,b)	((((a)&0xfefefefeu)>>1) + (((b)&0xfefefefeu)>>1))
-
-// Separable 1-2-1 soft pass over a 32-bit ARGB frame, in place, `passes` times.
-// PP_AVG(PP_AVG(left,right),centre) == left/4 + centre/2 + right/4 (a 1-2-1 kernel)
-// done with two SWAR averages instead of per-channel math.
-static void I_SoftenFrame (Uint32* buf, int w, int h, int passes)
-{
-    static Uint32*	tmp;
-    static int		cap;
-    int			x, y, p;
-
-    if (cap < w*h) { free (tmp); tmp = malloc (w*h*sizeof(Uint32)); cap = w*h; }
-    if (!tmp) return;
-
-    for (p = 0; p < passes; p++)
-    {
-	for (y = 0; y < h; y++)			// horizontal: buf -> tmp
-	{
-	    Uint32* s = buf + y*w;
-	    Uint32* d = tmp + y*w;
-	    d[0] = s[0];
-	    for (x = 1; x < w-1; x++)
-		d[x] = PP_AVG (PP_AVG (s[x-1], s[x+1]), s[x]);
-	    if (w > 1) d[w-1] = s[w-1];
-	}
-	for (y = 0; y < h; y++)			// vertical: tmp -> buf
-	{
-	    Uint32* s0 = tmp + (y>0   ? y-1 : y)*w;
-	    Uint32* s1 = tmp + y*w;
-	    Uint32* s2 = tmp + (y<h-1 ? y+1 : y)*w;
-	    Uint32* d  = buf + y*w;
-	    for (x = 0; x < w; x++)
-		d[x] = PP_AVG (PP_AVG (s0[x], s2[x]), s1[x]);
-	}
-    }
-}
-
-// Re-apply the texture scale mode when the antialiasing option changes (menu).
-// Antialiasing also gets bilinear scaling for free when the frame is upscaled to
-// a larger window/fullscreen (on top of the light soften pass in I_FinishUpdate).
+// Re-apply the texture scale mode.
 void I_ApplyVideoFilter (void)
 {
     if (texture)
 	SDL_SetTextureScaleMode (texture,
-	    antialiasing ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST);
+	    scale_mode ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST);
+}
+
+// Re-apply logical presentation.
+void I_ApplyLogicalPresentation (void)
+{
+    if (renderer)
+    {
+	SDL_SetRenderLogicalPresentation(renderer, SCREENWIDTH, I_OutHeight(),
+	    integer_scale ? SDL_LOGICAL_PRESENTATION_INTEGER_SCALE : SDL_LOGICAL_PRESENTATION_LETTERBOX);
+    }
+}
+
+// Re-apply VSync.
+void I_ApplyVSync (void)
+{
+    if (renderer)
+	SDL_SetRenderVSync(renderer, vsync);
 }
 
 // Non-zero when displaying fullscreen.  Saved/restored via the config file.
@@ -414,42 +388,12 @@ void I_FinishUpdate (void)
     if ( !SDL_LockTexture(texture, NULL, &pixels, &pitch) )
 	return;
 
-    // Soft passes: 0 = none (fast path), 1 = antialiasing (subtle), 2 = blur.
-    int softpasses = blur ? 2 : (antialiasing ? 1 : 0);
-
-    if (!softpasses)
+    for (y=0 ; y<SCREENHEIGHT ; y++)		// fast path: expand straight to texture
     {
-	for (y=0 ; y<SCREENHEIGHT ; y++)		// fast path: expand straight to texture
-	{
-	    Uint32*		dst = (Uint32 *)((Uint8 *)pixels + y*pitch);
-	    unsigned char*	src = screens[0] + y*SCREENWIDTH;
-	    for (x=0 ; x<SCREENWIDTH ; x++)
-		dst[x] = palette[src[x]];
-	}
-    }
-    else
-    {
-	// expand into a contiguous buffer, soften it, then copy to the texture
-	static Uint32*	fb;
-	static int	fbcap;
-	if (fbcap < SCREENWIDTH*SCREENHEIGHT)
-	{ free (fb); fb = malloc (SCREENWIDTH*SCREENHEIGHT*sizeof(Uint32)); fbcap = SCREENWIDTH*SCREENHEIGHT; }
-	if (fb)
-	{
-	    for (y=0 ; y<SCREENHEIGHT ; y++)
-	    {
-		Uint32*		d = fb + y*SCREENWIDTH;
-		unsigned char*	src = screens[0] + y*SCREENWIDTH;
-		for (x=0 ; x<SCREENWIDTH ; x++) d[x] = palette[src[x]];
-	    }
-	    I_SoftenFrame (fb, SCREENWIDTH, SCREENHEIGHT, softpasses);
-	    for (y=0 ; y<SCREENHEIGHT ; y++)
-	    {
-		Uint32*	dst = (Uint32 *)((Uint8 *)pixels + y*pitch);
-		Uint32*	s   = fb + y*SCREENWIDTH;
-		for (x=0 ; x<SCREENWIDTH ; x++) dst[x] = s[x];
-	    }
-	}
+	Uint32*		dst = (Uint32 *)((Uint8 *)pixels + y*pitch);
+	unsigned char*	src = screens[0] + y*SCREENWIDTH;
+	for (x=0 ; x<SCREENWIDTH ; x++)
+	    dst[x] = palette[src[x]];
     }
 
     SDL_UnlockTexture(texture);
@@ -503,19 +447,15 @@ static void I_CreateTexture(void)
     if (texture)
 	SDL_DestroyTexture(texture);
 
-    // Render at the internal resolution; SDL scales (aspect-preserving) to the
-    // window.  Letterbox keeps the chosen aspect with bars rather than distorting.
-    // For 4:3 the logical height is wider-aspect so the 16:10 buffer is shown 4:3.
-    SDL_SetRenderLogicalPresentation(renderer, SCREENWIDTH, I_OutHeight(),
-				     SDL_LOGICAL_PRESENTATION_LETTERBOX);
+    I_ApplyLogicalPresentation();
 
     texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
 				SDL_TEXTUREACCESS_STREAMING,
 				SCREENWIDTH, SCREENHEIGHT);
     if ( texture == NULL )
 	I_Error("Could not create texture: %s", SDL_GetError());
-    SDL_SetTextureScaleMode(texture,				// crisp, or smooth if AA on
-	antialiasing ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST);
+    
+    I_ApplyVideoFilter();
 }
 
 
@@ -657,14 +597,25 @@ void I_InitGraphics(void)
 	}
     }
 
-    renderer = SDL_CreateRenderer(window, NULL);
+    const char* driver_name = NULL;
+    static const char* backend_names[] = {
+	NULL,          // Auto
+	"vulkan",
+	"opengl",
+	"direct3d12",
+	"direct3d11",
+	"metal",
+	"software"
+    };
+    if (render_backend >= 1 && render_backend <= 6)
+	driver_name = backend_names[render_backend];
+
+    renderer = SDL_CreateRenderer(window, driver_name);
     if ( renderer == NULL )
 	I_Error("Could not create renderer: %s", SDL_GetError());
 
-    // VSync on: SDL3 defaults it OFF, which tears badly on fast strafes -- the
-    // high-contrast textures (e.g. the blue computer wall) showed as a horizontal
-    // "smear". Sync presentation to the refresh to kill the tearing.
-    SDL_SetRenderVSync(renderer, 1);
+    // Sync presentation to the refresh rate if vsync is enabled.
+    I_ApplyVSync();
 
     I_CreateTexture();
 

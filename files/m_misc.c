@@ -192,8 +192,10 @@ extern int	autorun;
 extern int	key_console;
 extern int	key_spy;
 extern int	crosshair;
-extern int	antialiasing;	// i_video.c -- smooth (bilinear) scaling
-extern int	blur;		// i_video.c -- soft blur post-process
+extern int	scale_mode;
+extern int	vsync;
+extern int	integer_scale;
+extern int	render_backend;
 extern int	aspect;		// doomdef.c -- 0=4:3, 1=16:9, 2=16:10
 
 // Monster pack-hunt AI (p_enemy.c)
@@ -307,8 +309,10 @@ default_t	defaults[] =
     // fullscreen flag.  Applied by i_video.c at startup.
     {"screen_resolution",&hires, 3},
     {"fullscreen",&fullscreen_mode, 0},
-    {"antialiasing",&antialiasing, 0},		// default OFF
-    {"blur",&blur, 0},				// default OFF
+    {"scale_mode",&scale_mode, 0},
+    {"vsync",&vsync, 1},
+    {"integer_scale",&integer_scale, 0},
+    {"render_backend",&render_backend, 0},
     {"aspect",&aspect, 0},			// default 4:3 (0=4:3, 1=16:9, 2=16:10)
 
     {"snd_channels",&numChannels, 3},

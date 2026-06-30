@@ -134,6 +134,11 @@ extern int	widescreen;	// derived: aspect==16:9
 extern int	NONWIDEWIDTH;
 extern int	WIDESCREENDELTA;
 
+extern int	scale_mode;	// 0=Nearest, 1=Linear
+extern int	vsync;		// 0=Off, 1=On
+extern int	integer_scale;	// 0=Letterbox, 1=Integer Scale
+extern int	render_backend;	// 0=Auto, 1=Vulkan, 2=OpenGL, 3=D3D12, 4=D3D11, 5=Metal, 6=Software
+
 
 
 
