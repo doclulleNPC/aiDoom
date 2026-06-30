@@ -8,6 +8,13 @@ Buddy mode (off / `-coop` / `-aicoop`), the Monster mode (vanilla / L4D /
 `-aidirector`), and the Skill, then hit **Launch** — it starts the game with the
 right flags and auto-starts the native `director` sidecar when an AI mode is chosen.
 
+> **Monster modes:** **vanilla** = stock 1993 AI; **L4D** = the rule-based `-director`
+> (stress-driven extra spawns + the spoken game-master "voice of god"); **`-aidirector`** =
+> the LLM monster director (Ollama). A selected **SIGIL / SIGIL II** PWAD is checksum-verified
+> (name **and** MD5) and warped to its own episode — `SIGIL_V1_23` → **E5M1**,
+> `SIGIL_COMPAT` → **E3M1**, `SIGIL II` → **E6M1**; a SIGIL-named file with the wrong checksum
+> is ignored (not loaded).
+
 > **Game WADs live in `run/ID0/`** (DOOM.WAD, doom2.wad, aidoom.wad,
 > doom2stuff.wad, heretic.wad, …). The engine, launcher and tools search there
 > automatically, so bare names (`-iwad DOOM.WAD`, `-file doom2stuff.wad`) resolve

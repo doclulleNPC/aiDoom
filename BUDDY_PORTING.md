@@ -131,10 +131,13 @@ verifiziert begehbarer Sprung Richtung Spieler.
 - Bei HP ≤ 0 stirbt der Buddy **nicht** (kein Game-Over): er geht „down", bleibt liegen
   (kein USE → kein Reborn), ruft `help:`.
 - Der Mensch revived ihn, indem er **nah** (`COOP_REVIVE_RANGE` 96u) **steht und USE
-  drückt** — `P_AICoop_RevivePress` überträgt 10 HP vom Menschen (geht nicht, wenn der
-  Mensch ≤ 10 HP hätte) und stellt den Buddy in-place wieder auf. Steht der Buddy dabei im
-  Menschen, wird er **weggeschoben** (kein Klemmen). Beim Revive **bedankt** er sich
-  zuverlässig (`thanks:`, VP_COMMAND).
+  drückt** — `P_AICoop_RevivePress` **kostet ein Heil-Item aus dem Inventar des Menschen**:
+  bevorzugt ein **Stimpack** (Buddy steht mit 10 HP auf), sonst ein **Medikit** (25 HP); das
+  Item wird aus `player->inventory[]` verbraucht. **Ohne Stimpack/Medikit** geht das Revive
+  **nicht** — der Mensch bekommt die Message *„NEED A STIMPACK OR MEDIKIT TO REVIVE YOUR
+  BUDDY"* und der USE-Press fällt durch (kein Revive, **kein** HP-Verlust mehr). Steht der
+  Buddy dabei im Menschen, wird er **weggeschoben** (kein Klemmen). Beim Revive **bedankt** er
+  sich zuverlässig (`thanks:`, VP_COMMAND).
 - **Nukage-Recall:** geht der Buddy auf einem Schadens-Boden (Nukage/Lava) down — wo der
   Mensch ihn nicht sicher erreichen kann — wird der Körper zum Map-Spawn teleportiert **und
   direkt mit 100 HP wieder aufgestellt**.
@@ -212,7 +215,7 @@ Tasten-Binds (`m_misc.c`): `key_buddy_come` (`,`), `key_buddy_attack` (`.`),
 | `COOP_CAUTION_HP` | 50 | darunter „spielt sicher" |
 | `COOP_HEAL_HP` / `_RANGE` | 50 / 1024u | Medkit suchen |
 | `COOP_SAFE_HP` | 40 | darunter Safe-Route |
-| `COOP_REVIVE_RANGE` | 96u | Revive-Reichweite (10 HP) |
+| `COOP_REVIVE_RANGE` | 96u | Revive-Reichweite (kostet 1 Stimpack/Medikit) |
 | `COOP_BLAST_SAFE` | 176u | Splash-Sicherheit Rakete/BFG |
 | `COOP_DODGE_RANGE` | 256u | Projektil-Ausweichen |
 | `COOP_FACING` / `COOP_TURN` | 1500 / 1300 BAM | Feuer-Winkel / max. Drehung/Tic |

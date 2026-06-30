@@ -19,9 +19,12 @@ a language model drive monster tactics in real time.
 - **Variable internal resolution** — the software renderer draws natively at
   320×200 … 1920×1200 (`hires` 1–6), switchable at runtime from an **Options → Video**
   menu (no upscaling of a fixed 320×200 image).
-- **Quake-style console** (`files/c_console.c`) — open with **F12** or **`` ` ``** (backquote);
+- **Quake-style console** (`files/c_console.c`) — open with **`` ` ``** (backquote);
   scrollback + input line over a dimmed view, commands: `help clear echo quit god
-  noclip give map`/`warp`.
+  noclip give map`/`warp`.  (**F12** is the spy view — watch the AI buddy.)
+- **Gamepad support** — plug in a controller (auto-detected, hot-pluggable): **left stick**
+  moves, **right stick** turns/looks, and the face/shoulder buttons map to
+  fire / use / jump / weapon-switch / strafe.
 - **Free-look** (mouse aims the view up/down and your shots follow), **jump**
   (default **Space**, with a grunt), toggle **autorun**, an optional
   **`-infight`** flag that enables same-species monster infighting, and
@@ -228,7 +231,7 @@ Behaviour (intentionally simple — straight-line movement, no pathfinding):
 
 In the launchers it's on by default; disable with `--no-coop` (`-NoCoop` on Windows).
 
-From the **console** (open with **F12** or `` ` ``) you can direct it:
+From the **console** (open with `` ` ``) you can direct it:
 
 | command | effect |
 |---|---|
