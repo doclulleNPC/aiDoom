@@ -202,8 +202,10 @@ void M_Video(int choice);
 void M_VideoRes(int choice);
 void M_VideoFullscreen(int choice);
 void M_VideoAspect(int choice);
-void M_VideoAntialias(int choice);
-void M_VideoBlur(int choice);
+void M_VideoFilter(int choice);
+void M_VideoVSync(int choice);
+void M_VideoScale(int choice);
+void M_VideoBackend(int choice);
 void M_DrawVideo(void);
 void M_WriteTextBig(int x, int y, char *string, int sc);
 
