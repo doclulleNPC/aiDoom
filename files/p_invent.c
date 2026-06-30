@@ -333,14 +333,17 @@ boolean P_DropArtifact (player_t* player)
 
     // Place it ~40u ahead so it lands in front; if that's inside a wall, drop at the feet.
     an = mo->angle >> ANGLETOFINESHIFT;
-    dx = mo->x + FixedMul (40*FRACUNIT, finecosine[an]);
-    dy = mo->y + FixedMul (40*FRACUNIT, finesine[an]);
+    dx = mo->x + FixedMul (48*FRACUNIT, finecosine[an]);
+    dy = mo->y + FixedMul (48*FRACUNIT, finesine[an]);
     drop = P_SpawnMobj (mo->x, mo->y, mo->z, t);	// spawn at the feet...
     P_TryMove (drop, dx, dy);				// ...slide it ahead (relinks; stays put if a wall blocks)
     drop->flags |= MF_DROPPED;				// a dropped item (no deathmatch respawn)
-    drop->momx = FixedMul (6*FRACUNIT, finecosine[an]);	// toss it forward + up
-    drop->momy = FixedMul (6*FRACUNIT, finesine[an]);
-    drop->momz = 4*FRACUNIT;
+    // Toss it along the player's facing (an = mo->angle), harder than before so it clears the
+    // player and lands well ahead instead of dropping at the feet to be re-grabbed instantly.
+    // The in-flight pickup guard in P_TouchSpecialThing keeps the dropper off it until it lands.
+    drop->momx = FixedMul (10*FRACUNIT, finecosine[an]);
+    drop->momy = FixedMul (10*FRACUNIT, finesine[an]);
+    drop->momz = 5*FRACUNIT;
 
     player->inventory[a] -= amount;
     if (player->inventory[a] < 0) player->inventory[a] = 0;

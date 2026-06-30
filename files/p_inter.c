@@ -366,6 +366,12 @@ P_TouchSpecialThing
 	// out of reach
 	return;
     }
+
+    // A just-dropped artifact is tossed forward through the air; until it has settled on the
+    // floor, ignore it so the dropper can't instantly re-pocket what they just threw.  (Items a
+    // dying monster drops sit at floor level, momz 0, so they're unaffected.)
+    if ((special->flags & MF_DROPPED) && (special->momz != 0 || special->z > special->floorz))
+	return;
     
 	
     sound = sfx_itemup;	
