@@ -28,6 +28,7 @@
 #include "doomstat.h"
 #include "d_event.h"
 #include "d_items.h"
+#include "p_invent.h"		// inventory: spend a stimpack/medikit to revive
 #include "m_argv.h"
 #include "p_local.h"
 #include "p_mobj.h"
@@ -1919,9 +1920,9 @@ static void P_AICoop_Revive (int hp)
     AICoop_Callout ("revived:", 3);
 }
 
-// Human pressed USE: if standing over the downed buddy, transfer 10 HP to it and
-// bring it back into the fight.  Returns true if the press was consumed (so the
-// caller doesn't also open a door with the same press).
+// Human pressed USE: if standing over the downed buddy, spend a Stimpack or Medikit from the
+// human's inventory to bring it back into the fight (no item -> a message, no revive).  Returns
+// true if the press was consumed (so the caller doesn't also open a door with the same press).
 boolean P_AICoop_RevivePress (player_t* presser)
 {
     player_t*	bot;
@@ -1933,10 +1934,22 @@ boolean P_AICoop_RevivePress (player_t* presser)
     if (!dmo || !presser->mo) return false;
     if (P_AproxDistance (presser->mo->x - dmo->x, presser->mo->y - dmo->y) >= COOP_REVIVE_RANGE)
 	return false;
-    if (presser->health <= 10) return false;	// can't spare it (would down the human)
-    presser->health -= 10;			// transfer 10 HP human -> buddy
-    if (presser->mo) presser->mo->health = presser->health;
-    P_AICoop_Revive (10);			// buddy back up with the donated 10 HP
+    // Reviving costs a health artifact from the human's pack -- a Stimpack or a Medikit (prefer
+    // the smaller Stimpack so the Medikit is saved).  The buddy comes back up on that item's heal
+    // value.  With neither in the inventory, the buddy can't be revived: say so and bail.
+    artitype_t	cost;
+    int		reviveHP;
+    if      (presser->inventory[arti_stimpack] > 0) { cost = arti_stimpack; reviveHP = 10; }
+    else if (presser->inventory[arti_medikit]  > 0) { cost = arti_medikit;  reviveHP = 25; }
+    else
+    {
+	presser->message = "NEED A STIMPACK OR MEDIKIT TO REVIVE YOUR BUDDY";
+	return false;
+    }
+    presser->inventory[cost]--;			// spend it
+    if (presser->invslot == cost && presser->inventory[cost] <= 0)
+	P_InvScroll (presser, +1);		// emptied the shown slot -> advance to another
+    P_AICoop_Revive (reviveHP);			// buddy back up on the spent stimpack/medikit
     // Thank the human, reliably: VP_COMMAND preempts the rate-limited "help!" screams the
     // downed buddy was making (an ambient "revived" line would be gated out right after them).
     AICoop_CalloutP ("thanks:", 6, VP_COMMAND);
