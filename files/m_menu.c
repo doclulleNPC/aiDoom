@@ -1037,7 +1037,7 @@ void		I_ApplyLogicalPresentation (void);
 void		I_ApplyVSync (void);
 
 static char* M_AspectNames[3] = { "4:3", "16:9", "16:10" };
-static char* M_FilterNames[2] = { "Nearest", "Linear" };
+static char* M_FilterNames[3] = { "None", "Nearest", "Linear" };
 static char* M_ScaleNames[2]  = { "Letterbox", "Integer" };
 static char* M_BackendNames[7] = { "Auto", "Vulkan", "OpenGL", "D3D12", "D3D11", "Metal", "Software" };
 
@@ -1061,7 +1061,7 @@ void M_DrawVideo(void)
 
     M_WriteText(VideoDef.x, VideoDef.y + LINEHEIGHT*vid_filter, "Filter");
     M_WriteText(VideoDef.x + 130, VideoDef.y + LINEHEIGHT*vid_filter,
-		M_FilterNames[(scale_mode>=0 && scale_mode<=1) ? scale_mode : 0]);
+		M_FilterNames[(scale_mode>=0 && scale_mode<=2) ? scale_mode : 0]);
 
     M_WriteText(VideoDef.x, VideoDef.y + LINEHEIGHT*vid_vsync, "VSync");
     M_WriteText(VideoDef.x + 130, VideoDef.y + LINEHEIGHT*vid_vsync,
@@ -1105,7 +1105,7 @@ void M_VideoAspect(int choice)	// left/right cycles 4:3 -> 16:9 -> 16:10
 
 void M_VideoFilter(int choice)
 {
-    scale_mode = choice ? 1 : 0;
+    scale_mode = choice ? (scale_mode+1)%3 : (scale_mode+2)%3;
     I_ApplyVideoFilter();	// re-apply scaling filter live
     M_SaveDefaults();
 }

@@ -211,6 +211,8 @@ void I_GetEvent(SDL_Event *Event)
 
       case SDL_EVENT_MOUSE_BUTTON_DOWN:
       case SDL_EVENT_MOUSE_BUTTON_UP:
+	if (menuactive)
+	    break;
 	event.type = ev_mouse;
 	event.data1 = I_MouseButtons(SDL_GetMouseState(NULL, NULL));
 	event.data2 = event.data3 = 0;
@@ -232,6 +234,8 @@ void I_GetEvent(SDL_Event *Event)
 	break;
 
       case SDL_EVENT_MOUSE_MOTION:
+	if (menuactive)
+	    break;
 	event.type = ev_mouse;
 	event.data1 = I_MouseButtons(Event->motion.state);
 	event.data2 =  ((int)Event->motion.xrel) << 2;
@@ -240,6 +244,8 @@ void I_GetEvent(SDL_Event *Event)
 	break;
 
       case SDL_EVENT_MOUSE_WHEEL:
+	if (menuactive)
+	    break;
 	// wheel up/down -> a one-shot key press (default: next/prev weapon)
 	if (Event->wheel.y != 0)
 	{
