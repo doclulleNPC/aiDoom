@@ -52,6 +52,20 @@ int			vsync = 1;            // 0 = Off, 1 = On (default On)
 int			integer_scale = 0;    // 0 = Letterbox, 1 = Integer Scale
 int			render_backend = 0;   // 0 = Auto, 1 = Vulkan, 2 = OpenGL, 3 = D3D12, 4 = D3D11, 5 = Metal, 6 = Software
 
+// Gamepad integration
+float gamepad_left_x = 0.0f;
+float gamepad_left_y = 0.0f;
+float gamepad_right_x = 0.0f;
+float gamepad_right_y = 0.0f;
+static SDL_Gamepad* gamepad = NULL;
+
+extern int mousex, mousey;
+extern int key_use;
+extern int key_fire;
+extern int key_jump;
+extern int key_strafeleft;
+extern int key_straferight;
+
 // Re-apply the texture scale mode.
 void I_ApplyVideoFilter (void)
 {
@@ -257,6 +271,118 @@ void I_GetEvent(SDL_Event *Event)
 	}
 	break;
 
+      case SDL_EVENT_GAMEPAD_ADDED:
+	if (!gamepad)
+	{
+	    gamepad = SDL_OpenGamepad(Event->gdevice.which);
+	    if (gamepad)
+		fprintf(stderr, "Gamepad connected: %s\n", SDL_GetGamepadName(gamepad));
+	}
+	break;
+
+      case SDL_EVENT_GAMEPAD_REMOVED:
+	if (gamepad && Event->gdevice.which == SDL_GetGamepadID(gamepad))
+	{
+	    fprintf(stderr, "Gamepad disconnected\n");
+	    SDL_CloseGamepad(gamepad);
+	    gamepad = NULL;
+	    gamepad_left_x = 0.0f;
+	    gamepad_left_y = 0.0f;
+	    gamepad_right_x = 0.0f;
+	    gamepad_right_y = 0.0f;
+	}
+	break;
+
+      case SDL_EVENT_GAMEPAD_BUTTON_DOWN:
+      case SDL_EVENT_GAMEPAD_BUTTON_UP:
+	{
+	    int doom_key = 0;
+	    switch (Event->gbutton.button)
+	    {
+		case SDL_GAMEPAD_BUTTON_SOUTH:        doom_key = key_jump; break;
+		case SDL_GAMEPAD_BUTTON_WEST:         doom_key = key_use; break;
+		case SDL_GAMEPAD_BUTTON_EAST:         doom_key = key_fire; break;
+		case SDL_GAMEPAD_BUTTON_NORTH:
+		    {
+			if (Event->type == SDL_EVENT_GAMEPAD_BUTTON_DOWN)
+			{
+			    event.type = ev_keydown;
+			    event.data1 = KEY_MWHEELUP;
+			    event.data2 = event.data3 = 0;
+			    D_PostEvent(&event);
+			    event.type = ev_keyup;
+			    D_PostEvent(&event);
+			}
+		    }
+		    break;
+		case SDL_GAMEPAD_BUTTON_LEFT_SHOULDER:  doom_key = key_strafeleft; break;
+		case SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER: doom_key = key_straferight; break;
+		case SDL_GAMEPAD_BUTTON_START:        doom_key = KEY_ESCAPE; break;
+		case SDL_GAMEPAD_BUTTON_BACK:         doom_key = KEY_TAB; break;
+		case SDL_GAMEPAD_BUTTON_DPAD_UP:      doom_key = KEY_UPARROW; break;
+		case SDL_GAMEPAD_BUTTON_DPAD_DOWN:    doom_key = KEY_DOWNARROW; break;
+		case SDL_GAMEPAD_BUTTON_DPAD_LEFT:    doom_key = KEY_LEFTARROW; break;
+		case SDL_GAMEPAD_BUTTON_DPAD_RIGHT:   doom_key = KEY_RIGHTARROW; break;
+	    }
+	    if (doom_key)
+	    {
+		event.type  = (Event->type == SDL_EVENT_GAMEPAD_BUTTON_DOWN) ? ev_keydown : ev_keyup;
+		event.data1 = doom_key;
+		event.data2 = event.data3 = 0;
+		D_PostEvent(&event);
+	    }
+	}
+	break;
+
+      case SDL_EVENT_GAMEPAD_AXIS_MOTION:
+	{
+	    float val = (float)Event->gaxis.value / 32767.0f;
+	    switch (Event->gaxis.axis)
+	    {
+		case SDL_GAMEPAD_AXIS_LEFTX:
+		    gamepad_left_x = val;
+		    break;
+		case SDL_GAMEPAD_AXIS_LEFTY:
+		    gamepad_left_y = val;
+		    break;
+		case SDL_GAMEPAD_AXIS_RIGHTX:
+		    gamepad_right_x = val;
+		    break;
+		case SDL_GAMEPAD_AXIS_RIGHTY:
+		    gamepad_right_y = val;
+		    break;
+		case SDL_GAMEPAD_AXIS_LEFT_TRIGGER:
+		    {
+			static boolean lt_pressed = false;
+			boolean pressed = (Event->gaxis.value > 16384);
+			if (pressed != lt_pressed)
+			{
+			    lt_pressed = pressed;
+			    event.type = pressed ? ev_keydown : ev_keyup;
+			    event.data1 = KEY_RSHIFT; // Speed
+			    event.data2 = event.data3 = 0;
+			    D_PostEvent(&event);
+			}
+		    }
+		    break;
+		case SDL_GAMEPAD_AXIS_RIGHT_TRIGGER:
+		    {
+			static boolean rt_pressed = false;
+			boolean pressed = (Event->gaxis.value > 16384);
+			if (pressed != rt_pressed)
+			{
+			    rt_pressed = pressed;
+			    event.type = pressed ? ev_keydown : ev_keyup;
+			    event.data1 = key_fire; // Fire
+			    event.data2 = event.data3 = 0;
+			    D_PostEvent(&event);
+			}
+		    }
+		    break;
+	    }
+	}
+	break;
+
       case SDL_EVENT_WINDOW_FOCUS_GAINED:
 	window_focused = 1;
 	I_ApplyMouseGrab();
@@ -281,6 +407,16 @@ void I_StartTic (void)
 
     while ( SDL_PollEvent(&Event) )
 	I_GetEvent(&Event);
+
+    // Apply right stick analog looking/turning to mouse accumulators
+    if (gamepad_right_x < -0.1f || gamepad_right_x > 0.1f) {
+        // Horizontal turn
+        mousex += (int)(gamepad_right_x * 8.0f * (mouseSensitivity + 5));
+    }
+    if (gamepad_right_y < -0.1f || gamepad_right_y > 0.1f) {
+        // Vertical look (inverted look: right stick down/positive Y is looking down, mousey negative is looking down)
+        mousey -= (int)(gamepad_right_y * 8.0f * (mouseSensitivity + 5));
+    }
 }
 
 

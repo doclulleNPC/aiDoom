@@ -454,8 +454,18 @@ void G_BuildTiccmd (ticcmd_t* cmd)
     else
 	cmd->angleturn -= mousex*0x8; 
 
-    mousex = mousey = 0; 
-	 
+    mousex = mousey = 0;
+
+    // Gamepad analog movement:
+    extern float gamepad_left_x;
+    extern float gamepad_left_y;
+    if (gamepad_left_y < -0.1f || gamepad_left_y > 0.1f) {
+        forward -= (int)(gamepad_left_y * forwardmove[speed]);
+    }
+    if (gamepad_left_x < -0.1f || gamepad_left_x > 0.1f) {
+        side += (int)(gamepad_left_x * sidemove[speed]);
+    }
+
     if (forward > MAXPLMOVE) 
 	forward = MAXPLMOVE; 
     else if (forward < -MAXPLMOVE) 
