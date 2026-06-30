@@ -409,7 +409,8 @@ menuitem_t VideoMenu[]=
     {2,"",	M_VideoFilter,'t'},	// Nearest vs Linear
     {1,"",	M_VideoVSync,'y'},	// VSync toggle
     {2,"",	M_VideoScale,'s'},	// Letterbox vs Integer
-    {2,"",	M_VideoBackend,'b'}	// GPU Backend
+    {2,"",	M_VideoBackend,'b'},	// GPU Backend
+    {2,"",	M_StatusBarStyle,'h'}	// Vanilla / Small / Alt HUD
 };
 
 menu_t  VideoDef =
