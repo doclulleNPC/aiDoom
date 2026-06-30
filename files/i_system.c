@@ -167,15 +167,18 @@ extern boolean demorecording;
 void I_Error (char *error, ...)
 {
     va_list	argptr;
+    char	buf[1024];
 
     // Message first.
     va_start (argptr,error);
-    fprintf (stderr, "Error: ");
-    vfprintf (stderr,error,argptr);
-    fprintf (stderr, "\n");
+    vsnprintf (buf, sizeof(buf), error, argptr);
     va_end (argptr);
 
+    fprintf (stderr, "Error: %s\n", buf);
     fflush( stderr );
+
+    // Show native message box to make errors user-friendly
+    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "aiDoom Error", buf, NULL);
 
     // Shutdown. Here might be other errors.
     if (demorecording)
