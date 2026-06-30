@@ -1137,6 +1137,84 @@ static patch_t* ST_CachePatch (const char* name)
     return (patch_t *) W_CacheLumpName ((char*)name, PU_STATIC);
 }
 
+// ---------------------------------------------------------------------------
+// Alternative status-bar styles (Options -> Video -> Status Bar): 0 = vanilla,
+// 1 = the vanilla bar scaled to 50% centred at the bottom, 2 = a minimal
+// fullscreen HUD (health bottom-left + ammo bottom-right).  Styles 1/2 overlay a
+// full-height view (forced in R_ExecuteSetViewSize when this is non-zero).
+int statusbar_style = 0;
+
+// Draw num with the big "tall" font, left edge at (x,y); returns x past the digits.
+static int ST_TallNum (int x, int y, int num)
+{
+    int  w = ST_TALLNUMWIDTH;
+    char buf[12];
+    int  i, n;
+    if (num < 0) num = 0;
+    n = sprintf (buf, "%d", num);
+    for (i = 0; i < n; i++) { V_DrawPatch (x, y, FG, tallnum[buf[i]-'0']); x += w; }
+    return x;
+}
+
+// Style 1: render the full vanilla bar, then nearest-neighbour scale it to 50%
+// centred along the bottom, keeping the full-height view behind its margins.
+void ST_DrawScaled (void)
+{
+    static byte* vsave = NULL; static int vcap  = 0;
+    static byte* bcap  = NULL; static int bccap = 0;
+    int hh    = ST_HEIGHT * hires;
+    int top   = SCREENHEIGHT - hh;
+    int bx    = ST_X * hires;
+    int bw    = ST_WIDTH * hires;
+    int strip = SCREENWIDTH * hh;
+    int dw, dh, dx, dy, x, y;
+
+    if (bx < 0) bx = 0;
+    if (bx + bw > SCREENWIDTH) bw = SCREENWIDTH - bx;
+    dw = bw/2; dh = hh/2;
+    dx = (SCREENWIDTH - dw)/2; dy = SCREENHEIGHT - dh;
+
+    if (vcap  < strip) { if (vsave) Z_Free(vsave); vsave = Z_Malloc(strip, PU_STATIC, 0); vcap  = strip; }
+    if (bccap < bw*hh) { if (bcap)  Z_Free(bcap);  bcap  = Z_Malloc(bw*hh, PU_STATIC, 0); bccap = bw*hh; }
+
+    memcpy (vsave, screens[0] + top*SCREENWIDTH, strip);	// 1) snapshot the view
+    ST_doPaletteStuff ();
+    ST_doRefresh ();						// 2) full vanilla bar -> screens[0]
+    for (y = 0; y < hh; y++)					// 3) capture the bar
+	memcpy (bcap + y*bw, screens[0] + (top+y)*SCREENWIDTH + bx, bw);
+    memcpy (screens[0] + top*SCREENWIDTH, vsave, strip);	// 4) put the view back
+    for (y = 0; y < dh; y++)					// 5) scale the bar -> 50%, centred
+    {
+	byte* d = screens[0] + (dy+y)*SCREENWIDTH + dx;
+	byte* s = bcap + (y*2)*bw;
+	for (x = 0; x < dw; x++) d[x] = s[x*2];
+    }
+}
+
+// Style 2: minimal fullscreen HUD -- big health bottom-left, ready-weapon ammo
+// bottom-right, over the full view (no status-bar graphic).
+void ST_DrawAltHUD (void)
+{
+    player_t* plyr  = &players[consoleplayer];
+    int       wbase = SCREENWIDTH / hires;		// wide base width
+    int       w     = ST_TALLNUMWIDTH;
+    int       y     = BASE_HEIGHT - 1 - tallnum[0]->height;
+    int       xx;
+
+    ST_doPaletteStuff ();				// keep damage/pickup palette flashes
+
+    xx = ST_TallNum (2, y, plyr->health);		// health, bottom-left
+    V_DrawPatch (xx, y, FG, tallpercent);
+
+    if (weaponinfo[plyr->readyweapon].ammo != am_noammo)	// ammo, bottom-right
+    {
+	int  ammo = plyr->ammo[weaponinfo[plyr->readyweapon].ammo];
+	char buf[12];
+	int  n = sprintf (buf, "%d", ammo < 0 ? 0 : ammo);
+	ST_TallNum (wbase - 2 - n*w, y, ammo);
+    }
+}
+
 void ST_loadGraphics(void)
 {
 

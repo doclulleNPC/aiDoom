@@ -318,11 +318,17 @@ void D_Display (void)
     if (gamestate == GS_LEVEL && gametic)
     {
 	extern int setblocks;
-	boolean st_minimal = (viewheight == SCREENHEIGHT)
-			     && !(setblocks <= 10);
-	boolean ws_bar = setblocks <= 10 && !st_minimal;
-	ST_Drawer (st_minimal, redrawsbar || ws_bar);
-	fullscreen = st_minimal;
+	extern int statusbar_style;
+	if (statusbar_style == 1)	{ ST_DrawScaled (); fullscreen = true; }
+	else if (statusbar_style == 2)	{ ST_DrawAltHUD (); fullscreen = true; }
+	else
+	{
+	    boolean st_minimal = (viewheight == SCREENHEIGHT)
+				 && !(setblocks <= 10);
+	    boolean ws_bar = setblocks <= 10 && !st_minimal;
+	    ST_Drawer (st_minimal, redrawsbar || ws_bar);
+	    fullscreen = st_minimal;
+	}
     }
 
     if (gamestate == GS_LEVEL && gametic)

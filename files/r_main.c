@@ -661,6 +661,7 @@ void R_InitLightTables (void)
 //
 boolean		setsizeneeded;
 int		setblocks;
+extern int	statusbar_style;	// small/alt HUD overlay a full view
 int		setdetail;
 
 
@@ -689,7 +690,7 @@ void R_ExecuteSetViewSize (void)
 
     setsizeneeded = false;
 
-    if (setblocks == 11)
+    if (setblocks == 11 || statusbar_style)
     {
 	scaledviewwidth = SCREENWIDTH;
 	scaledviewwidth_nonwide = NONWIDEWIDTH;

@@ -49,6 +49,9 @@ void ST_Ticker (void);
 
 // Called by main loop.
 void ST_Drawer (boolean fullscreen, boolean refresh);
+void ST_DrawScaled (void);	// status bar @50%, centred
+void ST_DrawAltHUD (void);	// minimal fullscreen HUD (health + ammo)
+extern int statusbar_style;	// 0=vanilla 1=small 2=alt HUD
 
 // Called when the console player is spawned on each level.
 void ST_Start (void);

@@ -206,6 +206,7 @@ void M_VideoFilter(int choice);
 void M_VideoVSync(int choice);
 void M_VideoScale(int choice);
 void M_VideoBackend(int choice);
+void M_StatusBarStyle(int choice);
 void M_DrawVideo(void);
 void M_WriteTextBig(int x, int y, char *string, int sc);
 
@@ -396,6 +397,7 @@ enum
     vid_vsync,      // VSync
     vid_scale,      // Presentation scale mode (Letterbox vs Integer)
     vid_backend,    // GPU Backend
+    vid_statusbar,  // Status bar style
     vid_end
 } video_e;
 
@@ -1040,6 +1042,8 @@ static char* M_AspectNames[3] = { "4:3", "16:9", "16:10" };
 static char* M_FilterNames[2] = { "Nearest(None)", "Linear" };
 static char* M_ScaleNames[2]  = { "Letterbox", "Integer" };
 static char* M_BackendNames[7] = { "Auto", "Vulkan", "OpenGL", "D3D12", "D3D11", "Metal", "Software" };
+extern int statusbar_style;
+static char* M_StatusBarNames[3] = { "Vanilla", "Small (50%)", "Alt HUD" };
 
 void M_DrawVideo(void)
 {
@@ -1074,6 +1078,18 @@ void M_DrawVideo(void)
     M_WriteText(VideoDef.x, VideoDef.y + LINEHEIGHT*vid_backend, "Backend (restart)");
     M_WriteText(VideoDef.x + 130, VideoDef.y + LINEHEIGHT*vid_backend,
 		M_BackendNames[(render_backend>=0 && render_backend<=6) ? render_backend : 0]);
+
+    M_WriteText(VideoDef.x, VideoDef.y + LINEHEIGHT*vid_statusbar, "Status Bar");
+    M_WriteText(VideoDef.x + 130, VideoDef.y + LINEHEIGHT*vid_statusbar,
+		M_StatusBarNames[(statusbar_style>=0 && statusbar_style<=2) ? statusbar_style : 0]);
+}
+
+void M_StatusBarStyle(int choice)
+{
+    if (choice) statusbar_style = (statusbar_style + 1) % 3;
+    else        statusbar_style = (statusbar_style + 2) % 3;
+    R_SetViewSize (screenblocks, detailLevel);	// styles 1/2 need a full-height view
+    M_SaveDefaults ();
 }
 
 void M_VideoRes(int choice)
