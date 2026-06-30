@@ -536,11 +536,8 @@ void I_SetFullscreen(int on)
     fullscreen_mode = on ? 1 : 0;
     SDL_SetWindowFullscreen(window, fullscreen_mode ? true : false);
 
-    if (!fullscreen_mode)
-    {
-	SDL_SetWindowSize(window, SCREENWIDTH, I_OutHeight());
-	SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
-    }
+    // Completely rebuild scaling, texture, status bar, and viewport tables for the new mode.
+    V_SetRes(hires);
 }
 
 int I_GetFullscreen(void)

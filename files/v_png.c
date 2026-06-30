@@ -80,7 +80,7 @@ static void VP_BuildHealthXlats (void)
 	int L = (r*77 + g*150 + b*29) >> 8;		// luminance 0..255
 	// A lighter green (mix some white in) instead of dark fully-saturated pure
 	// green, so the healthy-HP readout (buddy + player) reads as a normal green.
-	vp_xlat_grn[i] = VP_Nearest (L/3, L, L/3);
+	vp_xlat_grn[i] = VP_Nearest (L/2, L, L/2);
 	vp_xlat_yel[i] = VP_Nearest (L, L, 0);
 	vp_xlat_red[i] = VP_Nearest (L, 0, 0);
     }
