@@ -482,7 +482,11 @@ void D_PageTicker (void)
 //
 void D_PageDrawer (void)
 {
-    V_DrawPatch (0,0, 0, W_CacheLumpName(pagename, PU_CACHE));
+    // The page graphics (TITLEPIC / CREDIT / HELP) are 4:3 (320 wide).  In widescreen, black the
+    // pillarbox sides and centre the page so it isn't left-aligned (WIDESCREENDELTA is 0 in 4:3).
+    if (WIDESCREENDELTA)
+	memset (screens[0], 0, SCREENWIDTH*SCREENHEIGHT);
+    V_DrawPatch (WIDESCREENDELTA, 0, 0, W_CacheLumpName(pagename, PU_CACHE));
 }
 
 
