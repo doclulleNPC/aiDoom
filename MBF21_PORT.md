@@ -28,9 +28,13 @@ Goal: make aiDoom a **MBF21-compatible** port so it runs modern DeHackEd mods. T
   `Crispy and Brutal.wad` no longer crashes the parser (now stops at `R_InitSprites` -- a sprite
   rotation-leniency issue -> M3). **Deferred to M2b:** `[STRINGS]`/`Text`/`Misc`/`Cheat` (need the
   string-table refactor + aiDoom's cheat map).
-- [ ] **3. DSDHacked** — make `states` / `mobjinfo` / `sprnames` / `S_sfx` **dynamically growable**
-  (state/thing numbers into the tens of thousands). Fixed arrays → grown pointers; `NUMSTATES`
-  etc. become runtime counts. (port `dsdhacked.c`.)
+- [~] **3. DSDHacked** — **states + mobjinfo done** (M3a: `states`/`mobjinfo` are growable pointers
+  onto the built-in arrays + runtime counts `num_states`/`num_mobjtypes`; M3b: `files/dsdhacked.c`
+  `dsdh_EnsureStatesCapacity`/`dsdh_EnsureMobjInfoCapacity` realloc-grow on demand, wired into
+  `deh_procFrame`/`deh_procThing` and `deh_codeptr`). Verified: `Crispy and Brutal.wad`'s DEH now
+  loads fully (6257 frames up to #72138, 130 things) with **no OOB crash**. **M3c remaining:**
+  grow `sprnames`/`S_sfx` for DSDHacked sprites/sounds, and relax `R_InitSprites` (Brutal.wad trips
+  "Sprite POSS:A:2 has two lumps" -- vanilla-strict rotation loading; crispy/woof allow it).
 - [ ] **4. MBF21** — the ~20 new codepointers (`A_SpawnObject`, `A_MonsterProjectile`,
   `A_WeaponProjectile`, `A_WeaponSound`, `A_MonsterMeleeAttack`, `A_SeekTracer`, `A_AddFlags`,
   `A_JumpIfFlagsSet`, `A_HealChase`, …) in `p_enemy.c`/`p_pspr.c`; MBF21 thing flags (`flags2`) in

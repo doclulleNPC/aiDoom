@@ -572,7 +572,10 @@ deh_bexptr deh_bexptrs[] =
 };
 
 // to hold startup code pointers from INFO.C
-actionf_t deh_codeptr[NUMSTATES];
+#include <stdlib.h>
+extern actionf_t *deh_codeptr;
+void dsdh_EnsureStatesCapacity(int);
+void dsdh_EnsureMobjInfoCapacity(int);
 
 // ====================================================================
 // ProcessDehFile
@@ -629,6 +632,7 @@ void ProcessDehFile(char *filename, char *outfilename, int lumpnum)
 
   {
     static int i;   // killough 10/98: only run once, by keeping index static
+    if (!deh_codeptr) deh_codeptr = malloc(num_states*sizeof(actionf_t));  // (M3)
     for (; i<NUMSTATES; i++)  // remember what they start as for deh xref
       deh_codeptr[i] = states[i].action;
   }
@@ -816,13 +820,13 @@ void deh_procThing(DEHFILE *fpin, FILE* fpout, char *line)
   // Note that the mobjinfo[] array is base zero, but object numbers
   // in the dehacked file start with one.  Grumble.
   --indexnum;
-  if (indexnum < 0 || indexnum >= NUMMOBJTYPES)
-    { // (M2) DSDHacked thing beyond the mobjinfo table -- skip until M3
-      if (fpout) fprintf(fpout,"Bad thing number %d\n", indexnum+1);
+  if (indexnum < 0)
+    { if (fpout) fprintf(fpout,"Bad thing number %d\n", indexnum+1);
       while (!dehfeof(fpin) && dehfgets(inbuffer, sizeof(inbuffer), fpin))
         { lfstrip(inbuffer); if (!*inbuffer) break; }
       return;
     }
+  dsdh_EnsureMobjInfoCapacity(indexnum);   // (M3) grow the mobjinfo table to fit DSDHacked things
 
   // now process the stuff
   // Note that for Things we can look up the key and use its offset
@@ -907,13 +911,13 @@ void deh_procFrame(DEHFILE *fpin, FILE* fpout, char *line)
   // killough 8/98: allow hex numbers in input:
   sscanf(inbuffer,"%s %i",key, &indexnum);
   if (fpout) fprintf(fpout,"Processing Frame at index %d: %s\n",indexnum,key);
-  if (indexnum < 0 || indexnum >= NUMSTATES)
-    { // (M2) DSDHacked frame beyond the state table -- skip the block until M3 adds dynamic states
-      if (fpout) fprintf(fpout,"Bad frame number %d of %d\n",indexnum, NUMSTATES);
+  if (indexnum < 0)
+    { if (fpout) fprintf(fpout,"Bad frame number %d\n",indexnum);
       while (!dehfeof(fpin) && dehfgets(inbuffer, sizeof(inbuffer), fpin))
         { lfstrip(inbuffer); if (!*inbuffer) break; }
       return;
     }
+  dsdh_EnsureStatesCapacity(indexnum);   // (M3) grow the state table to fit DSDHacked frames
 
   while (!dehfeof(fpin) && *inbuffer && (*inbuffer != ' '))
     {
