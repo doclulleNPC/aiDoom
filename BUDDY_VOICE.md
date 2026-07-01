@@ -3,7 +3,8 @@
 Canonical reference for the AI co-op buddy's spoken voice lines: what the buddy
 can say, when, and **which line wins when several want to play at once**.
 
-The audio is pre-baked (ElevenLabs, Joker-HL voice) into `run/aidoom.wad` and
+The audio is pre-baked (ElevenLabs, Joker-HL voice) into `run/ID0/aidoom.wad`
+(the engine loads it as bare `aidoom.wad`, resolved under `run/ID0/`) and
 played offline through a dedicated SDL3 audio stream — see
 `tools/bake_buddy_voice.py` (bake), `files/i_voice.c` (playback + tag→lump map),
 `files/p_ai_coop.c` (when each line fires). Keep this doc in sync when lines or
@@ -11,11 +12,11 @@ the priority tiers change.
 
 ## What's in `aidoom.wad`
 
-`run/aidoom.wad` is a PWAD with **248 lumps**:
+`run/ID0/aidoom.wad` is a PWAD with **271 lumps**:
 
 | Kind | Count | Notes |
 |------|------:|-------|
-| `DS*` buddy voice clips (OGG/Vorbis) | 162 | the spoken lines below — ElevenLabs **Joker-HL** |
+| `DS*` buddy voice clips (OGG/Vorbis) | 168 | the spoken lines below — ElevenLabs **Joker-HL** |
 | `DD*` AI-Director voice clips (OGG/Vorbis) | 52 | the game-master persona — ElevenLabs **UT** (see below) |
 
 Recently added tags: **buddy** `home:` (`DSHOME*` — teleported back to spawn) and `thanks:`
@@ -23,6 +24,7 @@ Recently added tags: **buddy** `home:` (`DSHOME*` — teleported back to spawn) 
 (`DDDEATH*` — taunts a survivor's death). Re-run `tools/bake_buddy_voice.py` after editing the
 phrase list (it caches unchanged clips, only generating the new ones).
 | `BUF*` HUD face graphics | 42 | the buddy's status-bar face (see `BUDDY_HUD.md`) |
+| `RARR*` UI compass arrows (PNG) | 8 | point the player at a downed buddy (`hu_buddy.c`, decoded via `V_CachePNG`) |
 | `VOICEMAP` | 1 | text lump: lump↔phrase map (also `run/aidoom_voice_manifest.txt`; columns lump·persona·voice·phrase·src·bytes) |
 
 All voice clips are **wired** — every `DS*`/`DD*` lump has a tag entry in
@@ -85,12 +87,12 @@ things the player actually needs to hear.
 SDL3 stream (`SDL_PutAudioStreamData`). `I_Voice_Busy()` =
 `SDL_GetAudioStreamQueued() > 0`; `I_Voice_Stop()` = `SDL_ClearAudioStream()`.
 
-## Line catalogue (156 lines)
+## Line catalogue (168 lines)
 
 Grouped by tier; each row is a tag prefix, its rotation count, and the spoken
 text. The tag→lump→text mapping lives in `i_voice.c` + the bake manifest.
 
-### Tier 3 — COMMAND (27 lines) · *always answers, preempts*
+### Tier 3 — COMMAND (33 lines) · *always answers, preempts*
 | Tag | n | Lines |
 |-----|--:|-------|
 | `state:` | 6 | "Following you." / "Fighting." / "Getting health." / "Holding position." / "Coming to you." / "Grabbing an item." |
@@ -100,6 +102,7 @@ text. The tag→lump→text mapping lives in `i_voice.c` + the bake manifest.
 | `attack_ok` | 1 | "Attacking!" |
 | `attack_none` | 1 | "No targets around." |
 | `status:` | 16 | weapon readout for the `report` command (Fists / Pistol[. Loaded.] / Shotgun / Chaingun / Rocket launcher / Plasma rifle / B.F.G. / Chainsaw / Super shotgun, each with a "Loaded." ammo variant) |
+| `thanks:` | 6 | "Thanks, I owe you one!" / "You saved my hide -- cheers!" / "I won't forget this, marine!" / "Back in action -- let's move!" / "Knew you'd come back for me." / "Good as new. Cheers, marine!" *(human revived the downed buddy; `VP_COMMAND` so it always plays)* |
 
 ### Tier 2 — WEAPON (5 lines)
 | Tag | n | Lines |
@@ -138,7 +141,7 @@ Trigger gates (`P_AICoop_NoteKill`): only when `killer == buddy` and the victim
 is `MF_COUNTKILL`; overkill → `gib:` (~96/256), else a per-type quip (~64/256);
 4 kills in 5 s → `spree:`. The tier-1 4-second gap then throttles repeats.
 
-### Tier 0 — AMBIENT (90 lines) · *lowest; yields to everything above, 8 s gap*
+### Tier 0 — AMBIENT (96 lines) · *lowest; yields to everything above, 8 s gap*
 | Tag | n | Lines |
 |-----|--:|-------|
 | `contact:` | 4 | "Contact!" / "Tango, engaging!" / "I see one!" / "Got movement!" |
@@ -170,8 +173,9 @@ is `MF_COUNTKILL`; overkill → `gib:` (~96/256), else a per-type quip (~64/256)
 | `lvlclear:` | 3 | "All dead. Nice." / "Find the exit." / "Hail to the king." |
 | `secret:` | 2 | "Secret!" / "Ooh, hidden stash." |
 | `idle:` | 4 | "Quiet... too quiet." / "Anything?" / "Still with me?" / "I hate the waiting." |
-| `help:` | 5 | "Man down! Help!" / "I'm hit bad -- get over here!" / "Don't leave me!" / "Buddy down! Medic!" / "Help me up, damn it!" |
+| `help:` | 8 | "Man down! Help!" / "I'm hit bad -- get over here!" / "Don't leave me!" / "Buddy down! Medic!" / "Help me up, damn it!" / "Aagh -- I'm down, I'm down!" / "Can't move -- cover me and get over here!" / "They tore me up... patch me up, marine!" |
 | `revived:` | 3 | "Back in the fight!" / "Thanks -- I owe you one." / "Let's finish this." |
+| `home:` | 3 | "Regrouping on you!" / "Beam me back, baby!" / "Miss me? I'm back!" *(teleported/recalled back to the player)* |
 
 > **Note on the AMBIENT bucket:** by the chosen tiering, the urgent-sounding
 > `crit:`, `pldown:` and `help:` (incapacitation scream) currently sit at the
@@ -182,7 +186,7 @@ is `MF_COUNTKILL`; overkill → `gib:` (~96/256), else a per-type quip (~64/256)
 ## Adding a new line
 
 1. Add the phrase to `tools/bake_buddy_voice.py` (`PHRASES`/`EVENTS`), lump name
-   ≤ 8 chars, and re-bake `run/aidoom.wad`.
+   ≤ 8 chars, and re-bake `run/ID0/aidoom.wad`.
 2. Add the `{ "tag", "LUMP" }` row to `VOICE_MAP` in `files/i_voice.c`.
 3. Call it from `files/p_ai_coop.c` at the right tier:
    `AICoop_CalloutP("mytag:", n, VP_…)` (rotated) or `AICoop_SayTagP("mytag", VP_…)`.

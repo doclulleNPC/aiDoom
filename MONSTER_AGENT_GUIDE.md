@@ -162,8 +162,8 @@ infighting; you add coordination.
   raw coordinates; plan paths from the `pos` fields you see.
 - **Single-player only.** Directed monsters bypass the engine's RNG-driven AI, so
   this breaks demo/netgame sync. Fine for solo play.
-- **`use_door`/`use_teleporter`** are approximate (treated as "move toward
-  target"); don't rely on precise door routing yet.
+- **`use_door`** is approximate (treated as "move toward target" via the
+  pathfinder, which opens doors); don't rely on precise door routing yet.
 
 ---
 

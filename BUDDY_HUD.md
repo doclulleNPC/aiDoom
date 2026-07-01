@@ -1,47 +1,62 @@
-# BUDDY_HUD.md — Companion Top-of-Screen HUD
+# BUDDY_HUD.md — Companion HUD
 
-Small "second STBAR" HUD overlay for the AI co-op companion ("buddy") in aidoom.
-Lives at the top of the screen, centred, half the height of the player status
-bar (`STBAR`) and uses a mix of the original DOOM patches (half-scaled) and the
-baked DejaVuSansMono TTF atlas that the console already uses.
+Small HUD overlay for the AI co-op companion ("buddy") in aidoom, pinned to the
+**top-right corner**. It is drawn in the small Doom HUD message font
+(`hu_font` / `STCFN*`) at the same size and native colour as the in-game pickup
+messages, via `V_DrawPatch` (which handles the hi-res scaling), plus an animated
+**mugshot** (`BUF*` faces baked into `aidoom.wad`) to the left of the text.
+
+> NOTE: the sections below ("Umgesetzt", most of "History"/"Fixes"/"Xvfb")
+> describe an **earlier design** — a centred top strip using a custom
+> `HU_Buddy_DrawPatchHalf` half-scaled-STBAR renderer and a TTF atlas. That was
+> **replaced** by the current top-right, message-font + mugshot readout. They are
+> kept as history; the accurate current behaviour is this header and the code in
+> `files/hu_buddy.c`.
 
 Source: `files/hu_buddy.h`, `files/hu_buddy.c`
-Hooks: `files/hu_stuff.c` (`HU_Buddy_Drawer` from `HU_Drawer`),
+Hooks: `files/hu_stuff.c` (`HU_Buddy_Drawer` + `HU_Inventory_Drawer` from
+         `HU_Drawer`; `HU_Buddy_Ticker` from `HU_Ticker`),
        `files/d_main.c` (`HU_Buddy_Init` after `HU_Init`),
        `files/i_video.c` (`HU_Buddy_SetRes` after `ST_SetRes`),
-       `files/m_misc.c` (`show_buddy_hud` config key).
+       `files/m_misc.c` (`show_buddy_hud` / `show_inventory_hud` config keys).
 
 ---
 
-## Umgesetzt (Was der Code tut)
+## Was der Code aktuell tut
 
-- **Zentrierter HUD-Strip oben**, BASE-Koords (320×200) `X=80..240`, `Y=0..15`
-  (= 16 Pixel hoch, halbe Höhe des originalen `STBAR` mit 32 Pixel).
-- **Layout, von links nach rechts** (alles BASE-Koords):
-  - `HP` (TTF-label) + `STTNUM` 3-stellig + `STTPRCNT` %
-  - Waffen-Name (TTF, kurz-Code: `FIST/PISTOL/SHOTGUN/CHAINGUN/ROCKET/PLASMA/BFG/CHAINSAW/SSG`)
-  - `A:` (TTF-label) + `STTNUM` 3-stellig (nur bei Waffen mit Munition)
-  - `D:` (TTF-label) + `STTNUM` 3-stellig + `U` (Distanz zum nächsten Human)
-  - `S:` (TTF-label) + State-Name (TTF, `FOLLOW/FIGHT/HEAL/HOLD/COME/GRAB`)
-- **Patch-Rendering** mit eigenem `HU_Buddy_DrawPatchHalf`-Walker, der die
-  originalen DOOM-Patches (`STBAR`/`STTNUM*`/`STYSNUM*`/`STTPRCNT`/`STKEYS*`/
-  `STARMS`/`STTMINUS`) per nearest-neighbour auf halbe Größe (jede 2. Spalte,
-  jede 2. Zeile) ins `screens[0]`-Bytebuffer blittet.
-- **TTF-Rendering** mit Sub-Sampling (`BUDDY_TTF_SCALE_X/Y = 2`) gegen den
-  gebackenen DejaVuSansMono-Atlas (`tools/font_atlas.h`, shared mit der
-  Console-Overlay).
-- **Separators**: dünne horizontale Linien (PLAYPAL 96, helles Grau) am
-  oberen und unteren Rand des Strips als visuelle Barriere gegen das 3D-Bild.
-- **Config-Toggle** `show_buddy_hud` in `m_misc.c`'s `defaults[]` (Default 1 =
-  ON), persistiert via `M_LoadDefaults`/`M_SaveDefaults`.
-- **Auto-On**: HUD rendert auch ohne `-aicoop` problemlos (frühe Returns
-  wenn `P_AICoop_Slot() < 0`, also kein Player 2 im Spiel → no-op).
+- **Rechtsbündiger Readout oben rechts**, BASE- / wide-base-Koords, gezeichnet in
+  der kleinen Doom-HUD-Message-Font (`hu_font`) via `V_DrawPatch` /
+  `V_DrawPatchTranslated` — **kein** eigener Patch-Half-Renderer, **keine** TTF-Atlas,
+  **keine** Separator-Linien mehr.
+- **Animierter Mugshot** (`BUF*`-Faces aus `aidoom.wad`, `tools/bake_buddy_face.py`),
+  ST-Style-Statemachine (`HU_Buddy_FaceTick`), pro Tic aus `HU_Buddy_Ticker`
+  aktualisiert; fehlt die WAD, fällt der Readout auf ein `"BUDDY"`-Textlabel zurück.
+- **Text-Layout**, rechtsbündig (`tx = wb - 4 - textw`):
+  - Zeile 1: `HP <n>  AR <n>` — die HP-Zahl per `V_HealthTrans` gefärbt
+    (>75 grün, >25 gelb, sonst rot).
+  - Zeile 2: Waffen-Name (`FIST/PISTOL/SHOTGUN/CHAINGUN/ROCKET/PLASMA/BFG/CHAINSAW/SSG`)
+    + Ammo (nur bei Waffen mit Munition).
+  - Zeile 3: State-Name aus `P_AICoop_State()`
+    (`FOLLOWING/ATTACKING/HEALING/HOLDING/COMING/GRABBING`).
+- **Downed-Zustand** (`bot->playerstate == PST_DEAD`, inkapazitiert ≠ tot):
+  ersetzt die Stats durch `BUDDY DOWN` / `REVIVE: USE` und zeigt im Mugshot-Slot
+  einen **8-Richtungs-Kompass-Pfeil** (`RARR*` PNGs) der vom Menschen zum Buddy zeigt.
+- **Config-Toggles** in `m_misc.c`'s `defaults[]` (beide Default 1 = ON):
+  `show_buddy_hud` und `show_inventory_hud`, persistiert via
+  `M_LoadDefaults`/`M_SaveDefaults`.
+- **Auto-On**: rendert auch ohne aktiven Buddy problemlos (frühe Returns wenn
+  `P_AICoop_Slot() < 0` bzw. `!playeringame[slot]` → no-op).
+- **(J) Artifact-Inventory-HUD** (`HU_Inventory_Drawer`, Toggle `show_inventory_hud`):
+  eine **unten-zentrierte** Zeile knapp über der Status-Bar mit dem aktuell
+  gewählten Artefakt und Menge, z.B. `QUARTZ FLASK X3`; no-op wenn nichts
+  gewählt/gehalten. Nutzt dieselben Text-Helper (`HU_Buddy_Text`/`HU_Buddy_TextW`).
 - **Hooks**:
-  - `HU_Buddy_Init()` aus `D_DoomMain` direkt nach `HU_Init` (vor `ST_Init`).
-  - `HU_Buddy_Drawer()` aus `HU_Drawer` (`hu_stuff.c`), läuft nach
-    `ST_Drawer` und vor `I_FinishUpdate`.
-  - `HU_Buddy_SetRes()` aus `V_SetRes` (`i_video.c`), derzeit no-op aber
-    stable API falls je ein per-resolution Buffer dazukommt.
+  - `HU_Buddy_Init()` aus `D_DoomMain` direkt nach `HU_Init` (aktuell leerer Body —
+    `hu_font` wird schon von `HU_Init` geladen).
+  - `HU_Buddy_Drawer()` + `HU_Inventory_Drawer()` aus `HU_Drawer` (`hu_stuff.c`),
+    laufen nach `ST_Drawer`.
+  - `HU_Buddy_Ticker()` aus `HU_Ticker` (`hu_stuff.c`) — treibt die Mugshot-Animation.
+  - `HU_Buddy_SetRes()` aus `V_SetRes` (`i_video.c`), no-op (stable API).
 
 ---
 
@@ -51,12 +66,14 @@ Hooks: `files/hu_stuff.c` (`HU_Buddy_Drawer` from `HU_Drawer`),
       `SetRes` + `extern int show_buddy_hud`).
 - [x] Eigenes `files/hu_buddy.c` mit Patch-Half-Renderer, TTF-Sub-Sampler,
       Widget-Komposition und Layout.
-- [x] Patches geladen in `HU_Buddy_Init`: `STTNUM0..9`, `STTPRCNT`,
-      `STTMINUS`, `STBAR`, `STARMS`, `STKEYS0..5`.
-- [x] `HU_Buddy_Drawer` in `HU_Drawer` (`hu_stuff.c:496`) integriert.
-- [x] `HU_Buddy_Init` in `D_DoomMain` (`d_main.c:1218`) integriert.
-- [x] `HU_Buddy_SetRes` in `V_SetRes` (`i_video.c:506,545`) integriert.
-- [x] `show_buddy_hud` extern decl + `defaults[]`-Eintrag in `m_misc.c:208,241`.
+- [x] `HU_Buddy_Init` ist mittlerweile ein leerer Body — `hu_font` (die kleine
+      Doom-HUD-Message-Font) wird schon von `HU_Init` geladen; die `BUF*`-Mugshot-
+      Faces werden lazy in `HU_Buddy_LoadFaces` gecacht.
+- [x] `HU_Buddy_Drawer` (+ `HU_Inventory_Drawer`) in `HU_Drawer` (`hu_stuff.c`) integriert.
+- [x] `HU_Buddy_Ticker` in `HU_Ticker` (`hu_stuff.c`) integriert.
+- [x] `HU_Buddy_Init` in `D_DoomMain` (`d_main.c`) integriert.
+- [x] `HU_Buddy_SetRes` in `V_SetRes` (`i_video.c`) integriert.
+- [x] `show_buddy_hud` + `show_inventory_hud` extern decl + `defaults[]`-Einträge in `m_misc.c`.
 - [x] Build clean, keine neuen Warnings oder Errors.
 - [x] Game-Run-Test (xvfb headless): binary startet, initialisiert alle
       Subsysteme, `HU_Buddy_Init: Companion HUD.` im stderr, Buddy läuft

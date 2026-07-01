@@ -11,7 +11,7 @@ Yes, but it's narrower than it looks, and there's a fallback gotcha.
 | **Monster tactics** | Squad orders — flank / ambush / focus-fire / fall-back — issued over TCP (`p_ai_llm.c`: `act order=…`); `A_Chase` diverts to `A_LLMChase` for directed monsters. | **Same order set, rule-assigned** (`P_AI_RuleTactics`): flank / focus / ambush / fall-back by geometry + LOS. The LLM *replaces* this when actively issuing orders. |
 | **Spawn policy** | The model decides what / when / how many from the live state (`spawn type=… count=…`, `director relax`). | Fixed stress→spawn FSM curves (BUILDUP→SUSTAIN→FADE). |
 | **Buddy orders** | LLM gives the buddy high-level orders (engage/defend/regroup/goto/…). | Buddy runs purely on its built-in bot. |
-| **Director voice** | `dir:flank/ambush/focus/fallback` lines fire (from tactics). | Only phase/spawn/relax/item lines fire. |
+| **Director voice** | `dir:flank/ambush/focus/fallback` lines fire (from tactics). | Phase/spawn/relax/item lines, plus `dir:flank` narrated by the rule tactician (`P_AI_RuleTactics`); ambush/focus/fallback voice lines are LLM-only. |
 
 ### The SAME in both modes
 Intensity/stress tracking, objective seeding + idle guards, periodic objective top-up,

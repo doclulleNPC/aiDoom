@@ -60,7 +60,7 @@ Vollständige Liste aller CLI-Flags die `aidoom` akzeptiert, extrahiert via
 | `-devparm` | Enable Developer-Mode (Cheat-Codes, fps-Anzeige). |
 | `-debugfile` | Aktiviert Debug-Output in `debugfile` (Default: `debug.txt`). |
 | `-statcopy` | `<file>` | Externe Stat-Copy für Statistik-Tools. |
-| `-nomusic` | (aidoom) Musik aus (kein Vanilla-DOOM-Flag, aber aidoom kennt es). |
+| `-config` | `<file>` | Alternativer Pfad zur Config-Datei (statt `aidoom.cfg`). |
 
 ## aidoom-spezifisch
 
@@ -72,13 +72,18 @@ Vollständige Liste aller CLI-Flags die `aidoom` akzeptiert, extrahiert via
 | `-2` | — | — | Resolution Scale = 2 (640x400). |
 | `-3` | — | — | Resolution Scale = 3 (960x600). |
 | `-4` | — | — | Resolution Scale = 4 (1280x800). |
-| `-render` | `<n>` | aus cfg | Resolution Scale 1..7. Überschreibt `-1..-4`. |
+| `-render` | `<n>` | aus cfg | Resolution Scale 1..7 (auf 1..7 geclampt). Überschreibt `-1..-4`. |
 | `-fullscreen` | — | aus cfg | Vollbild-Modus erzwingen. |
-| `-window` | — | aus cfg | Windowed-Modus erzwingen (kein fullscreen). |
 | `-nomouse` | — | off | Maus-Input deaktivieren. |
 | `-nograb` | — | off | Maus-Grab deaktivieren (Maus kann Fenster verlassen). |
 | `-nodraw` | — | off | Kein Rendering (Benchmark/Headless-Modus). |
 | `-noblit` | — | off | Kein Buffer-Blit zum Fenster (CPU-only-Test). |
+
+### Audio
+
+| Flag | Parameter | Default | Wirkung |
+|------|-----------|---------|---------|
+| `-oldmixer` | — | off | Fällt auf den alten Single-Stream-`SDL_OpenAudioDevice`-Mixer zurück. Default ist der neue SDL3-Multi-Stream-Mixer (`i_sound.c`). |
 
 ### Monster-AI / LLM-Director
 
@@ -86,6 +91,7 @@ Vollständige Liste aller CLI-Flags die `aidoom` akzeptiert, extrahiert via
 |------|-----------|---------|---------|
 | `-aidirector` | `<port>` | off | Aktiviert den LLM-Director. Öffnet TCP-Listener auf `<port>` (aidoom.cfg-Default: 31666), erwartet einen Director-Client (`run/director`, SDL3/C) der das Monster-Verhalten steuert. |
 | `-aidemo` | — | off | Eingebauter AI-Director ohne Ollama (deterministisches Test-Mode für Director-Protokoll). |
+| `-aiplayer` | `[port\|demo]` | off | Volle Agent/LLM-Steuerung des **menschlichen** Spielers. LLM-Modus: TCP-Listener auf `127.0.0.1:<port>` (Default 31700). `-aiplayer demo` = eingebautes Skript-Brain (kein LLM). Siehe `g_agent.c` / `AGENT_CONTROL.md`. |
 | `-director` | — | off | **L4D-Style Spawn-Director (regelbasiert, offline, kein LLM).** Misst pro Tic ein Spieler-Stresslevel (0–100) aus: erlittenem Schaden (burst-gewichtet), Close-Quarters-Kills (Nahkampf/Schrotflinte zählt, Snipen kaum) und niedriger Munition. Fährt damit einen Build-up→Peak→Relax-Zyklus: spawnt Extra-Monster **außer Sicht** hinter den Survivors während des Aufbaus, droppt im Relax Items. Deterministisch (P_Random, tic-locked). Läuft *zusätzlich* zu den normalen Map-Monstern (am besten mit `-skill 4`). Die LLM-Variante liest dasselbe Stresslevel via `-aidirector`. |
 
 ### Co-op Companion (Buddy)
@@ -149,18 +155,19 @@ Zusätzlich zu CLI-Flags gibt es noch Config-Keys in `run/aidoom.cfg`:
 
 ```
 iwad                <file>   # Auto-Load wenn keine -iwad Flag
-ollama_host         <host>   # Ollama-Server-IP (Director)
-ollama_port         <n>      # Ollama-Server-Port (Director)
-ollama_model        <name>   # LLM-Modell (Director)
 show_messages       0|1      # Pickup-Messages im HUD
 show_buddy_hud      0|1      # Co-op-Buddy-HUD (Top-Bar)
-antialiasing        0|1      # SDL_TextureScaleMode LINEAR
-blur                0|2      # 1-2-1 Separable Blur Filter
-widescreen          0|1      # Hor+ Aspect (16:9 + 16:10)
+show_inventory_hud  0|1      # (J) Artefakt-Inventar-Readout
+screen_resolution   1..7     # Resolution Scale (Default 3)
 fullscreen          0|1      # Vollbild-Modus
-screen_resolution   1..6     # Resolution Scale
+scale_mode          0|1      # Texture-Scale-Mode (0=NEAREST, 1=LINEAR)
+vsync               0|1      # VSync (Default 1)
+integer_scale       0|1      # Integer-Scaling zum Fenster
+render_backend      <n>      # SDL-Render-Backend-Auswahl
+statusbar_style     0|1|2    # 0=vanilla 1=small 2=alt HUD
+light_dither        0|1      # Light-Banding weichzeichnen
+aspect              0|1|2    # 0=4:3, 1=16:9, 2=16:10  (ersetzt das alte 'widescreen')
 autorun             0|1      # Always-Run ohne Hold
-mouselook           0|1      # Y-Achsen-Mouselook
 key_buddy_come      <code>   # Co-op-Buddy "komm her"   (Default ',' = 44)
 key_buddy_attack    <code>   # Co-op-Buddy "angreifen"  (Default '.' = 46)
 key_buddy_stay      <code>   # Co-op-Buddy "bleib/halt" (Default '-' = 0x2d; übernimmt die Taste vom Screen-Size-Shortcut)
@@ -169,3 +176,9 @@ key_buddy_stay      <code>   # Co-op-Buddy "bleib/halt" (Default '-' = 0x2d; üb
 
 Config wird geladen via `M_LoadDefaults()` in `m_misc.c` (vor Init), gespeichert
 via `M_SaveDefaults()` (typischerweise beim Quit).
+
+Die `ollama_*` / `gpu_*` Keys werden **nicht** von der Engine verwaltet, sondern von
+den SDL3-Tools (`tools/aidoom_config.c`, `tools/director.c`, `tools/gpumon_sdl.c`)
+gelesen/geschrieben; die Engine bewahrt sie beim Speichern nur auf. Defaults der
+Config-App: `ollama_host`=`localhost`, `ollama_port`=`11434`,
+`ollama_model`=`ministral-3:8b`, `gpu_host`=`localhost`, `gpu_user`=leer.

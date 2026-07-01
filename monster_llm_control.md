@@ -60,7 +60,7 @@ In `p_enemy.c`, in `A_Chase`:
 ```c
 void A_Chase (mobj_t* actor)
 {
-    if (actor->llm_directive != NULL) {   // <-- neu
+    if (P_AI_Active (actor)) {   // <-- neu (side-table lookup, kein mobj_t-Feld)
         A_LLMChase(actor);
         return;
     }
@@ -145,9 +145,9 @@ Loop wartet **nie** auf das Modell.
 Order-Typen, die die C-Schicht kennen muss (klein halten!):
 
   * `chase` / `hold` / `fallback` / `flank_left` / `flank_right`
-  * `ambush_at` (Position übergeben)
-  * `focus_fire` (auf wen)
-  * `use_door` / `use_teleporter`
+  * `ambush` (Position via `x=`/`y=` übergeben)
+  * `focus_fire` (auf wen, via `focus=`)
+  * `use_door`
 
 Mehr nicht. Mehr ist micromanagement und der LLM wird schlecht drin.
 
@@ -190,7 +190,7 @@ Das hier ist die Kurzfassung. Für die echte Implementierung siehe:
   * **`AGENT_CONTROL.md` §12** "Letting an LLM control the *monsters*" — die
     ausführliche Version mit p_ai_llm.c-Skelett, A_LLMChase-Verhalten,
     Savegame-Konflikt-Warnung, Determinismus-Caveat.
-  * **`AGENT_CONTROL.md` §11** "A nice hybrid" — der LLM-vs-LLM-Modus:
+  * **`AGENT_CONTROL.md` §12** "A nice hybrid" — der LLM-vs-LLM-Modus:
     Spieler auf ViZDoom (oder §2 Player-Hook), Monster auf In-Engine
     Director. **Genau der Modus, der "LLM spielt Doom als Dungeon-Master"
     wahr macht.**

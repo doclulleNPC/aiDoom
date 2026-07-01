@@ -122,7 +122,7 @@ strafing toward a different goal. Order of operations:
 10. **Movement** = decompose the steer direction into **forward + strafe** relative to facing
     (`finecosine`/`finesine`), so the marine slides exactly along the route no matter which
     way it's looking. While not aiming a monster/face, `want` follows the move direction.
-11. **At the exit switch** (within 64u) → face it, press `BT_USE`, stop — finishes the level.
+11. **At the exit switch** (face it within 128u; press `BT_USE` within 56u) → stop — finishes the level.
 12. **Turn** toward `want`, clamped to `AGENT_TURN`/tic.
 13. **Fire** iff target visible **and** within `AGENT_FIRE_RANGE` **and** lined up within
     `AGENT_FACING` **and** the buddy is not in the line (`Agent_BuddyInLine`) **and** no
@@ -133,7 +133,7 @@ strafing toward a different goal. Order of operations:
     shot, so a foe dies before it reaches melee).
 16. **Door open + WAIT** → `Agent_UseAhead` taps USE on a *shut* door (it skips ones already
     risen ≥56u) or the exit switch in the forward arc within 80u. Pressing USE on a doorway
-    arms `door_wait_timer = 60`: for ~1.7 s the marine **faces the door and waits** for it to
+    arms `door_wait_timer = 75`: for ~2.1 s the marine **faces the door and waits** for it to
     rise — it does not re-spam USE or wiggle (the fix for jittering against an opening door).
     `waiting_at_door` is reported in `observe`.
 17. **Stuck recovery** → no progress for >5 tics while chasing (and not door-waiting) → sweep
