@@ -1010,7 +1010,11 @@ static void build_command(char* out, int n, const char* iwad_path)
                || (opt_heretic  && !strcasecmp(pw, "hereticstuff.wad"))
                || (opt_hexen    && !strcasecmp(pw, "hexenstuff.wad"));
         if (!dup)
-            fn += snprintf(files + fn, sizeof files - fn, " %s", pw);
+            // Quote the name: PWADs like "Crispy and Brutal.wad" have spaces, and an unquoted
+            // name reaches the game as several -file args ("Crispy", "and", ...) that all fail to
+            // open, so the PWAD (and its DEHACKED) is silently not loaded -> looks like vanilla.
+            fn += snprintf(files + fn, sizeof files - fn,
+                           strchr(pw, ' ') ? " \"%s\"" : " %s", pw);
     }
     if (files[0])
         off += snprintf(out + off, n - off, " -file%s", files);
