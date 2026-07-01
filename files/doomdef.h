@@ -30,7 +30,7 @@
 // Global parameters/defines.
 //
 // DOOM version
-enum { VERSION_NUM =  114 };
+enum { VERSION_NUM =  115 };
 
 // Demo format version -- DECOUPLED from VERSION_NUM (which auto-bumps for savegame struct
 // changes).  The stock IWAD attract demos are version 109 (DOOM 1.9); keeping the demo

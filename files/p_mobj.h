@@ -256,6 +256,7 @@ typedef struct mobj_s
     int			tics;	// state tic counter
     state_t*		state;
     int			flags;
+    int			flags2;		// mbf21 runtime flags (from info->flags2, A_AddFlags)
     int			health;
 
     // Movement direction, movement generation (zig-zagging).

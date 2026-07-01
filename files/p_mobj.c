@@ -500,6 +500,7 @@ P_SpawnMobj
     mobj->radius = info->radius;
     mobj->height = info->height;
     mobj->flags = info->flags;
+    mobj->flags2 = info->flags2;
     mobj->health = info->spawnhealth;
 
     if (gameskill != sk_nightmare)

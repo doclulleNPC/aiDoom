@@ -96,18 +96,46 @@ void A_RadiusDamage (mobj_t *actor)
 {
   if (actor->state) P_RadiusAttack (actor, actor->target, (int)actor->state->args[0]);
 }
-void A_NoiseAlert (mobj_t *a)        { (void)a; }
+void A_NoiseAlert (mobj_t *a) { if (a->target) P_NoiseAlert (a->target, a); }
 void A_HealChase (mobj_t *a)         { (void)a; }
 void A_SeekTracer (mobj_t *a)        { (void)a; }
 void A_FindTracer (mobj_t *a)        { (void)a; }
-void A_ClearTracer (mobj_t *a)       { (void)a; }
-void A_AddFlags (mobj_t *a)          { (void)a; }
-void A_RemoveFlags (mobj_t *a)       { (void)a; }
-void A_JumpIfFlagsSet (mobj_t *a)    { (void)a; }
-void A_JumpIfHealthBelow (mobj_t *a) { (void)a; }
-void A_JumpIfTargetInSight (mobj_t *a){ (void)a; }
-void A_JumpIfTargetCloser (mobj_t *a){ (void)a; }
-void A_JumpIfTracerInSight (mobj_t *a){ (void)a; }
-void A_JumpIfTracerCloser (mobj_t *a){ (void)a; }
+void A_ClearTracer (mobj_t *a) { a->tracer = NULL; }
+void A_AddFlags (mobj_t *a)
+{
+  int nf = (int)a->state->args[0];
+  boolean relink = (nf & (MF_NOBLOCKMAP|MF_NOSECTOR)) != 0;
+  if (relink) P_UnsetThingPosition (a);
+  a->flags  |= nf;
+  a->flags2 |= (int)a->state->args[1];
+  if (relink) P_SetThingPosition (a);
+}
+void A_RemoveFlags (mobj_t *a)
+{
+  int rf = (int)a->state->args[0];
+  boolean relink = (rf & (MF_NOBLOCKMAP|MF_NOSECTOR)) != 0;
+  if (relink) P_UnsetThingPosition (a);
+  a->flags  &= ~rf;
+  a->flags2 &= ~(int)a->state->args[1];
+  if (relink) P_SetThingPosition (a);
+}
+void A_JumpIfFlagsSet (mobj_t *a)
+{
+  if ((a->flags  & (int)a->state->args[1]) == (int)a->state->args[1]
+   && (a->flags2 & (int)a->state->args[2]) == (int)a->state->args[2])
+    P_SetMobjState (a, (int)a->state->args[0]);
+}
+void A_JumpIfHealthBelow (mobj_t *a)
+{ if (a->health < (int)a->state->args[1]) P_SetMobjState (a, (int)a->state->args[0]); }
+void A_JumpIfTargetInSight (mobj_t *a)
+{ if (a->target && P_CheckSight (a, a->target)) P_SetMobjState (a, (int)a->state->args[0]); }
+void A_JumpIfTargetCloser (mobj_t *a)
+{ if (a->target && (int)a->state->args[1] > P_AproxDistance (a->x - a->target->x, a->y - a->target->y))
+    P_SetMobjState (a, (int)a->state->args[0]); }
+void A_JumpIfTracerInSight (mobj_t *a)
+{ if (a->tracer && P_CheckSight (a, a->tracer)) P_SetMobjState (a, (int)a->state->args[0]); }
+void A_JumpIfTracerCloser (mobj_t *a)
+{ if (a->tracer && (int)a->state->args[1] > P_AproxDistance (a->x - a->tracer->x, a->y - a->tracer->y))
+    P_SetMobjState (a, (int)a->state->args[0]); }
 void A_Mushroom (mobj_t *a)          { (void)a; }
 void A_LineEffect (mobj_t *a)        { (void)a; }
