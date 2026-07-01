@@ -178,7 +178,7 @@ Harness result (E1M3, demo): explores most of the level, ~9 kills, closes from 2
 ## 5. The LLM client (`run/llm_player.py`)
 
 The reference brain for socket mode. Talks to **Ollama** (default
-`http://192.168.2.114:11434`, model `mistral:7b-instruct`).
+`http://localhost:11434`, model `ministral-3:8b`).
 
 - **Startup**: fetches `map` once (exit, spawn, all doors) as static context.
 - **Event-triggered, not fixed-rate**: polls `observe` at ~10 Hz but only calls the LLM on

@@ -220,9 +220,9 @@ static json* json_get (json* o, const char* key)   // object member by name
 //  Config (aidoom.cfg, next to the binary)
 // ===========================================================================
 
-static char cfg_host[128]  = "192.168.2.114";
+static char cfg_host[128]  = "localhost";
 static int  cfg_oport      = 11434;
-static char cfg_model[128] = "mistral:7b-instruct";
+static char cfg_model[128] = "ministral-3:8b";
 
 static void load_cfg (const char* dir)
 {

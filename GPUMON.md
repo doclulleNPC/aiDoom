@@ -65,7 +65,7 @@ folder). Keys used:
 
 | Key | Meaning | Default |
 |-----|---------|---------|
-| `gpu_host` | host running the GPU (falls back to `ollama_host`) | `192.168.2.114` |
+| `gpu_host` | host running the GPU (falls back to `ollama_host`) | `localhost` |
 | `gpu_user` | SSH user on that host | `lubee` |
 | `gpu_ssh_port` | SSH port | `22` |
 | `ollama_host` | host serving Ollama (for the `/api/ps` model readout) | = `gpu_host` |

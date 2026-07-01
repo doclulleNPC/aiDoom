@@ -10,7 +10,7 @@
 #
 # Env: PLAYER_PORT (31700), DIRECTOR_PORT (31666), OLLAMA_URL/OLLAMA_MODEL (player brain),
 #      DECISION_SECS.  The director sidecar reads its Ollama host/model from run/aidoom.cfg
-#      (or its own defaults: 192.168.2.114 / mistral:7b-instruct).
+#      (or its own defaults: localhost / ministral-3:8b).
 cd "$(dirname "$0")" || exit 1
 
 IWAD="${1:-DOOM.WAD}"
@@ -28,7 +28,7 @@ DIRBIN=./director; [ -x ./director.exe ] && DIRBIN=./director.exe
 HAVE_DIR=0; [ -x "$DIRBIN" ] && HAVE_DIR=1
 
 echo "=== aiDoom FULL LLM mode (E${EP}M${MAP}) ==="
-echo "  marine : -aiplayer $PPORT  + llm_player.py   (ollama ${OLLAMA_URL:-http://192.168.2.114:11434})"
+echo "  marine : -aiplayer $PPORT  + llm_player.py   (ollama ${OLLAMA_URL:-http://localhost:11434})"
 if [ "$HAVE_DIR" = 1 ]; then
   echo "  buddy + monsters : -aidirector $DPORT -aicoop + $DIRBIN"
 else

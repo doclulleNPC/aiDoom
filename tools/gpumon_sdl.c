@@ -32,7 +32,7 @@ static SDL_Window*   win;
 static SDL_Renderer* ren;
 static SDL_Texture*  font;
 
-static char host[128] = "192.168.2.114";
+static char host[128] = "localhost";
 static char user[64]  = "lubee";
 static int  sshport   = 22;
 static char ohost[128] = "";	// Ollama host for the model query (defaults to `host`)

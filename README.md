@@ -153,7 +153,7 @@ and kept as a backup in **`tools/scripts/`**:
 
 ```sh
 run/launcher                               # preferred: GUI launcher
-tools/scripts/start_aidoom.sh              # backup: scripted launch (default mistral:7b-instruct)
+tools/scripts/start_aidoom.sh              # backup: scripted launch (default ministral-3:8b)
 tools/scripts/start_aidoom.sh --offline    # just the game, no LLM
 ```
 
