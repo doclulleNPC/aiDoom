@@ -35,8 +35,8 @@
 #include "r_state.h"		// sprites[] -- presence test by parsed sprite
 #include "p_morph.h"
 
-extern state_t		states[];
-extern mobjinfo_t	mobjinfo[];
+extern state_t *states;
+extern mobjinfo_t *mobjinfo;
 
 // engine pieces we call (declared by hand, like hexen.c / revmarine.c)
 extern void	A_Look (mobj_t*);

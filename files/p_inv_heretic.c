@@ -38,8 +38,8 @@
 #include "r_state.h"			// sprites[] -- presence test by parsed sprite
 #include "p_inv_heretic.h"
 
-extern state_t		states[];
-extern mobjinfo_t	mobjinfo[];
+extern state_t *states;
+extern mobjinfo_t *mobjinfo;
 
 // engine pieces we call (declared by hand, like hexen.c/revmarine.c)
 extern boolean	P_GiveBody (player_t* player, int num);

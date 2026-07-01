@@ -28,8 +28,8 @@
 #include "p_local.h"
 #include "revmarine.h"
 
-extern state_t		states[];
-extern mobjinfo_t	mobjinfo[];
+extern state_t *states;
+extern mobjinfo_t *mobjinfo;
 
 // engine pieces we use (declared by hand, like heretic.c/hexen.c)
 extern void	A_Look (mobj_t*);

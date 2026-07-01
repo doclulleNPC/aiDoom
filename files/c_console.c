@@ -523,7 +523,7 @@ static void C_Execute (char* line)
 	    C_Printf ("resurrect: you're not dead");
 	else
 	{
-	    extern mobjinfo_t mobjinfo[];
+	    extern mobjinfo_t *mobjinfo;
 	    extern void P_SetupPsprites (player_t*);
 	    extern void ST_Start (void);
 	    mobj_t* mo = pl->mo;

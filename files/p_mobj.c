@@ -631,7 +631,7 @@ void P_RespawnSpecials (void)
     S_StartSound (mo, sfx_itmbk);
 
     // find which type to spawn
-    for (i=0 ; i< NUMMOBJTYPES ; i++)
+    for (i=0 ; i< num_mobjtypes ; i++)
     {
 	if (mthing->type == mobjinfo[i].doomednum)
 	    break;
@@ -782,7 +782,7 @@ void P_SpawnMapThing (mapthing_t* mthing)
     }
     else
     {
-	for (i=0 ; i< NUMMOBJTYPES ; i++)
+	for (i=0 ; i< num_mobjtypes ; i++)
 	    if (mthing->type == mobjinfo[i].doomednum)
 		break;
 

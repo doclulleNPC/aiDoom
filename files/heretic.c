@@ -29,8 +29,8 @@
 
 #define ONFLOORZ	MININT		// from p_local.h (avoided: its p_spec.h open/close enums)
 
-extern state_t		states[];
-extern mobjinfo_t	mobjinfo[];
+extern state_t *states;
+extern mobjinfo_t *mobjinfo;
 
 // engine helpers (no public header for the p_enemy action funcs -- declare by hand)
 extern void	A_Look (mobj_t*);

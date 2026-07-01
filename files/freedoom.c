@@ -36,8 +36,8 @@
 
 #define FATSPREAD	(ANG90/8)
 
-extern state_t		states[];
-extern mobjinfo_t	mobjinfo[];
+extern state_t *states;
+extern mobjinfo_t *mobjinfo;
 
 // engine action funcs we re-point or call (no public header -- declare by hand)
 extern void	A_FaceTarget (mobj_t*);

@@ -1430,7 +1430,9 @@ typedef struct
   int			flags;			// mbf21 frame flags (STATEF_SKILL5FAST, ...)
 } state_t;
 
-extern state_t	states[NUMSTATES];
+extern state_t	*states;
+extern state_t	states_builtin[];
+extern int	num_states;
 extern char *sprnames[NUMSPRITES];
 
 
@@ -1682,7 +1684,9 @@ typedef struct
 
 } mobjinfo_t;
 
-extern mobjinfo_t mobjinfo[NUMMOBJTYPES];
+extern mobjinfo_t *mobjinfo;
+extern mobjinfo_t mobjinfo_builtin[];
+extern int num_mobjtypes;
 
 #endif
 //-----------------------------------------------------------------------------

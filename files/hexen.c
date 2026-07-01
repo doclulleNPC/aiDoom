@@ -25,8 +25,8 @@
 #include "r_state.h"		// sprites[] -- presence test by parsed sprite, not lump name
 #include "hexen.h"
 
-extern state_t		states[];
-extern mobjinfo_t	mobjinfo[];
+extern state_t *states;
+extern mobjinfo_t *mobjinfo;
 
 // engine action funcs we call (no public header -- declare by hand)
 extern void	A_Look (mobj_t*);
