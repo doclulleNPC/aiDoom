@@ -38,7 +38,15 @@ Goal: make aiDoom a **MBF21-compatible** port so it runs modern DeHackEd mods. T
   **`Crispy and Brutal.wad` now LOADS and RUNS in-game with no crash.** Remaining for full fidelity:
   grow `sprnames`/`S_sfx` + parse the DSDHacked `[SPRITES]`/`[SOUNDS]` sections (so the custom
   sprites/sounds show instead of being skipped) -- part of M3c/M4.
-- [ ] **4. MBF21** — the ~20 new codepointers (`A_SpawnObject`, `A_MonsterProjectile`,
+- [x] **4. MBF21 codepointers** — done (M4a-e): args parsing; A_SpawnObject; the MBF classics
+  (RandomJump/PlaySound/Spawn/Turn/Face/Detonate/Die/Scratch/Mushroom); monster+weapon projectiles
+  (A_MonsterProjectile/A_WeaponProjectile); weapon Sound/ConsumeAmmo/GunFlashTo/RefireTo/Bullet+
+  MeleeAttack; A_RadiusDamage/MonsterMeleeAttack; the flags2 Jump/Flag family (A_AddFlags/
+  RemoveFlags/JumpIf*, NoiseAlert, ClearTracer); A_SeekTracer/FindTracer (homing); A_HealChase
+  (chase fallback). MBF21 thing fields parse into mobjinfo (MBF21 Bits->flags2, groups, dropped
+  item, fast speed, melee range). Only A_LineEffect is still a stub. **Not yet wired:** the flags2
+  *playsim effects* (RIP/BOUNCE/...) + infighting/projectile/splash *group* logic, and
+  [SOUNDS]/S_sfx growth so custom sounds play. — the ~20 new codepointers (`A_SpawnObject`, `A_MonsterProjectile`,
   `A_WeaponProjectile`, `A_WeaponSound`, `A_MonsterMeleeAttack`, `A_SeekTracer`, `A_AddFlags`,
   `A_JumpIfFlagsSet`, `A_HealChase`, …) in `p_enemy.c`/`p_pspr.c`; MBF21 thing flags (`flags2`) in
   `p_mobj.c`/`p_map.c`; projectile/splash/infighting **groups** (infighting logic in `p_map.c`);

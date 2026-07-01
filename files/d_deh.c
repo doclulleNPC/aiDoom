@@ -149,7 +149,7 @@ typedef struct
 // killough 8/9/98: make DEH_BLOCKMAX self-adjusting
 #define DEH_BLOCKMAX (sizeof deh_blocks/sizeof*deh_blocks)  // size of array
 #define DEH_MAXKEYLEN 32 // as much of any key as we'll look at
-#define DEH_MOBJINFOMAX 23 // number of ints in the mobjinfo_t structure (!)
+#define DEH_MOBJINFOMAX 30 // 23 vanilla ints + 7 mbf21 ints
 
 // Put all the block header values, and the function to be called when that
 // one is encountered, in this array:
@@ -208,7 +208,14 @@ char *deh_mobjinfo[DEH_MOBJINFOMAX] =
   "Missile damage",      // .damage
   "Action sound",        // .activesound
   "Bits",                // .flags
-  "Respawn frame"        // .raisestate
+  "Respawn frame",       // .raisestate
+  "MBF21 Bits",          // .flags2 (mbf21)
+  "Infighting group",    // .infighting_group
+  "Projectile group",    // .projectile_group
+  "Splash group",        // .splash_group
+  "Fast speed",          // .altspeed
+  "Melee range",         // .meleerange
+  "Dropped item"         // .droppeditem
 };
 
 // Strings that are used to indicate flags ("Bits" in mobjinfo)

@@ -6,6 +6,7 @@
 #include "s_sound.h"
 #include "m_random.h"
 #include "tables.h"
+#include "r_main.h"   // R_PointToAngle2
 #include "info.h"
 
 void A_FaceTarget (mobj_t* actor);   // p_enemy.c
@@ -91,15 +92,54 @@ void A_MonsterProjectile (mobj_t *actor)
   mo->momx = FixedMul (mo->info->speed, finecosine[an]);
   mo->momy = FixedMul (mo->info->speed, finesine[an]);
 }
-void A_MonsterMeleeAttack (mobj_t *a){ (void)a; }
+void A_MonsterMeleeAttack (mobj_t *actor)
+{
+  int dbase, dmod, hitsound, damage;
+  if (!actor->target) return;
+  dbase    = (int)actor->state->args[0]; if (dbase <= 0) dbase = 3;
+  dmod     = (int)actor->state->args[1]; if (dmod  <= 0) dmod  = 8;
+  hitsound = (int)actor->state->args[2];
+  A_FaceTarget (actor);
+  if (!P_CheckMeleeRange (actor)) return;
+  if (hitsound) S_StartSound (actor, hitsound);
+  damage = (P_Random() % dmod + 1) * dbase;
+  P_DamageMobj (actor->target, actor, actor, damage);
+}
 void A_RadiusDamage (mobj_t *actor)
 {
   if (actor->state) P_RadiusAttack (actor, actor->target, (int)actor->state->args[0]);
 }
 void A_NoiseAlert (mobj_t *a) { if (a->target) P_NoiseAlert (a->target, a); }
-void A_HealChase (mobj_t *a)         { (void)a; }
-void A_SeekTracer (mobj_t *a)        { (void)a; }
-void A_FindTracer (mobj_t *a)        { (void)a; }
+void A_HealChase (mobj_t *actor)   // no P_HealCorpse in aiDoom -> just keep chasing
+{ extern void A_Chase (mobj_t*); A_Chase (actor); }
+void A_SeekTracer (mobj_t *actor)
+{
+  angle_t exact, maxturn;
+  fixed_t dist, slope;
+  mobj_t *dest = actor->tracer;
+  int fa, deg;
+  if (!dest || dest->health <= 0) return;
+  deg = (int)(actor->state->args[1] >> 16);          // args[1]: max turn/tic, fixed degrees
+  if (deg <= 0) deg = 10;
+  maxturn = (angle_t)(deg * (ANG45 / 45));
+  exact = R_PointToAngle2 (actor->x, actor->y, dest->x, dest->y);
+  if (exact != actor->angle)
+  {
+    if (exact - actor->angle > 0x80000000)
+    { actor->angle -= maxturn; if (exact - actor->angle < 0x80000000) actor->angle = exact; }
+    else
+    { actor->angle += maxturn; if (exact - actor->angle > 0x80000000) actor->angle = exact; }
+  }
+  fa = actor->angle >> ANGLETOFINESHIFT;
+  actor->momx = FixedMul (actor->info->speed, finecosine[fa]);
+  actor->momy = FixedMul (actor->info->speed, finesine[fa]);
+  dist = P_AproxDistance (dest->x - actor->x, dest->y - actor->y) / (actor->info->speed ? actor->info->speed : FRACUNIT);
+  if (dist < 1) dist = 1;
+  slope = (dest->z + 40*FRACUNIT - actor->z) / dist;
+  if (slope < actor->momz) actor->momz -= FRACUNIT/8; else actor->momz += FRACUNIT/8;
+}
+void A_FindTracer (mobj_t *actor)
+{ if (!actor->tracer && actor->target) actor->tracer = actor->target; }
 void A_ClearTracer (mobj_t *a) { a->tracer = NULL; }
 void A_AddFlags (mobj_t *a)
 {
@@ -137,5 +177,26 @@ void A_JumpIfTracerInSight (mobj_t *a)
 void A_JumpIfTracerCloser (mobj_t *a)
 { if (a->tracer && (int)a->state->args[1] > P_AproxDistance (a->x - a->tracer->x, a->y - a->tracer->y))
     P_SetMobjState (a, (int)a->state->args[0]); }
-void A_Mushroom (mobj_t *a)          { (void)a; }
+void A_Mushroom (mobj_t *actor)   // classic MBF: normal explosion + a cloud of falling fireballs
+{
+  extern void A_Explode (mobj_t*);
+  int i, j, n = actor->info->damage;
+  fixed_t m1 = actor->state->misc1 ? actor->state->misc1 : FRACUNIT*4;
+  fixed_t m2 = actor->state->misc2 ? actor->state->misc2 : FRACUNIT/2;
+  A_Explode (actor);
+  for (i = -n; i <= n; i += 8)
+    for (j = -n; j <= n; j += 8)
+    {
+      mobj_t target = *actor, *mo;
+      target.x += i << FRACBITS;
+      target.y += j << FRACBITS;
+      target.z += P_AproxDistance (i, j) * m1;
+      mo = P_SpawnMissile (actor, &target, MT_FATSHOT);
+      if (!mo) continue;
+      mo->momx = FixedMul (mo->momx, m2);
+      mo->momy = FixedMul (mo->momy, m2);
+      mo->momz = FixedMul (mo->momz, m2);
+      mo->flags &= ~MF_NOGRAVITY;
+    }
+}
 void A_LineEffect (mobj_t *a)        { (void)a; }
