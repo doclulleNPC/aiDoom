@@ -722,6 +722,9 @@ void R_DrawPSprite (pspdef_t* psp)
     vis = &avis;
     vis->mobjflags = 0;
     vis->texturemid = (BASEYCENTER<<FRACBITS)+FRACUNIT/2-(psp->sy-spritetopoffset[lump]);
+    { extern int statusbar_style, setblocks;   // full bar over a full-height view hides the weapon
+      if (statusbar_style == 0 && setblocks <= 10 && viewheight == SCREENHEIGHT)
+        vis->texturemid += 32 << FRACBITS; }   // lift it above the 32px status bar
     vis->x1 = x1 < 0 ? 0 : x1;
     vis->x2 = x2 >= viewwidth ? viewwidth-1 : x2;	
     vis->scale = pspritescale<<detailshift;

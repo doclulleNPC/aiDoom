@@ -437,5 +437,7 @@ void HU_Inventory_Drawer (void)
     tx = (wb - HU_Buddy_TextW (line)) / 2;	// centre horizontally
     if (tx < 0) tx = 0;
     // Just above the status bar (BASE_HEIGHT - ST_HEIGHT), one line up.
-    HU_Buddy_Text (tx, BASE_HEIGHT - ST_HEIGHT - 10, line);
+    { extern int statusbar_style;   // vanilla: above the full bar; small/alt: lower (small/no bar)
+      int invy = BASE_HEIGHT - (statusbar_style == 0 ? ST_HEIGHT : ST_HEIGHT/2) - 10;
+      HU_Buddy_Text (tx, invy, line); }
 }
