@@ -47,7 +47,7 @@ right flags and auto-starts the native `director` sidecar when an AI mode is cho
 3. **Warm the model** into memory (`/api/generate` with a tiny prompt) so the
    first in-game planning round isn't slow. Skip with `--no-warm` / `-NoWarm`.
 4. **Start aiDoom** with `-aidirector <port>` (and `-warp`, `-skill`, the AI co-op
-   companion `-aicoop` by default, optional `-friendlyfire`).
+   companion `-aicoop` by default, optional `-nofriendlyfire` / `-infight`).
 5. **Start the native director** (`run/director`, a small SDL3 window), which loops
    observe → ask the LLM → issue squad orders and shows live status + a log. The
    game keeps running if the model is unavailable. Closing the director window (or
