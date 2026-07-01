@@ -39,3 +39,30 @@ Goal: make aiDoom a **MBF21-compatible** port so it runs modern DeHackEd mods. T
   it must not add wall-clock/float logic.
 - aiDoom's death-drops are hardcoded in the death states (not `droppeditem`); MBF21 `droppeditem`
   is additive and defaults to 0 (no drop) until step 4 wires it.
+
+## M2 execution plan (as scoped)
+
+**Port base: `../winmbf/Source/d_deh.c`** (Lee Killough's classic MBF parser, 2755 lines) — closest
+to aiDoom's 1993 structures, and it already carries the MBF codepointers (in `../winmbf/Source/p_enemy.c`).
+Nugget-Doom (`/home/dulli/Source/Nugget-Doom`) is the reference for the MBF21/DSDHacked layers (M3/M4).
+
+Verified **64-bit safe**: `deh_procFrame` assigns `state_t` fields explicitly (no int-array pun over
+the 8-byte `action` pointer); `deh_procThing`'s `((int*)&mobjinfo[i])[ix]` offset trick is fine
+because `mobjinfo_t` is all-`int` (including the new mbf21 fields).
+
+Steps:
+1. **`files/d_deh.{c,h}`** — bring in d_deh.c; adapt includes to aiDoom (`w_wad.h`, `info.h`,
+   `sounds.h`, `m_cheat.h`, `dstrings.h`), inline the `DEHFILE` lump/file reader.
+2. **Wire loading** — `DEH_LoadLumps()` in `d_main.c`: after `W_InitMultipleFiles`, scan for every
+   `DEHACKED` lump and `ProcessDehFile(NULL,NULL,lumpnum)`; add `-deh <file>` arg.
+3. **Name/mnemonic tables** — `deh_mobjinfo[]` (23 vanilla `mobjinfo_t` field names, order-matched),
+   `deh_state[]`, `deh_sfxinfo[]`, `deh_ammo[]`, `deh_weapon[]`, `deh_misc[]`, `deh_mobjflags[]`
+   (Bits mnemonics), `deh_bexptrs[]` (codepointer name→`A_*`), `deh_codeptr[NUMSTATES]`.
+4. **Sections** (procs): Thing, Frame, Pointer/`[CODEPTR]`, Sounds, Ammo, Weapon, Sprite, Misc,
+   Cheat, `[PARS]`. All operate on aiDoom's existing `mobjinfo`/`states`/`weaponinfo`/`S_sfx`/cheats.
+5. **Defer to M2b**: `[STRINGS]` / `Text` string replacement — aiDoom's strings are compile-time
+   `#define`s (dstrings.h), not a runtime `deh_strlookup` table. Parse-and-ignore first; the
+   string-table refactor (route message strings through a replaceable table) is a follow-up.
+   (Gameplay DEH — things/frames/pointers/weapons — needs none of this.)
+
+After M2, layer DSDHacked (M3) and the MBF21 codepointers/flags/groups (M4).
