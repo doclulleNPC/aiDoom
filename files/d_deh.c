@@ -486,7 +486,8 @@ void A_SpawnObject(), A_MonsterProjectile(), A_MonsterMeleeAttack(), A_RadiusDam
      A_NoiseAlert(), A_HealChase(), A_SeekTracer(), A_FindTracer(), A_ClearTracer(),
      A_AddFlags(), A_RemoveFlags(), A_JumpIfFlagsSet(), A_JumpIfHealthBelow(),
      A_JumpIfTargetInSight(), A_JumpIfTargetCloser(), A_JumpIfTracerInSight(), A_JumpIfTracerCloser(),
-     A_WeaponSound(), A_ConsumeAmmo(), A_GunFlashTo(), A_RefireTo(), A_WeaponProjectile();
+     A_WeaponSound(), A_ConsumeAmmo(), A_GunFlashTo(), A_RefireTo(), A_WeaponProjectile(),
+     A_WeaponBulletAttack(), A_WeaponMeleeAttack();
 
 deh_bexptr deh_bexptrs[] =
 {
@@ -598,6 +599,8 @@ deh_bexptr deh_bexptrs[] =
    {A_GunFlashTo,          "A_GunFlashTo"},
    {A_RefireTo,            "A_RefireTo"},
    {A_WeaponProjectile,    "A_WeaponProjectile"},
+   {A_WeaponBulletAttack,  "A_WeaponBulletAttack"},
+   {A_WeaponMeleeAttack,   "A_WeaponMeleeAttack"},
   {NULL,             "A_NULL"},  // Ty 05/16/98
 };
 

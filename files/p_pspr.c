@@ -928,3 +928,49 @@ void A_WeaponProjectile (player_t *player, pspdef_t *psp)
   if (type < 0 || type >= num_mobjtypes) return;
   P_SpawnPlayerMissile (player->mo, type);
 }
+
+void A_WeaponBulletAttack (player_t *player, pspdef_t *psp)
+{
+  int hspread, vspread, numbullets, dbase, dmod, i, damage, angle, slope;
+  if (!psp->state) return;
+  hspread    = (int)psp->state->args[0];
+  vspread    = (int)psp->state->args[1];
+  numbullets = (int)psp->state->args[2];
+  dbase      = (int)psp->state->args[3];
+  dmod       = (int)psp->state->args[4];
+  if (numbullets <= 0) numbullets = 1;
+  if (dbase <= 0) dbase = 5;
+  if (dmod  <= 0) dmod  = 3;
+  P_BulletSlope (player->mo);
+  for (i = 0; i < numbullets; i++)
+  {
+    damage = (P_Random() % dmod + 1) * dbase;
+    angle  = (int)player->mo->angle + ((P_Random() - P_Random()) * (hspread << 8) / 255);
+    slope  = bulletslope + (P_Random() - P_Random()) * (vspread << 8) / 255;
+    P_LineAttack (player->mo, (angle_t)angle, MISSILERANGE, slope, damage);
+  }
+}
+
+void A_WeaponMeleeAttack (player_t *player, pspdef_t *psp)
+{
+  int dbase, dmod, damage, hitsound, range, slope;
+  fixed_t zerk;
+  angle_t angle;
+  if (!psp->state) return;
+  dbase    = (int)psp->state->args[0]; if (dbase <= 0) dbase = 2;
+  dmod     = (int)psp->state->args[1]; if (dmod  <= 0) dmod  = 10;
+  zerk     = psp->state->args[2] ? (fixed_t)psp->state->args[2] : FRACUNIT;
+  hitsound = (int)psp->state->args[3];
+  range    = psp->state->args[4] ? (fixed_t)psp->state->args[4] : MELEERANGE;
+  damage = (P_Random() % dmod + 1) * dbase;
+  if (player->powers[pw_strength]) damage = (int)FixedMul (damage << FRACBITS, zerk) >> FRACBITS;
+  angle = player->mo->angle + ((P_Random() - P_Random()) << 18);
+  slope = P_AimLineAttack (player->mo, angle, range);
+  P_LineAttack (player->mo, angle, range, slope, damage);
+  if (linetarget)
+  {
+    if (hitsound) S_StartSound (player->mo, hitsound);
+    player->mo->angle = R_PointToAngle2 (player->mo->x, player->mo->y,
+                                         linetarget->x, linetarget->y);
+  }
+}

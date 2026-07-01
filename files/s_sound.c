@@ -274,8 +274,8 @@ S_StartSoundAtVolume
   	   sfx_id, S_sfx[sfx_id].name );*/
   
   // check for bogus sound #
-  if (sfx_id < 1 || sfx_id > NUMSFX)
-    I_Error("Bad sfx #: %d", sfx_id);
+  if (sfx_id < 1 || sfx_id >= NUMSFX)
+    return;   // (M4d) DSDHacked/custom sound beyond the built-in table -- skip, don't crash
   
   sfx = &S_sfx[sfx_id];
   
