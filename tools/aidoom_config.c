@@ -188,7 +188,7 @@ static void set_default_text(setting_t* s)
 {
     if (!strcmp(s->name,"ollama_host"))  strcpy(s->sval,"localhost");
     else if (!strcmp(s->name,"ollama_port"))  strcpy(s->sval,"11434");
-    else if (!strcmp(s->name,"ollama_model")) strcpy(s->sval,"minstral-8:3b");
+    else if (!strcmp(s->name,"ollama_model")) strcpy(s->sval,"ministral-3:8b");
     else if (!strcmp(s->name,"gpu_host"))     strcpy(s->sval,"localhost");
     else if (!strcmp(s->name,"gpu_user"))     strcpy(s->sval,"");
     else if (!strcmp(s->name,"gpu_ssh_port")) strcpy(s->sval,"22");

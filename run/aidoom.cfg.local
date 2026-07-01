@@ -51,7 +51,7 @@ coop_heal_range		1024
 iwad		./doom1.wad
 ollama_host		localhost
 ollama_port		11434
-ollama_model		minstral-8:3b
+ollama_model		ministral-3:8b
 gpu_host		localhost
 gpu_user		
 gpu_ssh_port		22
