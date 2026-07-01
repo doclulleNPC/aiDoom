@@ -1415,6 +1415,8 @@ typedef enum
 } statenum_t;
 
 
+#define MAXSTATEARGS	8		// mbf21: A_* codepointer arguments per frame
+
 typedef struct
 {
   spritenum_t	sprite;
@@ -1424,6 +1426,8 @@ typedef struct
   actionf_t			action;
   statenum_t			nextstate;
   long			misc1, misc2;
+  long			args[MAXSTATEARGS];	// mbf21 codepointer args (DEH "Args1..8")
+  int			flags;			// mbf21 frame flags (STATEF_SKILL5FAST, ...)
 } state_t;
 
 extern state_t	states[NUMSTATES];
@@ -1667,6 +1671,14 @@ typedef struct
     int	activesound;
     int	flags;
     int	raisestate;
+    // mbf21 (all default 0/off; populated by DeHackEd + used by the MBF21 codepointers/groups)
+    int	flags2;			// mbf21 thing flags (MF2_*)
+    int	infighting_group;	// mbf21 infighting group
+    int	projectile_group;	// mbf21 projectile group
+    int	splash_group;		// mbf21 splash group
+    int	altspeed;		// mbf21 fast-mode speed (-1 = use `speed`)
+    int	meleerange;		// mbf21 melee range (0 = default MELEERANGE)
+    int	droppeditem;		// mbf21 mobjtype dropped on death (0 = none)
 
 } mobjinfo_t;
 
