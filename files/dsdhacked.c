@@ -40,3 +40,20 @@ void dsdh_EnsureMobjInfoCapacity (int limit)
     mobjinfo = nm;
     num_mobjtypes = newn;
 }
+
+static char sprname_empty[4] = { 0, 0, 0, 0 };   // reads as int 0 -> matches no lump
+
+void dsdh_EnsureSpritesCapacity (int limit)
+{
+    int old, newn, i;
+    char **np;
+    if (limit < num_sprites) return;
+    old = num_sprites; newn = limit + 1;
+    if (sprnames == sprnames_builtin)
+        np = memcpy (malloc (newn * sizeof(char*)), sprnames_builtin, old * sizeof(char*));
+    else
+        np = realloc (sprnames, newn * sizeof(char*));
+    for (i = old; i < newn; i++) np[i] = sprname_empty;   // gap slots -> non-matching
+    sprnames = np;
+    num_sprites = newn;
+}

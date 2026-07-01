@@ -37,7 +37,7 @@ rcsid[] = "$Id: info.c,v 1.3 1997/01/26 07:45:00 b1 Exp $";
 
 #include "p_mobj.h"
 
-char *sprnames[NUMSPRITES] = {
+char *sprnames_builtin[NUMSPRITES] = {
     "TROO","SHTG","PUNG","PISG","PISF","SHTF","SHT2","CHGG","CHGF","MISG",
     "MISF","SAWG","PLSG","PLSF","BFGG","BFGF","BLUD","PUFF","BAL1","BAL2",
     "PLSS","PLSE","MISL","BFS1","BFE1","BFE2","TFOG","IFOG","PLAY","POSS",
@@ -4689,6 +4689,8 @@ mobjinfo_t mobjinfo_builtin[NUMMOBJTYPES] = {
 // --- DSDHacked (M3): the state/mobjinfo tables are growable.  They start as the built-in
 // data above; dsdh_Ensure*Capacity (dsdhacked.c) reallocs them larger when a DeHackEd patch
 // references a higher number.  Everything indexes states[]/mobjinfo[] through these pointers.
+char**      sprnames     = sprnames_builtin;
+int         num_sprites   = NUMSPRITES;
 state_t*    states       = states_builtin;
 int         num_states   = NUMSTATES;
 mobjinfo_t* mobjinfo     = mobjinfo_builtin;

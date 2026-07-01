@@ -1433,7 +1433,9 @@ typedef struct
 extern state_t	*states;
 extern state_t	states_builtin[];
 extern int	num_states;
-extern char *sprnames[NUMSPRITES];
+extern char **sprnames;
+extern char *sprnames_builtin[];
+extern int num_sprites;
 
 
 

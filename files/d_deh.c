@@ -132,6 +132,7 @@ void deh_procMisc(DEHFILE *, FILE*, char *);
 void deh_procText(DEHFILE *, FILE*, char *);
 void deh_procPars(DEHFILE *, FILE*, char *);
 void deh_procStrings(DEHFILE *, FILE*, char *);
+void deh_procSprites(DEHFILE *, FILE*, char *);
 void deh_procError(DEHFILE *, FILE*, char *);
 void deh_procBexCodePointers(DEHFILE *, FILE*, char *);
 
@@ -166,7 +167,8 @@ deh_block deh_blocks[] = {
 
   //     begin BOOM Extensions (BEX)
 
-  /* 10 */ {"[STRINGS]",deh_procStrings}, // new string changes
+  /* 10 */ {"[SPRITES]",deh_procSprites},  // dsdhacked sprite index->name
+  {"[STRINGS]",deh_procStrings}, // new string changes
   /* 11 */ {"[PARS]",deh_procPars}, // alternative block marker
   /* 12 */ {"[CODEPTR]",deh_procBexCodePointers}, // bex codepointers by mnemonic
   /* 13 */ {"",deh_procError} // dummy to handle anything else
@@ -576,6 +578,7 @@ deh_bexptr deh_bexptrs[] =
 extern actionf_t *deh_codeptr;
 void dsdh_EnsureStatesCapacity(int);
 void dsdh_EnsureMobjInfoCapacity(int);
+void dsdh_EnsureSpritesCapacity(int);
 
 // ====================================================================
 // ProcessDehFile
@@ -1353,7 +1356,7 @@ void deh_procPars(DEHFILE *fpin, FILE* fpout, char *line) // extension
 void deh_procCheat(DEHFILE *fpin, FILE* fpout, char *line)
 { char inbuffer[DEH_BUFFERMAX]; (void)fpout; (void)line;   // (M2b) deferred -- consume the block
   while (!dehfeof(fpin) && (dehfgets(inbuffer, sizeof inbuffer, fpin)))
-    if (*inbuffer=='\n' || *inbuffer=='\0') break;
+    { lfstrip(inbuffer); if (!*inbuffer) break; }
 }
 
 // ====================================================================
@@ -1367,7 +1370,7 @@ void deh_procCheat(DEHFILE *fpin, FILE* fpout, char *line)
 void deh_procMisc(DEHFILE *fpin, FILE* fpout, char *line)
 { char inbuffer[DEH_BUFFERMAX]; (void)fpout; (void)line;   // (M2b) deferred -- consume the block
   while (!dehfeof(fpin) && (dehfgets(inbuffer, sizeof inbuffer, fpin)))
-    if (*inbuffer=='\n' || *inbuffer=='\0') break;
+    { lfstrip(inbuffer); if (!*inbuffer) break; }
 }
 
 // ====================================================================
@@ -1407,7 +1410,7 @@ void deh_procError(DEHFILE *fpin, FILE* fpout, char *line)
 void deh_procStrings(DEHFILE *fpin, FILE* fpout, char *line)
 { char inbuffer[DEH_BUFFERMAX]; (void)fpout; (void)line;   // (M2b) deferred -- consume the block
   while (!dehfeof(fpin) && (dehfgets(inbuffer, sizeof inbuffer, fpin)))
-    if (*inbuffer=='\n' || *inbuffer=='\0') break;
+    { lfstrip(inbuffer); if (!*inbuffer) break; }
 }
 
 // ====================================================================
@@ -1662,4 +1665,26 @@ void D_ProcessDehInWads(void)
   for (i = 0; i < numlumps; i++)
     if (!strncasecmp(lumpinfo[i].name, "DEHACKED", 8))
       ProcessDehFile(NULL, NULL, i);
+}
+
+// ====================================================================
+// deh_procSprites -- DSDHacked [SPRITES] block: "index = NAME" lines that name new (or renamed)
+// 4-char sprites.  Grows sprnames[] and points the slot at the name so R_InitSpriteDefs picks up
+// the WAD's matching lumps.  (Must run before R_Init -- it does; DEH is applied right after WAD init.)
+void deh_procSprites (DEHFILE *fpin, FILE* fpout, char *line)
+{
+  char inbuffer[DEH_BUFFERMAX], name[16];
+  long index;
+  (void)line;
+  while (!dehfeof(fpin) && dehfgets(inbuffer, sizeof(inbuffer), fpin))
+  {
+    lfstrip(inbuffer);
+    if (!*inbuffer) break;
+    if (sscanf(inbuffer, "%ld = %15s", &index, name) == 2 && index >= 0)
+    {
+      dsdh_EnsureSpritesCapacity((int)index);
+      sprnames[index] = strdup(name);
+      if (fpout) fprintf(fpout, "Sprite %ld = %s\n", index, name);
+    }
+  }
 }

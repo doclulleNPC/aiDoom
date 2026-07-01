@@ -191,7 +191,7 @@ void R_InitSpriteDefs (char** namelist)
   //  the end (giving 138), and crashed under MSVC (read 141 then
   //  dereferenced garbage pointers). Use the known array length.
   (void)namelist;
-  numsprites = NUMSPRITES;
+  numsprites = num_sprites;
 
   printf("numsprites = %d\n", numsprites);
 
@@ -210,6 +210,7 @@ void R_InitSpriteDefs (char** namelist)
   {
     int		idx;
     spritename = namelist[i];
+    if (*(int *)namelist[i] == 0) { sprites[i].numframes = 0; continue; }  // empty gap slot
     memset (sprtemp,-1, sizeof(sprtemp));
 
     maxframe = - 1;

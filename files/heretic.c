@@ -271,7 +271,7 @@ static void ST (statenum_t s, spritenum_t spr, int frame, int tics,
 void Heretic_RemapNativeSprites (void)
 {
     extern int    heretic_mode;
-    extern char*  sprnames[];
+    extern char** sprnames;
     static const char* map[][2] = {
 	{"HIMP","IMPX"},{"HMUM","MUMM"},{"HMUF","FX15"},{"HKNI","KNIG"},{"HKAX","SPAX"},
 	{"HKRX","RAXE"},{"HBEA","BEAS"},{"HBEB","FRB1"},{"HCLK","CLNK"},{"HWIZ","WZRD"},
