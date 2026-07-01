@@ -257,6 +257,16 @@ typedef struct mobj_s
     state_t*		state;
     int			flags;
     int			flags2;		// mbf21 runtime flags (from info->flags2, A_AddFlags)
+#define MF2_LOGRAV        0x00000001   // lower gravity (1/8)
+#define MF2_SHORTMRANGE   0x00000002
+#define MF2_DMGIGNORED    0x00000004
+#define MF2_NORADIUSDMG   0x00000008   // not hurt by radius/splash damage
+#define MF2_FORCERADIUSDMG 0x00000010
+#define MF2_RANGEHALF     0x00000040
+#define MF2_NOTHRESHOLD   0x00000080
+#define MF2_BOSS          0x00000200
+#define MF2_RIP           0x00020000   // rips through things instead of exploding
+#define MF2_FULLVOLSOUNDS 0x00040000
     int			health;
 
     // Movement direction, movement generation (zig-zagging).

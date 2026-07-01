@@ -346,6 +346,9 @@ boolean PIT_CheckThing (mobj_t* thing)
 	damage = ((P_Random()%8)+1)*tmthing->info->damage;
 	P_DamageMobj (thing, tmthing, tmthing->target, damage);
 
+	if (tmthing->flags2 & MF2_RIP)
+	    return true;			// mbf21: rip through -- keep going, don't explode
+
 	// don't traverse any more
 	return false;				
     }
@@ -1232,6 +1235,9 @@ boolean PIT_RadiusAttack (mobj_t* thing)
 
     if (dist >= bombdamage)
 	return true;	// out of range
+
+    if (thing->flags2 & MF2_NORADIUSDMG)
+	return true;	// mbf21: immune to splash damage
 
     if ( P_CheckSight (thing, bombspot) )
     {

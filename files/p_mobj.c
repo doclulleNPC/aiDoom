@@ -321,10 +321,11 @@ void P_ZMovement (mobj_t* mo)
     }
     else if (! (mo->flags & MF_NOGRAVITY) )
     {
+	int g = (mo->flags2 & MF2_LOGRAV) ? GRAVITY/8 : GRAVITY;   // mbf21 low-gravity (gibs/debris)
 	if (mo->momz == 0)
-	    mo->momz = -GRAVITY*2;
+	    mo->momz = -g*2;
 	else
-	    mo->momz -= GRAVITY;
+	    mo->momz -= g;
     }
 	
     if (mo->z + mo->height > mo->ceilingz)
