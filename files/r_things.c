@@ -123,12 +123,12 @@ R_InstallSpriteLump
     {
 	// the lump should be used for all rotations
 	if (sprtemp[frame].rotate == false)
-	    I_Error ("R_InitSprites: Sprite %s frame %c has "
-		     "multip rot=0 lump", spritename, 'A'+frame);
+	    fprintf (stderr, "R_InitSprites: Sprite %s frame %c has "
+		     "multip rot=0 lump (later wins)\n", spritename, 'A'+frame);
 
 	if (sprtemp[frame].rotate == true)
-	    I_Error ("R_InitSprites: Sprite %s frame %c has rotations "
-		     "and a rot=0 lump", spritename, 'A'+frame);
+	    fprintf (stderr, "R_InitSprites: Sprite %s frame %c has rotations "
+		     "and a rot=0 lump (later wins)\n", spritename, 'A'+frame);
 
 	sprtemp[frame].rotate = false;
 	for (r=0 ; r<8 ; r++)
@@ -141,14 +141,14 @@ R_InstallSpriteLump
 
     // the lump is only used for one rotation
     if (sprtemp[frame].rotate == false)
-	I_Error ("R_InitSprites: Sprite %s frame %c has rotations "
-		 "and a rot=0 lump", spritename, 'A'+frame);
+	fprintf (stderr, "R_InitSprites: Sprite %s frame %c has rotations "
+		 "and a rot=0 lump (later wins)\n", spritename, 'A'+frame);
 
     sprtemp[frame].rotate = true;
     rotation--;				// make 0 based
     if (sprtemp[frame].lump[rotation] != -1)
-	I_Error ("R_InitSprites: Sprite %s : %c : %c "
-		 "has two lumps mapped to it", spritename, 'A'+frame, '1'+rotation);
+	fprintf (stderr, "R_InitSprites: Sprite %s : %c : %c "
+		 "has two lumps mapped to it (later wins)\n", spritename, 'A'+frame, '1'+rotation);
 
     sprtemp[frame].lump[rotation] = lump;	// `lump` is the merged sprite INDEX now
     sprtemp[frame].flip[rotation] = (byte)flipped;
@@ -514,13 +514,12 @@ void R_ProjectSprite (mobj_t* thing)
     // Heretic (phase 1): the H* monster/artifact sprites aren't present in heretic.wad
     // (they live in hereticstuff.wad / a later phase), so a spawned Heretic thing has no
     // sprite frames -- skip drawing it instead of I_Erroring.  DOOM is unaffected.
-    if (heretic_mode)
-    {
-	if ((unsigned)thing->sprite >= numsprites)
-	    return;
-	if ( (thing->frame&FF_FRAMEMASK) >= sprites[thing->sprite].numframes )
-	    return;
-    }
+    // (M3c) Skip a thing whose sprite/frame is out of range instead of aborting -- covers Heretic
+    // phase-1 sprites AND DSDHacked sprites/frames beyond the built-in tables (DOOM I_Errored).
+    if ((unsigned)thing->sprite >= numsprites)
+	return;
+    if ( (thing->frame&FF_FRAMEMASK) >= sprites[thing->sprite].numframes )
+	return;
 
     // decide which patch to use for sprite relative to player
 #ifdef RANGECHECK
@@ -678,13 +677,11 @@ void R_DrawPSprite (pspdef_t* psp)
     // Heretic (phase 1): DOOM weapon sprites (PISG/SHTG/...) aren't in heretic.wad,
     // so the player's psprite frame is invalid -- skip drawing the weapon instead of
     // I_Erroring (Heretic weapons are a later phase).  DOOM is unaffected.
-    if (heretic_mode)
-    {
-	if ((unsigned)psp->state->sprite >= numsprites)
-	    return;
-	if ((psp->state->frame & FF_FRAMEMASK) >= sprites[psp->state->sprite].numframes)
-	    return;
-    }
+    // (M3c) skip an out-of-range psprite (Heretic phase-1 sprites + DSDHacked) instead of aborting
+    if ((unsigned)psp->state->sprite >= numsprites)
+	return;
+    if ((psp->state->frame & FF_FRAMEMASK) >= sprites[psp->state->sprite].numframes)
+	return;
 
     // decide which patch to use
 #ifdef RANGECHECK
