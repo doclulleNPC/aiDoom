@@ -754,7 +754,8 @@ int R_FlatNumForName (char* name)
     {
 	namet[8] = 0;
 	memcpy (namet, name,8);
-	I_Error ("R_FlatNumForName: %s not found",namet);
+	fprintf(stderr, "Warning: R_FlatNumForName: %s not found, defaulting to 0\n", namet);
+	return 0;
     }
     return i - firstflat;
 }
@@ -797,8 +798,8 @@ int	R_TextureNumForName (char* name)
 
     if (i==-1)
     {
-	I_Error ("R_TextureNumForName: %s not found",
-		 name);
+	fprintf(stderr, "Warning: R_TextureNumForName: %s not found, defaulting to 0\n", name);
+	return 0;
     }
     return i;
 }
