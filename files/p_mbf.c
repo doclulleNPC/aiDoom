@@ -75,9 +75,27 @@ void A_SpawnObject (mobj_t *actor)
 }
 
 // ---- MBF21: remaining monster codepointers (M4b) ----
-void A_MonsterProjectile (mobj_t *a) { (void)a; }
+void A_MonsterProjectile (mobj_t *actor)
+{
+  int type, angle, an;
+  mobj_t *mo;
+  if (!actor->target || !actor->state->args[0]) return;
+  type = (int)actor->state->args[0] - 1;
+  if (type < 0 || type >= num_mobjtypes) return;
+  angle = (int)actor->state->args[1];
+  A_FaceTarget (actor);
+  mo = P_SpawnMissile (actor, actor->target, type);
+  if (!mo) return;
+  mo->angle += (angle_t)(((int64_t)angle << 16) / 360);
+  an = mo->angle >> ANGLETOFINESHIFT;
+  mo->momx = FixedMul (mo->info->speed, finecosine[an]);
+  mo->momy = FixedMul (mo->info->speed, finesine[an]);
+}
 void A_MonsterMeleeAttack (mobj_t *a){ (void)a; }
-void A_RadiusDamage (mobj_t *a)      { (void)a; }
+void A_RadiusDamage (mobj_t *actor)
+{
+  if (actor->state) P_RadiusAttack (actor, actor->target, (int)actor->state->args[0]);
+}
 void A_NoiseAlert (mobj_t *a)        { (void)a; }
 void A_HealChase (mobj_t *a)         { (void)a; }
 void A_SeekTracer (mobj_t *a)        { (void)a; }

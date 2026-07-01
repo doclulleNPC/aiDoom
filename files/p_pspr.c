@@ -891,4 +891,40 @@ void P_MovePsprites (player_t* player)
     player->psprites[ps_flash].sy = player->psprites[ps_weapon].sy;
 }
 
-
+// ======================================================================
+// MBF21 weapon codepointers (M4b).  args are set by DeHackEd (state.args[]).
+void A_WeaponSound (player_t *player, pspdef_t *psp)
+{
+  S_StartSound (psp->state->args[1] ? NULL : player->mo, (int)psp->state->args[0]);
+}
+void A_ConsumeAmmo (player_t *player, pspdef_t *psp)
+{
+  ammotype_t type = weaponinfo[player->readyweapon].ammo;
+  int amount;
+  if (!psp->state || type == am_noammo) return;
+  amount = psp->state->args[0] ? (int)psp->state->args[0] : 1;   // aiDoom has no ammopershot -> 1
+  player->ammo[type] -= amount;
+  if (player->ammo[type] < 0) player->ammo[type] = 0;
+}
+void A_GunFlashTo (player_t *player, pspdef_t *psp)
+{
+  if (!psp->state) return;
+  if (!psp->state->args[1]) P_SetMobjState (player->mo, S_PLAY_ATK2);
+  P_SetPsprite (player, ps_flash, (int)psp->state->args[0]);
+}
+void A_RefireTo (player_t *player, pspdef_t *psp)
+{
+  if (!psp->state) return;
+  if ((psp->state->args[1] || P_CheckAmmo (player))
+   && (player->cmd.buttons & BT_ATTACK)
+   && player->pendingweapon == wp_nochange && player->health)
+    P_SetPsprite (player, ps_weapon, (int)psp->state->args[0]);
+}
+void A_WeaponProjectile (player_t *player, pspdef_t *psp)
+{
+  int type;
+  if (!psp->state || !psp->state->args[0]) return;
+  type = (int)psp->state->args[0] - 1;
+  if (type < 0 || type >= num_mobjtypes) return;
+  P_SpawnPlayerMissile (player->mo, type);
+}
