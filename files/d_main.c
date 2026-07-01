@@ -1295,6 +1295,11 @@ void D_DoomMain (void)
 
     printf ("W_Init: Init WADfiles.\n");
     W_InitMultipleFiles (wadfiles);
+    {   // DeHackEd/BEX/MBF21: apply every DEHACKED lump + -deh files before the tables are read
+        extern void D_ProcessDehInWads (void);
+        printf ("DEH: Applying DeHackEd/BEX/MBF21 patches.\n");
+        D_ProcessDehInWads ();
+    }
 printf("added\n");
     
 

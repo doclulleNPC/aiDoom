@@ -19,11 +19,15 @@ Goal: make aiDoom a **MBF21-compatible** port so it runs modern DeHackEd mods. T
 - [x] **1. Struct foundation** — extend `state_t` (`args[MAXSTATEARGS]`, `flags`) and `mobjinfo_t`
   (`flags2`, `infighting_group`, `projectile_group`, `splash_group`, `altspeed`, `meleerange`,
   `droppeditem`) in `files/info.h`. Positional initializers in `info.c` stay valid (new fields → 0).
-- [ ] **2. DeHackEd/BEX parser** — port crispy's modular `deh_*.c` to `files/` and adapt to
-  aiDoom's globals (`states`, `mobjinfo`, `weaponinfo`, `sprnames`, `S_sfx`, cheats, pars).
-  Sections: Thing, Frame, Pointer/`[CODEPTR]`, Weapon, Sound, Ammo, Misc, Cheat, `[PARS]`, Text,
-  `[STRINGS]`. Load the `DEHACKED` lump (+ `-deh file`) in `d_main.c` after WAD init. *Testable
-  with any classic/Boom DEH.*
+- [x] **2. DeHackEd/BEX parser** — ported `../winmbf/Source/d_deh.c` -> `files/d_deh.{c,h}` (adapted
+  to aiDoom: DEHFILE lump reader via `W_*`, actionf_t union, string compat, 64-bit); wired
+  `D_ProcessDehInWads()` into `d_main.c` (every `DEHACKED` lump + `-deh <file>`). Live sections:
+  Thing / Frame / Pointer+`[CODEPTR]` / Weapon / Ammo / Sounds / Sprite / `[PARS]`. MBF codepointer
+  stubs in `files/p_mbf.c` (real impls in M4). **Bounds-safe:** DSDHacked frames/things beyond the
+  tables are skipped (no OOB crash) until M3. Verified: a vanilla thing/frame DEH loads + applies;
+  `Crispy and Brutal.wad` no longer crashes the parser (now stops at `R_InitSprites` -- a sprite
+  rotation-leniency issue -> M3). **Deferred to M2b:** `[STRINGS]`/`Text`/`Misc`/`Cheat` (need the
+  string-table refactor + aiDoom's cheat map).
 - [ ] **3. DSDHacked** — make `states` / `mobjinfo` / `sprnames` / `S_sfx` **dynamically growable**
   (state/thing numbers into the tens of thousands). Fixed arrays → grown pointers; `NUMSTATES`
   etc. become runtime counts. (port `dsdhacked.c`.)
