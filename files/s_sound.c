@@ -32,6 +32,7 @@ rcsid[] = "$Id: s_sound.c,v 1.6 1997/02/03 22:45:12 b1 Exp $";
 #include "i_system.h"
 #include "i_sound.h"
 #include "sounds.h"
+extern int num_sfx;
 #include "s_sound.h"
 
 #include "z_zone.h"
@@ -187,7 +188,7 @@ void S_Init
   mus_paused = 0;
 
   // Note that sounds have not been cached (yet).
-  for (i=1 ; i<NUMSFX ; i++)
+  for (i=1 ; i<num_sfx ; i++)
     S_sfx[i].lumpnum = S_sfx[i].usefulness = -1;
 }
 
@@ -274,7 +275,7 @@ S_StartSoundAtVolume
   	   sfx_id, S_sfx[sfx_id].name );*/
   
   // check for bogus sound #
-  if (sfx_id < 1 || sfx_id >= NUMSFX)
+  if (sfx_id < 1 || sfx_id >= num_sfx)
     return;   // (M4d) DSDHacked/custom sound beyond the built-in table -- skip, don't crash
   
   sfx = &S_sfx[sfx_id];
@@ -538,7 +539,7 @@ void S_UpdateSounds(void* listener_p)
     // DOS 8bit remains. 
     /*if (gametic > nextcleanup)
     {
-	for (i=1 ; i<NUMSFX ; i++)
+	for (i=1 ; i<num_sfx ; i++)
 	{
 	    if (S_sfx[i].usefulness < 1
 		&& S_sfx[i].usefulness > -1)

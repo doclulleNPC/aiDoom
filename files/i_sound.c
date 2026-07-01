@@ -68,7 +68,8 @@ static int SAMPLECOUNT=		512;
 #define SAMPLERATE		11025	// Hz
 
 // The actual lengths of all sound effects.
-int 		lengths[NUMSFX];
+int		*lengths;		// DSDHacked: grown with S_sfx (dsdhacked.c)
+extern int	num_sfx;
 
 // The actual output device.
 int	audio_fd;
@@ -797,19 +798,24 @@ I_InitSound()
   // Initialize external data (all sounds) at start, keep static.
   fprintf( stderr, "I_InitSound: ");
   
-  for (i=1 ; i<NUMSFX ; i++)
+  if (!lengths) lengths = calloc(num_sfx, sizeof(int));
+  for (i=1 ; i<num_sfx ; i++)
   { 
-    // Alias? Example is the chaingun sound linked to pistol.
-    if (!S_sfx[i].link)
+    // DSDHacked gap slots (grown but unnamed) have no name -> nothing to load.
+    if (!S_sfx[i].name || !S_sfx[i].name[0])
+    { S_sfx[i].data = NULL; lengths[i] = 0; continue; }
+    // Alias? Example is the chaingun sound linked to pistol.  DeHackEd stores a link as a raw
+    // small-int "pointer" (deh_procSounds), so only follow it when it actually points into the
+    // sound table; otherwise treat it as a normal (unlinked) sound and load by name.
+    if (S_sfx[i].link >= S_sfx && S_sfx[i].link < S_sfx + num_sfx)
+    {
+      S_sfx[i].data = S_sfx[i].link->data;
+      lengths[i] = lengths[S_sfx[i].link - S_sfx];
+    }
+    else
     {
       // Load data from WAD file.
       S_sfx[i].data = getsfx( S_sfx[i].name, &lengths[i] );
-    }	
-    else
-    {
-      // Previously loaded already?
-      S_sfx[i].data = S_sfx[i].link->data;
-      lengths[i] = lengths[(S_sfx[i].link - S_sfx)/sizeof(sfxinfo_t)];
     }
   }
 

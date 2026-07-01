@@ -133,6 +133,7 @@ void deh_procText(DEHFILE *, FILE*, char *);
 void deh_procPars(DEHFILE *, FILE*, char *);
 void deh_procStrings(DEHFILE *, FILE*, char *);
 void deh_procSprites(DEHFILE *, FILE*, char *);
+void deh_procSoundsList(DEHFILE *, FILE*, char *);
 void deh_procError(DEHFILE *, FILE*, char *);
 void deh_procBexCodePointers(DEHFILE *, FILE*, char *);
 
@@ -168,6 +169,7 @@ deh_block deh_blocks[] = {
   //     begin BOOM Extensions (BEX)
 
   /* 10 */ {"[SPRITES]",deh_procSprites},  // dsdhacked sprite index->name
+  {"[SOUNDS]",deh_procSoundsList}, // dsdhacked sound index->name
   {"[STRINGS]",deh_procStrings}, // new string changes
   /* 11 */ {"[PARS]",deh_procPars}, // alternative block marker
   /* 12 */ {"[CODEPTR]",deh_procBexCodePointers}, // bex codepointers by mnemonic
@@ -617,6 +619,7 @@ extern actionf_t *deh_codeptr;
 void dsdh_EnsureStatesCapacity(int);
 void dsdh_EnsureMobjInfoCapacity(int);
 void dsdh_EnsureSpritesCapacity(int);
+void dsdh_EnsureSFXCapacity(int);
 
 // ====================================================================
 // ProcessDehFile
@@ -1726,6 +1729,27 @@ void deh_procSprites (DEHFILE *fpin, FILE* fpout, char *line)
       dsdh_EnsureSpritesCapacity((int)index);
       sprnames[index] = strdup(name);
       if (fpout) fprintf(fpout, "Sprite %ld = %s\n", index, name);
+    }
+  }
+}
+
+// ====================================================================
+// deh_procSoundsList -- DSDHacked [SOUNDS] block: "index = NAME" -> grow S_sfx and set the name so
+// the precache loads ds<NAME>.  (Runs during DEH, before I_InitSound precaches.)
+void deh_procSoundsList (DEHFILE *fpin, FILE* fpout, char *line)
+{
+  char inbuffer[DEH_BUFFERMAX], name[16];
+  long index; extern int num_sfx;
+  (void)line;
+  while (!dehfeof(fpin) && dehfgets(inbuffer, sizeof(inbuffer), fpin))
+  {
+    lfstrip(inbuffer);
+    if (!*inbuffer) break;
+    if (sscanf(inbuffer, "%ld = %15s", &index, name) == 2 && index >= 0)
+    {
+      dsdh_EnsureSFXCapacity((int)index);
+      S_sfx[index].name = strdup(name);
+      if (fpout) fprintf(fpout, "Sound %ld = %s\n", index, name);
     }
   }
 }

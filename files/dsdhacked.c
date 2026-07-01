@@ -5,6 +5,8 @@
 #include <string.h>
 #include "doomdef.h"
 #include "info.h"
+#include "sounds.h"
+extern int *lengths;
 
 actionf_t *deh_codeptr = NULL;   // per-state original action (grown with states; used by d_deh.c)
 
@@ -56,4 +58,24 @@ void dsdh_EnsureSpritesCapacity (int limit)
     for (i = old; i < newn; i++) np[i] = sprname_empty;   // gap slots -> non-matching
     sprnames = np;
     num_sprites = newn;
+}
+
+void dsdh_EnsureSFXCapacity (int limit)
+{
+    int old, newn, i;
+    sfxinfo_t *ns; int *nl;
+    if (limit < num_sfx) return;
+    old = num_sfx; newn = limit + 1;
+    if (S_sfx == S_sfx_builtin)
+        ns = memcpy (malloc (newn * sizeof(sfxinfo_t)), S_sfx_builtin, old * sizeof(sfxinfo_t));
+    else
+        ns = realloc (S_sfx, newn * sizeof(sfxinfo_t));
+    memset (ns + old, 0, (newn - old) * sizeof(sfxinfo_t));
+    // rebase any intra-table link pointer (only chgun->pistol) into the new array
+    for (i = 0; i < old; i++)
+        if (ns[i].link) ns[i].link = ns + (ns[i].link - S_sfx_builtin);
+    for (i = old; i < newn; i++) { ns[i].lumpnum = -1; ns[i].usefulness = -1; ns[i].priority = 64; }
+    S_sfx = ns;
+    if (lengths) { nl = realloc (lengths, newn * sizeof(int)); memset (nl+old, 0, (newn-old)*sizeof(int)); lengths = nl; }
+    num_sfx = newn;
 }
