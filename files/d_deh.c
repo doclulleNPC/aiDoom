@@ -482,6 +482,11 @@ typedef struct {
   char *lookup;  // mnemonic lookup string to be specified in BEX
 } deh_bexptr;
 
+void A_SpawnObject(), A_MonsterProjectile(), A_MonsterMeleeAttack(), A_RadiusDamage(),
+     A_NoiseAlert(), A_HealChase(), A_SeekTracer(), A_FindTracer(), A_ClearTracer(),
+     A_AddFlags(), A_RemoveFlags(), A_JumpIfFlagsSet(), A_JumpIfHealthBelow(),
+     A_JumpIfTargetInSight(), A_JumpIfTargetCloser(), A_JumpIfTracerInSight(), A_JumpIfTracerCloser();
+
 deh_bexptr deh_bexptrs[] =
 {
   {A_Light0,         "A_Light0"},
@@ -570,6 +575,23 @@ deh_bexptr deh_bexptrs[] =
   {A_LineEffect,     "A_LineEffect"},     // killough 11/98
 
   // This NULL entry must be the last in the list
+   {A_SpawnObject,         "A_SpawnObject"},
+   {A_MonsterProjectile,   "A_MonsterProjectile"},
+   {A_MonsterMeleeAttack,  "A_MonsterMeleeAttack"},
+   {A_RadiusDamage,        "A_RadiusDamage"},
+   {A_NoiseAlert,          "A_NoiseAlert"},
+   {A_HealChase,           "A_HealChase"},
+   {A_SeekTracer,          "A_SeekTracer"},
+   {A_FindTracer,          "A_FindTracer"},
+   {A_ClearTracer,         "A_ClearTracer"},
+   {A_AddFlags,            "A_AddFlags"},
+   {A_RemoveFlags,         "A_RemoveFlags"},
+   {A_JumpIfFlagsSet,      "A_JumpIfFlagsSet"},
+   {A_JumpIfHealthBelow,   "A_JumpIfHealthBelow"},
+   {A_JumpIfTargetInSight, "A_JumpIfTargetInSight"},
+   {A_JumpIfTargetCloser,  "A_JumpIfTargetCloser"},
+   {A_JumpIfTracerInSight, "A_JumpIfTracerInSight"},
+   {A_JumpIfTracerCloser,  "A_JumpIfTracerCloser"},
   {NULL,             "A_NULL"},  // Ty 05/16/98
 };
 
@@ -932,6 +954,9 @@ void deh_procFrame(DEHFILE *fpin, FILE* fpout, char *line)
           if (fpout) fprintf(fpout,"Bad data pair in '%s'\n",inbuffer);
           continue;
         }
+      if (!strncasecmp(key,"args",4) && key[4]>='1' && key[4]<='8' && !key[5])
+        states[indexnum].args[key[4]-'1'] = value;   // (M4) mbf21 codepointer args
+      else
       if (!strcasecmp(key,deh_state[0]))  // Sprite number
         {
           if (fpout) fprintf(fpout," - sprite = %ld\n",value);
