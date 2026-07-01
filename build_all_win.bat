@@ -24,6 +24,10 @@ cd /d "%ROOT%files"
 nmake /nologo /f Makefile.msvc %* || exit /b 1
 echo [build] === tools (config + gpumon + launcher + director) ===
 cd /d "%ROOT%tools"
+REM clean first so every tool is (re)built by MSVC -- guards against a stale
+REM foreign-toolchain exe (e.g. a MinGW x64 launcher.exe) with a newer timestamp
+REM that nmake would otherwise consider up-to-date and skip -> arch mismatch.
+nmake /nologo /f Makefile.msvc clean >nul
 nmake /nologo /f Makefile.msvc %* || exit /b 1
 
 REM --- copy the aiDoom engine + tool binaries (+SDL3.dll) into run\ ---
