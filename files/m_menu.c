@@ -207,6 +207,7 @@ void M_VideoVSync(int choice);
 void M_VideoScale(int choice);
 void M_VideoBackend(int choice);
 void M_StatusBarStyle(int choice);
+void M_LightDither(int choice);
 void M_DrawVideo(void);
 void M_WriteTextBig(int x, int y, char *string, int sc);
 
@@ -398,6 +399,7 @@ enum
     vid_scale,      // Presentation scale mode (Letterbox vs Integer)
     vid_backend,    // GPU Backend
     vid_statusbar,  // Status bar style
+    vid_dither,     // Light dithering
     vid_end
 } video_e;
 
@@ -410,7 +412,8 @@ menuitem_t VideoMenu[]=
     {1,"",	M_VideoVSync,'y'},	// VSync toggle
     {2,"",	M_VideoScale,'s'},	// Letterbox vs Integer
     {2,"",	M_VideoBackend,'b'},	// GPU Backend
-    {2,"",	M_StatusBarStyle,'h'}	// Vanilla / Small / Alt HUD
+    {2,"",	M_StatusBarStyle,'h'},	// Vanilla / Small / Alt HUD
+    {2,"",	M_LightDither,'d'}	// soften light banding
 };
 
 menu_t  VideoDef =
@@ -1045,6 +1048,7 @@ static char* M_ScaleNames[2]  = { "Letterbox", "Integer" };
 static char* M_BackendNames[7] = { "Auto", "Vulkan", "OpenGL", "D3D12", "D3D11", "Metal", "Software" };
 extern int statusbar_style;
 static char* M_StatusBarNames[3] = { "Vanilla", "Small (50%)", "Alt HUD" };
+extern int dither_lighting;
 
 void M_DrawVideo(void)
 {
@@ -1083,6 +1087,17 @@ void M_DrawVideo(void)
     M_WriteText(VideoDef.x, VideoDef.y + LINEHEIGHT*vid_statusbar, "Status Bar");
     M_WriteText(VideoDef.x + 130, VideoDef.y + LINEHEIGHT*vid_statusbar,
 		M_StatusBarNames[(statusbar_style>=0 && statusbar_style<=2) ? statusbar_style : 0]);
+
+    M_WriteText(VideoDef.x, VideoDef.y + LINEHEIGHT*vid_dither, "Light Dither");
+    M_WriteText(VideoDef.x + 130, VideoDef.y + LINEHEIGHT*vid_dither,
+		dither_lighting ? "On" : "Off");
+}
+
+void M_LightDither(int choice)
+{
+    dither_lighting = !dither_lighting;
+    R_SetViewSize (screenblocks, detailLevel);	// recompute r_dither_on
+    M_SaveDefaults ();
 }
 
 void M_StatusBarStyle(int choice)

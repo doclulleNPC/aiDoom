@@ -127,11 +127,11 @@ R_RenderMaskedSegRange
 	lightnum++;
 
     if (lightnum < 0)		
-	walllights = scalelight[0];
+	{ walllights = scalelight[0]; walllights_fine = scalelight_fine[0]; }
     else if (lightnum >= LIGHTLEVELS)
-	walllights = scalelight[LIGHTLEVELS-1];
+	{ walllights = scalelight[LIGHTLEVELS-1]; walllights_fine = scalelight_fine[LIGHTLEVELS-1]; }
     else
-	walllights = scalelight[lightnum];
+	{ walllights = scalelight[lightnum]; walllights_fine = scalelight_fine[lightnum]; }
 
     maskedtexturecol = ds->maskedtexturecol;
 
@@ -271,7 +271,13 @@ void R_RenderSegLoop (void)
 	    if (index >=  MAXLIGHTSCALE )
 		index = MAXLIGHTSCALE-1;
 
-	    dc_colormap = walllights[index];
+	    if (r_dither_on && !fixedcolormap) {
+		int fine = walllights_fine[index], lvl = fine>>4;
+		dc_colormap  = colormaps + lvl*256;
+		dc_colormap2 = colormaps + (lvl < NUMCOLORMAPS-1 ? lvl+1 : lvl)*256;
+		dc_litfrac   = fine & 15;
+	    } else
+		dc_colormap = walllights[index];
 	    dc_x = rw_x;
 	    dc_iscale = 0xffffffffu / (unsigned)rw_scale;
 	}
@@ -284,7 +290,7 @@ void R_RenderSegLoop (void)
 	    dc_yh = yh;
 	    dc_texturemid = rw_midtexturemid;
 	    dc_source = R_GetColumn(midtexture,texturecolumn);
-	    colfunc ();
+	    { if (r_dither_on && !fixedcolormap) R_DrawColumnDither(); else colfunc(); }
 	    ceilingclip[rw_x] = viewheight;
 	    floorclip[rw_x] = -1;
 	}
@@ -306,7 +312,7 @@ void R_RenderSegLoop (void)
 		    dc_yh = mid;
 		    dc_texturemid = rw_toptexturemid;
 		    dc_source = R_GetColumn(toptexture,texturecolumn);
-		    colfunc ();
+		    { if (r_dither_on && !fixedcolormap) R_DrawColumnDither(); else colfunc(); }
 		    ceilingclip[rw_x] = mid;
 		}
 		else
@@ -336,7 +342,7 @@ void R_RenderSegLoop (void)
 		    dc_texturemid = rw_bottomtexturemid;
 		    dc_source = R_GetColumn(bottomtexture,
 					    texturecolumn);
-		    colfunc ();
+		    { if (r_dither_on && !fixedcolormap) R_DrawColumnDither(); else colfunc(); }
 		    floorclip[rw_x] = mid;
 		}
 		else
@@ -658,11 +664,11 @@ R_StoreWallRange
 		lightnum++;
 
 	    if (lightnum < 0)		
-		walllights = scalelight[0];
+		{ walllights = scalelight[0]; walllights_fine = scalelight_fine[0]; }
 	    else if (lightnum >= LIGHTLEVELS)
-		walllights = scalelight[LIGHTLEVELS-1];
+		{ walllights = scalelight[LIGHTLEVELS-1]; walllights_fine = scalelight_fine[LIGHTLEVELS-1]; }
 	    else
-		walllights = scalelight[lightnum];
+		{ walllights = scalelight[lightnum]; walllights_fine = scalelight_fine[lightnum]; }
 	}
     }
     

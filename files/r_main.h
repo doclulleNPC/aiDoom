@@ -90,6 +90,17 @@ extern lighttable_t*	fixedcolormap;
 // There a 0-31, i.e. 32 LUT in the COLORMAP lump.
 #define NUMCOLORMAPS		32
 
+// 2D light dithering (see r_draw.c)
+extern int		dither_lighting, r_dither_on;
+extern int		zlight_fine[LIGHTLEVELS][MAXLIGHTZ];
+extern int		scalelight_fine[LIGHTLEVELS][MAXLIGHTSCALE];
+extern int*		walllights_fine;
+extern int*		planezlight_fine;
+extern lighttable_t	*dc_colormap2, *ds_colormap2;
+extern int		dc_litfrac, ds_litfrac;
+void R_DrawColumnDither (void);
+void R_DrawSpanDither (void);
+
 
 // Blocky/low detail mode.
 //B remove this?

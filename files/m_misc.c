@@ -191,6 +191,7 @@ extern int	key_inv_drop;
 extern int	autorun;
 extern int	key_console;
 extern int	statusbar_style;
+extern int	dither_lighting;
 extern int	key_spy;
 extern int	crosshair;
 extern int	scale_mode;
@@ -310,6 +311,7 @@ default_t	defaults[] =
     // fullscreen flag.  Applied by i_video.c at startup.
     {"screen_resolution",&hires, 3},
     {"statusbar_style",&statusbar_style, 0},	// 0=vanilla 1=small 2=alt HUD
+    {"light_dither",&dither_lighting, 0},	// soften light banding
     {"fullscreen",&fullscreen_mode, 0},
     {"scale_mode",&scale_mode, 0},
     {"vsync",&vsync, 1},

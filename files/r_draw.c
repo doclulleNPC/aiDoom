@@ -582,6 +582,65 @@ int			ds_x2;
 
 lighttable_t*		ds_colormap; 
 
+// --- 2D ordered light dithering (Options -> Video -> Light Dither) --------------------------
+// Softens the hard 8-bit colormap banding: each pixel picks between the two nearest colormap
+// levels (dc/ds_colormap = brighter, *_colormap2 = next darker) using a 4x4 Bayer threshold vs
+// the fractional light (*_litfrac, 0-15).  Only walls + flats are dithered (r_segs / r_plane).
+lighttable_t*		dc_colormap2;
+int			dc_litfrac;
+lighttable_t*		ds_colormap2;
+int			ds_litfrac;
+int			dither_lighting = 0;	// config toggle
+int			r_dither_on = 0;		// dither_lighting && normal detail (per frame)
+
+static const unsigned char r_dith[4][4] = {
+    {  0,  8,  2, 10 },
+    { 12,  4, 14,  6 },
+    {  3, 11,  1,  9 },
+    { 15,  7, 13,  5 }
+};
+
+void R_DrawColumnDither (void)
+{
+    int		count = dc_yh - dc_yl;
+    byte*	dest;
+    fixed_t	frac, fracstep;
+    const unsigned char* drow;
+    int		y;
+    if (count < 0) return;
+    dest = ylookup[dc_yl] + columnofs[dc_x];
+    fracstep = dc_iscale;
+    frac = dc_texturemid + (dc_yl-centery)*fracstep;
+    drow = r_dith[dc_x & 3];
+    y = dc_yl;
+    do {
+	lighttable_t* cm = (dc_litfrac > drow[y & 3]) ? dc_colormap2 : dc_colormap;
+	*dest = cm[dc_source[(frac>>FRACBITS)&127]];
+	dest += SCREENWIDTH;
+	frac += fracstep;
+	y++;
+    } while (count--);
+}
+
+void R_DrawSpanDither (void)
+{
+    fixed_t	xfrac = ds_xfrac, yfrac = ds_yfrac;
+    byte*	dest;
+    int		count, spot, x, sy = ds_y & 3;
+    dest = ylookup[ds_y] + columnofs[ds_x1];
+    count = ds_x2 - ds_x1;
+    x = ds_x1;
+    do {
+	lighttable_t* cm = (ds_litfrac > r_dith[x & 3][sy]) ? ds_colormap2 : ds_colormap;
+	spot = ((yfrac>>(16-6))&(63*64)) + ((xfrac>>16)&63);
+	*dest++ = cm[ds_source[spot]];
+	xfrac += ds_xstep;
+	yfrac += ds_ystep;
+	x++;
+    } while (count--);
+}
+
+
 fixed_t			ds_xfrac; 
 fixed_t			ds_yfrac; 
 fixed_t			ds_xstep; 

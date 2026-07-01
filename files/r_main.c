@@ -123,6 +123,10 @@ fixed_t*		finecosine = &finesine[FINEANGLES/4];
 lighttable_t*		scalelight[LIGHTLEVELS][MAXLIGHTSCALE];
 lighttable_t*		scalelightfixed[MAXLIGHTSCALE];
 lighttable_t*		zlight[LIGHTLEVELS][MAXLIGHTZ];
+int			zlight_fine[LIGHTLEVELS][MAXLIGHTZ];	// fine (4-bit-frac) levels for dithering
+int			scalelight_fine[LIGHTLEVELS][MAXLIGHTSCALE];
+int*			walllights_fine;
+int*			planezlight_fine;
 
 // bumped light from gun blasts
 int			extralight;			
@@ -647,6 +651,13 @@ void R_InitLightTables (void)
 		level = NUMCOLORMAPS-1;
 
 	    zlight[i][j] = colormaps + level*256;
+	    {	// fine level for 2D light dithering (mirrors the above at 16x)
+		int rawf = FixedDiv ((NONWIDEWIDTH/2*FRACUNIT), (j+1)<<LIGHTZSHIFT) >> (LIGHTSCALESHIFT-4);
+		int l16 = startmap*16 - rawf/DISTMAP;
+		if (l16 < 0) l16 = 0;
+		if (l16 > (NUMCOLORMAPS-1)*16) l16 = (NUMCOLORMAPS-1)*16;
+		zlight_fine[i][j] = l16;
+	    }
 	}
     }
 }
@@ -773,6 +784,8 @@ void R_ExecuteSetViewSize (void)
 	distscale[i] = FixedDiv (FRACUNIT,cosadj);
     }
     
+    r_dither_on = dither_lighting && (detailshift == 0);
+
     // Calculate the light levels to use
     //  for each level / scale combination.
     for (i=0 ; i< LIGHTLEVELS ; i++)
@@ -789,6 +802,11 @@ void R_ExecuteSetViewSize (void)
 		level = NUMCOLORMAPS-1;
 
 	    scalelight[i][j] = colormaps + level*256;
+	    {	int l16 = startmap*16 - j*NONWIDEWIDTH*16/(viewwidth_nonwide<<detailshift)/DISTMAP;
+		if (l16 < 0) l16 = 0;
+		if (l16 > (NUMCOLORMAPS-1)*16) l16 = (NUMCOLORMAPS-1)*16;
+		scalelight_fine[i][j] = l16;
+	    }
 	}
     }
 }

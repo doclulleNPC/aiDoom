@@ -166,7 +166,13 @@ R_MapPlane
 	if (index >= MAXLIGHTZ )
 	    index = MAXLIGHTZ-1;
 
-	ds_colormap = planezlight[index];
+	if (r_dither_on) {
+	    int fine = planezlight_fine[index], lvl = fine>>4;
+	    ds_colormap  = colormaps + lvl*256;
+	    ds_colormap2 = colormaps + (lvl < NUMCOLORMAPS-1 ? lvl+1 : lvl)*256;
+	    ds_litfrac   = fine & 15;
+	} else
+	    ds_colormap = planezlight[index];
     }
 	
     ds_y = y;
@@ -174,7 +180,7 @@ R_MapPlane
     ds_x2 = x2;
 
     // high or low detail
-    spanfunc ();	
+    if (r_dither_on && !fixedcolormap) R_DrawSpanDither(); else spanfunc ();	
 }
 
 
@@ -454,7 +460,7 @@ void R_DrawPlanes (void)
 	if (light < 0)
 	    light = 0;
 
-	planezlight = zlight[light];
+	planezlight = zlight[light]; planezlight_fine = zlight_fine[light];
 
 	pl->top[pl->maxx+1] = 0xffff;
 	pl->top[pl->minx-1] = 0xffff;
