@@ -32,8 +32,8 @@ right flags and auto-starts the native `director` sidecar when an AI mode is cho
 |------|----------|---------|
 | `ID0/` | all | **Game WADs + savegames** (IWADs, aidoom.wad, doom2stuff.wad, doomsav*.dsg). |
 | `director` / `director.exe` | Linux / Windows | **Native SDL3 AI director** (C) — the no-Python LLM monster director: a small window showing live status + a scrolling log, talks to Ollama + the game. Used by the launchers for `--director`. Build: `tools/build_director.sh` (Linux) / `tools/build_director_win.sh` (Windows). |
-| (`../tools/buddy_voice.py`) | all | AI co-op **buddy voice**: tails `buddy_say.txt` (written here by `-aicoop`) and speaks lines via ElevenLabs (Joker-HL). Run from here: `python3 ../tools/buddy_voice.py`. Needs `ELEVENLABS_API_KEY` (env or `elevenlabs_api_key` in `aidoom.cfg`) + ffplay/mpg123. |
-| `gpumon` / `gpumon.exe` | Linux / Windows | GPU monitor as a small **SDL window** (bars for load/VRAM/temp/power). On error it stops and shows a **Reconnect** button (no auto-retry). Build: Linux `tools/build_gpumon.sh`; Windows via CMake or `build_all_win.bat`. See **`../GPUMON.md`**. |
+| (`../tools/buddy_voice.py`) | all | **Legacy** live-TTS buddy voice (ElevenLabs, Joker-HL) that tailed `buddy_say.txt`. The buddy now speaks from **pre-baked OGG clips in `ID0/aidoom.wad`** (`files/i_voice.c`), so the game no longer writes `buddy_say.txt`; this script is kept only for the old live-TTS path. |
+| `gpumon` / `gpumon.exe` | Linux / Windows | GPU monitor as a small **SDL window** (bars for load / memory / temp / power). **Auto-detects the tool**: `nvidia-smi` (NVIDIA) or `macmon` (Apple Silicon). On error it stops and shows a **Reconnect** button (no auto-retry). Build: Linux `tools/build_gpumon.sh`; Windows via CMake or `build_all_win.bat`. See **`../GPUMON.md`**. |
 | `aidoom_config` / `aidoom_config.exe` | Linux / Windows | SDL3 settings editor; reads/writes `aidoom.cfg` here. Build: Linux `tools/build_config.sh`; Windows via CMake or `build_all_win.bat`. |
 | `launcher` / `launcher.exe` | Linux / Windows | SDL3 **launcher GUI**: scans this folder (+ `~/.doom`) for IWADs, lets you pick the IWAD and the Buddy (off / `-coop` / `-aicoop`) and Monster (vanilla / L4D / `-aidirector`) modes, then launches the game with the right flags (auto-starting the native `director` sidecar when AI monsters are picked). Build: Linux `tools/build_launcher.sh`; Windows via CMake or `build_all_win.bat`. |
 | `aidoom.cfg` | all | The single config file (game keys/video + Ollama), read by the game and all tools from this folder. |
@@ -60,7 +60,8 @@ right flags and auto-starts the native `director` sidecar when an AI mode is cho
     copies the `aidoom` binary into `run/`. (SDL3 is linked from the system, so
     there's no library to copy alongside it.)
   - Windows (MSVC + the SDL3 SDK): run **`..\build_all_win.bat`** — it builds
-    `aidoom.exe` **and** both tools and copies them + `SDL3.dll` into `run/`.
+    `aidoom.exe` **and** the tools (config, gpumon, launcher, director) and copies
+    them + `SDL3.dll` into `run/`.
     Equivalently with CMake (finds a sibling `../SDL3` SDK automatically, also
     stages everything into `run/`): `cmake -B build && cmake --build build`.
     (The legacy `tools/build_*_win.sh` are MinGW cross-builds needing a MinGW SDL3
@@ -93,7 +94,7 @@ cd run
 ../tools/scripts/start_aidoom.sh                    # FULL LLM: AI buddy (-aicoop) + director (default)
 ../tools/scripts/start_aidoom.sh --buddy                           # rule-based buddy instead of the AI buddy
 ../tools/scripts/start_aidoom.sh --offline                         # plain aidoom, no LLM/Ollama
-../tools/scripts/start_aidoom.sh --model qwen3:8b --skill 4 --friendlyfire
+../tools/scripts/start_aidoom.sh --model qwen3:8b --skill 4 --nofriendlyfire
 ../tools/scripts/start_aidoom.sh --ollama http://localhost:11434   # override the server
 ```
 
@@ -109,7 +110,8 @@ Flags (unrecognized args are passed straight through to `aidoom`):
 | `--episode <n>` / `--map <n>` | `1` / `1` | `-warp` target |
 | `--skill <n>` | `4` | difficulty (1–5) |
 | `--ollama <url>` | `http://192.168.2.114:11434` | Ollama base URL |
-| `--friendlyfire` | off | enable monster infighting (`-friendlyfire`) |
+| `--nofriendlyfire` (`--noff`) | off | player & AI buddy can't hurt each other (`-nofriendlyfire`) |
+| `--infight` | off | monster same-species infighting (`-infight`) |
 | `--no-warm` | off | skip model warm-up |
 
 `--director` (monsters) and `--aicoop` (buddy) compose: pass both and one LLM loop
@@ -124,10 +126,10 @@ double-click **`tools\scripts\start_aidoom.bat`**, or run the PowerShell script:
 tools\scripts\start_aidoom.ps1      # FULL LLM: AI buddy (-aicoop) + director (default)
 .\start_aidoom.ps1 -RuleCoop        # rule-based buddy instead of the AI buddy
 .\start_aidoom.ps1 -NoDirector      # just the game, no LLM director
-.\start_aidoom.ps1 -Model qwen2.5-coder:1.5b -Skill 4 -FriendlyFire
+.\start_aidoom.ps1 -Model qwen2.5-coder:1.5b -Skill 4 -NoFriendlyFire
 ```
 
-Params: `-Model -Port -Episode -Map -Skill -Ollama -FriendlyFire -NoCoop -NoDirector -NoWarm`.
+Params: `-Model -Port -Episode -Map -Skill -Ollama -NoFriendlyFire -Infight -RuleCoop -NoCoop -NoDirector -NoWarm`.
 
 The **AI co-op companion** (player 2) is launched **by default**; pass `--no-coop`
 (`-NoCoop` on Windows) to play solo.
@@ -154,9 +156,10 @@ override. It's the same file the game uses for keys/video.
 
 While the AI Director runs, watch the Ollama machine's GPU with **`gpumon`** (an SDL3
 window, built into this folder).
-It reads `gpu_host` / `gpu_user` / `gpu_ssh_port` from `aidoom.cfg` here and uses
-`nvidia-smi` over SSH (or directly for `localhost`); the SDL one has a **Reconnect**
-button. Full docs: **`../GPUMON.md`**.
+It reads `gpu_host` / `gpu_user` / `gpu_ssh_port` from `aidoom.cfg` here and
+**auto-detects the GPU tool** — `nvidia-smi` (NVIDIA) or `macmon` (Apple Silicon) —
+over SSH (or directly for `localhost`); the window has a **Reconnect** button. Full
+docs: **`../GPUMON.md`**.
 
 ## Without the launcher (manual)
 
@@ -185,4 +188,4 @@ the marine, the AI buddy AND the monsters:
 
 Two independent sockets (player 31700, director 31666), each with its own client; both
 talk to Ollama. Env: `PLAYER_PORT`, `DIRECTOR_PORT`, `OLLAMA_URL`, `OLLAMA_MODEL` (player
-brain, default `llama3.1:8b`), `DECISION_SECS`.
+brain, default `mistral:7b-instruct`), `DECISION_SECS`.
