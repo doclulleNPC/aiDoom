@@ -14,7 +14,7 @@
     .\start_aidoom.ps1 -Model qwen2.5-coder:1.5b -Skill 4 -NoFriendlyFire
 #>
 param(
-    [string]$Model     = "mistral:7b-instruct",
+    [string]$Model     = "ministral-3:8b",
     [int]   $Port      = 31666,
     [int]   $Episode   = 1,
     [int]   $Map       = 1,

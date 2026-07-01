@@ -15,7 +15,7 @@
 #   ./start_aibuddy.sh -iwad /path/to/some.wad
 #
 # Ollama host/port/model come from aidoom.cfg; override with:
-#   ./start_aibuddy.sh --ollama http://192.168.2.114:11434 --model qwen3:8b
+#   ./start_aibuddy.sh --ollama http://localhost:11434 --model qwen3:8b
 # Any other args pass straight to the game (default warp: E1M1 in doom.wad):
 #   ./start_aibuddy.sh -warp 3 1 -skill 4
 #
@@ -38,9 +38,9 @@ done
 HOST=$(awk '$1=="ollama_host"{print $2}'  aidoom.cfg 2>/dev/null | tail -1)
 OPORT=$(awk '$1=="ollama_port"{print $2}' aidoom.cfg 2>/dev/null | tail -1)
 MODEL=$(awk '$1=="ollama_model"{print $2}' aidoom.cfg 2>/dev/null | tail -1)
-[ -n "$HOST" ]  || HOST=192.168.2.114
+[ -n "$HOST" ]  || HOST=localhost
 [ -n "$OPORT" ] || OPORT=11434
-[ -n "$MODEL" ] || MODEL=mistral:7b-instruct
+[ -n "$MODEL" ] || MODEL=ministral-3:8b
 OLLAMA="http://$HOST:$OPORT"
 
 # Parse a few overrides; everything else goes to the game.

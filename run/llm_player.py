@@ -9,8 +9,8 @@ or goal reached/timeout), and tracks recent history for stable, strategic planni
 import json, os, socket, sys, time, urllib.request
 
 PORT   = int(os.environ.get("AIPLAYER_PORT", "31700"))
-OLLAMA = os.environ.get("OLLAMA_URL", "http://192.168.2.114:11434")
-MODEL  = os.environ.get("OLLAMA_MODEL", "mistral:7b-instruct")
+OLLAMA = os.environ.get("OLLAMA_URL", "http://localhost:11434")
+MODEL  = os.environ.get("OLLAMA_MODEL", "ministral-3:8b")
 
 SYSTEM = """You are the brain of a DOOM marine. Each turn you receive the game state as
 JSON (player status, exit coordinates, doors and their seen status, and "things": nearby monsters/items).

@@ -71,7 +71,7 @@ right flags and auto-starts the native `director` sidecar when an AI mode is cho
   → a Steam install. Bare names resolve under `ID0/` automatically. Pick which to use
   in the launcher/config app. **Bring your own** — IWADs are not shipped.
 - An **Ollama** server reachable over HTTP, with the chosen model pulled
-  (`ollama pull mistral:7b-instruct`). For a *remote* server it must listen on the
+  (`ollama pull ministral-3:8b`). For a *remote* server it must listen on the
   network (`OLLAMA_HOST=0.0.0.0 ollama serve`), not just localhost.
 - The **native director** binary for `--director`: build it once with
   `tools/build_director.sh` (Linux) / `tools/build_director_win.sh` (MinGW). No
@@ -105,11 +105,11 @@ Flags (unrecognized args are passed straight through to `aidoom`):
 | `--director` | off | LLM **monster** director (`-aidirector` + run the director) |
 | `--buddy` | off | rule-based co-op buddy, player 2 (`-coop`, no LLM) |
 | `--aicoop` | off | **AI buddy**: `-aicoop` + turns the director on, so the LLM directs the buddy's tactics (engage/defend/regroup/…) in the same loop as the monsters |
-| `--model <name>` | `mistral:7b-instruct` | Ollama model for tactics |
+| `--model <name>` | `ministral-3:8b` | Ollama model for tactics |
 | `--port <n>` | `31666` | director TCP port (`-aidirector`) |
 | `--episode <n>` / `--map <n>` | `1` / `1` | `-warp` target |
 | `--skill <n>` | `4` | difficulty (1–5) |
-| `--ollama <url>` | `http://192.168.2.114:11434` | Ollama base URL |
+| `--ollama <url>` | `http://localhost:11434` | Ollama base URL |
 | `--nofriendlyfire` (`--noff`) | off | player & AI buddy can't hurt each other (`-nofriendlyfire`) |
 | `--infight` | off | monster same-species infighting (`-infight`) |
 | `--no-warm` | off | skip model warm-up |
@@ -138,7 +138,7 @@ The **AI co-op companion** (player 2) is launched **by default**; pass `--no-coo
 
 The server URL is configurable and defaults differ by platform:
 
-- **`start_aidoom.sh`** defaults to **`http://192.168.2.114:11434`** (from
+- **`start_aidoom.sh`** defaults to **`http://localhost:11434`** (from
   `aidoom.cfg`). Override with `--ollama`.
 - **`start_aidoom.ps1`** defaults to `http://localhost:11434`. Override with `-Ollama`.
 
@@ -165,7 +165,7 @@ docs: **`../GPUMON.md`**.
 
 ```sh
 cd run && ./aidoom -warp 1 1 -skill 4 -aidirector 31666 &
-./director --port 31666 --model mistral:7b-instruct
+./director --port 31666 --model ministral-3:8b
 ```
 
 See `../AGENT_CONTROL.md` (§12–13) and `../MONSTER_AGENT_GUIDE.md` for the
@@ -188,4 +188,4 @@ the marine, the AI buddy AND the monsters:
 
 Two independent sockets (player 31700, director 31666), each with its own client; both
 talk to Ollama. Env: `PLAYER_PORT`, `DIRECTOR_PORT`, `OLLAMA_URL`, `OLLAMA_MODEL` (player
-brain, default `mistral:7b-instruct`), `DECISION_SECS`.
+brain, default `ministral-3:8b`), `DECISION_SECS`.

@@ -28,12 +28,12 @@
 set -u
 
 # --- defaults (Ollama IP; overridden by aidoom.cfg below) ---
-MODEL="mistral:7b-instruct"
+MODEL="ministral-3:8b"
 PORT=31666
 EPISODE=1
 MAP=1
 SKILL=4
-OLLAMA="http://192.168.2.114:11434"
+OLLAMA="http://localhost:11434"
 FRIENDLYFIRE=0
 INFIGHT=0
 NODIRECTOR=0		# default ON -- full LLM: the director drives monsters + the AI buddy
