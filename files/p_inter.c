@@ -346,6 +346,13 @@ P_GivePower
 
 
 //
+// (mod) In buddy co-op, once the human is comfortably healed (>75% HP) a picked-up health item
+// is pocketed into the DOOM inventory for later instead of being wasted on a near-full bar.
+static boolean P_HoardHealth (player_t* player)
+{
+    return P_AICoop_Active () && player->health > MAXHEALTH*3/4;
+}
+
 // P_TouchSpecialThing
 //
 void
@@ -435,7 +442,7 @@ P_TouchSpecialThing
 	
 	// bonus items
       case SPR_BON1:
-	if (player->health >= 200)
+	if (P_HoardHealth (player) || player->health >= 200)
 	{
 	    // (J) overflow: at the 200 cap -> pocket the bonus instead of wasting it.
 	    if (!P_StoreOverflow (player, arti_healthbonus, 1))
@@ -539,9 +546,9 @@ P_TouchSpecialThing
 	
 	// medikits, heals
       case SPR_STIM:
-	if (!P_GiveBody (player, 10))
+	if (P_HoardHealth (player) || !P_GiveBody (player, 10))
 	{
-	    // (J) overflow: at full health -> pocket the stimpack for later.
+	    // overflow: full HP (or >75% in buddy co-op) -> pocket the stimpack for later.
 	    if (!P_StoreOverflow (player, arti_stimpack, 1))
 		return;
 	}
@@ -549,7 +556,7 @@ P_TouchSpecialThing
 	break;
 
       case SPR_MEDI:
-	if (!P_GiveBody (player, 25))
+	if (P_HoardHealth (player) || !P_GiveBody (player, 25))
 	{
 	    if (!P_StoreOverflow (player, arti_medikit, 1))
 		return;
