@@ -738,6 +738,17 @@ void A_Look (mobj_t* actor)
 
     actor->threshold = 0;	// any shot will wake up
 
+    // Friendly actors (revived marine, summonfriend) must NEVER acquire the player:
+    // not via pack-lock and not via weapon NOISE (sector->soundtarget, which is the
+    // human who just fired).  Route straight to the enemy-monster finder so they hunt
+    // monsters and leave the player/buddy alone.
+    if (actor->flags & MF_FRIEND)
+    {
+	if (!P_LookForPlayers (actor, false))
+	    return;
+	goto seeyou;
+    }
+
     // Pack hunt: lock onto the player at once (even with no line of sight) so a
     // freshly-spawned monster starts searching/closing in immediately.
     if (monster_pack)

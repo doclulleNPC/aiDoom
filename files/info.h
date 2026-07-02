@@ -1393,6 +1393,9 @@ typedef enum
     S_REVMAR_PAIN,
     S_REVMAR_DIE1, S_REVMAR_DIE2, S_REVMAR_DIE3, S_REVMAR_DIE4,
     S_REVMAR_DIE5, S_REVMAR_DIE6, S_REVMAR_DIE7,
+    // (G) "get up" -- the death frames played in REVERSE when a corpse is revived
+    S_REVMAR_RISE1, S_REVMAR_RISE2, S_REVMAR_RISE3, S_REVMAR_RISE4,
+    S_REVMAR_RISE5, S_REVMAR_RISE6, S_REVMAR_RISE7,
     // (H) Heretic artifact pickup spinning-icon states (files/p_inv_heretic.c).
     // One spawnstate per artifact (looping); filled in HereticInv_Init.
     S_HARTI_FLASK, S_HARTI_URN, S_HARTI_TOME, S_HARTI_TORCH,

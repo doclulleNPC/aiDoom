@@ -590,6 +590,7 @@ static mobj_t* AICoop_FindTarget (mobj_t* self)
 
 	if (m == self)			continue;
 	if (m->type == MT_PLAYER)	continue;	// never target a human
+	if (m->flags & MF_FRIEND)	continue;	// never target an ally (revived marine / summonfriend)
 	if (!(m->flags & MF_COUNTKILL))	continue;	// monsters only (skip barrels etc.)
 	if (!(m->flags & MF_SHOOTABLE))	continue;
 	if (m->flags & MF_CORPSE)	continue;
@@ -623,6 +624,7 @@ static mobj_t* AICoop_NearestMonsterTo (fixed_t x, fixed_t y)
 	m = (mobj_t*)th;
 
 	if (m->type == MT_PLAYER)	continue;
+	if (m->flags & MF_FRIEND)	continue;	// never target an ally (revived marine / summonfriend)
 	if (!(m->flags & MF_COUNTKILL))	continue;
 	if (!(m->flags & MF_SHOOTABLE))	continue;
 	if (m->flags & MF_CORPSE)	continue;

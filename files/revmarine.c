@@ -26,6 +26,7 @@
 #include "tables.h"
 #include "sounds.h"
 #include "p_local.h"
+#include "p_invent.h"			// (J) buddy-mode inventory -- revive is paid from it
 #include "revmarine.h"
 
 extern state_t *states;
@@ -93,6 +94,15 @@ void RevMarine_Init (void)
     ST (S_REVMAR_DIE5, 11,        5, NULL,                        S_REVMAR_DIE6);
     ST (S_REVMAR_DIE6, 12,        4, (actionf_p1)A_RevMarineGib,  S_REVMAR_DIE7);
     ST (S_REVMAR_DIE7, 13,        4, NULL,                        S_NULL);
+    // "Get up": the death frames in REVERSE (13->7), then stand.  No action funcs --
+    // just the un-dying animation; when it ends, S_REVMAR_STND's A_Look picks a target.
+    ST (S_REVMAR_RISE1, 13,       4, NULL,                        S_REVMAR_RISE2);
+    ST (S_REVMAR_RISE2, 12,       4, NULL,                        S_REVMAR_RISE3);
+    ST (S_REVMAR_RISE3, 11,       4, NULL,                        S_REVMAR_RISE4);
+    ST (S_REVMAR_RISE4, 10,       4, NULL,                        S_REVMAR_RISE5);
+    ST (S_REVMAR_RISE5, 9,        4, NULL,                        S_REVMAR_RISE6);
+    ST (S_REVMAR_RISE6, 8,        4, NULL,                        S_REVMAR_RISE7);
+    ST (S_REVMAR_RISE7, 7,        4, NULL,                        S_REVMAR_STND);
 
     m = &mobjinfo[MT_REVMARINE];
     m->doomednum   = -1;			// never map-placed; only spawned by a revive
@@ -107,7 +117,9 @@ void RevMarine_Init (void)
     // MF_FRIEND is added at spawn so A_Look/A_Chase hunt enemy monsters (P_FriendNearestEnemy);
     // no MF_COUNTKILL -- a friendly ally must not count as a level "monster"/kill.
     m->flags = MF_SOLID | MF_SHOOTABLE;
-    m->raisestate = S_NULL;
+    // raisestate = the reverse-death "get up" chain, so the revive plays it the same way
+    // an Arch-Vile / the director raises a corpse (P_SetMobjState(.., info->raisestate)).
+    m->raisestate = S_REVMAR_RISE1;
 }
 
 // ---------------------------------------------------------------------------
@@ -137,17 +149,28 @@ const char* P_ReviveMarineNear (player_t* presser)
 	if (d < bestd) { bestd = d; corpse = c; }
     }
     if (!corpse) return NULL;				// nothing to revive in reach
-    if (presser->health <= 10)
-	return "[Marine] (you're too hurt to spare the health)";
+
+    // Cost: spend from the buddy-mode inventory -- one stimpack (worth 10 HP) OR ten
+    // health bonuses (10x1 HP).  The reviver's own health is NOT touched.
+    if      (presser->inventory[arti_stimpack]    >= 1)  presser->inventory[arti_stimpack]    -= 1;
+    else if (presser->inventory[arti_healthbonus] >= 10) presser->inventory[arti_healthbonus] -= 10;
+    else return "[Marine] (need a stimpack or 10 health bonuses to revive)";
 
     mar = P_SpawnMobj (corpse->x, corpse->y, corpse->z, MT_REVMARINE);
     mar->flags |= MF_FRIEND;				// hunts enemy monsters, not the player
     mar->health = 10;
     mar->angle  = corpse->angle;
+    P_SetMobjState (mar, mar->info->raisestate);	// play the death animation in REVERSE (Arch-Vile-style get up)
+    // Restore the full LIVING hitbox from mobjinfo (cf. P_Director_ReviveCorpse's ghost-monster
+    // fix) so hitscans/projectiles connect -- a zero/short height would make the marine
+    // unshootable.  Flags are left untouched so MF_FRIEND (set above) survives.
+    mar->height = mar->info->height;
+    mar->radius = mar->info->radius;
     P_RemoveMobj (corpse);
 
-    presser->health -= 10;				// donate 10 HP (same as the buddy revive)
-    if (presser->mo) presser->mo->health = presser->health;
+    // If that emptied the selected inventory slot, hop the selection to a held one.
+    if (presser->invslot != arti_none && presser->inventory[presser->invslot] <= 0)
+	P_InvScroll (presser, +1);
 
     // Stood up inside the reviver or a wall?  Shove to the nearest free spot.
     if (!P_CheckPosition (mar, mar->x, mar->y))
