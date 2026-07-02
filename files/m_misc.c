@@ -275,8 +275,8 @@ default_t	defaults[] =
     {"key_buddy_mode",&key_buddy_mode, -1},	// unbound
     {"key_inv_left",&key_inv_left, KEY_LEFTARROW},	// (J) inventory: select prev artifact
     {"key_inv_right",&key_inv_right, KEY_RIGHTARROW},	// (J) inventory: select next artifact
-    {"key_inv_use",&key_inv_use, KEY_UPARROW},		// (J) inventory: use selected artifact
-    {"key_inv_drop",&key_inv_drop, KEY_DOWNARROW},	// (J) inventory: drop selected artifact
+    {"key_inv_use",&key_inv_use, KEY_DOWNARROW},	// (J) inventory: use selected artifact (arrow down)
+    {"key_inv_drop",&key_inv_drop, KEY_UPARROW},		// (J) inventory: drop selected artifact (arrow up)
 
     {"key_fire",&key_fire, KEY_RCTRL},
     {"key_use",&key_use, 'e'},
