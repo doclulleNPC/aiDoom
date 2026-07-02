@@ -289,6 +289,7 @@ P_UseSpecialLine
   line_t*	line,
   int		side )
 {               
+    if (!side && P_DoGenLineSpecial (line, thing, 1)) return true;   // Boom generalized (switch)
 
     // Err...
     // Use the back sides of VERY SPECIAL lines...

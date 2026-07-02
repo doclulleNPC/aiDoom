@@ -27,7 +27,7 @@ nodes). `../winmbf` is the original MBF (has the specials, not extended nodes).
 - [x] **B1. Extended nodes** -- DONE (ZDBSP XNOD). — detect + load ZDBSP `XNOD`/`ZNOD` (and DeePBSP `xNd4`) in
   `P_LoadNodes`/`P_LoadSubsectors`/`P_LoadSegs`: 32-bit subsector/seg indices, rebuilt vertices.
   The loading gate for large maps. (crispy lacks this; port from Nugget/dsda.)
-- [ ] **B2. Generalized linedef specials** — recognise `line->special >= 0x2000` and decode the
+- [x] **B2. Generalized linedef specials** -- DONE (ported p_genlin.c). — recognise `line->special >= 0x2000` and decode the
   bitfields (type + speed + model + direction + delay + target/change) into the existing
   door/plat/floor/ceiling/stair/crusher builders. Boom maps' doors/lifts/floors.
 - [ ] **B3. Generalized + extended sector types** — treat `sector->special` as bitfielded when

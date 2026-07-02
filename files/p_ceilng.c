@@ -276,6 +276,7 @@ void P_RemoveActiveCeiling(ceiling_t* c)
 	if (activeceilings[i] == c)
 	{
 	    activeceilings[i]->sector->specialdata = NULL;
+	    activeceilings[i]->sector->ceilingdata = NULL;   // Boom
 	    P_RemoveThinker (&activeceilings[i]->thinker);
 	    activeceilings[i] = NULL;
 	    break;

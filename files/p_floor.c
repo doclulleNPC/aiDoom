@@ -245,6 +245,7 @@ void T_MoveFloor(floormove_t* floor)
 		break;
 	    }
 	}
+	floor->sector->floordata = NULL;   // Boom: allow re-trigger
 	P_RemoveThinker(&floor->thinker);
 
 	S_StartSound((mobj_t *)&floor->sector->soundorg,

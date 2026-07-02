@@ -305,6 +305,7 @@ void P_RemoveActivePlat(plat_t* plat)
 	if (plat == activeplats[i])
 	{
 	    (activeplats[i])->sector->specialdata = NULL;
+	    (activeplats[i])->sector->floordata = NULL;   // Boom
 	    P_RemoveThinker(&(activeplats[i])->thinker);
 	    activeplats[i] = NULL;
 	    

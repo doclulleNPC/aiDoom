@@ -128,6 +128,7 @@ void T_VerticalDoor (vldoor_t* door)
 	      case blazeRaise:
 	      case blazeClose:
 		door->sector->specialdata = NULL;
+		door->sector->ceilingdata = NULL;  // Boom
 		P_RemoveThinker (&door->thinker);  // unlink and free
 		S_StartSound((mobj_t *)&door->sector->soundorg,
 			     sfx_bdcls);
@@ -136,6 +137,7 @@ void T_VerticalDoor (vldoor_t* door)
 	      case normal:
 	      case close:
 		door->sector->specialdata = NULL;
+		door->sector->ceilingdata = NULL;  // Boom
 		P_RemoveThinker (&door->thinker);  // unlink and free
 		break;
 		
@@ -186,6 +188,7 @@ void T_VerticalDoor (vldoor_t* door)
 	      case blazeOpen:
 	      case open:
 		door->sector->specialdata = NULL;
+		door->sector->ceilingdata = NULL;  // Boom
 		P_RemoveThinker (&door->thinker);  // unlink and free
 		break;
 		
@@ -658,6 +661,7 @@ void T_SlidingDoor (slidedoor_t*	door)
 		if (door->type == sdt_openOnly)
 		{
 		    door->frontsector->specialdata = NULL;
+		    door->sector->ceilingdata = NULL;  // Boom
 		    P_RemoveThinker (&door->thinker);
 		    break;
 		}
@@ -706,6 +710,7 @@ void T_SlidingDoor (slidedoor_t*	door)
 		// IF DOOR IS DONE CLOSING...
 		door->line->flags |= ML_BLOCKING;
 		door->frontsector->specialdata = NULL;
+		door->sector->ceilingdata = NULL;  // Boom
 		P_RemoveThinker (&door->thinker);
 		break;
 	    }

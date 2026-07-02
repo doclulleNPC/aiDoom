@@ -498,6 +498,7 @@ P_CrossSpecialLine
     int		ok;
 
     line = &lines[linenum];
+    if (P_DoGenLineSpecial (line, thing, 0)) return;   // Boom generalized (walk)
     
     //	Triggers that other things can activate
     if (!thing->player)
@@ -961,6 +962,7 @@ P_ShootSpecialLine
   line_t*	line )
 {
     int		ok;
+    if (P_DoGenLineSpecial (line, thing, 2)) return;   // Boom generalized (gun)
     
     //	Impacts that other things can activate.
     if (!thing->player)

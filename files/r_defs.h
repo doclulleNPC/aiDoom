@@ -132,6 +132,15 @@ typedef	struct
     int			linecount;
     struct line_s**	lines;	// [linecount] size
     
+
+    // Boom generalized-special support (jff): per-sector active thinker pointers + change/stair state
+    short	oldspecial;	// remembers a secret sector's special (automap)
+    void*	floordata;	// active floor thinker on this sector (Boom P_SectorActive)
+    void*	ceilingdata;	// active ceiling thinker
+    void*	lightingdata;	// active light thinker
+    int		stairlock;	// -2 first locked, -1 after thinker done, 0 normal
+    int		prevsec;	// -1 or previous step sector (gen stairs)
+    int		nextsec;	// -1 or next step sector
 } sector_t;
 
 
