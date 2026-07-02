@@ -112,6 +112,8 @@ static void C_StoreLine (const char* s)
     } while (*s);
 }
 
+void C_LLM_Ask (const char* prompt);
+void C_LLM_Poll (void);
 void C_Printf (const char* fmt, ...)
 {
     char	buf[1024];
@@ -144,6 +146,7 @@ void C_Init (void)
     con_head = con_count = con_inlen = con_open = con_shift = con_scroll = 0;
     con_input[0] = '\0';
     C_Printf ("aiDoom console.  Type 'help'.  Open/close with ` (backquote).");
+    C_Printf ("Ask the LLM: llm <message>  (alias tellme / buddy)");
 }
 
 
@@ -310,6 +313,8 @@ static void C_Execute (char* line)
     }
     else if (!strcmp(cmd, "clear"))
 	{ con_head = con_count = 0; con_scroll = 0; }
+    else if (!strcmp(cmd, "llm") || !strcmp(cmd, "tellme") || !strcmp(cmd, "buddy"))
+	C_LLM_Ask (args);
     else if (!strcmp(cmd, "echo"))
 	C_Printf ("%s", args);
     else if (!strcmp(cmd, "quit") || !strcmp(cmd, "exit"))
@@ -902,7 +907,7 @@ boolean C_Responder (event_t* ev)
 // overlay drawn with the baked DejaVuSansMono ("TrueType") atlas -- crisp,
 // anti-aliased and translucent.  c_console only owns state; i_video pulls the
 // display lines via C_GetLine().
-void C_Drawer (void) { }		// (legacy hook; SDL overlay does the drawing)
+void C_Drawer (void) { C_LLM_Poll (); }	// per-frame: surface any async LLM reply (SDL overlay draws)
 
 // Text for display row r: row 0 = input line (with blinking cursor); rows 1..
 // = scrollback, newest first (honouring the scroll offset).  NULL past the end.
