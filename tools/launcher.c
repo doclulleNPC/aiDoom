@@ -237,6 +237,8 @@ static void draw_launch_button(void);
 static int  hit_launch_button(int mouse_px, int mouse_py);
 
 static void do_launch(void);
+static void save_launcher_prefs(void);
+static void load_launcher_prefs(void);
 static void build_command(char* out, int n, const char* iwad_path);
 static const char* run_dir(void);
 
@@ -952,6 +954,61 @@ static int launcher_sigil_classify(const char* fname, int* ep)
     return -1;						// SIGIL name + unknown checksum -> reject
 }
 
+// --- Launcher preference persistence ------------------------------------------------------------
+// The launcher remembers the last selection in its OWN file (run/launcher.ini) rather than
+// aidoom.cfg -- the game rewrites aidoom.cfg on exit and would strip unknown keys.  Value is the
+// rest of the line, so names with spaces (IWAD/PWAD) survive.
+static const char* prefs_path(void)
+{
+    static char p[300];
+    snprintf(p, sizeof p, "%s/launcher.ini", run_dir());
+    return p;
+}
+
+static void save_launcher_prefs(void)
+{
+    FILE* f = fopen(prefs_path(), "w");
+    if (!f) return;
+    fprintf(f, "iwad %s\n",     (iwad_sel >= 0 && iwad_sel < iwad_count) ? iwads[iwad_sel].name : "");
+    fprintf(f, "pwad %s\n",     (pwad_sel > 0 && pwad_sel < pwad_count) ? pwads[pwad_sel] : "");
+    fprintf(f, "buddy %d\n",    buddy_mode);
+    fprintf(f, "monster %d\n",  mon_mode);
+    fprintf(f, "skill %d\n",    opt_skill);
+    fprintf(f, "infight %d\n",  opt_infight);
+    fprintf(f, "autoaim %d\n",  opt_autoaim);
+    fprintf(f, "overunder %d\n",opt_overunder);
+    fprintf(f, "noff %d\n",     opt_noff);
+    fprintf(f, "freedoom %d\n", opt_freedoom);
+    fprintf(f, "heretic %d\n",  opt_heretic);
+    fprintf(f, "hexen %d\n",    opt_hexen);
+    fclose(f);
+}
+
+static void load_launcher_prefs(void)
+{
+    FILE* f = fopen(prefs_path(), "r");
+    if (!f) return;
+    char line[320], key[32], val[280];
+    int i;
+    while (fgets(line, sizeof line, f))
+    {
+        if (sscanf(line, "%31s %279[^\n\r]", key, val) < 1) continue;
+        if      (!strcmp(key, "iwad"))    { for (i=0;i<iwad_count;i++) if (!strcmp(iwads[i].name,val)) { iwad_sel=i; break; } }
+        else if (!strcmp(key, "pwad"))    { pwad_sel=0; for (i=1;i<pwad_count;i++) if (!strcmp(pwads[i],val)) { pwad_sel=i; break; } }
+        else if (!strcmp(key, "buddy"))     buddy_mode   = atoi(val);
+        else if (!strcmp(key, "monster"))   mon_mode     = atoi(val);
+        else if (!strcmp(key, "skill"))     opt_skill    = atoi(val);
+        else if (!strcmp(key, "infight"))   opt_infight  = atoi(val);
+        else if (!strcmp(key, "autoaim"))   opt_autoaim  = atoi(val);
+        else if (!strcmp(key, "overunder")) opt_overunder= atoi(val);
+        else if (!strcmp(key, "noff"))      opt_noff     = atoi(val);
+        else if (!strcmp(key, "freedoom"))  opt_freedoom = atoi(val);
+        else if (!strcmp(key, "heretic"))   opt_heretic  = atoi(val);
+        else if (!strcmp(key, "hexen"))     opt_hexen    = atoi(val);
+    }
+    fclose(f);
+}
+
 static void build_command(char* out, int n, const char* iwad_path)
 {
     int off = 0;
@@ -1134,6 +1191,7 @@ static void do_launch(void)
 #endif
 
     fprintf(stderr, "[launcher] %s\n", full);
+    save_launcher_prefs();   // remember this selection for next time
     system(full);   // returns immediately -- the launcher stays responsive
     snprintf(g_status, sizeof g_status, "launched aiDoom%s",
              start_director ? " + director"
@@ -1214,6 +1272,7 @@ int main(int argc, char** argv)
     hero_init();
     scan_iwads();
     scan_pwads();
+    load_launcher_prefs();   // restore the last session's selection
 
     int running = 1;
     SDL_Event ev;
