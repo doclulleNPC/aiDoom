@@ -984,6 +984,8 @@ void G_PlayerReborn (int player)
     boolean	cards[NUMCARDS];
     boolean	backpack = false;
     weapontype_t ready = wp_pistol, pending = wp_pistol;
+    int		inventory[NUMARTIFACTS];		// artifact inventory carries across reborn
+    int		invslot = arti_none;
 
     if (keepgear)
     {
@@ -991,6 +993,8 @@ void G_PlayerReborn (int player)
 	memcpy (ammo,    players[player].ammo,        sizeof(ammo));
 	memcpy (ammomax, players[player].maxammo,     sizeof(ammomax));
 	memcpy (cards,   players[player].cards,       sizeof(cards));
+	memcpy (inventory, players[player].inventory, sizeof(inventory));
+	invslot  = players[player].invslot;
 	backpack = players[player].backpack;
 	ready    = players[player].readyweapon;
 	pending  = players[player].pendingweapon;
@@ -1026,6 +1030,8 @@ void G_PlayerReborn (int player)
 	memcpy (p->ammo,        ammo,    sizeof(p->ammo));
 	memcpy (p->maxammo,     ammomax, sizeof(p->maxammo));
 	memcpy (p->cards,       cards,   sizeof(p->cards));
+	memcpy (p->inventory,   inventory, sizeof(p->inventory));
+	p->invslot       = invslot;		// keep the held-item inventory across a reborn
 	p->backpack      = backpack;
 	p->weaponowned[wp_fist]   = true;	// always keep the bare minimum
 	p->weaponowned[wp_pistol] = true;
