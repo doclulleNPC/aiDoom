@@ -32,7 +32,7 @@ nodes). `../winmbf` is the original MBF (has the specials, not extended nodes).
   door/plat/floor/ceiling/stair/crusher builders. Boom maps' doors/lifts/floors.
 - [x] **B3. Generalized + extended sector types** -- DONE. — treat `sector->special` as bitfielded when
   `>= 32`: low bits = damage/light preset, plus SECRET/FRICTION/PUSHPULL bits; keep vanilla ≤17.
-- [ ] **B4. Boom transfers & thinkers** — deep water (242 transfer-height), friction (223), wind/
+- [~] **B4. Boom transfers & thinkers** -- scrollers DONE (wall + carry); flat-scroll render, friction, pushers, deep-water remain. — deep water (242 transfer-height), friction (223), wind/
   current/pusher (224–226), scrollers (245–255), and the associated `p_spec` thinkers. Renderer
   hooks for transfer-height (fake floor/ceiling) are the hard part.
 - [ ] **B5. `ANIMATED` / `SWITCHES` lumps** — load Boom's custom flat/texture animation + switch

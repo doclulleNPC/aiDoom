@@ -1132,8 +1132,8 @@ void P_UpdateSpecials (void)
 	switch(line->special)
 	{
 	  case 48:
-	    // EFFECT FIRSTCOL SCROLL +
-	    sides[line->sidenum[0]].textureoffset += FRACUNIT;
+	    // EFFECT FIRSTCOL SCROLL -- now handled by the Boom scroll_t thinker
+	    // (P_SpawnScrollers), so don't double-scroll it here.
 	    break;
 	}
     }
@@ -1377,4 +1377,7 @@ void P_SpawnSpecials (void)
 
     // UNUSED: no horizonal sliders.
     //	P_InitSlidingDoorFrames();
+
+    P_SpawnScrollers ();   // Boom: floor/wall/ceiling scroll + carry thinkers
+
 }

@@ -138,6 +138,8 @@ typedef	struct
     void*	floordata;	// active floor thinker on this sector (Boom P_SectorActive)
     void*	ceilingdata;	// active ceiling thinker
     void*	lightingdata;	// active light thinker
+    fixed_t	floor_xoffs, floor_yoffs;	// Boom flat scroll (renderer hook: TODO)
+    fixed_t	ceiling_xoffs, ceiling_yoffs;
     int		stairlock;	// -2 first locked, -1 after thinker done, 0 normal
     int		prevsec;	// -1 or previous step sector (gen stairs)
     int		nextsec;	// -1 or next step sector
