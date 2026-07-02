@@ -69,7 +69,8 @@ char *sprnames_builtin[NUMSPRITES] = {
     "XICE","XICP","XSSP","XSSF","XDRA","XDRF",				// Hexen wendigo / stalker / dragon + projectiles
     // (H) Heretic artifact pickup sprites -- lock-step with spritenum_t (info.h)
     "PTN1","SPHL","PWBK","TRCH","FBMB","INVU","INVS","ATLP",
-    "SOAR","EGGC","HCHK"			// Wings / Morph Ovum / morph chicken
+    "SOAR","EGGC","HCHK",			// Wings / Morph Ovum / morph chicken
+    "TNT1"				// invisible placeholder (mbf/dsdhacked): no lumps -> renders nothing
 };
 
 

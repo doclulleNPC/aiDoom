@@ -22,7 +22,7 @@ void dsdh_EnsureStatesCapacity (int limit)
     else
         ns = realloc (states, newn * sizeof(state_t));
     memset (ns + old, 0, (newn - old) * sizeof(state_t));
-    for (i = old; i < newn; i++) { ns[i].tics = -1; ns[i].nextstate = i; }  // idle until DEH'd
+    for (i = old; i < newn; i++) { ns[i].sprite = SPR_TNT1; ns[i].tics = -1; ns[i].nextstate = i; }  // invisible + idle until DEH'd
     states = ns;
     deh_codeptr = realloc (deh_codeptr, newn * sizeof(actionf_t));
     memset (deh_codeptr + old, 0, (newn - old) * sizeof(actionf_t));

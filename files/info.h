@@ -235,6 +235,7 @@ typedef enum
     SPR_SOAR,		// Wings of Wrath pickup (SOAR)
     SPR_EGGC,		// Morph Ovum pickup + egg projectile (EGGC)
     SPR_HCHK,		// morph chicken (HCHK) -- generic morph creature (files/p_morph.c)
+    SPR_TNT1,		// invisible placeholder (no lumps) -- default for grown DSDHacked states
     NUMSPRITES
 
 } spritenum_t;
