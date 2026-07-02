@@ -80,7 +80,7 @@ typedef struct
 
 
 
-#define MAXANIMS                32
+#define MAXANIMS                128   // bumped for Boom ANIMATED lumps
 
 extern anim_t	anims[MAXANIMS];
 extern anim_t*	lastanim;
@@ -148,42 +148,60 @@ extern  line_t*	linespeciallist[MAXLINEANIMS];
 void P_InitPicAnims (void)
 {
     int		i;
+    // Boom: use the WAD's ANIMATED lump if present, else the vanilla compile-time table.
+    byte*	animlump = (W_CheckNumForName("ANIMATED") >= 0)
+			   ? W_CacheLumpName("ANIMATED", PU_STATIC) : NULL;
 
-    
-    //	Init animation
     lastanim = anims;
-    for (i=0 ; animdefs[i].istexture != -1 ; i++)
+    for (i=0 ; ; i++)
     {
-	if (animdefs[i].istexture)
-	{
-	    // different episode ?
-	    if (R_CheckTextureNumForName(animdefs[i].startname) == -1)
-		continue;	
+	boolean	istexture;
+	char	endname[9], startname[9];
+	int	speed;
 
-	    lastanim->picnum = R_TextureNumForName (animdefs[i].endname);
-	    lastanim->basepic = R_TextureNumForName (animdefs[i].startname);
+	if (animlump)			// packed on-disk record: byte, char[9], char[9], int32
+	{
+	    byte* p = animlump + i*23;
+	    if ((signed char)p[0] == -1) break;
+	    istexture = p[0];
+	    memcpy (endname,   p + 1,  9); endname[8]   = 0;
+	    memcpy (startname, p + 10, 9); startname[8] = 0;
+	    speed = p[19] | (p[20]<<8) | (p[21]<<16) | ((unsigned)p[22]<<24);
 	}
 	else
 	{
-	    if (W_CheckNumForName(animdefs[i].startname) == -1)
-		continue;
-
-	    lastanim->picnum = R_FlatNumForName (animdefs[i].endname);
-	    lastanim->basepic = R_FlatNumForName (animdefs[i].startname);
+	    if (animdefs[i].istexture == -1) break;
+	    istexture = animdefs[i].istexture;
+	    strcpy (endname,   animdefs[i].endname);
+	    strcpy (startname, animdefs[i].startname);
+	    speed = animdefs[i].speed;
 	}
 
-	lastanim->istexture = animdefs[i].istexture;
+	if (lastanim >= anims + MAXANIMS) break;   // don't overflow the table
+
+	if (istexture)
+	{
+	    if (R_CheckTextureNumForName(startname) == -1) continue;
+	    lastanim->picnum  = R_TextureNumForName (endname);
+	    lastanim->basepic = R_TextureNumForName (startname);
+	}
+	else
+	{
+	    if (W_CheckNumForName(startname) == -1) continue;
+	    lastanim->picnum  = R_FlatNumForName (endname);
+	    lastanim->basepic = R_FlatNumForName (startname);
+	}
+
+	lastanim->istexture = istexture;
 	lastanim->numpics = lastanim->picnum - lastanim->basepic + 1;
 
 	if (lastanim->numpics < 2)
-	    I_Error ("P_InitPicAnims: bad cycle from %s to %s",
-		     animdefs[i].startname,
-		     animdefs[i].endname);
-	
-	lastanim->speed = animdefs[i].speed;
+	    I_Error ("P_InitPicAnims: bad cycle from %s to %s", startname, endname);
+
+	lastanim->speed = speed;
 	lastanim++;
     }
-	
+    if (animlump) Z_ChangeTag (animlump, PU_CACHE);
 }
 
 

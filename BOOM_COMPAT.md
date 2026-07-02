@@ -35,9 +35,9 @@ nodes). `../winmbf` is the original MBF (has the specials, not extended nodes).
 - [~] **B4. Boom transfers & thinkers** -- scrollers DONE (wall + carry); flat-scroll render, friction, pushers, deep-water remain. — deep water (242 transfer-height), friction (223), wind/
   current/pusher (224–226), scrollers (245–255), and the associated `p_spec` thinkers. Renderer
   hooks for transfer-height (fake floor/ceiling) are the hard part.
-- [ ] **B5. `ANIMATED` / `SWITCHES` lumps** — load Boom's custom flat/texture animation + switch
+- [x] **B5. ANIMATED / SWITCHES lumps** -- DONE. — load Boom's custom flat/texture animation + switch
   tables in `P_InitPicAnims` / the switch init, falling back to the vanilla table when absent.
-- [ ] **B6. Verify** — a Boom-format test map (generalized specials + extended nodes) loads and
+- [~] **B6. Verify** -- structural: vanilla unaffected + XNOD map loads/renders; full Boom-map behaviour needs real Boom WADs. — a Boom-format test map (generalized specials + extended nodes) loads and
   plays.
 
 ## Notes

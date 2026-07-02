@@ -27,6 +27,7 @@ rcsid[] = "$Id: p_switch.c,v 1.3 1997/01/28 22:08:29 b1 Exp $";
 
 
 #include "i_system.h"
+#include "z_zone.h"
 #include "doomdef.h"
 #include "p_local.h"
 
@@ -128,7 +129,34 @@ void P_InitSwitchList(void)
     else
 	if ( gamemode == commercial )
 	    episode = 3;
-		
+
+    // Boom: use the WAD's SWITCHES lump if present (packed: char[9] name1, char[9] name2, int16
+    // episode; terminated by episode==0), else the vanilla alphSwitchList[] table.
+    {
+	byte* sw = (W_CheckNumForName("SWITCHES") >= 0) ? W_CacheLumpName("SWITCHES", PU_STATIC) : NULL;
+	if (sw)
+	{
+	    char n1[9], n2[9]; int ep;
+	    for (index = 0, i = 0; ; i++)
+	    {
+		byte* p = sw + i*20;
+		memcpy (n1, p, 9); n1[8]=0; memcpy (n2, p+9, 9); n2[8]=0;
+		ep = (short)(p[18] | (p[19]<<8));
+		if (!ep) break;
+		if (index >= MAXSWITCHES*2 - 2) break;
+		if (ep <= episode && R_CheckTextureNumForName(n1) >= 0 && R_CheckTextureNumForName(n2) >= 0)
+		{
+		    switchlist[index++] = R_TextureNumForName(n1);
+		    switchlist[index++] = R_TextureNumForName(n2);
+		}
+	    }
+	    numswitches = index/2;
+	    switchlist[index] = -1;
+	    Z_ChangeTag (sw, PU_CACHE);
+	    return;
+	}
+    }
+
     for (index = 0,i = 0;i < MAXSWITCHES;i++)
     {
 	if (!alphSwitchList[i].episode)
