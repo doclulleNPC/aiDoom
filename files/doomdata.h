@@ -175,7 +175,8 @@ typedef struct
 // BSP node structure.
 
 // Indicate a leaf.
-#define	NF_SUBSECTOR	0x8000
+#define	NF_SUBSECTOR_16	0x8000		// on-disk (vanilla mapnode_t) subsector flag
+#define	NF_SUBSECTOR	0x80000000	// in-memory (node_t.children is int, extended-node capable)
 
 typedef struct
 {

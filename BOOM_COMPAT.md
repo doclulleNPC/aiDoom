@@ -24,7 +24,7 @@ nodes). `../winmbf` is the original MBF (has the specials, not extended nodes).
 
 ## Plan (phased, each a testable milestone)
 
-- [ ] **B1. Extended nodes** — detect + load ZDBSP `XNOD`/`ZNOD` (and DeePBSP `xNd4`) in
+- [x] **B1. Extended nodes** -- DONE (ZDBSP XNOD). — detect + load ZDBSP `XNOD`/`ZNOD` (and DeePBSP `xNd4`) in
   `P_LoadNodes`/`P_LoadSubsectors`/`P_LoadSegs`: 32-bit subsector/seg indices, rebuilt vertices.
   The loading gate for large maps. (crispy lacks this; port from Nugget/dsda.)
 - [ ] **B2. Generalized linedef specials** — recognise `line->special >= 0x2000` and decode the

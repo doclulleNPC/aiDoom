@@ -261,6 +261,95 @@ void P_LoadSectors (int lump)
 }
 
 
+// ZDBSP / Boom "extended nodes": when a map is built with uncompressed extended nodes the NODES
+// lump starts with "XNOD" (SSECTORS + SEGS lumps are empty) and carries new vertices, subsectors,
+// segs and 32-bit nodes itself.  Detect + load the whole thing here.  (ZNOD = zlib-compressed and
+// the GL variants are not handled yet.)  Returns true if it consumed the lump.
+extern angle_t R_PointToAngle2 (fixed_t, fixed_t, fixed_t, fixed_t);
+
+static fixed_t P_SegOffset (fixed_t x1, fixed_t y1, fixed_t x2, fixed_t y2)
+{
+    double dx = (double)(x1 - x2) / FRACUNIT;
+    double dy = (double)(y1 - y2) / FRACUNIT;
+    return (fixed_t)(sqrt (dx*dx + dy*dy) * FRACUNIT);
+}
+
+boolean P_LoadNodes_Extended (int lump)
+{
+    byte*   data = W_CacheLumpNum (lump, PU_STATIC);
+    byte*   p;
+    unsigned origv, newv, i;
+    unsigned nsub, nseg, nnod;
+
+    if (W_LumpLength (lump) < 8 || memcmp (data, "XNOD", 4) != 0)
+    { Z_Free (data); return false; }
+
+    p = data + 4;
+    #define RD32() ( p += 4, (unsigned)(p[-4] | (p[-3]<<8) | (p[-2]<<16) | ((unsigned)p[-1]<<24)) )
+    #define RD16() ( p += 2, (unsigned short)(p[-2] | (p[-1]<<8)) )
+
+    origv = RD32();  newv = RD32();
+
+    // --- vertices: keep the originals (already loaded), append the new ones ---
+    {
+        vertex_t* nv = Z_Malloc ((origv + newv) * sizeof(vertex_t), PU_LEVEL, 0);
+        memcpy (nv, vertexes, origv * sizeof(vertex_t));
+        for (i = 0; i < newv; i++) { nv[origv+i].x = (fixed_t) RD32(); nv[origv+i].y = (fixed_t) RD32(); }
+        vertexes = nv; numvertexes = origv + newv;
+    }
+
+    // --- subsectors: each stores only a seg count; firstline is the running total ---
+    nsub = RD32();
+    numsubsectors = nsub;
+    subsectors = Z_Malloc (nsub * sizeof(subsector_t), PU_LEVEL, 0);
+    memset (subsectors, 0, nsub * sizeof(subsector_t));
+    { int first = 0;
+      for (i = 0; i < nsub; i++)
+      { int cnt = (int) RD32(); subsectors[i].firstline = first; subsectors[i].numlines = cnt; first += cnt; } }
+
+    // --- segs: v1,v2 (32-bit), linedef (16), side (8); angle+offset are computed ---
+    nseg = RD32();
+    numsegs = nseg;
+    segs = Z_Malloc (nseg * sizeof(seg_t), PU_LEVEL, 0);
+    memset (segs, 0, nseg * sizeof(seg_t));
+    for (i = 0; i < nseg; i++)
+    {
+        seg_t* li = &segs[i];
+        unsigned v1 = RD32(), v2 = RD32();
+        int ld = RD16();
+        int side = *p++;
+        line_t* ldef = &lines[ld];
+        li->v1 = &vertexes[v1];
+        li->v2 = &vertexes[v2];
+        li->linedef = ldef;
+        li->sidedef = &sides[ldef->sidenum[side]];
+        li->frontsector = sides[ldef->sidenum[side]].sector;
+        li->backsector = (ldef->flags & ML_TWOSIDED) ? sides[ldef->sidenum[side^1]].sector : 0;
+        li->angle = R_PointToAngle2 (li->v1->x, li->v1->y, li->v2->x, li->v2->y);
+        { vertex_t* vv = side ? ldef->v2 : ldef->v1;
+          li->offset = P_SegOffset (li->v1->x, li->v1->y, vv->x, vv->y); }
+    }
+
+    // --- nodes: 16-bit geometry, 32-bit children (bit 31 = subsector) ---
+    nnod = RD32();
+    numnodes = nnod;
+    nodes = Z_Malloc (nnod * sizeof(node_t), PU_LEVEL, 0);
+    for (i = 0; i < nnod; i++)
+    {
+        node_t* no = &nodes[i]; int j, k;
+        no->x = ((short) RD16()) << FRACBITS; no->y = ((short) RD16()) << FRACBITS;
+        no->dx = ((short) RD16()) << FRACBITS; no->dy = ((short) RD16()) << FRACBITS;
+        for (j = 0; j < 2; j++) for (k = 0; k < 4; k++) no->bbox[j][k] = ((short) RD16()) << FRACBITS;
+        for (j = 0; j < 2; j++) no->children[j] = (int) RD32();   // already bit-31 = subsector
+    }
+    #undef RD32
+    #undef RD16
+    Z_Free (data);
+    printf ("P_LoadNodes: extended (XNOD) nodes -- %u verts, %u ssectors, %u segs, %u nodes\n",
+            origv + newv, nsub, nseg, nnod);
+    return true;
+}
+
 //
 // P_LoadNodes
 //
@@ -288,7 +377,9 @@ void P_LoadNodes (int lump)
 	no->dy = SHORT(mn->dy)<<FRACBITS;
 	for (j=0 ; j<2 ; j++)
 	{
-	    no->children[j] = SHORT(mn->children[j]);
+	    unsigned short raw = (unsigned short) SHORT(mn->children[j]);
+	    no->children[j] = (raw & NF_SUBSECTOR_16)
+			     ? (NF_SUBSECTOR | (raw & ~NF_SUBSECTOR_16)) : raw;
 	    for (k=0 ; k<4 ; k++)
 		no->bbox[j][k] = SHORT(mn->bbox[j][k])<<FRACBITS;
 	}
@@ -658,9 +749,12 @@ P_SetupLevel
     P_LoadSideDefs (lumpnum+ML_SIDEDEFS);
 
     P_LoadLineDefs (lumpnum+ML_LINEDEFS);
-    P_LoadSubsectors (lumpnum+ML_SSECTORS);
-    P_LoadNodes (lumpnum+ML_NODES);
-    P_LoadSegs (lumpnum+ML_SEGS);
+    if (!P_LoadNodes_Extended (lumpnum+ML_NODES))   // Boom/ZDBSP XNOD -> loads verts+ssectors+segs+nodes
+    {
+	P_LoadSubsectors (lumpnum+ML_SSECTORS);
+	P_LoadNodes (lumpnum+ML_NODES);
+	P_LoadSegs (lumpnum+ML_SEGS);
+    }
 	
     rejectmatrix = W_CacheLumpNum (lumpnum+ML_REJECT,PU_LEVEL);
     P_GroupLines ();

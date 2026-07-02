@@ -227,8 +227,8 @@ typedef struct line_s
 typedef struct subsector_s
 {
     sector_t*	sector;
-    short	numlines;
-    short	firstline;
+    int		numlines;	// int for extended nodes (Boom/ZDBSP)
+    int		firstline;
     
 } subsector_t;
 
@@ -273,8 +273,8 @@ typedef struct
     // Bounding box for each child.
     fixed_t	bbox[2][4];
 
-    // If NF_SUBSECTOR its a subsector.
-    unsigned short children[2];
+    // If NF_SUBSECTOR its a subsector.  int (not short) for Boom/ZDBSP extended nodes.
+    int children[2];
     
 } node_t;
 
