@@ -28,16 +28,17 @@ Goal: make aiDoom a **MBF21-compatible** port so it runs modern DeHackEd mods. T
   `Crispy and Brutal.wad` no longer crashes the parser (now stops at `R_InitSprites` -- a sprite
   rotation-leniency issue -> M3). **Deferred to M2b:** `[STRINGS]`/`Text`/`Misc`/`Cheat` (need the
   string-table refactor + aiDoom's cheat map).
-- [~] **3. DSDHacked** — **states + mobjinfo done** (M3a: `states`/`mobjinfo` are growable pointers
-  onto the built-in arrays + runtime counts `num_states`/`num_mobjtypes`; M3b: `files/dsdhacked.c`
-  `dsdh_EnsureStatesCapacity`/`dsdh_EnsureMobjInfoCapacity` realloc-grow on demand, wired into
-  `deh_procFrame`/`deh_procThing` and `deh_codeptr`). Verified: `Crispy and Brutal.wad`'s DEH now
-  loads fully (6257 frames up to #72138, 130 things) with **no OOB crash**. M3c: made
-  `R_InstallSpriteLump` (sprite rotation conflicts) and `R_ProjectSprite`/`R_DrawPSprite`
-  (out-of-range sprite/frame) **non-fatal** -- later lump wins / skip-draw instead of I_Error. Result:
-  **`Crispy and Brutal.wad` now LOADS and RUNS in-game with no crash.** Remaining for full fidelity:
-  grow `sprnames`/`S_sfx` + parse the DSDHacked `[SPRITES]`/`[SOUNDS]` sections (so the custom
-  sprites/sounds show instead of being skipped) -- part of M3c/M4.
+- [x] **3. DSDHacked** — **done.** `states`/`mobjinfo`/`sprnames`/`S_sfx` are growable pointers onto
+  the built-in arrays with runtime counts (`num_states`/`num_mobjtypes`/`num_sprites`/`num_sfx`);
+  `files/dsdhacked.c` realloc-grows them on demand, wired into `deh_procFrame`/`deh_procThing` and
+  the `[SPRITES]`/`[SOUNDS]` sections (`deh_procSprites`/`deh_procSoundsList`). Sprite loading made
+  non-fatal (`R_InstallSpriteLump`, `R_InitSpriteDefs` "no patches", `R_ProjectSprite`/
+  `R_DrawPSprite` out-of-range → skip/later-wins). `P_SetMobjState` uses Killough's seenstate/
+  recursion form so zero-tic + jumping (`A_RandomJump`) chains don't hang or clobber. **Grown states
+  default to the invisible `SPR_TNT1` placeholder** (added to `info.h`/`info.c`), not sprite 0 — an
+  unset DSDHacked sprite must render nothing, never SPR_TROO (the imp). Verified: `Crispy and
+  Brutal.wad`'s 471 KB patch loads fully (6257 frames to #72138, 130 things, numsprites 199→8100)
+  and monsters/gore/sounds render correctly.
 - [x] **4. MBF21 codepointers** — done (M4a-e): args parsing; A_SpawnObject; the MBF classics
   (RandomJump/PlaySound/Spawn/Turn/Face/Detonate/Die/Scratch/Mushroom); monster+weapon projectiles
   (A_MonsterProjectile/A_WeaponProjectile); weapon Sound/ConsumeAmmo/GunFlashTo/RefireTo/Bullet+
@@ -51,7 +52,35 @@ Goal: make aiDoom a **MBF21-compatible** port so it runs modern DeHackEd mods. T
   `A_JumpIfFlagsSet`, `A_HealChase`, …) in `p_enemy.c`/`p_pspr.c`; MBF21 thing flags (`flags2`) in
   `p_mobj.c`/`p_map.c`; projectile/splash/infighting **groups** (infighting logic in `p_map.c`);
   fast-speed / DEH `Args`. Wire the `[CODEPTR]` names + flag mnemonics into the parser.
-- [ ] **5. Verify** — `Crispy and Brutal.wad` loads and plays.
+  **flags2 playsim effects wired** (`p_mobj.c`/`p_map.c`): `MF2_LOGRAV`, `MF2_RIP`,
+  `MF2_NORADIUSDMG`, `MF2_FULLVOLSOUNDS`; **groups wired** (`p_map.c`/`p_inter.c`):
+  infighting/projectile/splash. **[SOUNDS]/S_sfx growth done** (custom sounds play). Weapon
+  codepointers completed incl. `A_CheckAmmo`/`A_WeaponJump`/`A_WeaponAlert` (a missing `A_CheckAmmo`
+  on a DSDHacked readystate frame is what stopped Brutal's weapons from firing). Only `A_LineEffect`
+  is still a stub; `[STRINGS]`/`Text`/`Misc`/`Cheat` string replacement deferred to M2b.
+- [x] **5. Verify** — **`Crispy and Brutal.wad` loads and plays**: weapons fire, gore/gibs spawn,
+  monsters die with correct animations + sprites, custom sounds play.
+
+## Status: MBF21 / DeHackEd port complete (gameplay level)
+
+aiDoom runs modern DeHackEd/DSDHacked/MBF21 gameplay mods (verified end-to-end with
+`Crispy and Brutal.wad`). The **map/level** side of Boom/MBF (generalized specials, extended nodes,
+deep water/friction/wind/scrollers, `ANIMATED`/`SWITCHES`) is a **separate** effort — see
+`BOOM_COMPAT.md`.
+
+### Debugging log — the subtle bugs that took real digging (all fixed)
+- **Weapons wouldn't fire** — `[CODEPTR]`/`Pointer` bounds-checked the frame index against the fixed
+  `NUMSTATES` instead of the runtime `num_states`, so every codepointer on a DSDHacked frame (70000+)
+  was rejected and left `NULL`; the pistol's readystate `A_CheckAmmo` and firing actions did nothing.
+- **Monsters glitched into each other's poses** — `dsdh_EnsureStatesCapacity` left the base
+  `seenstate_tab` entries uninitialised on the first grow (realloc-from-NULL); `P_SetMobjState`'s
+  cycle guard read garbage and cut vanilla-state transitions short.
+- **Gore rendered as standing imps; monsters "froze" then vanished** — grown DSDHacked states
+  defaulted to sprite 0 = `SPR_TROO` (the imp). Brutal's blood-splat frames leave the sprite unset;
+  they rendered as a standing imp (`TROOA`) for their linger duration. Fixed by defaulting grown
+  states to the invisible `SPR_TNT1`.
+- **PWAD with spaces didn't load** — the launcher passed `Crispy and Brutal.wad` unquoted, so it
+  reached the game as three failed `-file` args (looked exactly like vanilla).
 
 ## Notes
 - Keep the playsim deterministic (fixed-point, tic-locked) — DeHackEd only *rewrites the tables*,
