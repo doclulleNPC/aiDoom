@@ -57,7 +57,23 @@ P_SetMobjState
 ( mobj_t*	mobj,
   statenum_t	state )
 {
-    state_t*	st;
+    // killough 4/9/98 (via MBF/nugget): a `seenstate` table + recursion counter make MBF/MBF21
+    // jumping codepointers (A_RandomJump, A_SpawnObject chains, ...) and zero-tic state chains
+    // safe -- it detects and breaks state cycles instead of hanging, and gives each nested
+    // P_SetMobjState call (from a jumping action) its own table so they don't corrupt each other.
+    extern int*		seenstate_tab;		// dsdhacked.c: sized num_states, zeroed
+    state_t*		st;
+    int*		seenstate = seenstate_tab;
+    static int		recursion;
+    statenum_t		i = state;
+    boolean		ret = true;
+    int*		tempstate = NULL;
+
+    if (!seenstate_tab)				// no DEH loaded -> allocate the base table once
+    { extern int num_states; seenstate_tab = calloc (num_states, sizeof(int)); seenstate = seenstate_tab; }
+
+    if (recursion++)				// nested call (from a jumping action): own table
+	seenstate = tempstate = calloc (num_states, sizeof(int));
 
     do
     {
@@ -65,7 +81,8 @@ P_SetMobjState
 	{
 	    mobj->state = (state_t *) S_NULL;
 	    P_RemoveMobj (mobj);
-	    return false;
+	    ret = false;
+	    break;
 	}
 
 	st = &states[state];
@@ -74,15 +91,21 @@ P_SetMobjState
 	mobj->sprite = st->sprite;
 	mobj->frame = st->frame;
 
-	// Modified handling.
-	// Call action functions when the state is set
-	if (st->action.acp1)		
-	    st->action.acp1(mobj);	
-	
+	if (st->action.acp1)			// action may itself call P_SetMobjState (jump)
+	    st->action.acp1(mobj);
+
+	seenstate[state] = 1 + st->nextstate;	// remember: visited, and where it goes
 	state = st->nextstate;
-    } while (!mobj->tics);
-				
-    return true;
+    } while (!mobj->tics && !seenstate[state]);	// stop on a real duration OR a detected cycle
+
+    if (!--recursion)
+	for (; (state = seenstate_tab[i]); i = state - 1)
+	    seenstate_tab[i] = 0;		// erase memory of visited states
+
+    if (tempstate)
+	free (tempstate);
+
+    return ret;
 }
 
 

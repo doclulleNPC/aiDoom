@@ -9,6 +9,7 @@
 extern int *lengths;
 
 actionf_t *deh_codeptr = NULL;   // per-state original action (grown with states; used by d_deh.c)
+int *seenstate_tab = NULL;       // P_SetMobjState cycle-detection table (grown with states)
 
 void dsdh_EnsureStatesCapacity (int limit)
 {
@@ -25,6 +26,8 @@ void dsdh_EnsureStatesCapacity (int limit)
     states = ns;
     deh_codeptr = realloc (deh_codeptr, newn * sizeof(actionf_t));
     memset (deh_codeptr + old, 0, (newn - old) * sizeof(actionf_t));
+    seenstate_tab = realloc (seenstate_tab, newn * sizeof(int));
+    memset (seenstate_tab + old, 0, (newn - old) * sizeof(int));
     num_states = newn;
 }
 
