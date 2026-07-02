@@ -199,6 +199,11 @@ void R_InitSpriteDefs (char** namelist)
 	  return;
 		
   sprites = Z_Malloc(numsprites *sizeof(*sprites), PU_STATIC, NULL);
+  // Z_Malloc does NOT zero -- sprites with no matching lumps take the
+  // numframes==0 path below without setting .spriteframes, leaving it garbage.
+  // doom1.wad leaves many sprnames slots (Heretic/Hexen names) lumpless, so any
+  // later deref of an uninitialised .spriteframes crashes nondeterministically.
+  memset(sprites, 0, numsprites * sizeof(*sprites));
 
   (void)start; (void)end; (void)patched;
 

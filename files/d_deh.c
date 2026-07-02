@@ -37,7 +37,9 @@ rcsid[] = "$Id: d_deh.c,v 1.20 1998/06/01 22:30:38 thldrmn Exp $";
 #include <ctype.h>
 #define stricmp  strcasecmp
 #define strnicmp strncasecmp
+#ifndef _MSC_VER   // MSVC's CRT already provides strlwr
 static char *strlwr(char *s){ char *p=s; for(;*p;p++) *p=(char)tolower((unsigned char)*p); return s; }
+#endif
 #include "z_zone.h"
 #ifndef TRUE
 #define TRUE 1
@@ -48,6 +50,8 @@ static int not_deh = FALSE;
 extern int maxammo[], clipammo[];	// p_inter.c (deh_procAmmo)
 char *dehReformatStr(char *string);
 char *ptr_lstrip(char *p);
+void lfstrip(char *s);                                     // used before its def (MSVC C2371)
+boolean deh_GetData(char *s, char *k, long *l, char **strval, FILE *fpout);
 #include "doomstat.h"
 #include "sounds.h"
 #include "info.h"
