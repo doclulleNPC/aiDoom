@@ -282,7 +282,7 @@ void
 A_WeaponReady
 ( player_t*	player,
   pspdef_t*	psp )
-{	
+{
     statenum_t	newstate;
     int		angle;
     
@@ -973,4 +973,24 @@ void A_WeaponMeleeAttack (player_t *player, pspdef_t *psp)
     player->mo->angle = R_PointToAngle2 (player->mo->x, player->mo->y,
                                          linetarget->x, linetarget->y);
   }
+}
+
+void A_CheckAmmo (player_t *player, pspdef_t *psp)
+{
+  ammotype_t type = weaponinfo[player->readyweapon].ammo;
+  int amount;
+  if (!psp->state || type == am_noammo) return;
+  amount = psp->state->args[1] ? (int)psp->state->args[1] : 1;   // aiDoom: no ammopershot -> 1
+  if (player->ammo[type] < amount)
+    P_SetPsprite (player, ps_weapon, (int)psp->state->args[0]);
+}
+void A_WeaponJump (player_t *player, pspdef_t *psp)
+{
+  if (!psp->state) return;
+  if (P_Random() < (int)psp->state->args[1])
+    P_SetPsprite (player, ps_weapon, (int)psp->state->args[0]);
+}
+void A_WeaponAlert (player_t *player, pspdef_t *psp)
+{
+  (void)psp; P_NoiseAlert (player->mo, player->mo);
 }

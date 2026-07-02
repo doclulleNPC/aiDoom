@@ -496,7 +496,7 @@ void A_SpawnObject(), A_MonsterProjectile(), A_MonsterMeleeAttack(), A_RadiusDam
      A_AddFlags(), A_RemoveFlags(), A_JumpIfFlagsSet(), A_JumpIfHealthBelow(),
      A_JumpIfTargetInSight(), A_JumpIfTargetCloser(), A_JumpIfTracerInSight(), A_JumpIfTracerCloser(),
      A_WeaponSound(), A_ConsumeAmmo(), A_GunFlashTo(), A_RefireTo(), A_WeaponProjectile(),
-     A_WeaponBulletAttack(), A_WeaponMeleeAttack();
+     A_WeaponBulletAttack(), A_WeaponMeleeAttack(), A_CheckAmmo(), A_WeaponJump(), A_WeaponAlert();
 
 deh_bexptr deh_bexptrs[] =
 {
@@ -610,6 +610,9 @@ deh_bexptr deh_bexptrs[] =
    {A_WeaponProjectile,    "A_WeaponProjectile"},
    {A_WeaponBulletAttack,  "A_WeaponBulletAttack"},
    {A_WeaponMeleeAttack,   "A_WeaponMeleeAttack"},
+   {A_CheckAmmo,           "A_CheckAmmo"},
+   {A_WeaponJump,          "A_WeaponJump"},
+   {A_WeaponAlert,         "A_WeaponAlert"},
   {NULL,             "A_NULL"},  // Ty 05/16/98
 };
 
@@ -799,10 +802,11 @@ void deh_procBexCodePointers(DEHFILE *fpin, FILE* fpout, char *line)
 
       if (fpout) fprintf(fpout,"Processing pointer at index %d: %s\n",
                          indexnum, mnemonic);
-      if (indexnum < 0 || indexnum >= NUMSTATES)
+      dsdh_EnsureStatesCapacity(indexnum);   // (M4) grow so DSDHacked-frame codepointers apply
+      if (indexnum < 0 || indexnum >= num_states)
         {
           if (fpout) fprintf(fpout,"Bad pointer number %d of %d\n",
-                             indexnum, NUMSTATES);
+                             indexnum, num_states);
           return; // killough 10/98: fix SegViol
         }
       strcpy(key,"A_");  // reusing the key area to prefix the mnemonic
@@ -1050,10 +1054,11 @@ void deh_procPointer(DEHFILE *fpin, FILE* fpout, char *line) // done
     }
 
   if (fpout) fprintf(fpout,"Processing Pointer at index %d: %s\n",indexnum, key);
-  if (indexnum < 0 || indexnum >= NUMSTATES)
+  dsdh_EnsureStatesCapacity(indexnum);
+  if (indexnum < 0 || indexnum >= num_states)
     {
       if (fpout)
-        fprintf(fpout,"Bad pointer number %d of %d\n",indexnum, NUMSTATES);
+        fprintf(fpout,"Bad pointer number %d of %d\n",indexnum, num_states);
       return;
     }
 
@@ -1068,10 +1073,10 @@ void deh_procPointer(DEHFILE *fpin, FILE* fpout, char *line) // done
           continue;
         }
 
-      if (value < 0 || value >= NUMSTATES)
+      if (value < 0 || value >= num_states)
         {
           if (fpout)
-            fprintf(fpout,"Bad pointer number %ld of %d\n",value, NUMSTATES);
+            fprintf(fpout,"Bad pointer number %ld of %d\n",value, num_states);
           return;
         }
 
