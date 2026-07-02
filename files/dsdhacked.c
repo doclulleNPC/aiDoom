@@ -27,7 +27,13 @@ void dsdh_EnsureStatesCapacity (int limit)
     deh_codeptr = realloc (deh_codeptr, newn * sizeof(actionf_t));
     memset (deh_codeptr + old, 0, (newn - old) * sizeof(actionf_t));
     seenstate_tab = realloc (seenstate_tab, newn * sizeof(int));
-    memset (seenstate_tab + old, 0, (newn - old) * sizeof(int));
+    memset (seenstate_tab, 0, newn * sizeof(int));   // zero the WHOLE table: on the first grow realloc
+                                                     // (from NULL) leaves the base [0..old-1] entries
+                                                     // uninitialised; P_SetMobjState needs them 0 (it's
+                                                     // all-zero between calls anyway, and we grow at DEH
+                                                     // load, never mid-transition).  A garbage base entry
+                                                     // corrupted vanilla-state transitions (monsters
+                                                     // rendering each other's frames).
     num_states = newn;
 }
 
