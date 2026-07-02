@@ -216,6 +216,16 @@ typedef struct
 
 
 
+// Boom generalized SECTOR special bitfields (jff)
+#define DAMAGE_MASK    0x60
+#define DAMAGE_SHIFT   5
+#define SECRET_MASK    0x80
+#define SECRET_SHIFT   7
+#define FRICTION_MASK  0x100
+#define FRICTION_SHIFT 8
+#define PUSH_MASK      0x200
+#define PUSH_SHIFT     9
+
 // --- Boom generalized linedef specials + field enums (from ../winmbf/Source/p_spec.h) ---
 #define GenFloorBase          0x6000
 #define GenCeilingBase        0x4000

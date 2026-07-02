@@ -1019,6 +1019,19 @@ void P_PlayerInSpecialSector (player_t* player)
 	return;	
 
     // Has hitten ground.
+    if (sector->special >= 32)   // Boom generalized sector: damage/secret via bitfields
+    {
+	switch ((sector->special & DAMAGE_MASK) >> DAMAGE_SHIFT)
+	{
+	  case 1: if (!player->powers[pw_ironfeet] && !(leveltime&0x1f)) P_DamageMobj (player->mo,NULL,NULL,5);  break;
+	  case 2: if (!player->powers[pw_ironfeet] && !(leveltime&0x1f)) P_DamageMobj (player->mo,NULL,NULL,10); break;
+	  case 3: if ((!player->powers[pw_ironfeet] || P_Random()<5) && !(leveltime&0x1f)) P_DamageMobj (player->mo,NULL,NULL,20); break;
+	}
+	if (sector->special & SECRET_MASK)
+	{ player->secretcount++; sector->special &= ~SECRET_MASK; }
+	return;
+    }
+
     switch (sector->special)
     {
       case 5:
@@ -1275,7 +1288,10 @@ void P_SpawnSpecials (void)
 	if (!sector->special)
 	    continue;
 	
-	switch (sector->special)
+	if (sector->special & SECRET_MASK)	// Boom: extended secret sectors
+	    totalsecret++;
+	
+	switch (sector->special & 31)	// Boom: low 5 bits = light/special preset
 	{
 	  case 1:
 	    // FLICKERING LIGHTS

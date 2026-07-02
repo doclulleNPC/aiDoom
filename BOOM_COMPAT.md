@@ -30,7 +30,7 @@ nodes). `../winmbf` is the original MBF (has the specials, not extended nodes).
 - [x] **B2. Generalized linedef specials** -- DONE (ported p_genlin.c). — recognise `line->special >= 0x2000` and decode the
   bitfields (type + speed + model + direction + delay + target/change) into the existing
   door/plat/floor/ceiling/stair/crusher builders. Boom maps' doors/lifts/floors.
-- [ ] **B3. Generalized + extended sector types** — treat `sector->special` as bitfielded when
+- [x] **B3. Generalized + extended sector types** -- DONE. — treat `sector->special` as bitfielded when
   `>= 32`: low bits = damage/light preset, plus SECRET/FRICTION/PUSHPULL bits; keep vanilla ≤17.
 - [ ] **B4. Boom transfers & thinkers** — deep water (242 transfer-height), friction (223), wind/
   current/pusher (224–226), scrollers (245–255), and the associated `p_spec` thinkers. Renderer
