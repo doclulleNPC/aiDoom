@@ -260,6 +260,19 @@ boolean PIT_CheckLine (line_t* ld)
 }
 
 //
+// mbf21 projectile groups: two things with the same non-default projectile_group don't damage each
+// other with missiles (even across species); default group keeps the vanilla same-species rule.
+static boolean P_SameProjectileGroup (mobj_t* a, mobj_t* b)
+{
+    return mobjinfo[a->type].projectile_group != 0
+        && mobjinfo[a->type].projectile_group == mobjinfo[b->type].projectile_group;
+}
+static boolean P_SameSplashGroup (mobj_t* a, mobj_t* b)
+{
+    return mobjinfo[a->type].splash_group != 0
+        && mobjinfo[a->type].splash_group == mobjinfo[b->type].splash_group;
+}
+
 // PIT_CheckThing
 //
 // When set (-infight), monsters' projectiles damage same-species monsters
@@ -335,6 +348,9 @@ boolean PIT_CheckThing (mobj_t* thing)
 		return false;
 	    }
 	}
+	// mbf21: same projectile-group things pass through each other harmlessly
+	else if (tmthing->target && P_SameProjectileGroup (tmthing->target, thing))
+	    return false;
 	
 	if (! (thing->flags & MF_SHOOTABLE) )
 	{
@@ -1238,6 +1254,9 @@ boolean PIT_RadiusAttack (mobj_t* thing)
 
     if (thing->flags2 & MF2_NORADIUSDMG)
 	return true;	// mbf21: immune to splash damage
+
+    if (bombspot && P_SameSplashGroup (thing, bombspot))
+	return true;	// mbf21: same splash-group -> no splash damage
 
     if ( P_CheckSight (thing, bombspot) )
     {

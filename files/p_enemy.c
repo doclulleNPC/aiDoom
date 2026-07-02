@@ -797,7 +797,8 @@ void A_Look (mobj_t* actor)
 	}
 
 	if (actor->type==MT_SPIDER
-	    || actor->type == MT_CYBORG)
+	    || actor->type == MT_CYBORG
+	    || (actor->flags2 & (MF2_BOSS | MF2_FULLVOLSOUNDS)))   // mbf21
 	{
 	    // full volume
 	    S_StartSound (NULL, sound);
