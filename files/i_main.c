@@ -78,6 +78,45 @@ static void I_InstallCrashHandler (void)
     sigaction (SIGFPE,  &sa, NULL);
     sigaction (SIGBUS,  &sa, NULL);
 }
+#elif defined(_WIN32)
+// Windows has no signals for hardware faults; a bad pointer raises a Structured
+// Exception instead.  A top-level SetUnhandledExceptionFilter catches the access
+// violation (etc.) that would otherwise just close the (now windowless) game with
+// no feedback -- it names the fault + address in an SDL dialog and writes it to
+// stderr (-> run/aidoom_stderr.log via the launcher).  Best-effort: on a stack
+// overflow the handler runs on a nearly-exhausted stack, so keep it minimal
+// (static buffer, no allocation).
+#define WIN32_LEAN_AND_MEAN	// keep rpcndr.h/wtypesbase.h out: their boolean/BOOLEAN clash with doomtype.h (cf. i_net.c)
+#include <windows.h>
+#include <stdio.h>
+static LONG WINAPI I_Win32CrashFilter (EXCEPTION_POINTERS* ep)
+{
+    static char	msg[512];			// static: don't lean on the trashed stack
+    DWORD	code = (ep && ep->ExceptionRecord) ? ep->ExceptionRecord->ExceptionCode    : 0;
+    void*	addr = (ep && ep->ExceptionRecord) ? ep->ExceptionRecord->ExceptionAddress : NULL;
+    const char*	name =
+	code == EXCEPTION_ACCESS_VIOLATION    ? "ACCESS_VIOLATION"       :
+	code == EXCEPTION_STACK_OVERFLOW      ? "STACK_OVERFLOW"         :
+	code == EXCEPTION_ILLEGAL_INSTRUCTION ? "ILLEGAL_INSTRUCTION"    :
+	code == EXCEPTION_INT_DIVIDE_BY_ZERO  ? "INT_DIVIDE_BY_ZERO"     :
+	code == EXCEPTION_PRIV_INSTRUCTION    ? "PRIVILEGED_INSTRUCTION" :
+	code == EXCEPTION_IN_PAGE_ERROR       ? "IN_PAGE_ERROR"          :
+					        "unhandled exception";
+    snprintf (msg, sizeof msg,
+	      "aiDoom crashed.\n\n%s (0x%08lX) at address 0x%p.\n\n"
+	      "A log was written to run\\aidoom_stderr.log.",
+	      name, (unsigned long)code, addr);
+    fprintf (stderr, "\n*** aiDoom CRASH: %s ***\n", msg);
+    fflush (stderr);
+    // SDL's message box is the native Win32 dialog underneath; safe with parent = NULL
+    // even after a crash / with no game window.
+    SDL_ShowSimpleMessageBox (SDL_MESSAGEBOX_ERROR, "aiDoom crashed", msg, NULL);
+    return EXCEPTION_EXECUTE_HANDLER;		// let the process terminate
+}
+static void I_InstallCrashHandler (void)
+{
+    SetUnhandledExceptionFilter (I_Win32CrashFilter);
+}
 #else
 static void I_InstallCrashHandler (void) {}
 #endif
