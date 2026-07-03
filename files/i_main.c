@@ -88,10 +88,31 @@ static void I_InstallCrashHandler (void)
 // (static buffer, no allocation).
 #define WIN32_LEAN_AND_MEAN	// keep rpcndr.h/wtypesbase.h out: their boolean/BOOLEAN clash with doomtype.h (cf. i_net.c)
 #include <windows.h>
+#include <dbghelp.h>			// MiniDumpWriteDump (links dbghelp.lib)
 #include <stdio.h>
+// Write a post-mortem minidump next to the game (run/aidoom_crash.dmp) that
+// Visual Studio / WinDbg can open to see the faulting stack + registers.
+// Returns 1 on success.  MiniDumpWithThreadInfo keeps it small but useful.
+static int I_WriteMinidump (EXCEPTION_POINTERS* ep)
+{
+    MINIDUMP_EXCEPTION_INFORMATION mei;
+    BOOL   ok;
+    HANDLE hf = CreateFileA ("aidoom_crash.dmp", GENERIC_WRITE, 0, NULL,
+			     CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hf == INVALID_HANDLE_VALUE)
+	return 0;
+    mei.ThreadId          = GetCurrentThreadId ();
+    mei.ExceptionPointers = ep;
+    mei.ClientPointers    = FALSE;
+    ok = MiniDumpWriteDump (GetCurrentProcess (), GetCurrentProcessId (), hf,
+			    (MINIDUMP_TYPE)(MiniDumpNormal | MiniDumpWithThreadInfo),
+			    ep ? &mei : NULL, NULL, NULL);
+    CloseHandle (hf);
+    return ok ? 1 : 0;
+}
 static LONG WINAPI I_Win32CrashFilter (EXCEPTION_POINTERS* ep)
 {
-    static char	msg[512];			// static: don't lean on the trashed stack
+    static char	msg[640];			// static: don't lean on the trashed stack
     DWORD	code = (ep && ep->ExceptionRecord) ? ep->ExceptionRecord->ExceptionCode    : 0;
     void*	addr = (ep && ep->ExceptionRecord) ? ep->ExceptionRecord->ExceptionAddress : NULL;
     const char*	name =
@@ -102,11 +123,17 @@ static LONG WINAPI I_Win32CrashFilter (EXCEPTION_POINTERS* ep)
 	code == EXCEPTION_PRIV_INSTRUCTION    ? "PRIVILEGED_INSTRUCTION" :
 	code == EXCEPTION_IN_PAGE_ERROR       ? "IN_PAGE_ERROR"          :
 					        "unhandled exception";
+    int		dumped = I_WriteMinidump (ep);	// write the .dmp before anything else can fail
     snprintf (msg, sizeof msg,
 	      "aiDoom crashed.\n\n%s (0x%08lX) at address 0x%p.\n\n"
-	      "A log was written to run\\aidoom_stderr.log.",
-	      name, (unsigned long)code, addr);
-    fprintf (stderr, "\n*** aiDoom CRASH: %s ***\n", msg);
+	      "Saved in run\\:\n"
+	      "  - aidoom_stderr.log  (console log)\n"
+	      "%s",
+	      name, (unsigned long)code, addr,
+	      dumped ? "  - aidoom_crash.dmp   (open in Visual Studio / WinDbg)"
+		     : "  (minidump could not be written)");
+    fprintf (stderr, "\n*** aiDoom CRASH: %s (0x%08lX) at 0x%p; minidump %s ***\n",
+	     name, (unsigned long)code, addr, dumped ? "aidoom_crash.dmp" : "FAILED");
     fflush (stderr);
     // SDL's message box is the native Win32 dialog underneath; safe with parent = NULL
     // even after a crash / with no game window.

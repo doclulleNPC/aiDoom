@@ -15,7 +15,7 @@ CFLAGS = /nologo /O2 /MD /W3 /I"$(SDL)\include" \
 	/D_CRT_SECURE_NO_WARNINGS /D_CRT_NONSTDC_NO_DEPRECATE \
 	/D_WINSOCK_DEPRECATED_NO_WARNINGS /DWIN32 /D_WINDOWS
 
-LIBS = "$(SDL)\lib\x86\SDL3.lib" ws2_32.lib
+LIBS = "$(SDL)\lib\x86\SDL3.lib" ws2_32.lib dbghelp.lib
 LDFLAGS = /link /SUBSYSTEM:CONSOLE
 
 RES = aidoom.res
