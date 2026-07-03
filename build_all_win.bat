@@ -38,6 +38,8 @@ nmake /nologo /f Makefile.msvc %* || exit /b 1
 REM --- copy the aiDoom engine + tool binaries (+SDL3.dll) into run\ ---
 echo [build] === copy outputs to run\ ===
 copy /Y "%ROOT%files\aidoom.exe"      "%ROOT%run\aidoom.exe"      >nul || exit /b 1
+if exist "%ROOT%files\aidoom.pdb" copy /Y "%ROOT%files\aidoom.pdb" "%ROOT%run\aidoom.pdb" >nul
+
 copy /Y "%ROOT%tools\aidoom_config.exe" "%ROOT%run\aidoom_config.exe" >nul || exit /b 1
 copy /Y "%ROOT%tools\gpumon.exe"      "%ROOT%run\gpumon.exe"      >nul || exit /b 1
 copy /Y "%ROOT%tools\launcher.exe"    "%ROOT%run\launcher.exe"    >nul || exit /b 1

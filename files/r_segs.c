@@ -99,6 +99,9 @@ int*		maskedtexturecol;
 //
 // R_RenderMaskedSegRange
 //
+extern short**		texturecolumnlump;	// r_data.c: <=0 for composite (multi-patch) columns
+extern int*		texturewidthmask;
+
 void
 R_RenderMaskedSegRange
 ( drawseg_t*	ds,
@@ -162,7 +165,15 @@ R_RenderMaskedSegRange
     for (dc_x = x1 ; dc_x <= x2 ; dc_x++)
     {
 	// calculate lighting
-	if (maskedtexturecol[dc_x] != MAXSHORT)
+	//
+	// A 2S middle texture must be single-patch (posted) so R_DrawMaskedColumn can
+	// walk its posts.  A multi-patch/composite texture -- or a Boom control-line
+	// texture that "defaulted to 0" -- returns raw pixels from R_GetColumn with no
+	// 0xff post terminator, so the walk runs off the block into unmapped memory
+	// (the boomedit.wad crash).  texturecolumnlump[texnum][col] <= 0 marks such a
+	// composite column: skip it (leave the wall gap) instead of crashing.
+	if (maskedtexturecol[dc_x] != MAXSHORT
+	    && texturecolumnlump[texnum][maskedtexturecol[dc_x] & texturewidthmask[texnum]] > 0)
 	{
 	    if (!fixedcolormap)
 	    {

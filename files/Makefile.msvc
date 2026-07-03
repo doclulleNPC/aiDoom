@@ -10,13 +10,16 @@
 SDL = C:\Source\SDL3
 
 CC = cl
-CFLAGS = /nologo /O2 /MD /W3 /I"$(SDL)\include" \
+# /Zi + /DEBUG (below): emit aidoom.pdb.  Codegen is unchanged from plain /O2, but a
+# shipped PDB lets the crash handler's minidump (i_main.c) symbolise to exact
+# functions/lines instead of guessing against a mismatched build.
+CFLAGS = /nologo /O2 /Zi /MD /W3 /I"$(SDL)\include" \
 	/DSDL_MAIN_HANDLED \
 	/D_CRT_SECURE_NO_WARNINGS /D_CRT_NONSTDC_NO_DEPRECATE \
 	/D_WINSOCK_DEPRECATED_NO_WARNINGS /DWIN32 /D_WINDOWS
 
 LIBS = "$(SDL)\lib\x86\SDL3.lib" ws2_32.lib dbghelp.lib
-LDFLAGS = /link /SUBSYSTEM:CONSOLE
+LDFLAGS = /link /SUBSYSTEM:CONSOLE /DEBUG
 
 RES = aidoom.res
 
