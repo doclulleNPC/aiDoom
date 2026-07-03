@@ -49,7 +49,12 @@ planefunction_t		ceilingfunc;
 //
 
 // Here comes the obnoxious "visplane".
-#define MAXVISPLANES	128
+// Raised from the vanilla 128: big open Boom/modern maps (and the hi-res renderer,
+// which splits more spans) blow past 128 -> "R_DrawPlanes: visplane overflow"
+// (boomedit.wad hit 130).  A flat array (not Boom's growable hash) keeps it simple
+// and safe -- the BSP renderer holds visplane_t* across the frame, so a realloc that
+// moved them would dangle.  1024 * ~7.7KB (top/bottom[MAXWIDTH]) ~= 8MB of zeroed BSS.
+#define MAXVISPLANES	1024
 visplane_t		visplanes[MAXVISPLANES];
 visplane_t*		lastvisplane;
 visplane_t*		floorplane;
