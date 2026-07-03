@@ -29,6 +29,10 @@ config.status
 # play the buddy voice offline without anyone re-running the ElevenLabs
 # baker.  Listed AFTER the general *.wad rule so it takes precedence.
 !run/ID0/aidoom.wad
+# Exception: BOOMEDIT.WAD is TeamTNT's freely-distributable Boom demonstration
+# map (ships with the Boom source), kept as a Boom-compat test asset -- not
+# copyrighted id IWAD data.
+!run/ID0/BOOMEDIT.WAD
 doom.cfg
 .doomrc
 doomsav*.dsg
