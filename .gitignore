@@ -33,6 +33,9 @@ config.status
 # map (ships with the Boom source), kept as a Boom-compat test asset -- not
 # copyrighted id IWAD data.
 !run/ID0/BOOMEDIT.WAD
+# Exception: MBF21/DeHackEd test PWADs (kept for exercising the MBF21 + Boom port).
+!run/ID0/Crispy and Brutal.wad
+!run/ID0/Crispy and Brutal TruecolorPNG.wad
 doom.cfg
 .doomrc
 doomsav*.dsg
