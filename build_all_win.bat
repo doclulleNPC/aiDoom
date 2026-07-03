@@ -21,6 +21,11 @@ call "%VSDIR%\VC\Auxiliary\Build\vcvars32.bat" >nul || ( echo [build] vcvars32 f
 
 echo [build] === aiDoom ===
 cd /d "%ROOT%files"
+REM ALWAYS clean-build the engine: the generated deps have NO header tracking, so
+REM after any .h edit (e.g. NUMSTATES in info.h) nmake would keep stale .obj files
+REM that were compiled against the old header -> a binary of MIXED objects and
+REM phantom boot crashes.  build.sh does the same (it just recompiles every .c).
+nmake /nologo /f Makefile.msvc clean >nul
 nmake /nologo /f Makefile.msvc %* || exit /b 1
 echo [build] === tools (config + gpumon + launcher + director) ===
 cd /d "%ROOT%tools"
