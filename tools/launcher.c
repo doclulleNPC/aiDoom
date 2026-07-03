@@ -58,7 +58,7 @@
 
 // --- Layout (BASE = 320x200 reference, scaled at runtime) ---
 #define WINW 560
-#define WINH 544			// +32 for the second Options row
+#define WINH 594			// +32 for the second Options row, +50 for the lowered LAUNCH button
 #define PAD 12
 
 // Vertical bands, BASE pixels (we scale 2x for 320->640 feel on a 560px wide
@@ -90,7 +90,7 @@
 #define IWAD_H    22
 #define IWAD_DD_H 80			// dropdown open height
 #define PWAD_Y    390			// extra PWAD selector (one row below IWAD)
-#define LAUNCH_Y  494
+#define LAUNCH_Y  544			// lowered 50px (window grew 50px to match)
 #define LAUNCH_H  34
 
 // Colours (RGB).
@@ -1279,7 +1279,7 @@ int main(int argc, char** argv)
     }
 
     win = SDL_CreateWindow("aiDoom Launcher", WINW, WINH,
-                           SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
+                           SDL_WINDOW_HIGH_PIXEL_DENSITY);	// fixed size (no SDL_WINDOW_RESIZABLE)
     if (!win) {
         fprintf(stderr, "SDL_CreateWindow failed: %s\n", SDL_GetError());
         SDL_Quit();
