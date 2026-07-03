@@ -36,6 +36,7 @@ rcsid[] = "$Id: p_genlin.c,v 1.18 1998/05/23 10:23:23 jim Exp $";
 #define demo_version 203   /* MBF -- enables Boom generalized behaviour paths */
 #include "r_main.h"
 #include "p_spec.h"
+#include "p_local.h"		// P_AddThinker prototype
 #include "p_tick.h"
 #include "m_random.h"
 #include "s_sound.h"
@@ -73,7 +74,7 @@ int EV_DoGenFloor
 ( line_t*       line )
 {
   int                   secnum;
-  int                   rtn;
+  int                   rtn = 0;	// 0 = no thinker created (Boom default; used by manual early-returns)
   boolean               manual;
   sector_t*             sec;
   floormove_t*          floor;
@@ -275,7 +276,7 @@ int EV_DoGenCeiling
 ( line_t*       line )
 {
   int                   secnum;
-  int                   rtn;
+  int                   rtn = 0;	// 0 = no thinker created (Boom default; used by manual early-returns)
   boolean               manual;
   fixed_t               targheight;
   sector_t*             sec;
@@ -486,7 +487,7 @@ int EV_DoGenLift
 {
   plat_t*         plat;
   int             secnum;
-  int             rtn;
+  int             rtn = 0;	// 0 = no thinker created (Boom default; used by manual early-returns)
   boolean         manual;
   sector_t*       sec;
   unsigned        value = (unsigned)line->special - GenLiftBase;
@@ -640,7 +641,7 @@ int EV_DoGenStairs
   int                   newsecnum;
   int                   texture;
   int                   ok;
-  int                   rtn;
+  int                   rtn = 0;	// 0 = no thinker created (Boom default; used by manual early-returns)
   boolean               manual;
     
   sector_t*             sec;
@@ -835,7 +836,7 @@ int EV_DoGenCrusher
 ( line_t*       line )
 {
   int                   secnum;
-  int                   rtn;
+  int                   rtn = 0;	// 0 = no thinker created (Boom default; used by manual early-returns)
   boolean               manual;
   sector_t*             sec;
   ceiling_t*            ceiling;

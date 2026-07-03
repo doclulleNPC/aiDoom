@@ -12,7 +12,7 @@
 #include "tables.h"
 #define SCROLL_SHIFT 5
 #define CARRYFACTOR ((3*FRACUNIT)>>5)
-void Add_WallScroller(long dx, long dy, const line_t *l, int control, int accel);
+void Add_WallScroller(int64_t dx, int64_t dy, const line_t *l, int control, int accel);	// int64_t (NOT long: 32-bit on MSVC x86) must match the definition below
 int P_FindLineFromLineTag(const line_t *line, int start);
 #ifndef D_MININT
 #define D_MININT MININT
