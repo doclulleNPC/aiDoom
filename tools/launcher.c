@@ -1518,9 +1518,11 @@ int main(int argc, char** argv)
         draw_launch_button();
 
         // Status line (launch error / confirmation) just above the button.
+        // -30 (not -16): the font is 19px tall, so -16 put the text bottom at +3
+        // INTO the button -- lift it so there is a clear gap above the button.
         if (g_status[0]) {
-            if (g_status_err) text(PAD, LAUNCH_Y - 16, g_status, COL_BTN_BD);
-            else              text(PAD, LAUNCH_Y - 16, g_status, COL_CHECK);
+            if (g_status_err) text(PAD, LAUNCH_Y - 30, g_status, COL_BTN_BD);
+            else              text(PAD, LAUNCH_Y - 30, g_status, COL_CHECK);
         }
 
         if (dropdown_open) { draw_pwad_dropdown(); draw_iwad_dropdown(); }
