@@ -811,10 +811,16 @@ void P_SpawnMapThing (mapthing_t* mthing)
 	    if (mthing->type == mobjinfo[i].doomednum)
 		break;
 
-	if (i==NUMMOBJTYPES)
-	    I_Error ("P_SpawnMapThing: Unknown type %i at (%i, %i)",
-		     mthing->type,
-		     mthing->x, mthing->y);
+	if (i == num_mobjtypes)		// not NUMMOBJTYPES: mobjinfo[] grows (DSDHacked)
+	{
+	    // Modern/Boom maps carry editor + Boom special things this 1993 engine has
+	    // no actor for -- Boom point pusher/puller (5001/5002), MBF music changer,
+	    // DoomBuilder camera (32000), etc.  Skip them with a warning instead of
+	    // aborting the whole level load (non-fatal, like the sprite/texture loaders).
+	    fprintf (stderr, "Warning: P_SpawnMapThing: unknown type %i at (%i, %i) -- skipped\n",
+		     mthing->type, mthing->x, mthing->y);
+	    return;
+	}
     }
 		
     // don't spawn keycards and players in deathmatch
