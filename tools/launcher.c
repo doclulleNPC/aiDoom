@@ -36,6 +36,7 @@
 #endif
 #include <sys/stat.h>
 #ifdef _MSC_VER
+#include <windows.h>	// CreateProcess -- launch the game non-blocking + windowless
 #include <io.h>
 #include <process.h>
 #define access _access
@@ -1168,31 +1169,64 @@ static void do_launch(void)
     int reuse_director  = needs_director && has_director && director_running();
     int start_director  = needs_director && has_director && !reuse_director;
 
-    // Build a DETACHED launch string so system() returns at once (non-blocking).
-    char full[1400];
+    save_launcher_prefs();   // remember this selection for next time
+
 #ifdef _WIN32
-    // cmd.exe: `start` detaches each process into its own session.  /B = no new
-    // console for the director; the game gets its own window.
+    // Launch with CreateProcess (NOT system("start ...")): it returns immediately so the
+    // launcher window never freezes, and CREATE_NO_WINDOW stops the CONSOLE-subsystem game
+    // from popping up a console/cmd window.  The game's stdout+stderr are redirected to
+    // run/aidoom_stderr.log so a fatal I_Error is still recoverable after the window closes.
+    char gamexe[300], logpath[320];
+    snprintf(gamexe,  sizeof gamexe,  "%s/aidoom.exe",        run_dir());
+    snprintf(logpath, sizeof logpath, "%s/aidoom_stderr.log", run_dir());
+
     if (start_director)
-        snprintf(full, sizeof full,
-                 "start \"aiDoom Director\" /B \"%s\" --port 31666 & start \"aiDoom\" %s",
-                 dir_path, cmd);
-    else
-        snprintf(full, sizeof full, "start \"aiDoom\" %s", cmd);
+    {
+        char dircmd[320];
+        snprintf(dircmd, sizeof dircmd, "\"%s\" --port 31666", dir_path);
+        STARTUPINFOA dsi; PROCESS_INFORMATION dpi;
+        memset(&dsi, 0, sizeof dsi); dsi.cb = sizeof dsi;
+        if (CreateProcessA(dir_path, dircmd, NULL, NULL, FALSE,
+                           CREATE_NO_WINDOW, NULL, run_dir(), &dsi, &dpi))
+        { CloseHandle(dpi.hThread); CloseHandle(dpi.hProcess); }
+    }
+
+    // Inheritable log handle -> the game's stdout+stderr (windowless, but still logged).
+    SECURITY_ATTRIBUTES sa; memset(&sa, 0, sizeof sa);
+    sa.nLength = sizeof sa; sa.bInheritHandle = TRUE;
+    HANDLE hlog = CreateFileA(logpath, GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                              &sa, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    STARTUPINFOA si; PROCESS_INFORMATION pi;
+    memset(&si, 0, sizeof si); si.cb = sizeof si;
+    BOOL inherit = FALSE;
+    if (hlog != INVALID_HANDLE_VALUE)
+    { si.dwFlags = STARTF_USESTDHANDLES; si.hStdOutput = si.hStdError = hlog; inherit = TRUE; }
+
+    BOOL ok = CreateProcessA(gamexe, cmd, NULL, NULL, inherit,
+                             CREATE_NO_WINDOW, NULL, run_dir(), &si, &pi);
+    if (hlog != INVALID_HANDLE_VALUE) CloseHandle(hlog);
+    if (!ok)
+    {
+        snprintf(g_status, sizeof g_status,
+                 "failed to launch aidoom.exe (error %lu)", (unsigned long)GetLastError());
+        g_status_err = 1;
+        return;
+    }
+    CloseHandle(pi.hThread); CloseHandle(pi.hProcess);
 #else
-    // POSIX: background both in subshells; tee the game's stderr to a log so a
-    // fatal I_Error survives the window vanishing.
+    // POSIX: background both in subshells; tee the game's stderr to a log so a fatal
+    // I_Error survives the window vanishing.  system() returns at once here.
+    char full[1400];
     if (start_director)
         snprintf(full, sizeof full,
                  "( \"%s\" --port 31666 >/dev/null 2>&1 & ) ; ( %s >aidoom_stderr.log 2>&1 & )",
                  dir_path, cmd);
     else
         snprintf(full, sizeof full, "( %s >aidoom_stderr.log 2>&1 & )", cmd);
+    fprintf(stderr, "[launcher] %s\n", full);
+    system(full);   // returns immediately -- the launcher stays responsive
 #endif
 
-    fprintf(stderr, "[launcher] %s\n", full);
-    save_launcher_prefs();   // remember this selection for next time
-    system(full);   // returns immediately -- the launcher stays responsive
     snprintf(g_status, sizeof g_status, "launched aiDoom%s",
              start_director ? " + director"
              : reuse_director ? " (director already running)" : "");
@@ -1202,7 +1236,7 @@ static void do_launch(void)
     // that we don't wait for it).
     FILE* f = fopen("launcher.log", "a");
     if (f) {
-        fprintf(f, "launched: %s\n", full);
+        fprintf(f, "launched: %s\n", cmd);
         fclose(f);
     }
 }
