@@ -149,8 +149,8 @@ void P_InitPicAnims (void)
 {
     int		i;
     // Boom: use the WAD's ANIMATED lump if present, else the vanilla compile-time table.
-    byte*	animlump = (W_CheckNumForName("ANIMATED") >= 0)
-			   ? W_CacheLumpName("ANIMATED", PU_STATIC) : NULL;
+    int		animlen = (W_CheckNumForName("ANIMATED") >= 0) ? W_LumpLength(W_GetNumForName("ANIMATED")) : -1;
+    byte*	animlump = (animlen >= 23) ? W_CacheLumpName("ANIMATED", PU_STATIC) : NULL;
 
     lastanim = anims;
     for (i=0 ; ; i++)
@@ -162,7 +162,7 @@ void P_InitPicAnims (void)
 	if (animlump)			// packed on-disk record: byte, char[9], char[9], int32
 	{
 	    byte* p = animlump + i*23;
-	    if ((signed char)p[0] == -1) break;
+	    if ((i+1)*23 > animlen || (signed char)p[0] == -1) break;
 	    istexture = p[0];
 	    memcpy (endname,   p + 1,  9); endname[8]   = 0;
 	    memcpy (startname, p + 10, 9); startname[8] = 0;

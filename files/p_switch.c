@@ -28,6 +28,7 @@ rcsid[] = "$Id: p_switch.c,v 1.3 1997/01/28 22:08:29 b1 Exp $";
 
 #include "i_system.h"
 #include "z_zone.h"
+#include "w_wad.h"
 #include "doomdef.h"
 #include "p_local.h"
 
@@ -41,6 +42,7 @@ rcsid[] = "$Id: p_switch.c,v 1.3 1997/01/28 22:08:29 b1 Exp $";
 // State.
 #include "doomstat.h"
 #include "r_state.h"
+#include "r_data.h"
 
 
 //
@@ -133,11 +135,12 @@ void P_InitSwitchList(void)
     // Boom: use the WAD's SWITCHES lump if present (packed: char[9] name1, char[9] name2, int16
     // episode; terminated by episode==0), else the vanilla alphSwitchList[] table.
     {
-	byte* sw = (W_CheckNumForName("SWITCHES") >= 0) ? W_CacheLumpName("SWITCHES", PU_STATIC) : NULL;
+	int swlen = (W_CheckNumForName("SWITCHES") >= 0) ? W_LumpLength(W_GetNumForName("SWITCHES")) : -1;
+	byte* sw = (swlen >= 20) ? W_CacheLumpName("SWITCHES", PU_STATIC) : NULL;
 	if (sw)
 	{
 	    char n1[9], n2[9]; int ep;
-	    for (index = 0, i = 0; ; i++)
+	    for (index = 0, i = 0; (i+1)*20 <= swlen; i++)
 	    {
 		byte* p = sw + i*20;
 		memcpy (n1, p, 9); n1[8]=0; memcpy (n2, p+9, 9); n2[8]=0;
