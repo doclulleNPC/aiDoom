@@ -37,8 +37,12 @@ nodes). `../winmbf` is the original MBF (has the specials, not extended nodes).
   hooks for transfer-height (fake floor/ceiling) are the hard part.
 - [x] **B5. ANIMATED / SWITCHES lumps** -- DONE. — load Boom's custom flat/texture animation + switch
   tables in `P_InitPicAnims` / the switch init, falling back to the vanilla table when absent.
-- [~] **B6. Verify** -- structural: vanilla unaffected + XNOD map loads/renders; full Boom-map behaviour needs real Boom WADs. — a Boom-format test map (generalized specials + extended nodes) loads and
-  plays.
+  (Fix: `p_switch.c` needed `#include "w_wad.h"` — without it `W_CacheLumpName` was implicitly
+  `int`-declared and its 64-bit lump pointer was truncated to 32 bits → `P_InitSwitchList` segfault.)
+- [x] **B6. Verify** -- DONE. Vanilla DOOM/DOOM2 + Brutal.wad unaffected; `BOOMEDIT.WAD` (TeamTNT's
+  Boom test map: generalized specials + `ANIMATED` + `SWITCHES`) loads and runs on `doom2.wad`; XNOD
+  extended-node maps load/render. Full Boom-map *behaviour* (deep water, friction, pushers) still
+  needs the B4 renderer/thinker hooks below to be visible in play.
 
 ## Notes
 - Keep the playsim deterministic (fixed-point, tic-locked). Boom specials are all integer.
