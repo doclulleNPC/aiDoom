@@ -134,6 +134,10 @@ typedef struct
 // Set if already seen, thus drawn in automap.
 #define ML_MAPPED		256
 
+// Boom: USE passes through this special line to activate a line behind it (e.g. a walk-trigger
+// line placed right in front of a door, so the door can still be used).  jff 3/21/98.
+#define ML_PASSUSE		512
+
 
 
 

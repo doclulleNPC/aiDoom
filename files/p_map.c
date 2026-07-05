@@ -1235,13 +1235,15 @@ boolean	PTR_UseTraverse (intercept_t* in)
     side = 0;
     if (P_PointOnLineSide (usething->x, usething->y, in->d.line) == 1)
 	side = 1;
-    
+
     //	return false;		// don't use back side
-	
+
     P_UseSpecialLine (usething, in->d.line, side);
 
-    // can't use for than one special line in a row
-    return false;
+    // Boom (jff 3/21/98): normally USE stops at the first special line, but a line flagged
+    // ML_PASSUSE lets the use pass through to the line behind it -- BOOMEDIT places a walk-trigger
+    // line right in front of a door and flags it PASSUSE so the door can still be opened.
+    return (in->d.line->flags & ML_PASSUSE) ? true : false;
 }
 
 
