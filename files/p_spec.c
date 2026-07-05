@@ -546,6 +546,14 @@ P_CrossSpecialLine
 	  case 4:	// RAISE DOOR
 	  case 10:	// PLAT DOWN-WAIT-UP-STAY TRIGGER
 	  case 88:	// PLAT DOWN-WAIT-UP-STAY RETRIGGER
+	  case 207:	// Boom W1 silent teleport
+	  case 208:	// Boom WR silent teleport
+	  case 243:	// Boom W1 silent line-to-line teleport
+	  case 244:	// Boom WR silent line-to-line teleport (conveyor loops)
+	  case 262: case 263:	// silent line-to-line, reversed
+	  case 264: case 265:	// silent line-to-line, monster-only, reversed
+	  case 266: case 267:	// silent line-to-line, monster-only
+	  case 268: case 269:	// silent teleport, monster-only
 	    ok = 1;
 	    break;
 	}
@@ -679,6 +687,21 @@ P_CrossSpecialLine
 	EV_Teleport( line, side, thing );
 	line->special = 0;
 	break;
+
+      // Boom silent teleporters (no fog/sound, momentum preserved) -- W1 (once).
+      case 207:	EV_SilentTeleport (line, side, thing); line->special = 0; break;
+      case 243:	EV_SilentLineTeleport (line, side, thing, false); line->special = 0; break;
+      case 262:	EV_SilentLineTeleport (line, side, thing, true);  line->special = 0; break;
+      case 264:	if (!thing->player) EV_SilentLineTeleport (line, side, thing, true);  line->special = 0; break;
+      case 266:	if (!thing->player) EV_SilentLineTeleport (line, side, thing, false); line->special = 0; break;
+      case 268:	if (!thing->player) EV_SilentTeleport (line, side, thing); line->special = 0; break;
+      // Boom silent teleporters -- WR (repeatable; the conveyor candle loop uses 244/267).
+      case 208:	EV_SilentTeleport (line, side, thing); break;
+      case 244:	EV_SilentLineTeleport (line, side, thing, false); break;
+      case 263:	EV_SilentLineTeleport (line, side, thing, true);  break;
+      case 265:	if (!thing->player) EV_SilentLineTeleport (line, side, thing, true);  break;
+      case 267:	if (!thing->player) EV_SilentLineTeleport (line, side, thing, false); break;
+      case 269:	if (!thing->player) EV_SilentTeleport (line, side, thing); break;
 
       case 40:
 	// RaiseCeilingLowerFloor

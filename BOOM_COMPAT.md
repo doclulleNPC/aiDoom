@@ -52,6 +52,16 @@ nodes). `../winmbf` is the original MBF (has the specials, not extended nodes).
   extended-node maps load/render. Full Boom-map *behaviour* (deep water, friction, pushers) still
   needs the B4 renderer/thinker hooks below to be visible in play.
 
+## Extra Boom specials wired (beyond B1–B6)
+- **Silent teleporters** (`p_telept.c` `EV_SilentTeleport`/`EV_SilentLineTeleport`, dispatched in
+  `P_CrossSpecialLine`): thing-exit 207/208 + monster 268/269, and linedef-to-linedef 243/244
+  (+ reversed 262/263, monster 264–267). No fog/sound, angle+height preserved and **momentum
+  rotated**, so a 252 conveyor can carry things (BOOMEDIT's candles) through a teleporter and have
+  them re-emerge still moving — the "loop the belt" effect. Ported from `../winmbf` (Killough).
+- **Generalized-switch feedback**: `P_DoGenLineSpecial` now calls `P_ChangeSwitchTexture` on a
+  switch/use (`actclass==1`) activation, so Boom generalized lifts/doors/etc. toggle their switch
+  texture + play the switch sound instead of silently doing nothing ("use does nothing").
+
 ## Notes
 - Keep the playsim deterministic (fixed-point, tic-locked). Boom specials are all integer.
 - Boom bumped several **on-disk limits** (segs/subsectors/nodes) to 32-bit; the vanilla loaders use

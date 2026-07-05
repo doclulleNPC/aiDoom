@@ -1440,8 +1440,15 @@ boolean P_DoGenLineSpecial (line_t* line, mobj_t* thing, int actclass)
     }
 
     if (func (line))
+    {
+        // switch/use activation must toggle the switch texture + play the switch sound,
+        // else the player gets no feedback and it feels like "use does nothing" (Boom).
+        // useAgain = trig&1: Many (SR) toggles back after a delay, Once (S1) is permanent.
+        if (actclass == 1)
+            P_ChangeSwitchTexture (line, trig & 1);
         if (!(trig & 1))                    // an "Once" trigger -> consume the special
             line->special = 0;
+    }
 
     return true;
 }

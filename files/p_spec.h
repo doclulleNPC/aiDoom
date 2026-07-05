@@ -983,6 +983,10 @@ EV_Teleport
   int		side,
   mobj_t*	thing );
 
+// Boom silent teleporters (no fog/sound, momentum preserved).
+int EV_SilentTeleport (line_t* line, int side, mobj_t* thing);
+int EV_SilentLineTeleport (line_t* line, int side, mobj_t* thing, boolean reverse);
+
 //-----------------------------------------------------------------------------
 //
 // $Log:$
