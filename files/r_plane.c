@@ -216,12 +216,14 @@ void R_ClearPlanes (void)
 
     // left to right mapping
     angle = (viewangle-ANG90)>>ANGLETOFINESHIFT;
-	
-    // scale will be unit scale at the NON-wide half-width (the projection focal),
-    // so floor/ceiling texture scale matches the walls in Hor+ widescreen (using
-    // the wide centerxfrac stretched the flats).  Equal to centerxfrac in 16:10.
-    basexscale = FixedDiv (finecosine[angle],centerxfrac_nonwide);
-    baseyscale = -FixedDiv (finesine[angle],centerxfrac_nonwide);
+
+    // The flat span step is scaled by the WIDE centre (centerxfrac), exactly as crispy-doom does.
+    // yslope already uses the non-wide half-width, and the two together make the flat world-locked
+    // in Hor+ widescreen.  Using centerxfrac_nonwide here (an earlier attempt to stop a seam) left
+    // the step too large in 16:9, so the floor/ceiling texture slid with the view angle instead of
+    // staying fixed.  In 16:10 centerxfrac == centerxfrac_nonwide, so 4:3/16:10 are unchanged.
+    basexscale = FixedDiv (finecosine[angle],centerxfrac);
+    baseyscale = -FixedDiv (finesine[angle],centerxfrac);
 }
 
 
