@@ -189,6 +189,42 @@ void R_DrawColumn (void)
 
 
 //
+// R_DrawTLColumn  (Boom 260) -- like R_DrawColumn but blends the texel over the existing screen
+// pixel through dc_tranmap, giving a translucent 2S middle texture.
+//
+byte* dc_tranmap;
+
+void R_DrawTLColumn (void)
+{
+    int		count;
+    byte*	dest;
+    fixed_t	frac;
+    fixed_t	fracstep;
+
+    count = dc_yh - dc_yl;
+    if (count < 0)
+	return;
+
+#ifdef RANGECHECK
+    if ((unsigned)dc_x >= SCREENWIDTH || dc_yl < 0 || dc_yh >= SCREENHEIGHT)
+	I_Error ("R_DrawTLColumn: %i to %i at %i", dc_yl, dc_yh, dc_x);
+#endif
+
+    dest = ylookup[dc_yl] + columnofs[dc_x];
+    fracstep = dc_iscale;
+    frac = dc_texturemid + (dc_yl-centery)*fracstep;
+
+    do
+    {
+	// foreground texel (already colormapped) over the current screen pixel via the tranmap
+	*dest = dc_tranmap[(*dest<<8) + dc_colormap[dc_source[(frac>>FRACBITS)&127]]];
+	dest += SCREENWIDTH;
+	frac += fracstep;
+    } while (count--);
+}
+
+
+//
 // R_DrawSkyColumn
 // Like R_DrawColumn but CLAMPS the texture row to [0,127] instead of wrapping
 // (&127).  The sky texture is 128 rows; at hi-res a tall sky span (a large open

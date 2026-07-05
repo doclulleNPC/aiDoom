@@ -45,6 +45,10 @@ column_t* R_GetMaskedColumn (int tex, int col);
 void R_InitData (void);
 void R_PrecacheLevel (void);
 
+// Boom 260 translucency filter map (main_tranmap[bg*256+fg] -> blended palette index).
+extern byte* main_tranmap;
+void R_InitTranMap (void);
+
 
 // Retrieval.
 // Floor/ceiling opaque texture tiles,

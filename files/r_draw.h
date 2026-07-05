@@ -51,6 +51,10 @@ void 	R_DrawColumnLow (void);
 void 	R_DrawFuzzColumn (void);
 void 	R_DrawFuzzColumnLow (void);
 
+// Boom 260 translucent 2S middle texture.
+void	R_DrawTLColumn (void);
+extern byte*	dc_tranmap;
+
 // Draw with color translation tables,
 //  for player sprite rendering,
 //  Green/Red/Blue/Indigo shirts.

@@ -225,7 +225,10 @@ typedef struct line_s
     int		validcount;
 
     // thinker_t for reversable actions
-    void*	specialdata;		
+    void*	specialdata;
+
+    // Boom 260: translucent 2S middle texture.  -1 = opaque, 0 = translucent (main_tranmap).
+    int		tranlump;
 } line_t;
 
 

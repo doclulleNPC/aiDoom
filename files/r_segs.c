@@ -160,7 +160,16 @@ R_RenderMaskedSegRange
 			
     if (fixedcolormap)
 	dc_colormap = fixedcolormap;
-    
+
+    // Boom 260: a linedef flagged translucent draws its middle texture through the tranmap.
+    if (curline->linedef->tranlump >= 0 && main_tranmap)
+    {
+	colfunc = R_DrawTLColumn;
+	dc_tranmap = main_tranmap;
+    }
+    else
+	colfunc = R_DrawColumn;
+
     // draw the columns
     for (dc_x = x1 ; dc_x <= x2 ; dc_x++)
     {

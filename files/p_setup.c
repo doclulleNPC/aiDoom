@@ -523,8 +523,27 @@ void P_LoadLineDefs (int lump)
 	    ld->backsector = sides[ld->sidenum[1]].sector;
 	else
 	    ld->backsector = 0;
+
+	ld->tranlump = -1;	// Boom 260: opaque unless a 260 special says otherwise (below)
     }
-	
+
+    // Boom 260 (killough 4/11/98): translucent 2S middle textures.  tag 0 -> just this linedef;
+    // tag N -> every linedef with that tag.  aiDoom uses the generated main_tranmap (tranlump 0).
+    {
+	line_t* ld = lines;
+	int i, j;
+	for (i = 0; i < numlines; i++, ld++)
+	    if (ld->special == 260)
+	    {
+		if (!ld->tag)
+		    ld->tranlump = 0;
+		else
+		    for (j = 0; j < numlines; j++)
+			if (lines[j].tag == ld->tag)
+			    lines[j].tranlump = 0;
+	    }
+    }
+
     Z_Free (data);
 }
 

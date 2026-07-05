@@ -774,6 +774,52 @@ void R_InitData (void)
     printf ("\nInitSprites");
     R_InitColormaps ();
     printf ("\nInitColormaps");
+    R_InitTranMap ();
+    printf ("\nInitTranMap");
+}
+
+
+// Boom 260 translucency map: main_tranmap[bg*256 + fg] = the palette index closest to blending
+// foreground colour fg (~66%) over background colour bg (~34%).  Loaded from a TRANMAP lump if the
+// WAD provides one, else generated once from PLAYPAL at startup.
+byte* main_tranmap = NULL;
+
+void R_InitTranMap (void)
+{
+    int lump = W_CheckNumForName ("TRANMAP");
+    byte* pal;
+    int bg, fg, c;
+    const int w1 = 168, w2 = 256 - 168;		// ~66% foreground
+
+    if (lump != -1)					// WAD-supplied filter map
+    {
+	main_tranmap = W_CacheLumpNum (lump, PU_STATIC);
+	return;
+    }
+
+    pal = W_CacheLumpName ("PLAYPAL", PU_STATIC);
+    main_tranmap = Z_Malloc (256*256, PU_STATIC, 0);
+
+    for (bg = 0; bg < 256; bg++)
+    {
+	int br = pal[bg*3+0], bgg = pal[bg*3+1], bb = pal[bg*3+2];
+	for (fg = 0; fg < 256; fg++)
+	{
+	    int tr = (pal[fg*3+0]*w1 + br *w2) >> 8;
+	    int tg = (pal[fg*3+1]*w1 + bgg*w2) >> 8;
+	    int tb = (pal[fg*3+2]*w1 + bb *w2) >> 8;
+	    int best = 0;
+	    long bestd = 1L<<30;
+	    for (c = 0; c < 256; c++)
+	    {
+		int dr = tr - pal[c*3+0], dg = tg - pal[c*3+1], db = tb - pal[c*3+2];
+		long d = (long)dr*dr + (long)dg*dg + (long)db*db;
+		if (d < bestd) { bestd = d; best = c; }
+	    }
+	    main_tranmap[bg*256 + fg] = (byte)best;
+	}
+    }
+    Z_ChangeTag (pal, PU_CACHE);
 }
 
 
