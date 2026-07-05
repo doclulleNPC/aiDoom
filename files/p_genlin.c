@@ -1412,6 +1412,7 @@ boolean P_DoGenLineSpecial (line_t* line, mobj_t* thing, int actclass)
 {
     unsigned special = (unsigned) line->special;
     int      trig    = special & TriggerType;
+    int      tclass  = trig >> 1;           // 0=walk, 1=switch, 2=gun, 3=push
     boolean  player  = thing && thing->player;
     int    (*func)(line_t*) = NULL;
 
@@ -1419,7 +1420,11 @@ boolean P_DoGenLineSpecial (line_t* line, mobj_t* thing, int actclass)
         return false;                       // not a generalized special
 
     // Activation class must match the trigger type: walk=WalkOnce/Many, switch=Switch*, gun=Gun*.
-    if ((trig >> 1) != actclass)
+    // Push (D1/DR) triggers activate on USE like a switch -- but as the line itself (manual, no
+    // remote switch texture): map them onto the switch/use class.
+    if (tclass == 3)
+        tclass = 1;
+    if (tclass != actclass)
         return false;                       // e.g. a switch special crossed by walking
 
     if      (special >= GenFloorBase)   func = EV_DoGenFloor;
@@ -1441,10 +1446,11 @@ boolean P_DoGenLineSpecial (line_t* line, mobj_t* thing, int actclass)
 
     if (func (line))
     {
-        // switch/use activation must toggle the switch texture + play the switch sound,
-        // else the player gets no feedback and it feels like "use does nothing" (Boom).
-        // useAgain = trig&1: Many (SR) toggles back after a delay, Once (S1) is permanent.
-        if (actclass == 1)
+        // A remote Switch (S1/SR) toggles the switch texture + plays the switch sound, else the
+        // player gets no feedback ("use does nothing").  A Push (D1/DR) trigger is the line itself
+        // (manual door/lift), so it must NOT change any switch texture -- its own effect sound plays.
+        // useAgain = trig&1: Many (SR/DR) toggles back after a delay, Once (S1/D1) is permanent.
+        if ((trig >> 1) == 1)               // real Switch trigger only (not Push)
             P_ChangeSwitchTexture (line, trig & 1);
         if (!(trig & 1))                    // an "Once" trigger -> consume the special
             line->special = 0;

@@ -90,15 +90,16 @@ void T_PlatRaise(plat_t* plat)
 		{
 		  case blazeDWUS:
 		  case downWaitUpStay:
-		    P_RemoveActivePlat(plat);
+		  case genLift:		// Boom generalized lift is momentary (down-wait-up-STAY):
+		    P_RemoveActivePlat(plat);	// remove at the top, else it cycles perpetually
 		    break;
-		    
+
 		  case raiseAndChange:
 		  case raiseToNearestAndChange:
 		    P_RemoveActivePlat(plat);
 		    break;
-		    
-		  default:
+
+		  default:		// genPerpetual falls through here -> keeps cycling (correct)
 		    break;
 		}
 	    }
