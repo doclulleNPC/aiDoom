@@ -527,17 +527,21 @@ void R_Subsector (int num)
     {
 	floorplane = R_FindPlane (frontsector->floorheight,
 				  frontsector->floorpic,
-				  frontsector->lightlevel);
+				  frontsector->lightlevel,
+				  frontsector->floor_xoffs,
+				  frontsector->floor_yoffs);
     }
     else
 	floorplane = NULL;
-    
-    if (frontsector->ceilingheight > viewz 
+
+    if (frontsector->ceilingheight > viewz
 	|| frontsector->ceilingpic == skyflatnum)
     {
 	ceilingplane = R_FindPlane (frontsector->ceilingheight,
 				    frontsector->ceilingpic,
-				    frontsector->lightlevel);
+				    frontsector->lightlevel,
+				    frontsector->ceiling_xoffs,
+				    frontsector->ceiling_yoffs);
     }
     else
 	ceilingplane = NULL;

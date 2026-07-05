@@ -433,6 +433,45 @@ R_GetColumn
 }
 
 
+//
+// R_GetMaskedColumn
+//
+// For a 2S middle texture, return a POSTED column_t* that R_DrawMaskedColumn can walk
+// (topdelta/length posts + 0xff terminator), or NULL if the texture can't be drawn masked.
+//
+// A single-patch texture whose patch doesn't span the full texture height gets forced through
+// the tutti-frutti composite path (R_GenerateLookup) -- but the composite is raw pixels with no
+// posts, so it can't be masked (that's why aiDoom skipped it, making transparent single-patch
+// signs like BOOMEDIT's "250TEXT" description shields vanish).  Here we read such a column
+// straight from its source patch instead, which is already posted (transparent below the patch).
+// (Assumes the patch's originy is 0 -- true for the sign textures; a nonzero originy would shift
+// the posts, but multi-patch composites are genuinely un-maskable and return NULL.)
+//
+column_t*
+R_GetMaskedColumn
+( int		tex,
+  int		col )
+{
+    texture_t*	t = textures[tex];
+
+    col &= texturewidthmask[tex];
+
+    if (texturecolumnlump[tex][col] > 0)		// ordinary direct single-patch column
+	return (column_t *)((byte *)R_GetColumn (tex, col) - 3);
+
+    if (t->patchcount == 1)				// tutti-frutti-composited single patch
+    {
+	texpatch_t*	tp = &t->patches[0];
+	patch_t*	rp = W_CacheLumpNum (tp->patch, PU_CACHE);
+	int		pc = col - tp->originx;
+	if (pc >= 0 && pc < SHORT(rp->width))
+	    return (column_t *)((byte *)rp + LONG(rp->columnofs[pc]));
+    }
+
+    return NULL;					// multi-patch composite: not maskable
+}
+
+
 
 
 //

@@ -166,14 +166,14 @@ R_RenderMaskedSegRange
     {
 	// calculate lighting
 	//
-	// A 2S middle texture must be single-patch (posted) so R_DrawMaskedColumn can
-	// walk its posts.  A multi-patch/composite texture -- or a Boom control-line
-	// texture that "defaulted to 0" -- returns raw pixels from R_GetColumn with no
-	// 0xff post terminator, so the walk runs off the block into unmapped memory
-	// (the boomedit.wad crash).  texturecolumnlump[texnum][col] <= 0 marks such a
-	// composite column: skip it (leave the wall gap) instead of crashing.
+	// A 2S middle texture must yield a POSTED column so R_DrawMaskedColumn can walk it.
+	// R_GetMaskedColumn returns one for a direct single-patch column OR for a single-patch
+	// texture that the tutti-frutti fix composited (read straight from its patch -- this is
+	// what makes BOOMEDIT's transparent "250TEXT" sign shields draw again).  It returns NULL
+	// for a genuine multi-patch composite (un-maskable -- raw pixels, no 0xff terminator ->
+	// the walk would run off the block: the old boomedit.wad crash); skip those.
 	if (maskedtexturecol[dc_x] != MAXSHORT
-	    && texturecolumnlump[texnum][maskedtexturecol[dc_x] & texturewidthmask[texnum]] > 0)
+	    && (col = R_GetMaskedColumn (texnum, maskedtexturecol[dc_x])) != NULL)
 	{
 	    if (!fixedcolormap)
 	    {
@@ -184,14 +184,11 @@ R_RenderMaskedSegRange
 
 		dc_colormap = walllights[index];
 	    }
-			
+
 	    sprtopscreen = (int64_t)centeryfrac - (int64_t)FixedMul(dc_texturemid, spryscale);
 	    dc_iscale = 0xffffffffu / (unsigned)spryscale;
-	    
+
 	    // draw the texture
-	    col = (column_t *)( 
-		(byte *)R_GetColumn(texnum,maskedtexturecol[dc_x]) -3);
-			
 	    R_DrawMaskedColumn (col);
 	    maskedtexturecol[dc_x] = MAXSHORT;
 	}

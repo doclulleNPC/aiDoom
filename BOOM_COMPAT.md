@@ -32,15 +32,17 @@ nodes). `../winmbf` is the original MBF (has the specials, not extended nodes).
   door/plat/floor/ceiling/stair/crusher builders. Boom maps' doors/lifts/floors.
 - [x] **B3. Generalized + extended sector types** -- DONE. — treat `sector->special` as bitfielded when
   `>= 32`: low bits = damage/light preset, plus SECRET/FRICTION/PUSHPULL bits; keep vanilla ≤17.
-- [~] **B4. Boom transfers & thinkers** -- scrollers + friction + pushers DONE; flat-scroll render + deep-water remain. — scrollers
-  (245–255, wall + carry), **friction (223)** and **wind/current/point-push-pull (224–226)** are done
-  (`p_boomsp.c`: `P_SpawnFriction`/`P_SpawnPushers`/`T_Pusher`; `p_map.c`: `P_GetFriction`/
-  `P_GetMoveFactor` hooked into `P_XYMovement` coast-down and `P_MovePlayer` thrust; `MT_PUSH`/
-  `MT_PULL` things + `S_TNT1` idle state added to `info.{h,c}`). aiDoom has no msecnode
-  touching-sector list, so friction uses the object's **centre sector** (accurate except straddling
-  two floors) and constant pushers scan `sector->thinglist`. **Remaining:** the visual flat-scroll
-  renderer hook (`floor_xoffs`/`ceiling_xoffs` are tracked but not drawn) and deep water (242
-  transfer-height) — both need renderer work (fake floor/ceiling).
+- [~] **B4. Boom transfers & thinkers** -- scrollers + friction + pushers + flat-scroll render DONE; only deep-water remains. — scrollers
+  (245–255, wall + carry), **friction (223)**, **wind/current/point-push-pull (224–226)** and the
+  **visual flat scroll (250/251/253)** are done. Friction/pushers: `p_boomsp.c`
+  (`P_SpawnFriction`/`P_SpawnPushers`/`T_Pusher`); `p_map.c` (`P_GetFriction`/`P_GetMoveFactor`
+  hooked into `P_XYMovement` coast-down and `P_MovePlayer` thrust); `MT_PUSH`/`MT_PULL` things +
+  `S_TNT1` idle state in `info.{h,c}`. aiDoom has no msecnode touching-sector list, so friction uses
+  the object's **centre sector** and constant pushers scan `sector->thinglist`. Flat scroll: the
+  `floor_xoffs`/`ceiling_xoffs` the scroll thinker accumulates are now carried on `visplane_t`
+  (`R_FindPlane` keys on them so differently-scrolled planes don't merge) and added to the span
+  texture coords in `R_MapPlane`. **Remaining:** deep water (242 transfer-height) — needs a fake
+  floor/ceiling renderer.
 - [x] **B5. ANIMATED / SWITCHES lumps** -- DONE. — load Boom's custom flat/texture animation + switch
   tables in `P_InitPicAnims` / the switch init, falling back to the vanilla table when absent.
   (Fix: `p_switch.c` needed `#include "w_wad.h"` — without it `W_CacheLumpName` was implicitly

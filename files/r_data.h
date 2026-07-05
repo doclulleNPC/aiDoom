@@ -38,6 +38,9 @@ R_GetColumn
   int		col );
 
 
+// 2S masked-midtexture column fetch: posted column_t*, or NULL if un-maskable.
+column_t* R_GetMaskedColumn (int tex, int col);
+
 // I/O, setting up the stuff.
 void R_InitData (void);
 void R_PrecacheLevel (void);

@@ -86,6 +86,8 @@ int			spanstop[MAXHEIGHT];
 //
 lighttable_t**		planezlight;
 fixed_t			planeheight;
+fixed_t			ds_planexoffs;	// Boom flat scroll: offset added in R_MapPlane
+fixed_t			ds_planeyoffs;
 
 fixed_t			yslope[MAXHEIGHT];
 fixed_t			distscale[MAXWIDTH];
@@ -159,8 +161,9 @@ R_MapPlane
 	
     length = FixedMul (distance,distscale[x1]);
     angle = (viewangle + xtoviewangle[x1])>>ANGLETOFINESHIFT;
-    ds_xfrac = viewx + FixedMul(finecosine[angle], length);
-    ds_yfrac = -viewy - FixedMul(finesine[angle], length);
+    // ds_planexoffs/yoffs carry the Boom flat-scroll offset of the current visplane (0 normally).
+    ds_xfrac = viewx + FixedMul(finecosine[angle], length) + ds_planexoffs;
+    ds_yfrac = -viewy - FixedMul(finesine[angle], length) + ds_planeyoffs;
 
     if (fixedcolormap)
 	ds_colormap = fixedcolormap;
@@ -231,21 +234,26 @@ visplane_t*
 R_FindPlane
 ( fixed_t	height,
   int		picnum,
-  int		lightlevel )
+  int		lightlevel,
+  fixed_t	xoffs,
+  fixed_t	yoffs )
 {
     visplane_t*	check;
-	
+
     if (picnum == skyflatnum)
     {
 	height = 0;			// all skys map together
 	lightlevel = 0;
+	xoffs = yoffs = 0;
     }
-	
+
     for (check=visplanes; check<lastvisplane; check++)
     {
 	if (height == check->height
 	    && picnum == check->picnum
-	    && lightlevel == check->lightlevel)
+	    && lightlevel == check->lightlevel
+	    && xoffs == check->xoffs		// Boom: differently-scrolled flats
+	    && yoffs == check->yoffs)		// must not merge into one visplane
 	{
 	    break;
 	}
@@ -263,11 +271,13 @@ R_FindPlane
     check->height = height;
     check->picnum = picnum;
     check->lightlevel = lightlevel;
+    check->xoffs = xoffs;
+    check->yoffs = yoffs;
     check->minx = SCREENWIDTH;
     check->maxx = -1;
-    
+
     memset (check->top,0xff,sizeof(check->top));
-		
+
     return check;
 }
 
@@ -326,7 +336,9 @@ R_CheckPlane
     lastvisplane->height = pl->height;
     lastvisplane->picnum = pl->picnum;
     lastvisplane->lightlevel = pl->lightlevel;
-    
+    lastvisplane->xoffs = pl->xoffs;
+    lastvisplane->yoffs = pl->yoffs;
+
     pl = lastvisplane++;
     pl->minx = start;
     pl->maxx = stop;
@@ -457,6 +469,8 @@ void R_DrawPlanes (void)
 				   PU_STATIC);
 	
 	planeheight = abs(pl->height-viewz);
+	ds_planexoffs = pl->xoffs;	// Boom flat scroll for this visplane
+	ds_planeyoffs = pl->yoffs;
 	light = (pl->lightlevel >> LIGHTSEGSHIFT)+extralight;
 
 	if (light >= LIGHTLEVELS)

@@ -477,7 +477,8 @@ typedef struct
   int			lightlevel;
   int			minx;
   int			maxx;
-  
+  fixed_t		xoffs, yoffs;	// Boom flat scroll (250/251/253) -- shifts the flat texture
+
   // leave pads for [minx-1]/[maxx+1]
 
   // These hold screen row numbers, so they must be wide enough for the
