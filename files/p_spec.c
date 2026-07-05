@@ -1296,6 +1296,7 @@ void P_SpawnSpecials (void)
 {
     sector_t*	sector;
     int		i;
+    int		s;
     int		episode;
 
     episode = 1;
@@ -1422,5 +1423,16 @@ void P_SpawnSpecials (void)
     P_SpawnScrollers ();   // Boom: floor/wall/ceiling scroll + carry thinkers
     P_SpawnFriction ();    // Boom: variable friction floors (223)
     P_SpawnPushers ();     // Boom: wind/current/point push-pull (224-226)
+
+    // Boom 242: transfer heights (deep water / fake floor+ceiling / glass floor).  Each 242 line's
+    // FRONT sector is the "control" whose floor/ceiling heights + flats are used to render the
+    // tagged sectors' fake planes (R_FakeFlat).  Purely visual -- collision uses the real heights.
+    for (i = 0; i < numlines; i++)
+	if (lines[i].special == 242)
+	{
+	    int control = lines[i].frontsector - sectors;
+	    for (s = -1; (s = P_FindSectorFromLineTag (&lines[i], s)) >= 0; )
+		sectors[s].heightsec = control;
+	}
 
 }

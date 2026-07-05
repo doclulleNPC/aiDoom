@@ -145,6 +145,7 @@ typedef	struct
     int		nextsec;	// -1 or next step sector
     int		friction;	// Boom variable friction (223): ORIG_FRICTION = normal
     int		movefactor;	// Boom: acceleration factor on this floor
+    int		heightsec;	// Boom 242 transfer-heights: control sector index, or -1
 } sector_t;
 
 

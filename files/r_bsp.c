@@ -262,6 +262,76 @@ void R_ClearClipSegs (void)
 }
 
 //
+// R_FakeFlat  (killough 3/7/98) -- Boom 242 transfer heights (deep water / fake floor+ceiling).
+//
+// If `sec` has a control sector (heightsec != -1), return a temp copy whose floor/ceiling heights,
+// flats and offsets are taken from the control sector, chosen by where the viewer is relative to the
+// water surface.  This is purely a rendering hack -- the real sector (collision) is untouched.  A
+// sector with no control sector is returned unchanged.  `back` is true when faking a backsector
+// (suppresses the head-below-floor swap so only the front subsector paints the surface).
+//
+sector_t* R_FakeFlat (sector_t* sec, sector_t* tempsec, boolean back)
+{
+    int		heightsec;
+    int		underwater;
+    const sector_t* s;
+
+    if (sec->heightsec == -1)
+	return sec;
+
+    s = &sectors[sec->heightsec];
+    heightsec = viewplayer->mo->subsector->sector->heightsec;
+    underwater = heightsec != -1 && viewz <= sectors[heightsec].floorheight;
+
+    *tempsec = *sec;			// copy, then hack the copy
+    tempsec->floorheight   = s->floorheight;
+    tempsec->ceilingheight = s->ceilingheight;
+
+    if (underwater && (tempsec->floorheight = sec->floorheight,
+		       tempsec->ceilingheight = s->floorheight - 1, !back))
+    {
+	// viewer's head is below the water surface
+	tempsec->floorpic    = s->floorpic;
+	tempsec->floor_xoffs = s->floor_xoffs;
+	tempsec->floor_yoffs = s->floor_yoffs;
+	if (s->ceilingpic == skyflatnum)
+	{
+	    tempsec->floorheight   = tempsec->ceilingheight + 1;
+	    tempsec->ceilingpic    = tempsec->floorpic;
+	    tempsec->ceiling_xoffs = tempsec->floor_xoffs;
+	    tempsec->ceiling_yoffs = tempsec->floor_yoffs;
+	}
+	else
+	{
+	    tempsec->ceilingpic    = s->ceilingpic;
+	    tempsec->ceiling_xoffs = s->ceiling_xoffs;
+	    tempsec->ceiling_yoffs = s->ceiling_yoffs;
+	}
+	tempsec->lightlevel = s->lightlevel;
+    }
+    else if (heightsec != -1 && viewz >= sectors[heightsec].ceilingheight &&
+	     sec->ceilingheight > s->ceilingheight)
+    {
+	// viewer is above a fake ceiling
+	tempsec->ceilingheight = s->ceilingheight;
+	tempsec->floorheight   = s->ceilingheight + 1;
+	tempsec->floorpic    = tempsec->ceilingpic    = s->ceilingpic;
+	tempsec->floor_xoffs = tempsec->ceiling_xoffs = s->ceiling_xoffs;
+	tempsec->floor_yoffs = tempsec->ceiling_yoffs = s->ceiling_yoffs;
+	if (s->floorpic != skyflatnum)
+	{
+	    tempsec->ceilingheight = sec->ceilingheight;
+	    tempsec->floorpic    = s->floorpic;
+	    tempsec->floor_xoffs = s->floor_xoffs;
+	    tempsec->floor_yoffs = s->floor_yoffs;
+	}
+	tempsec->lightlevel = s->lightlevel;
+    }
+    return tempsec;
+}
+
+
+//
 // R_AddLine
 // Clips the given segment
 // and adds any visible pieces to the line list.
@@ -274,7 +344,8 @@ void R_AddLine (seg_t*	line)
     angle_t		angle2;
     angle_t		span;
     angle_t		tspan;
-    
+    static sector_t	tempsec;	// Boom 242: faked backsector (deep water)
+
     curline = line;
 
     // OPTIMIZE: quickly reject orthogonal back sides.
@@ -331,12 +402,15 @@ void R_AddLine (seg_t*	line)
 
     // Single sided line?
     if (!backsector)
-	goto clipsolid;		
+	goto clipsolid;
+
+    // Boom 242: swap in the control sector's heights for deep water / fake ceiling rendering.
+    backsector = R_FakeFlat (backsector, &tempsec, true);
 
     // Closed door.
     if (backsector->ceilingheight <= frontsector->floorheight
 	|| backsector->floorheight >= frontsector->ceilingheight)
-	goto clipsolid;		
+	goto clipsolid;
 
     // Window.
     if (backsector->ceilingheight != frontsector->ceilingheight
@@ -509,7 +583,10 @@ void R_Subsector (int num)
     int			count;
     seg_t*		line;
     subsector_t*	sub;
-	
+    sector_t*		realsector;	// Boom 242: sprites use the real sector, not the faked one
+    static sector_t	tempsec;	// Boom 242: faked frontsector (deep water); persists through
+					// the seg loop below (R_AddLine reads the global frontsector)
+
 #ifdef RANGECHECK
     if (num>=numsubsectors)
 	I_Error ("R_Subsector: ss %i with numss = %i",
@@ -522,6 +599,10 @@ void R_Subsector (int num)
     frontsector = sub->sector;
     count = sub->numlines;
     line = &segs[sub->firstline];
+
+    // Boom 242: swap in the control sector's heights/flats for deep water / fake floor+ceiling.
+    realsector = frontsector;
+    frontsector = R_FakeFlat (frontsector, &tempsec, false);
 
     if (frontsector->floorheight < viewz)
     {
@@ -546,7 +627,7 @@ void R_Subsector (int num)
     else
 	ceilingplane = NULL;
 		
-    R_AddSprites (frontsector);	
+    R_AddSprites (realsector);	// sprites lit/placed by the real sector, not the faked copy
 
     while (count--)
     {

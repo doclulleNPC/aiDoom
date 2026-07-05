@@ -32,7 +32,7 @@ nodes). `../winmbf` is the original MBF (has the specials, not extended nodes).
   door/plat/floor/ceiling/stair/crusher builders. Boom maps' doors/lifts/floors.
 - [x] **B3. Generalized + extended sector types** -- DONE. — treat `sector->special` as bitfielded when
   `>= 32`: low bits = damage/light preset, plus SECRET/FRICTION/PUSHPULL bits; keep vanilla ≤17.
-- [~] **B4. Boom transfers & thinkers** -- scrollers + friction + pushers + flat-scroll render DONE; only deep-water remains. — scrollers
+- [x] **B4. Boom transfers & thinkers** -- DONE (scrollers, friction, pushers, flat-scroll render, and 242 transfer-heights). — scrollers
   (245–255, wall + carry), **friction (223)**, **wind/current/point-push-pull (224–226)** and the
   **visual flat scroll (250/251/253)** are done. Friction/pushers: `p_boomsp.c`
   (`P_SpawnFriction`/`P_SpawnPushers`/`T_Pusher`); `p_map.c` (`P_GetFriction`/`P_GetMoveFactor`
@@ -41,8 +41,11 @@ nodes). `../winmbf` is the original MBF (has the specials, not extended nodes).
   the object's **centre sector** and constant pushers scan `sector->thinglist`. Flat scroll: the
   `floor_xoffs`/`ceiling_xoffs` the scroll thinker accumulates are now carried on `visplane_t`
   (`R_FindPlane` keys on them so differently-scrolled planes don't merge) and added to the span
-  texture coords in `R_MapPlane`. **Remaining:** deep water (242 transfer-height) — needs a fake
-  floor/ceiling renderer.
+  texture coords in `R_MapPlane`. **Deep water / fake floor+ceiling / glass floor (242)** now works:
+  `sector_t.heightsec` points at the control sector (set in `P_SpawnSpecials`); `R_FakeFlat`
+  (`r_bsp.c`, ported from `../winmbf`) swaps in the control sector's heights/flats/offsets for
+  rendering, wired into `R_Subsector` (frontsector) and `R_AddLine` (backsector). Purely visual --
+  collision uses the real heights. Verified against BOOMEDIT (no more HOM; the fake flat renders).
 - [x] **B5. ANIMATED / SWITCHES lumps** -- DONE. — load Boom's custom flat/texture animation + switch
   tables in `P_InitPicAnims` / the switch init, falling back to the vanilla table when absent.
   (Fix: `p_switch.c` needed `#include "w_wad.h"` — without it `W_CacheLumpName` was implicitly

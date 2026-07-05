@@ -255,6 +255,7 @@ void P_LoadSectors (int lump)
 	ss->special = SHORT(ms->special);
 	ss->tag = SHORT(ms->tag);
 	ss->thinglist = NULL;
+	ss->heightsec = -1;	// Boom 242: no transfer-height control sector unless set below
     }
 	
     Z_Free (data);
