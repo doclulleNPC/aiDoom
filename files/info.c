@@ -1118,7 +1118,10 @@ state_t	states_builtin[NUMSTATES] = {
     {SPR_TLP2,32768,4,{NULL},S_TECH2LAMP2,0,0},	// S_TECH2LAMP
     {SPR_TLP2,32769,4,{NULL},S_TECH2LAMP3,0,0},	// S_TECH2LAMP2
     {SPR_TLP2,32770,4,{NULL},S_TECH2LAMP4,0,0},	// S_TECH2LAMP3
-    {SPR_TLP2,32771,4,{NULL},S_TECH2LAMP,0,0}	// S_TECH2LAMP4
+    {SPR_TLP2,32771,4,{NULL},S_TECH2LAMP,0,0},	// S_TECH2LAMP4
+    // Boom MT_PUSH/MT_PULL idle: SPR_TNT1 is invisible (no lumps), tics -1 = never advances, loops to
+    // itself so the point-source thing persists for the whole level (found via P_GetPushThing).
+    [S_TNT1] = {SPR_TNT1,0,-1,{NULL},S_TNT1,0,0}
 };
 
 
@@ -4684,6 +4687,32 @@ mobjinfo_t mobjinfo_builtin[NUMMOBJTYPES] = {
 	sfx_None,		// activesound
 	MF_NOBLOCKMAP,		// flags
 	S_NULL		// raisestate
+    },
+
+    // Boom push/pull point sources (phares).  Invisible, non-blocking, but kept in the sector
+    // thinglist (no MF_NOSECTOR) so P_GetPushThing can find them.  Designated indices skip past the
+    // runtime-patched Heretic/Hexen gap entries above.
+    [MT_PUSH] = {
+	5001,		// doomednum
+	S_TNT1,		// spawnstate
+	1000,		// spawnhealth
+	S_NULL, sfx_None, 8, sfx_None, S_NULL, 0, sfx_None,
+	S_NULL, S_NULL, S_NULL, S_NULL, sfx_None,
+	0,		// speed
+	8*FRACUNIT,	// radius
+	8*FRACUNIT,	// height
+	10,		// mass
+	0,		// damage
+	sfx_None,	// activesound
+	MF_NOBLOCKMAP,	// flags
+	S_NULL		// raisestate
+    },
+    [MT_PULL] = {
+	5002, S_TNT1, 1000,
+	S_NULL, sfx_None, 8, sfx_None, S_NULL, 0, sfx_None,
+	S_NULL, S_NULL, S_NULL, S_NULL, sfx_None,
+	0, 8*FRACUNIT, 8*FRACUNIT, 10, 0,
+	sfx_None, MF_NOBLOCKMAP, S_NULL
     }
 };
 

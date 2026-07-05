@@ -40,6 +40,7 @@ rcsid[] = "$Id: p_mobj.c,v 1.5 1997/02/03 22:45:12 b1 Exp $";
 #include "heretic.h"		// P_HereticThingType (heretic_mode map-thing resolution)
 
 #include "doomstat.h"
+#include "p_spec.h"
 
 
 void G_PlayerReborn (int player);
@@ -260,8 +261,11 @@ void P_XYMovement (mobj_t* mo)
     }
     else
     {
-	mo->momx = FixedMul (mo->momx, FRICTION);
-	mo->momy = FixedMul (mo->momy, FRICTION);
+	// Boom variable friction (phares 3/98): ice/mud floors change the coast-down rate.
+	// P_GetFriction returns the vanilla FRICTION (0xe800) off a friction sector.
+	fixed_t friction = P_GetFriction (mo, NULL);
+	mo->momx = FixedMul (mo->momx, friction);
+	mo->momy = FixedMul (mo->momy, friction);
     }
 }
 

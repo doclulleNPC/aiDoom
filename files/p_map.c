@@ -38,6 +38,7 @@ rcsid[] = "$Id: p_map.c,v 1.5 1997/02/03 22:45:11 b1 Exp $";
 
 // State.
 #include "doomstat.h"
+#include "p_spec.h"
 #include "r_state.h"
 // Data.
 #include "sounds.h"
@@ -111,6 +112,63 @@ boolean PIT_StompThing (mobj_t* thing)
     P_DamageMobj (thing, tmthing, tmthing, 10000);
 	
     return true;
+}
+
+
+// Boom variable-friction (phares 3/98).  Both default on; no menu toggle yet.
+int variable_friction = 1;
+int allow_pushers     = 1;
+
+//
+// P_GetFriction()  (killough 8/28/98)
+//
+// Returns the friction (and, via frictionfactor, the movefactor) for the floor mo rests on.
+// aiDoom has no msecnode touching-sector list, so we use the object's centre sector
+// (mo->subsector->sector) -- accurate except when straddling two differently-frictioned floors.
+//
+int P_GetFriction (const mobj_t *mo, int *frictionfactor)
+{
+    int friction = ORIG_FRICTION;
+    int movefactor = ORIG_FRICTION_FACTOR;
+    const sector_t *sec;
+
+    if (!(mo->flags & (MF_NOCLIP | MF_NOGRAVITY)) && variable_friction)
+    {
+	sec = mo->subsector->sector;
+	if ((sec->special & FRICTION_MASK) && mo->z <= sec->floorheight)
+	{
+	    friction = sec->friction;
+	    movefactor = sec->movefactor;
+	}
+    }
+    if (frictionfactor)
+	*frictionfactor = movefactor;
+    return friction;
+}
+
+//
+// P_GetMoveFactor()  (phares 3/19/98, killough 8/28/98)
+//
+// The value the player's x,y move is multiplied by.  On low-friction floors you start slowly and
+// speed up as you gain momentum (icy footing).
+//
+int P_GetMoveFactor (const mobj_t *mo, int *frictionp)
+{
+    int movefactor, friction;
+
+    if ((friction = P_GetFriction (mo, &movefactor)) < ORIG_FRICTION)
+    {
+	int momentum = P_AproxDistance (mo->momx, mo->momy);
+	if (momentum > MORE_FRICTION_MOMENTUM << 2)
+	    movefactor <<= 3;
+	else if (momentum > MORE_FRICTION_MOMENTUM << 1)
+	    movefactor <<= 2;
+	else if (momentum > MORE_FRICTION_MOMENTUM)
+	    movefactor <<= 1;
+    }
+    if (frictionp)
+	*frictionp = friction;
+    return movefactor;
 }
 
 

@@ -36,6 +36,7 @@ rcsid[] = "$Id: p_user.c,v 1.3 1997/01/28 22:08:29 b1 Exp $";
 #include "revmarine.h"		// P_ReviveMarineNear -- USE revives a dead marine into a friendly ally
 
 #include "doomstat.h"
+#include "p_spec.h"
 #include "s_sound.h"
 #include "sounds.h"
 
@@ -168,7 +169,8 @@ void P_CalcHeight (player_t* player)
 void P_MovePlayer (player_t* player)
 {
     ticcmd_t*		cmd;
-	
+    int			movefactor;
+
     cmd = &player->cmd;
 	
     player->mo->angle += (cmd->angleturn<<16);
@@ -199,11 +201,15 @@ void P_MovePlayer (player_t* player)
 	S_StartSound (player->mo, sfx_oof);
     }
 
+    // Boom variable friction (phares 3/98): on ice/mud the thrust is scaled by movefactor
+    // instead of the constant 2048 (harder to get going, easier to slide).
+    movefactor = P_GetMoveFactor (player->mo, NULL);
+
     if (cmd->forwardmove && onground)
-	P_Thrust (player, player->mo->angle, cmd->forwardmove*2048);
-    
+	P_Thrust (player, player->mo->angle, cmd->forwardmove*movefactor);
+
     if (cmd->sidemove && onground)
-	P_Thrust (player, player->mo->angle-ANG90, cmd->sidemove*2048);
+	P_Thrust (player, player->mo->angle-ANG90, cmd->sidemove*movefactor);
 
     if ( (cmd->forwardmove || cmd->sidemove) 
 	 && player->mo->state == &states[S_PLAY] )

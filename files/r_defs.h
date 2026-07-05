@@ -143,6 +143,8 @@ typedef	struct
     int		stairlock;	// -2 first locked, -1 after thinker done, 0 normal
     int		prevsec;	// -1 or previous step sector (gen stairs)
     int		nextsec;	// -1 or next step sector
+    int		friction;	// Boom variable friction (223): ORIG_FRICTION = normal
+    int		movefactor;	// Boom: acceleration factor on this floor
 } sector_t;
 
 

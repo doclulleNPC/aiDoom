@@ -1397,5 +1397,7 @@ void P_SpawnSpecials (void)
     //	P_InitSlidingDoorFrames();
 
     P_SpawnScrollers ();   // Boom: floor/wall/ceiling scroll + carry thinkers
+    P_SpawnFriction ();    // Boom: variable friction floors (223)
+    P_SpawnPushers ();     // Boom: wind/current/point push-pull (224-226)
 
 }

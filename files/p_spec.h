@@ -589,6 +589,34 @@ void T_Scroll (scroll_t*);
 void P_SpawnScrollers (void);
 
 
+// phares 3/12/98: Boom variable friction (linedef special 223) and push/pull (224-226).
+#define ORIG_FRICTION		0xE800	// original friction value (per-tic momentum multiplier)
+#define ORIG_FRICTION_FACTOR	2048	// original movefactor (thrust multiplier)
+#define MORE_FRICTION_MOMENTUM	15000	// low-momentum threshold for slow ice start-up
+#define PUSH_FACTOR		7
+
+typedef struct
+{
+    thinker_t	thinker;	// Thinker structure for pusher
+    enum { p_push, p_pull, p_wind, p_current } type;
+    mobj_t*	source;		// Point source if point pusher
+    int		x_mag;		// X Strength
+    int		y_mag;		// Y Strength
+    int		magnitude;	// Vector strength for point pusher
+    int		radius;		// Effective radius for point pusher
+    int		x, y;		// X,Y of point source if point pusher
+    int		affectee;	// Number of affected sector
+} pusher_t;
+
+void T_Pusher (pusher_t*);		// pusher thinker
+void P_SpawnFriction (void);		// friction init (223)
+void P_SpawnPushers (void);		// pusher init (224-226)
+int  P_GetFriction (const mobj_t *mo, int *frictionfactor);
+int  P_GetMoveFactor (const mobj_t *mo, int *frictionp);
+extern int variable_friction;		// enable/disable variable friction
+extern int allow_pushers;		// enable/disable pushers
+
+
 
 
 #define PLATWAIT		3

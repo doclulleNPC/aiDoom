@@ -32,9 +32,15 @@ nodes). `../winmbf` is the original MBF (has the specials, not extended nodes).
   door/plat/floor/ceiling/stair/crusher builders. Boom maps' doors/lifts/floors.
 - [x] **B3. Generalized + extended sector types** -- DONE. — treat `sector->special` as bitfielded when
   `>= 32`: low bits = damage/light preset, plus SECRET/FRICTION/PUSHPULL bits; keep vanilla ≤17.
-- [~] **B4. Boom transfers & thinkers** -- scrollers DONE (wall + carry); flat-scroll render, friction, pushers, deep-water remain. — deep water (242 transfer-height), friction (223), wind/
-  current/pusher (224–226), scrollers (245–255), and the associated `p_spec` thinkers. Renderer
-  hooks for transfer-height (fake floor/ceiling) are the hard part.
+- [~] **B4. Boom transfers & thinkers** -- scrollers + friction + pushers DONE; flat-scroll render + deep-water remain. — scrollers
+  (245–255, wall + carry), **friction (223)** and **wind/current/point-push-pull (224–226)** are done
+  (`p_boomsp.c`: `P_SpawnFriction`/`P_SpawnPushers`/`T_Pusher`; `p_map.c`: `P_GetFriction`/
+  `P_GetMoveFactor` hooked into `P_XYMovement` coast-down and `P_MovePlayer` thrust; `MT_PUSH`/
+  `MT_PULL` things + `S_TNT1` idle state added to `info.{h,c}`). aiDoom has no msecnode
+  touching-sector list, so friction uses the object's **centre sector** (accurate except straddling
+  two floors) and constant pushers scan `sector->thinglist`. **Remaining:** the visual flat-scroll
+  renderer hook (`floor_xoffs`/`ceiling_xoffs` are tracked but not drawn) and deep water (242
+  transfer-height) — both need renderer work (fake floor/ceiling).
 - [x] **B5. ANIMATED / SWITCHES lumps** -- DONE. — load Boom's custom flat/texture animation + switch
   tables in `P_InitPicAnims` / the switch init, falling back to the vanilla table when absent.
   (Fix: `p_switch.c` needed `#include "w_wad.h"` — without it `W_CacheLumpName` was implicitly

@@ -1415,6 +1415,8 @@ typedef enum
     S_CHIC_ATK1, S_CHIC_ATK2,
     S_CHIC_PAIN1, S_CHIC_PAIN2,
     S_CHIC_DIE1, S_CHIC_DIE2, S_CHIC_DIE3, S_CHIC_DIE4, S_CHIC_DIE5,
+    // Boom push/pull point-source (MT_PUSH/MT_PULL) idle state: invisible + persistent.
+    S_TNT1,
     NUMSTATES
 } statenum_t;
 
@@ -1650,6 +1652,8 @@ typedef enum {
     MT_HARTI_EGG,	// Morph Ovum pickup
     MT_HEGGFX,		// Morph Ovum egg projectile (morphs on impact)
     MT_CHICKEN,		// (M) generic morph creature -- the Heretic chicken (files/p_morph.c)
+    MT_PUSH,		// Boom point-source pusher thing (DoomEd 5001) -- wind/current away
+    MT_PULL,		// Boom point-source puller thing (DoomEd 5002) -- toward
     NUMMOBJTYPES
 
 } mobjtype_t;
