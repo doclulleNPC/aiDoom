@@ -124,17 +124,19 @@ void R_InitPlanes (void)
 //
 // BASIC PRIMITIVE
 //
+extern fixed_t	viewsin, viewcos;	// set in R_SetupFrame
+extern int	centerx;
+
 void
 R_MapPlane
 ( int		y,
   int		x1,
   int		x2 )
 {
-    angle_t	angle;
     fixed_t	distance;
-    fixed_t	length;
     unsigned	index;
-	
+    int		dx, dy;
+
 #ifdef RANGECHECK
     if (x2 < x1
 	|| x1<0
@@ -145,12 +147,21 @@ R_MapPlane
     }
 #endif
 
+    // crispy/prboom+ linear flat mapping (world-locked even in Hor+ widescreen).  The vanilla
+    // xtoviewangle/distscale form sheared floors/ceilings toward the wide screen edges (the flat
+    // "wandered" with the view angle); this derives the world coord from the pixel offset off the
+    // TRUE view centre (dx = x1 - centerx) instead, so it stays fixed to the world.
+    if (centery == y)
+	return;				// horizon row: infinite distance
+
+    dy = (abs(centery - y) << FRACBITS) + (y < centery ? -FRACUNIT : FRACUNIT) / 2;
+
     if (planeheight != cachedheight[y])
     {
 	cachedheight[y] = planeheight;
 	distance = cacheddistance[y] = FixedMul (planeheight, yslope[y]);
-	ds_xstep = cachedxstep[y] = FixedMul (distance,basexscale);
-	ds_ystep = cachedystep[y] = FixedMul (distance,baseyscale);
+	ds_xstep = cachedxstep[y] = FixedDiv (FixedMul (viewsin, planeheight), dy) << detailshift;
+	ds_ystep = cachedystep[y] = FixedDiv (FixedMul (viewcos, planeheight), dy) << detailshift;
     }
     else
     {
@@ -158,12 +169,11 @@ R_MapPlane
 	ds_xstep = cachedxstep[y];
 	ds_ystep = cachedystep[y];
     }
-	
-    length = FixedMul (distance,distscale[x1]);
-    angle = (viewangle + xtoviewangle[x1])>>ANGLETOFINESHIFT;
+
+    dx = x1 - centerx;
     // ds_planexoffs/yoffs carry the Boom flat-scroll offset of the current visplane (0 normally).
-    ds_xfrac = viewx + FixedMul(finecosine[angle], length) + ds_planexoffs;
-    ds_yfrac = -viewy - FixedMul(finesine[angle], length) + ds_planeyoffs;
+    ds_xfrac =  viewx + FixedMul (viewcos, distance) + dx * ds_xstep + ds_planexoffs;
+    ds_yfrac = -viewy - FixedMul (viewsin, distance) + dx * ds_ystep + ds_planeyoffs;
 
     if (fixedcolormap)
 	ds_colormap = fixedcolormap;
@@ -217,11 +227,9 @@ void R_ClearPlanes (void)
     // left to right mapping
     angle = (viewangle-ANG90)>>ANGLETOFINESHIFT;
 
-    // The flat span step is scaled by the WIDE centre (centerxfrac), exactly as crispy-doom does.
-    // yslope already uses the non-wide half-width, and the two together make the flat world-locked
-    // in Hor+ widescreen.  Using centerxfrac_nonwide here (an earlier attempt to stop a seam) left
-    // the step too large in 16:9, so the floor/ceiling texture slid with the view angle instead of
-    // staying fixed.  In 16:10 centerxfrac == centerxfrac_nonwide, so 4:3/16:10 are unchanged.
+    // NOTE: basexscale/baseyscale are legacy -- the vanilla angle-table flat mapping they fed was
+    // replaced by the crispy/prboom+ linear mapping in R_MapPlane (which sheared in widescreen).
+    // Kept only so the globals stay defined; R_MapPlane no longer reads them.
     basexscale = FixedDiv (finecosine[angle],centerxfrac);
     baseyscale = -FixedDiv (finesine[angle],centerxfrac);
 }
