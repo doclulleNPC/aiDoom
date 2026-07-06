@@ -36,6 +36,7 @@ right flags and auto-starts the native `director` sidecar when an AI mode is cho
 | `gpumon` / `gpumon.exe` | Linux / Windows | GPU monitor as a small **SDL window** (bars for load / memory / temp / power). **Auto-detects the tool**: `nvidia-smi` (NVIDIA) or `macmon` (Apple Silicon). On error it stops and shows a **Reconnect** button (no auto-retry). Build: Linux `tools/build_gpumon.sh`; Windows via CMake or `build_all_win.bat`. See **`../GPUMON.md`**. |
 | `aidoom_config` / `aidoom_config.exe` | Linux / Windows | SDL3 settings editor; reads/writes `aidoom.cfg` here. Build: Linux `tools/build_config.sh`; Windows via CMake or `build_all_win.bat`. |
 | `launcher` / `launcher.exe` | Linux / Windows | SDL3 **launcher GUI**: scans this folder (+ `~/.doom`) for IWADs, lets you pick the IWAD and the Buddy (off / `-coop` / `-aicoop`) and Monster (vanilla / L4D / `-aidirector`) modes, then launches the game with the right flags (auto-starting the native `director` sidecar when AI monsters are picked). Build: Linux `tools/build_launcher.sh`; Windows via CMake or `build_all_win.bat`. |
+| `extractor` / `extractor.exe` | Linux / Windows | SDL3 **asset-extractor GUI**: scans `ID0/` + this folder for `heretic.wad` / `hexen.wad` / `freedoom2.wad`, shows them in a **dropdown** with an **Extract** button, and builds the palette-converted, renamed monster PWADs into `ID0/` (`hereticstuff.wad` / `hexenstuff.wad` / `freedoomstuff.wad`). Replaces the `extract_heretic_monsters.py` / `extract_hexen.py` / `extract_freedoom2.py` scripts (byte-identical output). Also has a headless `extractor --cli [outdir]` batch mode. Build: Linux `tools/build_extractor.sh`; Windows via CMake or `build_all_win.bat`. |
 | `aidoom.cfg` | all | The single config file (game keys/video + Ollama), read by the game and all tools from this folder. |
 
 (The source `aidoom.ico` lives one level up, in the repo root.)
@@ -60,8 +61,8 @@ right flags and auto-starts the native `director` sidecar when an AI mode is cho
     copies the `aidoom` binary into `run/`. (SDL3 is linked from the system, so
     there's no library to copy alongside it.)
   - Windows (MSVC + the SDL3 SDK): run **`..\build_all_win.bat`** — it builds
-    `aidoom.exe` **and** the tools (config, gpumon, launcher, director) and copies
-    them + `SDL3.dll` into `run/`.
+    `aidoom.exe` **and** the tools (config, gpumon, launcher, director, extractor)
+    and copies them + `SDL3.dll` into `run/`.
     Equivalently with CMake (finds a sibling `../SDL3` SDK automatically, also
     stages everything into `run/`): `cmake -B build && cmake --build build`.
     (The legacy `tools/build_*_win.sh` are MinGW cross-builds needing a MinGW SDL3

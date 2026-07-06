@@ -1,6 +1,7 @@
 # Makefile.msvc -- build aiDoom's SDL3 tools with Visual Studio 2019 (MSVC).
 #   aidoom_config.exe  (settings editor)   gpumon.exe (GPU monitor)
 #   launcher.exe       (IWAD / mode picker GUI)
+#   extractor.exe      (Heretic/Hexen/FreeDoom2 asset extractor GUI)
 #
 # Usage (x86 Native Tools Command Prompt for VS 2019), in tools\:
 #     nmake /f Makefile.msvc
@@ -18,7 +19,7 @@ CFLAGS = /nologo /O2 /MD /W3 /I. /I"$(SDL)\include" /DSDL_MAIN_HANDLED \
 LIBS = "$(SDL)\lib\x86\SDL3.lib"
 LDFLAGS = /link /SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup
 
-all: aidoom_config.exe gpumon.exe launcher.exe director.exe
+all: aidoom_config.exe gpumon.exe launcher.exe director.exe extractor.exe
 
 aidoom_config.res: aidoom_config.rc ..\aidoom.ico
 	rc /nologo /fo aidoom_config.res aidoom_config.rc
@@ -53,5 +54,13 @@ director.exe: director.c director.res font_atlas.h ..\files\aidoom_icon.h
 	@if not exist ..\run mkdir ..\run
 	@copy /Y director.exe ..\run\director.exe >nul
 
+extractor.res: extractor.rc ..\aidoom.ico
+	rc /nologo /fo extractor.res extractor.rc
+
+extractor.exe: extractor.c extractor.res font_atlas.h ..\files\aidoom_icon.h
+	$(CC) $(CFLAGS) /Fe:extractor.exe extractor.c extractor.res $(LDFLAGS) $(LIBS)
+	@if not exist ..\run mkdir ..\run
+	@copy /Y extractor.exe ..\run\extractor.exe >nul
+
 clean:
-	-del *.obj *.res aidoom_config.exe gpumon.exe gpumon_sdl.exe launcher.exe director.exe 2>nul
+	-del *.obj *.res aidoom_config.exe gpumon.exe gpumon_sdl.exe launcher.exe director.exe extractor.exe 2>nul

@@ -4,6 +4,7 @@ REM build_all_win.bat -- build EVERYTHING on Windows (MSVC + SDL3):
 REM   files\aidoom.exe   +   tools\aidoom_config.exe   +   tools\gpumon.exe
 REM   +   tools\director.exe
 REM   +   tools\launcher.exe
+REM   +   tools\extractor.exe
 REM All outputs are copied into run\.  Self-contained: finds VS 2019 via vswhere
 REM and sets up the x86 build environment automatically.
 REM
@@ -27,7 +28,7 @@ REM that were compiled against the old header -> a binary of MIXED objects and
 REM phantom boot crashes.  build.sh does the same (it just recompiles every .c).
 nmake /nologo /f Makefile.msvc clean >nul
 nmake /nologo /f Makefile.msvc %* || exit /b 1
-echo [build] === tools (config + gpumon + launcher + director) ===
+echo [build] === tools (config + gpumon + launcher + director + extractor) ===
 cd /d "%ROOT%tools"
 REM clean first so every tool is (re)built by MSVC -- guards against a stale
 REM foreign-toolchain exe (e.g. a MinGW x64 launcher.exe) with a newer timestamp
@@ -44,8 +45,9 @@ copy /Y "%ROOT%tools\aidoom_config.exe" "%ROOT%run\aidoom_config.exe" >nul || ex
 copy /Y "%ROOT%tools\gpumon.exe"      "%ROOT%run\gpumon.exe"      >nul || exit /b 1
 copy /Y "%ROOT%tools\launcher.exe"    "%ROOT%run\launcher.exe"    >nul || exit /b 1
 copy /Y "%ROOT%tools\director.exe"    "%ROOT%run\director.exe"    >nul || exit /b 1
+copy /Y "%ROOT%tools\extractor.exe"   "%ROOT%run\extractor.exe"   >nul || exit /b 1
 if exist "%ROOT%files\SDL3.dll" copy /Y "%ROOT%files\SDL3.dll" "%ROOT%run\SDL3.dll" >nul
 
 echo.
-echo [build] OK -- aidoom.exe + aidoom_config.exe + gpumon.exe + launcher.exe + director.exe built and copied to run\.
+echo [build] OK -- aidoom.exe + aidoom_config.exe + gpumon.exe + launcher.exe + director.exe + extractor.exe built and copied to run\.
 endlocal

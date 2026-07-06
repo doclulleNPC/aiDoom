@@ -1,9 +1,11 @@
 # CMakeLists.txt -- unified cross-platform build for aiDoom (SDL3).
 #
-# Builds three targets and stages them into run/ :
+# Builds these targets and stages them into run/ :
 #   aidoom          - the game (console subsystem; keeps stdout for AI director logs)
 #   aidoom_config   - SDL3 settings editor (GUI)
 #   gpumon_sdl      - SDL3 GPU monitor (GUI)
+#   launcher        - SDL3 IWAD / mode picker (GUI)
+#   extractor       - SDL3 Heretic/Hexen/FreeDoom2 asset extractor (GUI)
 #
 # SDL3 is found via find_package; by default it looks for a sibling ../SDL3 SDK
 # (next to this repo) and then system locations.  Override with CMAKE_PREFIX_PATH.
@@ -72,7 +74,7 @@ endif()
 # -------------------------------------------------------------------
 # tools -- aidoom_config + gpumon_sdl + launcher (SDL3 GUI apps that own main())
 # -------------------------------------------------------------------
-foreach(tool aidoom_config gpumon_sdl launcher)
+foreach(tool aidoom_config gpumon_sdl launcher extractor)
     add_executable(${tool} ${CMAKE_SOURCE_DIR}/tools/${tool}.c)
     target_include_directories(${tool} PRIVATE ${CMAKE_SOURCE_DIR}/tools)
     aidoom_common(${tool})
@@ -94,4 +96,5 @@ if(WIN32)
     target_sources(gpumon_sdl    PRIVATE ${CMAKE_SOURCE_DIR}/tools/gpumon.rc)
     target_sources(aidoom_config PRIVATE ${CMAKE_SOURCE_DIR}/tools/aidoom_config.rc)
     target_sources(launcher     PRIVATE ${CMAKE_SOURCE_DIR}/tools/launcher.rc)
+    target_sources(extractor    PRIVATE ${CMAKE_SOURCE_DIR}/tools/extractor.rc)
 endif()
