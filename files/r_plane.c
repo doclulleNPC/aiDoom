@@ -430,13 +430,13 @@ void R_DrawPlanes (void)
 	// sky flat
 	if (pl->picnum == skyflatnum)
 	{
-	    // Map sky texture rows 0..100 over screen-top..horizon from the ACTUAL
-	    // view height (centery), not pspriteiscale (which is tied to the width /
-	    // hires and mismatches when the view height isn't 200*hires).  This keeps
-	    // frac >= 0 at the top (no row-0 clamp -> no vertical streaks) and the
-	    // visible range within the 128-row sky above the horizon (no tiling); the
-	    // clamp in R_DrawSkyColumn only catches the rare below-horizon rows.
-	    dc_iscale = (centery > 0 ? (100*FRACUNIT / centery) : pspriteiscale) >> detailshift;
+	    // Map sky texture rows 0..100 over screen-top..horizon.  Use the UNPITCHED half-view
+	    // height (viewheight/2), NOT the freelook-adjusted centery: the drawer already places the
+	    // horizon at centery via (y - centery), so the scale must stay fixed -- keying it on the
+	    // pitched centery stretched the sky when looking up/down (centery grows -> iscale shrinks).
+	    { int basecy = viewheight/2;
+	      dc_iscale = (basecy > 0 ? (100*FRACUNIT / basecy) : pspriteiscale) >> detailshift;
+	      dc_iscale = (dc_iscale * 5) / 8; }
 
 	    // Sky is allways drawn full bright,
 	    //  i.e. colormaps[0] is used.

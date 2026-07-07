@@ -152,30 +152,40 @@ void P_SpawnScrollers(void)
           register int s;
 
         case 250:   // scroll effect ceiling
-          for (s=-1; (s = P_FindSectorFromLineTag(l,s)) >= 0;)
-            Add_Scroller(sc_ceiling, -dx, dy, control, s, accel);
+          if (l->tag)
+            for (s=-1; (s = P_FindSectorFromLineTag(l,s)) >= 0;)
+              Add_Scroller(sc_ceiling, -dx, dy, control, s, accel);
           break;
 
         case 251:   // scroll effect floor
         case 253:   // scroll and carry objects on floor
-          for (s=-1; (s = P_FindSectorFromLineTag(l,s)) >= 0;)
-            Add_Scroller(sc_floor, -dx, dy, control, s, accel);
+          if (l->tag)
+            for (s=-1; (s = P_FindSectorFromLineTag(l,s)) >= 0;)
+              Add_Scroller(sc_floor, -dx, dy, control, s, accel);
           if (special != 253)
             break;
 
         case 252: // carry objects on floor
           dx = FixedMul(dx,CARRYFACTOR);
           dy = FixedMul(dy,CARRYFACTOR);
-          for (s=-1; (s = P_FindSectorFromLineTag(l,s)) >= 0;)
-            Add_Scroller(sc_carry, dx, dy, control, s, accel);
+          if (l->tag)
+            for (s=-1; (s = P_FindSectorFromLineTag(l,s)) >= 0;)
+              Add_Scroller(sc_carry, dx, dy, control, s, accel);
           break;
 
           // killough 3/1/98: scroll wall according to linedef
           // (same direction and speed as scrolling floors)
         case 254:
-          for (s=-1; (s = P_FindLineFromLineTag(l,s)) >= 0;)
-            if (s != i)
-              Add_WallScroller(dx, dy, lines+s, control, accel);
+          if (l->tag)
+            {
+              for (s=-1; (s = P_FindLineFromLineTag(l,s)) >= 0;)
+                if (s != i)
+                  Add_WallScroller(dx, dy, lines+s, control, accel);
+            }
+          else
+            {
+              Add_WallScroller(dx, dy, l, control, accel);
+            }
           break;
 
         case 255:    // killough 3/2/98: scroll according to sidedef offsets
