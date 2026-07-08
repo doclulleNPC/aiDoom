@@ -35,7 +35,7 @@ echo "[build] compiling aidoom.exe (MinGW) ..."
     -Wno-incompatible-pointer-types \
     -DSDL_MAIN_HANDLED -DWIN32 -I"$SDL3/include" \
     *.c aidoom_res.o \
-    -L"$SDL3/lib" -lSDL3 -lws2_32 -lm -mconsole \
+    -L"$SDL3/lib" -lSDL3 -lws2_32 -lm -ldbghelp -mconsole \
     -static-libgcc \
     -o aidoom.exe )
 

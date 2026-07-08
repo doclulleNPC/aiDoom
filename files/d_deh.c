@@ -37,9 +37,9 @@ rcsid[] = "$Id: d_deh.c,v 1.20 1998/06/01 22:30:38 thldrmn Exp $";
 #include <ctype.h>
 #define stricmp  strcasecmp
 #define strnicmp strncasecmp
-#ifndef _MSC_VER   // MSVC's CRT already provides strlwr
-static char *strlwr(char *s){ char *p=s; for(;*p;p++) *p=(char)tolower((unsigned char)*p); return s; }
-#endif
+// Own lowercase helper (named deh_strlwr, not strlwr, so it never clashes with a CRT strlwr --
+// MSVC and MinGW both declare a non-static strlwr in <string.h>).
+static char *deh_strlwr(char *s){ char *p=s; for(;*p;p++) *p=(char)tolower((unsigned char)*p); return s; }
 #include "z_zone.h"
 #ifndef TRUE
 #define TRUE 1
@@ -1348,7 +1348,7 @@ void deh_procPars(DEHFILE *fpin, FILE* fpout, char *line) // extension
   while (!dehfeof(fpin) && *inbuffer && (*inbuffer != ' '))
     {
       if (!dehfgets(inbuffer, sizeof(inbuffer), fpin)) break;
-      lfstrip(strlwr(inbuffer)); // lowercase it
+      lfstrip(deh_strlwr(inbuffer)); // lowercase it
       if (!*inbuffer) break;      // killough 11/98
       if (3 != sscanf(inbuffer,"par %i %i %i",&episode, &level, &partime))
         { // not 3
