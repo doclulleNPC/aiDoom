@@ -54,13 +54,17 @@ int	mb_used = 48;	// zone heap; bumped for the larger screen-wipe buffer at 2560
 
 int I_strncasecmp(char *str1, char *str2, int len)
 {
-	char c1, c2;
-
-	while ( *str1 && *str2 && len-- ) {
-		c1 = *str1++;
-		c2 = *str2++;
-		if ( toupper(c1) != toupper(c2) )
+	// Compare exactly `len` bytes (or until both end at the same NUL).  The old loop
+	// `while (*str1 && *str2 && len--)` stopped at the FIRST NUL in EITHER string and then
+	// returned "equal", so a 7-char name like "242TEXT" wrongly matched the 8-char "242TEXTA"
+	// (it is a prefix) -- and whichever came first in TEXTURE1 won.  8-byte WAD names must
+	// compare all 8 bytes, treating the NUL pad as a real character.
+	while ( len-- ) {
+		char c1 = *str1++, c2 = *str2++;
+		if ( toupper((unsigned char)c1) != toupper((unsigned char)c2) )
 			return(1);
+		if ( !c1 )		// both equal and NUL -> the names ended together
+			return(0);
 	}
 	return(0);
 }
