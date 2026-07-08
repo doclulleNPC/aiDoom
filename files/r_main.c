@@ -725,6 +725,11 @@ void R_ExecuteSetViewSize (void)
 	}
     }
 
+    // Force high detail.  The vanilla "low detail" blocky mode (half horizontal resolution, each
+    // column doubled via R_DrawColumnLow) is pointless on the hi-res renderer and was never adapted
+    // to it -- at hi-res widescreen the doubled scale over-projected walls off the framebuffer and
+    // segfaulted (no RANGECHECK in release).  Ignore the setting; keep the flag consistent.
+    setdetail = 0;
     detailshift = setdetail;
     viewwidth = scaledviewwidth>>detailshift;
     viewwidth_nonwide = scaledviewwidth_nonwide>>detailshift;
