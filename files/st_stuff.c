@@ -1069,12 +1069,13 @@ void ST_drawWidgets(boolean refresh)
 	STlib_updateNum(&w_maxammo[i], refresh);
     }
 
-    // Colour the health number by value (>75 green, >25 yellow, else red).
+    // Colour the health + armor numbers by value like MBF (<25 red, <50 gold, <=100 green, else blue).
     extern const byte* st_num_xlat;
     st_num_xlat = V_HealthTrans (plyr->health);
     STlib_updatePercent(&w_health, refresh);
-    st_num_xlat = NULL;				// other numbers stay default-coloured
+    st_num_xlat = V_HealthTrans (plyr->armorpoints);
     STlib_updatePercent(&w_armor, refresh);
+    st_num_xlat = NULL;				// ammo / frags stay the default red font
 
     STlib_updateBinIcon(&w_armsbg, refresh);
 

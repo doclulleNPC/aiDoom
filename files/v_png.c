@@ -67,7 +67,7 @@ static byte VP_Nearest (int r, int g, int b)
 // so any source colour (the gray HUD font OR the red status-bar numbers) becomes
 // the target hue at the same brightness.
 
-static byte	vp_xlat_grn[256], vp_xlat_yel[256], vp_xlat_red[256];
+static byte	vp_xlat_grn[256], vp_xlat_yel[256], vp_xlat_red[256], vp_xlat_blu[256];
 static boolean	vp_xlat_ready;
 
 static void VP_BuildHealthXlats (void)
@@ -81,19 +81,21 @@ static void VP_BuildHealthXlats (void)
 	// A lighter green (mix some white in) instead of dark fully-saturated pure
 	// green, so the healthy-HP readout (buddy + player) reads as a normal green.
 	vp_xlat_grn[i] = VP_Nearest (L/2, L, L/2);
-	vp_xlat_yel[i] = VP_Nearest (L, L, 0);
+	vp_xlat_yel[i] = VP_Nearest (L, L*13/16, 0);	// gold (MBF cr_gold), not pure yellow
 	vp_xlat_red[i] = VP_Nearest (L, 0, 0);
+	vp_xlat_blu[i] = VP_Nearest (L/2, L/2, L);	// >max readout (mega health/armor)
     }
     vp_xlat_ready = true;
 }
 
-// Translation table for a health value: >75 green, >25 yellow, else red.
+// MBF/Boom status-bar colour for a health/armor value: <25 red, <50 gold, <=100 green, else blue.
 const byte* V_HealthTrans (int hp)
 {
     if (!vp_xlat_ready) VP_BuildHealthXlats ();
-    if (hp > 75) return vp_xlat_grn;
-    if (hp > 25) return vp_xlat_yel;
-    return vp_xlat_red;
+    if (hp <  25) return vp_xlat_red;
+    if (hp <  50) return vp_xlat_yel;
+    if (hp <= 100) return vp_xlat_grn;
+    return vp_xlat_blu;
 }
 
 // ---- RGBA -> patch_t --------------------------------------------------------
