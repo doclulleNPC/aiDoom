@@ -1039,6 +1039,18 @@ P_ShootSpecialLine
 	EV_DoPlat(line,raiseToNearestAndChange,0);
 	P_ChangeSwitchTexture(line,0);
 	break;
+
+      case 197:
+	// Boom: G1 Exit Level (gunshot)
+	G_ExitLevel ();
+	P_ChangeSwitchTexture(line,0);
+	break;
+
+      case 198:
+	// Boom: G1 Secret Exit Level (gunshot)
+	G_SecretExitLevel ();
+	P_ChangeSwitchTexture(line,0);
+	break;
     }
 }
 
