@@ -50,6 +50,7 @@ void 	R_DrawColumnLow (void);
 // The Spectre/Invisibility effect.
 void 	R_DrawFuzzColumn (void);
 void 	R_DrawFuzzColumnLow (void);
+void 	R_DrawShadowColumn (void);
 
 // Boom 260 translucent 2S middle texture.
 void	R_DrawTLColumn (void);

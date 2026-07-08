@@ -46,6 +46,7 @@ extern int*		mfloorclip;
 extern int*		mceilingclip;
 extern fixed_t		spryscale;
 extern int64_t		sprtopscreen;
+extern int		r_shadows;
 
 extern fixed_t		pspritescale;
 extern fixed_t		pspriteiscale;

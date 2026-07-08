@@ -425,6 +425,7 @@ typedef struct vissprite_s
    
     int			mobjflags;
     
+    fixed_t     floorz;
 } vissprite_t;
 
 

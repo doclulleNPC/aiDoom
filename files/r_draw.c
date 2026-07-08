@@ -389,6 +389,27 @@ int	fuzzoffset[FUZZTABLE] =
 int	fuzzpos = 0; 
 
 
+void R_DrawShadowColumn (void)
+{
+    int		count;
+    byte*	dest;
+    byte*   colormap;
+
+    count = dc_yh - dc_yl + 1;
+    if (count <= 0)
+	return;
+
+    dest = ylookup[dc_yl] + columnofs[dc_x];
+    colormap = colormaps + 16 * 256; 
+
+    do
+    {
+	*dest = colormap[*dest];
+	dest += SCREENWIDTH;
+    } while (--count);
+}
+
+
 //
 // Framebuffer postprocessing.
 // Creates a fuzzy image by copying pixels

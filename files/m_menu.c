@@ -67,6 +67,8 @@ extern boolean		message_dontfuckwithme;
 
 extern boolean		chat_on;		// in heads-up code
 
+void M_SpriteShadow(int choice);
+
 //
 // defaulted values
 //
@@ -400,6 +402,7 @@ enum
     vid_backend,    // GPU Backend
     vid_statusbar,  // Status bar style
     vid_dither,     // Light dithering
+    vid_shadow,     // Sprite shadows
     vid_end
 } video_e;
 
@@ -413,7 +416,8 @@ menuitem_t VideoMenu[]=
     {2,"",	M_VideoScale,'s'},	// Letterbox vs Integer
     {2,"",	M_VideoBackend,'b'},	// GPU Backend
     {2,"",	M_StatusBarStyle,'h'},	// Vanilla / Small / Alt HUD
-    {2,"",	M_LightDither,'d'}	// soften light banding
+    {2,"",	M_LightDither,'d'},	// soften light banding
+    {1,"",	M_SpriteShadow,'o'}	// soft sprite shadows
 };
 
 menu_t  VideoDef =
@@ -422,7 +426,7 @@ menu_t  VideoDef =
     &OptionsDef,
     VideoMenu,
     M_DrawVideo,
-    60,45,                  // Y offset changed from 55 to 45 to fit 7 items
+    60,37,
     0
 };
 
@@ -1049,6 +1053,7 @@ static char* M_BackendNames[7] = { "Auto", "Vulkan", "OpenGL", "D3D12", "D3D11",
 extern int statusbar_style;
 static char* M_StatusBarNames[3] = { "Vanilla", "Small (50%)", "Alt HUD" };
 extern int dither_lighting;
+extern int r_shadows;
 
 void M_DrawVideo(void)
 {
@@ -1091,12 +1096,22 @@ void M_DrawVideo(void)
     M_WriteText(VideoDef.x, VideoDef.y + LINEHEIGHT*vid_dither, "Light Dither");
     M_WriteText(VideoDef.x + 130, VideoDef.y + LINEHEIGHT*vid_dither,
 		dither_lighting ? "On" : "Off");
+
+    M_WriteText(VideoDef.x, VideoDef.y + LINEHEIGHT*vid_shadow, "Sprite Shadows");
+    M_WriteText(VideoDef.x + 130, VideoDef.y + LINEHEIGHT*vid_shadow,
+		r_shadows ? "On" : "Off");
 }
 
 void M_LightDither(int choice)
 {
     dither_lighting = !dither_lighting;
     R_SetViewSize (screenblocks, detailLevel);	// recompute r_dither_on
+    M_SaveDefaults ();
+}
+
+void M_SpriteShadow(int choice)
+{
+    r_shadows = !r_shadows;
     M_SaveDefaults ();
 }
 

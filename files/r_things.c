@@ -362,6 +362,7 @@ int*		mceilingclip;
 
 fixed_t		spryscale;
 int64_t		sprtopscreen;
+int		r_shadows = 1;
 
 void R_DrawMaskedColumn (column_t* column)
 {
@@ -421,6 +422,41 @@ R_DrawVisSprite
 	
 	
     patch = W_CacheLumpNum (spritelumps[vis->patch], PU_CACHE);
+
+    if (r_shadows && !fixedcolormap)
+    {
+	if (!(vis->mobjflags & (MF_NOSECTOR | MF_MISSILE | MF_NOCLIP | MF_SHADOW)))
+	{
+	    if (vis->mobjflags & (MF_SHOOTABLE | MF_SPECIAL | MF_SOLID))
+	    {
+		fixed_t saved_spryscale = spryscale;
+		int64_t saved_sprtopscreen = sprtopscreen;
+		fixed_t saved_dc_iscale = dc_iscale;
+		fixed_t saved_dc_texturemid = dc_texturemid;
+		void (*saved_colfunc)(void) = colfunc;
+
+		spryscale = vis->scale / 10;
+		if (spryscale < 1) spryscale = 1;
+		sprtopscreen = (int64_t)centeryfrac - (int64_t)FixedMul(vis->floorz - viewz, vis->scale);
+		colfunc = R_DrawShadowColumn;
+
+		frac = vis->startfrac;
+		for (dc_x=vis->x1 ; dc_x<=vis->x2 ; dc_x++, frac += vis->xiscale)
+		{
+		    texturecolumn = frac>>FRACBITS;
+		    column = (column_t *) ((byte *)patch +
+					   LONG(patch->columnofs[texturecolumn]));
+		    R_DrawMaskedColumn (column);
+		}
+
+		spryscale = saved_spryscale;
+		sprtopscreen = saved_sprtopscreen;
+		dc_iscale = saved_dc_iscale;
+		dc_texturemid = saved_dc_texturemid;
+		colfunc = saved_colfunc;
+	    }
+	}
+    }
 
     dc_colormap = vis->colormap;
     
@@ -574,6 +610,7 @@ void R_ProjectSprite (mobj_t* thing)
     // store information in a vissprite
     vis = R_NewVisSprite ();
     vis->mobjflags = thing->flags;
+    vis->floorz = thing->floorz;
     vis->scale = xscale<<detailshift;
     vis->gx = thing->x;
     vis->gy = thing->y;
