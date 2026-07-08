@@ -1435,4 +1435,18 @@ void P_SpawnSpecials (void)
 		sectors[s].heightsec = control;
 	}
 
+    // Boom 213 / 261: transfer the control line's FRONT sector light level to the tagged sectors'
+    // floor (213) or ceiling (261), independent of the sector's own brightness -- gives fake floor
+    // shadows / lit ceilings.
+    for (i = 0; i < numlines; i++)
+	if (lines[i].special == 213 || lines[i].special == 261)
+	{
+	    int control = lines[i].frontsector - sectors;
+	    for (s = -1; (s = P_FindSectorFromLineTag (&lines[i], s)) >= 0; )
+		if (lines[i].special == 213)
+		    sectors[s].floorlightsec = control;
+		else
+		    sectors[s].ceilinglightsec = control;
+	}
+
 }

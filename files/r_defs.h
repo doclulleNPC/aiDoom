@@ -146,6 +146,8 @@ typedef	struct
     int		friction;	// Boom variable friction (223): ORIG_FRICTION = normal
     int		movefactor;	// Boom: acceleration factor on this floor
     int		heightsec;	// Boom 242 transfer-heights: control sector index, or -1
+    int		floorlightsec;	// Boom 213: floor lit by this control sector's light, or -1
+    int		ceilinglightsec;// Boom 261: ceiling lit by this control sector's light, or -1
 } sector_t;
 
 

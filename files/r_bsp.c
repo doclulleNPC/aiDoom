@@ -583,6 +583,8 @@ void R_Subsector (int num)
     int			count;
     seg_t*		line;
     subsector_t*	sub;
+    int			floorlightlevel;	// Boom 213/261 light transfer
+    int			ceilinglightlevel;
     sector_t*		realsector;	// Boom 242: sprites use the real sector, not the faked one
     static sector_t	tempsec;	// Boom 242: faked frontsector (deep water); persists through
 					// the seg loop below (R_AddLine reads the global frontsector)
@@ -604,11 +606,16 @@ void R_Subsector (int num)
     realsector = frontsector;
     frontsector = R_FakeFlat (frontsector, &tempsec, false);
 
+    // Boom 213/261: the floor/ceiling can be lit by a different sector's brightness (fake shadows).
+    { int fl = realsector->floorlightsec, cl = realsector->ceilinglightsec;
+      floorlightlevel   = (fl == -1) ? frontsector->lightlevel : sectors[fl].lightlevel;
+      ceilinglightlevel = (cl == -1) ? frontsector->lightlevel : sectors[cl].lightlevel; }
+
     if (frontsector->floorheight < viewz)
     {
 	floorplane = R_FindPlane (frontsector->floorheight,
 				  frontsector->floorpic,
-				  frontsector->lightlevel,
+				  floorlightlevel,
 				  frontsector->floor_xoffs,
 				  frontsector->floor_yoffs);
     }
@@ -620,7 +627,7 @@ void R_Subsector (int num)
     {
 	ceilingplane = R_FindPlane (frontsector->ceilingheight,
 				    frontsector->ceilingpic,
-				    frontsector->lightlevel,
+				    ceilinglightlevel,
 				    frontsector->ceiling_xoffs,
 				    frontsector->ceiling_yoffs);
     }
