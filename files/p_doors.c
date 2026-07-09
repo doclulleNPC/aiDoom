@@ -73,21 +73,30 @@ void T_VerticalDoor (vldoor_t* door)
 	    switch(door->type)
 	    {
 	      case blazeRaise:
+	      case genBlazeRaise:
 		door->direction = -1; // time to go back down
 		S_StartSound((mobj_t *)&door->sector->soundorg,
 			     sfx_bdcls);
 		break;
 		
 	      case normal:
+	      case genRaise:
 		door->direction = -1; // time to go back down
 		S_StartSound((mobj_t *)&door->sector->soundorg,
 			     sfx_dorcls);
 		break;
 		
 	      case close30ThenOpen:
+	      case genCdO:
 		door->direction = 1;
 		S_StartSound((mobj_t *)&door->sector->soundorg,
 			     sfx_doropn);
+		break;
+
+	      case genBlazeCdO:
+		door->direction = 1;
+		S_StartSound((mobj_t *)&door->sector->soundorg,
+			     sfx_bdopn);
 		break;
 		
 	      default:
@@ -127,6 +136,8 @@ void T_VerticalDoor (vldoor_t* door)
 	    {
 	      case blazeRaise:
 	      case blazeClose:
+	      case genBlazeRaise:
+	      case genBlazeClose:
 		door->sector->specialdata = NULL;
 		door->sector->ceilingdata = NULL;  // Boom
 		P_RemoveThinker (&door->thinker);  // unlink and free
@@ -136,6 +147,8 @@ void T_VerticalDoor (vldoor_t* door)
 		
 	      case normal:
 	      case close:
+	      case genRaise:
+	      case genClose:
 		door->sector->specialdata = NULL;
 		door->sector->ceilingdata = NULL;  // Boom
 		P_RemoveThinker (&door->thinker);  // unlink and free
@@ -144,6 +157,12 @@ void T_VerticalDoor (vldoor_t* door)
 	      case close30ThenOpen:
 		door->direction = 0;
 		door->topcountdown = 35*30;
+		break;
+
+	      case genCdO:
+	      case genBlazeCdO:
+		door->direction = 0;
+		door->topcountdown = door->topwait;
 		break;
 		
 	      default:
@@ -155,7 +174,9 @@ void T_VerticalDoor (vldoor_t* door)
 	    switch(door->type)
 	    {
 	      case blazeClose:
-	      case close:		// DO NOT GO BACK UP!
+	      case close:
+	      case genClose:
+	      case genBlazeClose:		// DO NOT GO BACK UP!
 		break;
 		
 	      default:
@@ -180,6 +201,8 @@ void T_VerticalDoor (vldoor_t* door)
 	    {
 	      case blazeRaise:
 	      case normal:
+	      case genRaise:
+	      case genBlazeRaise:
 		door->direction = 0; // wait at top
 		door->topcountdown = door->topwait;
 		break;
@@ -187,6 +210,10 @@ void T_VerticalDoor (vldoor_t* door)
 	      case close30ThenOpen:
 	      case blazeOpen:
 	      case open:
+	      case genBlazeOpen:
+	      case genOpen:
+	      case genCdO:
+	      case genBlazeCdO:
 		door->sector->specialdata = NULL;
 		door->sector->ceilingdata = NULL;  // Boom
 		P_RemoveThinker (&door->thinker);  // unlink and free
