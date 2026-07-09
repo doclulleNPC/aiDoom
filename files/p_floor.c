@@ -230,6 +230,14 @@ void T_MoveFloor(floormove_t* floor)
 	      case donutRaise:
 		floor->sector->special = floor->newspecial;
 		floor->sector->floorpic = floor->texture;
+		break;
+	      case genFloorChgT:
+	      case genFloorChg0:
+		floor->sector->special = floor->newspecial;
+		floor->sector->oldspecial = floor->oldspecial;
+	      case genFloorChg:
+		floor->sector->floorpic = floor->texture;
+		break;
 	      default:
 		break;
 	    }
@@ -240,7 +248,16 @@ void T_MoveFloor(floormove_t* floor)
 	    {
 	      case lowerAndChange:
 		floor->sector->special = floor->newspecial;
+		floor->sector->oldspecial = floor->oldspecial;
 		floor->sector->floorpic = floor->texture;
+		break;
+	      case genFloorChgT:
+	      case genFloorChg0:
+		floor->sector->special = floor->newspecial;
+		floor->sector->oldspecial = floor->oldspecial;
+	      case genFloorChg:
+		floor->sector->floorpic = floor->texture;
+		break;
 	      default:
 		break;
 	    }

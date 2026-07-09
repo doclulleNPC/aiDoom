@@ -70,6 +70,7 @@ void T_MoveCeiling (ceiling_t* ceiling)
 	    switch(ceiling->type)
 	    {
 	      case silentCrushAndRaise:
+	      case genSilentCrusher:
 		break;
 	      default:
 		S_StartSound((mobj_t *)&ceiling->sector->soundorg,
@@ -84,12 +85,24 @@ void T_MoveCeiling (ceiling_t* ceiling)
 	    switch(ceiling->type)
 	    {
 	      case raiseToHighest:
+	      case genCeiling:
 		P_RemoveActiveCeiling(ceiling);
 		break;
 		
+	      case genCeilingChgT:
+	      case genCeilingChg0:
+		ceiling->sector->special = ceiling->newspecial;
+		ceiling->sector->oldspecial = ceiling->oldspecial;
+	      case genCeilingChg:
+		ceiling->sector->ceilingpic = ceiling->texture;
+		P_RemoveActiveCeiling(ceiling);
+		break;
+
 	      case silentCrushAndRaise:
 		S_StartSound((mobj_t *)&ceiling->sector->soundorg,
 			     sfx_pstop);
+	      case genSilentCrusher:
+	      case genCrusher:
 	      case fastCrushAndRaise:
 	      case crushAndRaise:
 		ceiling->direction = -1;
@@ -113,7 +126,9 @@ void T_MoveCeiling (ceiling_t* ceiling)
 	{
 	    switch(ceiling->type)
 	    {
-	      case silentCrushAndRaise: break;
+	      case silentCrushAndRaise:
+	      case genSilentCrusher:
+		break;
 	      default:
 		S_StartSound((mobj_t *)&ceiling->sector->soundorg,
 			     sfx_stnmov);
@@ -124,6 +139,13 @@ void T_MoveCeiling (ceiling_t* ceiling)
 	{
 	    switch(ceiling->type)
 	    {
+	      case genSilentCrusher:
+	      case genCrusher:
+		if (ceiling->oldspeed < CEILSPEED*3)
+		    ceiling->speed = ceiling->oldspeed;
+		ceiling->direction = 1;
+		break;
+
 	      case silentCrushAndRaise:
 		S_StartSound((mobj_t *)&ceiling->sector->soundorg,
 			     sfx_pstop);
@@ -133,8 +155,18 @@ void T_MoveCeiling (ceiling_t* ceiling)
 		ceiling->direction = 1;
 		break;
 
+	      case genCeilingChgT:
+	      case genCeilingChg0:
+		ceiling->sector->special = ceiling->newspecial;
+		ceiling->sector->oldspecial = ceiling->oldspecial;
+	      case genCeilingChg:
+		ceiling->sector->ceilingpic = ceiling->texture;
+		P_RemoveActiveCeiling(ceiling);
+		break;
+
 	      case lowerAndCrush:
 	      case lowerToFloor:
+	      case genCeiling:
 		P_RemoveActiveCeiling(ceiling);
 		break;
 
@@ -148,6 +180,12 @@ void T_MoveCeiling (ceiling_t* ceiling)
 	    {
 		switch(ceiling->type)
 		{
+		  case genCrusher:
+		  case genSilentCrusher:
+		    if (ceiling->oldspeed < CEILSPEED*3)
+			ceiling->speed = CEILSPEED / 8;
+		    break;
+
 		  case silentCrushAndRaise:
 		  case crushAndRaise:
 		  case lowerAndCrush:
