@@ -35,10 +35,12 @@
 #include <dirent.h>	// not shipped by MSVC; unused here (we probe known names)
 #endif
 #include <sys/stat.h>
-#ifdef _MSC_VER
+#ifdef _WIN32
 #include <windows.h>	// CreateProcess -- launch the game non-blocking + windowless
 #include <io.h>
 #include <process.h>
+#endif
+#ifdef _MSC_VER
 #define access _access
 #ifndef F_OK
 #define F_OK 0
