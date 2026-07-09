@@ -1461,4 +1461,12 @@ void P_SpawnSpecials (void)
 		    sectors[s].ceilinglightsec = control;
 	}
 
+    // Boom 271 / 272: sky transfer from sidedef.
+    for (i = 0; i < numlines; i++)
+	if (lines[i].special == 271 || lines[i].special == 272)
+	{
+	    for (s = -1; (s = P_FindSectorFromLineTag (&lines[i], s)) >= 0; )
+		sectors[s].sky = i | PL_SKYFLAT;
+	}
+
 }

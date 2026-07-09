@@ -41,6 +41,7 @@ rcsid[] = "$Id: p_genlin.c,v 1.18 1998/05/23 10:23:23 jim Exp $";
 #include "m_random.h"
 #include "s_sound.h"
 #include "sounds.h"
+#include "dstrings.h"		// PD_* "you need a key" prompts (generalized locked doors)
 
 // forward decls for the Boom helpers appended at the bottom of this file
 int P_SectorActive (special_e, sector_t*);
@@ -1402,6 +1403,111 @@ fixed_t P_FindShortestUpperAround(int secnum)
   return minsize;
 }
 
+//
+// P_CanUnlockGenDoor()  (jff 02/05/98, ported from Boom P_SPEC.C)
+//
+// Tests whether the player holds the key(s) required by a generalized locked
+// door (0x3800-0x3BFF).  The LockedKey field selects which key/skull, and the
+// LockedNKeys bit selects "card OR skull of that color counts" (0) vs. the exact
+// item, and for AllKeys "all six" (0) vs. "all three colors" (1).  On failure it
+// sets the player's message + plays the oof sound and returns false.
+// The linedef MUST be a generalized locked-door type or results are undefined.
+//
+boolean P_CanUnlockGenDoor ( line_t* line, player_t* player )
+{
+  // does this line special distinguish between skulls and cards?
+  int skulliscard = (line->special & LockedNKeys) >> LockedNKeysShift;
+
+  switch ((line->special & LockedKey) >> LockedKeyShift)
+  {
+    case AnyKey:
+      if (!player->cards[it_redcard]    && !player->cards[it_redskull]  &&
+          !player->cards[it_bluecard]   && !player->cards[it_blueskull] &&
+          !player->cards[it_yellowcard] && !player->cards[it_yellowskull])
+      {
+        player->message = PD_ANY;
+        S_StartSound(player->mo, sfx_oof);
+        return false;
+      }
+      break;
+    case RCard:
+      if (!player->cards[it_redcard] &&
+          (!skulliscard || !player->cards[it_redskull]))
+      {
+        player->message = skulliscard ? PD_REDK : PD_REDC;
+        S_StartSound(player->mo, sfx_oof);
+        return false;
+      }
+      break;
+    case BCard:
+      if (!player->cards[it_bluecard] &&
+          (!skulliscard || !player->cards[it_blueskull]))
+      {
+        player->message = skulliscard ? PD_BLUEK : PD_BLUEC;
+        S_StartSound(player->mo, sfx_oof);
+        return false;
+      }
+      break;
+    case YCard:
+      if (!player->cards[it_yellowcard] &&
+          (!skulliscard || !player->cards[it_yellowskull]))
+      {
+        player->message = skulliscard ? PD_YELLOWK : PD_YELLOWC;
+        S_StartSound(player->mo, sfx_oof);
+        return false;
+      }
+      break;
+    case RSkull:
+      if (!player->cards[it_redskull] &&
+          (!skulliscard || !player->cards[it_redcard]))
+      {
+        player->message = skulliscard ? PD_REDK : PD_REDS;
+        S_StartSound(player->mo, sfx_oof);
+        return false;
+      }
+      break;
+    case BSkull:
+      if (!player->cards[it_blueskull] &&
+          (!skulliscard || !player->cards[it_bluecard]))
+      {
+        player->message = skulliscard ? PD_BLUEK : PD_BLUES;
+        S_StartSound(player->mo, sfx_oof);
+        return false;
+      }
+      break;
+    case YSkull:
+      if (!player->cards[it_yellowskull] &&
+          (!skulliscard || !player->cards[it_yellowcard]))
+      {
+        player->message = skulliscard ? PD_YELLOWK : PD_YELLOWS;
+        S_StartSound(player->mo, sfx_oof);
+        return false;
+      }
+      break;
+    case AllKeys:
+      if (!skulliscard &&
+          (!player->cards[it_redcard]    || !player->cards[it_redskull]  ||
+           !player->cards[it_bluecard]   || !player->cards[it_blueskull] ||
+           !player->cards[it_yellowcard] || !player->cards[it_yellowskull]))
+      {
+        player->message = PD_ALL6;
+        S_StartSound(player->mo, sfx_oof);
+        return false;
+      }
+      if (skulliscard &&
+          ((!player->cards[it_redcard]    && !player->cards[it_redskull])  ||
+           (!player->cards[it_bluecard]   && !player->cards[it_blueskull]) ||
+           (!player->cards[it_yellowcard] && !player->cards[it_yellowskull])))
+      {
+        player->message = PD_ALL3;
+        S_StartSound(player->mo, sfx_oof);
+        return false;
+      }
+      break;
+  }
+  return true;
+}
+
 // ---------------------------------------------------------------------------
 // Compact generalized-special dispatcher (activation-class based; mirrors the winmbf
 // P_CrossSpecialLine/P_UseSpecialLine/P_ShootSpecialLine dispatch without the tangled
@@ -1443,6 +1549,13 @@ boolean P_DoGenLineSpecial (line_t* line, mobj_t* thing, int actclass)
         if (special >= GenLiftBase && special < GenStairsBase && !(special & LiftMonster)) return true;
         if (special >= GenStairsBase && special < GenLiftBase && !(special & StairMonster)) return true;
     }
+
+    // Generalized locked doors (0x3800-0x3BFF): require the right key(s).  On failure
+    // P_CanUnlockGenDoor has already given the player the "you need a key" message + oof;
+    // return true so the caller treats the line as handled (no vanilla fallthrough).
+    if (special >= GenLockedBase && special < GenDoorBase &&
+        !P_CanUnlockGenDoor(line, thing->player))
+        return true;
 
     if (func (line))
     {

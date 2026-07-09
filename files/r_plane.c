@@ -250,7 +250,7 @@ R_FindPlane
 {
     visplane_t*	check;
 
-    if (picnum == skyflatnum)
+    if (picnum == skyflatnum || (picnum & PL_SKYFLAT))
     {
 	height = 0;			// all skys map together
 	lightlevel = 0;
@@ -428,8 +428,40 @@ void R_DrawPlanes (void)
 
 	
 	// sky flat
-	if (pl->picnum == skyflatnum)
+	if (pl->picnum == skyflatnum || (pl->picnum & PL_SKYFLAT))
 	{
+	    int texture;
+	    angle_t an, flip;
+
+	    if (pl->picnum & PL_SKYFLAT)
+	    {
+		// Sky Linedef
+		const line_t *l = &lines[pl->picnum & ~PL_SKYFLAT];
+
+		// Sky transferred from first sidedef
+		const side_t *s = *l->sidenum + sides;
+
+		// Texture comes from upper texture of reference sidedef
+		texture = texturetranslation[s->toptexture];
+
+		// Horizontal offset is turned into an angle offset,
+		// to allow sky rotation as well as careful positioning.
+		an = viewangle + s->textureoffset;
+
+		// Vertical offset allows careful sky positioning.
+		dc_texturemid = s->rowoffset - 28*FRACUNIT;
+
+		// We sometimes flip the picture horizontally.
+		flip = l->special == 272 ? 0u : ~0u;
+	    }
+	    else
+	    {
+		dc_texturemid = skytexturemid;
+		texture = skytexture;
+		an = viewangle;
+		flip = 0;
+	    }
+
 	    // Map sky texture rows 0..100 over screen-top..horizon.  Use the UNPITCHED half-view
 	    // height (viewheight/2), NOT the freelook-adjusted centery: the drawer already places the
 	    // horizon at centery via (y - centery), so the scale must stay fixed -- keying it on the
@@ -438,12 +470,15 @@ void R_DrawPlanes (void)
 	      dc_iscale = (basecy > 0 ? (100*FRACUNIT / basecy) : pspriteiscale) >> detailshift;
 	      dc_iscale = (dc_iscale * 5) / 8; }
 
+	    // Set the height of the current sky texture for column clamping.
+	    { extern int dc_skyheight;
+	      dc_skyheight = textureheight[texture] >> FRACBITS; }
+
 	    // Sky is allways drawn full bright,
 	    //  i.e. colormaps[0] is used.
 	    // Because of this hack, sky is not affected
 	    //  by INVUL inverse mapping.
 	    dc_colormap = colormaps;
-	    dc_texturemid = skytexturemid;
 	    for (x=pl->minx ; x <= pl->maxx ; x++)
 	    {
 		dc_yl = pl->top[x];
@@ -451,12 +486,9 @@ void R_DrawPlanes (void)
 
 		if (dc_yl <= dc_yh)
 		{
-		    angle = (viewangle + xtoviewangle[x])>>ANGLETOSKYSHIFT;
+		    angle_t col_angle = ((an + xtoviewangle[x]) ^ flip) >> ANGLETOSKYSHIFT;
 		    dc_x = x;
-		    dc_source = R_GetColumn(skytexture, angle);
-		    // Sky-specific column: CLAMP the texture row instead of the &127
-		    // wrap R_DrawColumn does -- at hi-res a tall sky span (big open
-		    // area) exceeds the 128-row sky and would tile vertically.
+		    dc_source = R_GetColumn(texture, col_angle);
 		    R_DrawSkyColumn ();
 		}
 	    }
@@ -467,7 +499,7 @@ void R_DrawPlanes (void)
 	// other Boom flat features can leave pl->picnum outside the flat range -> the
 	// flattranslation[pl->picnum] read goes OOB and feeds a garbage lump to W_CacheLumpNum.
 	{ extern int numflats;
-	  if (pl->picnum < 0 || pl->picnum >= numflats)
+	  if ((pl->picnum < 0 || pl->picnum >= numflats) && !(pl->picnum & PL_SKYFLAT))
 	  {
 	      static int warned; if (!warned) { warned=1; fprintf(stderr,"R_DrawPlanes: skipping visplane with out-of-range flat %d (numflats=%d) -- malformed PWAD?\n", pl->picnum, numflats); }
 	      continue;	// skip rather than feed a garbage lump to W_CacheLumpNum

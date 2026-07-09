@@ -45,6 +45,8 @@
 
 
 
+#define PL_SKYFLAT		(0x80000000)
+
 // Silhouette, needed for clipping Segs (mainly)
 // and sprites representing things.
 #define SIL_NONE		0
@@ -148,6 +150,7 @@ typedef	struct
     int		heightsec;	// Boom 242 transfer-heights: control sector index, or -1
     int		floorlightsec;	// Boom 213: floor lit by this control sector's light, or -1
     int		ceilinglightsec;// Boom 261: ceiling lit by this control sector's light, or -1
+    int		sky;		// Boom 271/272 sky transfer: control line index | PL_SKYFLAT
 } sector_t;
 
 

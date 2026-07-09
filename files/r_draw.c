@@ -128,6 +128,7 @@ int			dc_yl;
 int			dc_yh; 
 fixed_t			dc_iscale; 
 fixed_t			dc_texturemid;
+int			dc_skyheight = 128;
 
 // first pixel in a column (possibly virtual) 
 byte*			dc_source;		
@@ -252,8 +253,8 @@ void R_DrawSkyColumn (void)
     do
     {
 	row = frac>>FRACBITS;
-	if (row < 0)        row = 0;
-	else if (row > 127) row = 127;
+	if (row < 0)                  row = 0;
+	else if (row >= dc_skyheight) row = dc_skyheight - 1;
 	*dest = dc_colormap[dc_source[row]];
 	dest += SCREENWIDTH;
 	frac += fracstep;

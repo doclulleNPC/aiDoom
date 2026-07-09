@@ -1000,6 +1000,7 @@ int EV_DoGenStairs   (line_t* line);
 int EV_DoGenCrusher  (line_t* line);
 int EV_DoGenDoor     (line_t* line);
 int EV_DoGenLockedDoor (line_t* line);
+boolean P_CanUnlockGenDoor (line_t* line, player_t* player);
 boolean P_DoGenLineSpecial (line_t* line, mobj_t* thing, int actclass);
 
 #endif

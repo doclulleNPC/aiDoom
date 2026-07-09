@@ -129,6 +129,17 @@
 #define PD_REDK	"You need a red key to open this door"
 #define PD_YELLOWK	"You need a yellow key to open this door"
 
+// Boom generalized locked doors (0x3800-0x3BFF): finer-grained key prompts.
+#define PD_BLUEC	"You need a blue card to open this door"
+#define PD_REDC		"You need a red card to open this door"
+#define PD_YELLOWC	"You need a yellow card to open this door"
+#define PD_BLUES	"You need a blue skull to open this door"
+#define PD_REDS		"You need a red skull to open this door"
+#define PD_YELLOWS	"You need a yellow skull to open this door"
+#define PD_ANY		"Any key will open this door"
+#define PD_ALL3		"You need all three keys to open this door"
+#define PD_ALL6		"You need all six keys to open this door"
+
 //
 //	G_game.C
 //

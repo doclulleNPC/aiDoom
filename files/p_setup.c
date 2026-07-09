@@ -257,6 +257,7 @@ void P_LoadSectors (int lump)
 	ss->thinglist = NULL;
 	ss->heightsec = -1;	// Boom 242: no transfer-height control sector unless set below
 	ss->floorlightsec = ss->ceilinglightsec = -1;	// Boom 213/261 light transfer: none
+	ss->sky = 0;		// Boom 271/272 sky transfer: none
     }
 	
     Z_Free (data);
