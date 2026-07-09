@@ -60,7 +60,7 @@ void A_RevMarineGib (mobj_t* actor)
 }
 
 #define BRIGHT		32768			// FF_FULLBRIGHT frame bit
-#define REVMAR_RANGE	(96*FRACUNIT)		// human must be this close (and press USE) to revive
+#define REVMAR_RANGE	(64*FRACUNIT)		// human must be this close (and press USE) to revive
 
 static void ST (statenum_t s, int frame, int tics, actionf_p1 act, statenum_t next)
 {
@@ -145,6 +145,10 @@ const char* P_ReviveMarineNear (player_t* presser)
 	if (th->function.acp1 != (actionf_p1)P_MobjThinker) continue;
 	c = (mobj_t*)th;
 	if (c->type != MT_MISC62) continue;		// dead marine (thing type 15)
+	
+	// Check line of sight: do not revive through closed doors or walls
+	if (!P_CheckSight (presser->mo, c)) continue;
+	
 	d = P_AproxDistance (c->x - presser->mo->x, c->y - presser->mo->y);
 	if (d < bestd) { bestd = d; corpse = c; }
     }
@@ -154,7 +158,11 @@ const char* P_ReviveMarineNear (player_t* presser)
     // health bonuses (10x1 HP).  The reviver's own health is NOT touched.
     if      (presser->inventory[arti_stimpack]    >= 1)  presser->inventory[arti_stimpack]    -= 1;
     else if (presser->inventory[arti_healthbonus] >= 10) presser->inventory[arti_healthbonus] -= 10;
-    else return "[Marine] (need a stimpack or 10 health bonuses to revive)";
+    else
+    {
+	presser->message = "[Marine] (need a stimpack or 10 health bonuses to revive)";
+	return NULL;
+    }
 
     mar = P_SpawnMobj (corpse->x, corpse->y, corpse->z, MT_REVMARINE);
     mar->flags |= MF_FRIEND;				// hunts enemy monsters, not the player

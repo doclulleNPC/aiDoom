@@ -95,7 +95,7 @@ static void AICoop_CrumbAdd (fixed_t x, fixed_t y)
 #define COOP_RUN	0x32		// forwardmove "run" magnitude
 #define COOP_HEAL_HP	50		// seek a med-pack below this health
 #define COOP_SAFE_HP	40		// below this HP the buddy routes home the low-danger way
-#define COOP_REVIVE_RANGE (96*FRACUNIT)	// human must stand this close (and press USE) to revive
+#define COOP_REVIVE_RANGE (64*FRACUNIT)	// human must stand this close (and press USE) to revive
 #define COOP_HEAL_RANGE	(1024*FRACUNIT)	// how far to look for one
 #define COOP_ITEM_RANGE	(128*FRACUNIT)	// idle pickups only when right nearby (not "miles away")
 #define COOP_GRAB_NEAR	(512*FRACUNIT)	// only grab items while still near the human (else follow)
@@ -1935,6 +1935,8 @@ boolean P_AICoop_RevivePress (player_t* presser)
     dmo = bot->mo;
     if (!dmo || !presser->mo) return false;
     if (P_AproxDistance (presser->mo->x - dmo->x, presser->mo->y - dmo->y) >= COOP_REVIVE_RANGE)
+	return false;
+    if (!P_CheckSight (presser->mo, dmo))
 	return false;
     // Reviving costs a health artifact from the human's pack -- a Stimpack or a Medikit (prefer
     // the smaller Stimpack so the Medikit is saved).  The buddy comes back up on that item's heal
