@@ -168,6 +168,7 @@ statusbar_style     0|1|2    # 0=vanilla 1=small 2=alt HUD
 light_dither        0|1      # Light-Banding weichzeichnen
 aspect              0|1|2    # 0=4:3, 1=16:9, 2=16:10  (ersetzt das alte 'widescreen')
 autorun             0|1      # Always-Run ohne Hold
+sprite_shadows      0|1      # Weiche Objektschatten unter Sprites (Default 1)
 key_buddy_come      <code>   # Co-op-Buddy "komm her"   (Default ',' = 44)
 key_buddy_attack    <code>   # Co-op-Buddy "angreifen"  (Default '.' = 46)
 key_buddy_stay      <code>   # Co-op-Buddy "bleib/halt" (Default '-' = 0x2d; übernimmt die Taste vom Screen-Size-Shortcut)

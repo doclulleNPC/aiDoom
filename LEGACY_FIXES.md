@@ -214,7 +214,25 @@ flag — this is exactly what Boom's `comp_stairs` does — and never change the
     wrong place or get skipped. (Boom saves+restores `secnum` to fix this; vanilla
     doesn't, and neither do we.)
   aiDoom ships this code **unchanged on purpose.** Don't "tidy" the increment order or
-  the `secnum` reuse — both are load-bearing for compatibility.
+    the `secnum` reuse — both are load-bearing for compatibility.
+
+---
+
+## 10. Dead Marine (Thing 15) Revival Interference
+
+| Symptom | Root cause | Fix | Files |
+|---|---|---|---|
+| Player cannot open a door when a dead marine (Thing 15) lies near it; revival also occurs through closed doors/walls | The revival handler checked a 96-unit radius, lacked a line-of-sight check, and returned a warning message string (non-NULL) even when player resources were insufficient. This consumed the player's USE button, preventing door activations | Reduce range to 64 units, add line-of-sight checks (`P_CheckSight`), and return `NULL` on insufficient resources to let the USE action fall through | `revmarine.c`, `p_ai_coop.c` |
+
+---
+
+## 11. Missing Cases in Generalized Thinkers
+
+| Symptom | Root cause | Fix | Files |
+|---|---|---|---|
+| Generalized doors, floors, and ceilings/crushers get stuck or fail to apply texture/type/speed changes | The dispatcher parsed the generalized specials, but the individual thinkers (`T_VerticalDoor`, `T_MoveFloor`, `T_MoveCeiling`) lacked case statements for the newly introduced generalized enums | Add cases for all generalized enums to handle direction changes, wait countdowns, texture/type transfers (including `oldspecial`/`newspecial`), and speed adjustments when blocked | `p_doors.c`, `p_floor.c`, `p_ceilng.c` |
+
+---
 
 ## How to spot the next one
 

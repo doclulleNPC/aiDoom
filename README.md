@@ -19,6 +19,8 @@ a language model drive monster tactics in real time.
 - **Variable internal resolution** — the software renderer draws natively at
   320×200 … 1920×1200 (`hires` 1–6), switchable at runtime from an **Options → Video**
   menu (no upscaling of a fixed 320×200 image).
+- **Soft Sprite Shadows** — *Doom Retro*-style translucent floor shadows under all sprite objects (projected at floor height), toggleable via the Options → Video menu.
+- **Boom & MBF Map Compatibility** — Full support for Boom-format level features: loads large modern maps via ZDBSP extended nodes (`XNOD`/`ZNOD`), decodes and processes all **generalized linedef specials** (doors, floors, ceilings, plats, stairs, crushers, and locked doors), supports **generalized sector types** (bitfielded secrets, friction, wind, push/pull), and handles thinkers including **deep water (242)**, **sky transfers (271/272)** with rotation, offsets, and flipping, conveyors/scrollers, and custom `ANIMATED`/`SWITCHES` lumps. See `BOOM_COMPAT.md`.
 - **Quake-style console** (`files/c_console.c`) — open with **`` ` ``** (backquote);
   scrollback + input line over a dimmed view, commands: `help clear echo quit god
   noclip give map`/`warp`.  (**F12** is the spy view — watch the AI buddy.)
@@ -288,6 +290,7 @@ writes one on exit; the editor shows those defaults too.
 - `BUDDY_HUD.md` / `BUDDY_VOICE.md` — the buddy's HUD strip and spoken-line catalogue
 - `DIRECTOR_MODES.md` — the AI director(s): rule-based L4D, LLM, demo
 - `HERETIC_HEXEN.md` — the Heretic/Hexen monster & asset ports
+- `BOOM_COMPAT.md` — the Boom and MBF map/level compatibility details
 - `AGENT_CONTROL.md` — full player- and monster-control API & TCP protocol
 - `MONSTER_AGENT_GUIDE.md` — guide to directing monsters with an LLM
 - `GPUMON.md` — the GPU monitor (`gpumon`, SDL3)

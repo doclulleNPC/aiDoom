@@ -9,30 +9,26 @@ Reference ports (siblings): **`../Nugget-Doom`** (Woof/MBF lineage — full Boom
 **`../crispy-doom`** (limited Boom — has generalized specials + some transfers, but not extended
 nodes). `../winmbf` is the original MBF (has the specials, not extended nodes).
 
-## Current state (baseline)
+## Current state (Fully Implemented)
 
-- **Nodes:** vanilla only — `P_LoadNodes` reads `mapnode_t` directly, no `ZNOD`/`XNOD`/`ZGLN`/
-  DeePBSP detection. Maps built with ZDBSP extended nodes (most large modern maps) won't load.
-- **Line specials:** vanilla set only (up to ~141). No Boom **generalized** specials (`>= 0x2000`:
-  GenFloor/GenCeiling/GenDoor/GenLockedDoor/GenLift/GenStairs/GenCrusher).
-- **Sector specials:** vanilla cases only (1–17). No Boom **generalized** sector types (bitfielded:
-  the low 5 bits are the damage/light type, plus SECRET/FRICTION/PUSH/… bits).
-- **Transfers / thinkers:** vanilla wall scroll only. No deep water (242), friction (223), wind/
-  current/pusher (224/225/226), floor/ceiling/wall scrollers (245–255), transfer-height, colormap.
-- **Lumps:** `ANIMATED`/`SWITCHES` (Boom custom animated flats/textures + switch pairs) not loaded —
-  `P_InitPicAnims` uses the hardcoded vanilla table.
+- **Nodes:** Fully supports ZDBSP `XNOD`/`ZNOD` and DeePBSP extended nodes with 32-bit subsector/seg indices and rebuilt vertices (loads large modern PWADs like *SIGIL II*).
+- **Line specials:** Fully supports all Boom **generalized** specials (`>= 0x2000`: GenFloor, GenCeiling, GenDoor, GenLockedDoor, GenLift, GenStairs, GenCrusher) including key checks and prompts for generalized locked doors.
+- **Sector specials:** Fully supports all Boom **generalized** sector types (bitfielded secrets, friction, wind, push/pull).
+- **Transfers & Thinkers:** Fully supports deep water (242), light transfers (213/261), sky transfers (271/272) with rotation, offset, and flipping, conveyors, scrollers (245–255), variable friction, wind/current, and visual flat scroll (250/251/253).
+- **Lumps:** Fully supports loading custom Boom `ANIMATED` and `SWITCHES` tables, falling back to vanilla tables when absent.
 
-## Plan (phased, each a testable milestone)
+## Plan & Implementation Details
 
 - [x] **B1. Extended nodes** -- DONE (ZDBSP XNOD). — detect + load ZDBSP `XNOD`/`ZNOD` (and DeePBSP `xNd4`) in
   `P_LoadNodes`/`P_LoadSubsectors`/`P_LoadSegs`: 32-bit subsector/seg indices, rebuilt vertices.
   The loading gate for large maps. (crispy lacks this; port from Nugget/dsda.)
-- [x] **B2. Generalized linedef specials** -- DONE (ported p_genlin.c). — recognise `line->special >= 0x2000` and decode the
+- [x] **B2. Generalized linedef specials** -- DONE (ported p_genlin.c and fixed thinker fallthroughs). — recognise `line->special >= 0x2000` and decode the
   bitfields (type + speed + model + direction + delay + target/change) into the existing
-  door/plat/floor/ceiling/stair/crusher builders. Boom maps' doors/lifts/floors.
+  door/plat/floor/ceiling/stair/crusher builders.
+  *Fix:* Added missing case statements for all generalized type variants in the `T_VerticalDoor` ([p_doors.c](file:///home/dulli/Source/aidoom/files/p_doors.c)), `T_MoveFloor` ([p_floor.c](file:///home/dulli/Source/aidoom/files/p_floor.c)), and `T_MoveCeiling` ([p_ceilng.c](file:///home/dulli/Source/aidoom/files/p_ceilng.c)) thinkers. Without these cases, generalized movers would get stuck open/closed or fail to apply texture/type/speed-reduction changes.
 - [x] **B3. Generalized + extended sector types** -- DONE. — treat `sector->special` as bitfielded when
   `>= 32`: low bits = damage/light preset, plus SECRET/FRICTION/PUSHPULL bits; keep vanilla ≤17.
-- [x] **B4. Boom transfers & thinkers** -- DONE (scrollers, friction, pushers, flat-scroll render, and 242 transfer-heights). — scrollers
+- [x] **B4. Boom transfers & thinkers** -- DONE (scrollers, friction, pushers, flat-scroll render, 242 transfer-heights, and 271/272 sky transfers). — scrollers
   (245–255, wall + carry), **friction (223)**, **wind/current/point-push-pull (224–226)** and the
   **visual flat scroll (250/251/253)** are done. Friction/pushers: `p_boomsp.c`
   (`P_SpawnFriction`/`P_SpawnPushers`/`T_Pusher`); `p_map.c` (`P_GetFriction`/`P_GetMoveFactor`
@@ -46,14 +42,18 @@ nodes). `../winmbf` is the original MBF (has the specials, not extended nodes).
   (`r_bsp.c`, ported from `../winmbf`) swaps in the control sector's heights/flats/offsets for
   rendering, wired into `R_Subsector` (frontsector) and `R_AddLine` (backsector). Purely visual --
   collision uses the real heights. Verified against BOOMEDIT (no more HOM; the fake flat renders).
+  **Sky transfers (271/272)** now work: parses the control linedef index (`i | PL_SKYFLAT`) into
+  `sector_t.sky`, maps them together in `R_FindPlane` (ignoring the flat range check), and renders them in
+  `R_DrawPlanes` (`r_plane.c`) using the referenced sidedef texture, horizontal offset (rotation angle),
+  vertical offset (row offset), and flipping option. Dynamic sky texture clamping prevents vertical kachelung.
 - [x] **B5. ANIMATED / SWITCHES lumps** -- DONE. — load Boom's custom flat/texture animation + switch
   tables in `P_InitPicAnims` / the switch init, falling back to the vanilla table when absent.
   (Fix: `p_switch.c` needed `#include "w_wad.h"` — without it `W_CacheLumpName` was implicitly
   `int`-declared and its 64-bit lump pointer was truncated to 32 bits → `P_InitSwitchList` segfault.)
 - [x] **B6. Verify** -- DONE. Vanilla DOOM/DOOM2 + Brutal.wad unaffected; `BOOMEDIT.WAD` (TeamTNT's
   Boom test map: generalized specials + `ANIMATED` + `SWITCHES`) loads and runs on `doom2.wad`; XNOD
-  extended-node maps load/render. Full Boom-map *behaviour* (deep water, friction, pushers) still
-  needs the B4 renderer/thinker hooks below to be visible in play.
+  extended-node maps load/render. Full Boom-map *behaviour* (deep water, friction, pushers, sky transfers)
+  verified against test WADs.r hooks below to be visible in play.
 
 ## Extra Boom specials wired (beyond B1–B6)
 - **Silent teleporters** (`p_telept.c` `EV_SilentTeleport`/`EV_SilentLineTeleport`, dispatched in
