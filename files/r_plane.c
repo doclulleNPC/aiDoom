@@ -505,9 +505,8 @@ void R_DrawPlanes (void)
 	      continue;	// skip rather than feed a garbage lump to W_CacheLumpNum
 	  }
 	}
-	// regular flat
-	ds_source = W_CacheLumpNum(firstflat +
-				   flattranslation[pl->picnum],
+	// regular flat (flatlumps[] maps the dense flat index -> lump number)
+	ds_source = W_CacheLumpNum(flatlumps[flattranslation[pl->picnum]],
 				   PU_STATIC);
 	
 	planeheight = abs(pl->height-viewz);

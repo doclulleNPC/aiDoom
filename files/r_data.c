@@ -139,6 +139,7 @@ typedef struct
 int		firstflat;
 int		lastflat;
 int		numflats;
+int*		flatlumps;	// flat index -> lump number (merged across all F_*..F_END, like spritelumps[])
 
 int		firstpatch;
 int		lastpatch;
@@ -659,26 +660,58 @@ void R_InitTextures (void)
 //
 // R_InitFlats
 //
+// A flat lives inside an F_START..F_END (or Boom FF_START..FF_END) region.  The IWAD
+// nests sub-markers (F1_START/F1_END, F2_START/F2_END, ...) inside that region purely
+// for organisation; those, like any *_START/*_END marker, are NOT flats.
+#define IS_F_START(n) (!strncasecmp((n),"F_START",8) || !strncasecmp((n),"FF_START",8))
+#define IS_F_END(n)   (!strncasecmp((n),"F_END",8)   || !strncasecmp((n),"FF_END",8))
+static boolean R_IsFlatMarker (const char* name)
+{
+    // 8-char, NUL-padded copy so strstr can't run off the fixed-size lump name.
+    char nm[9]; nm[8] = 0; memcpy (nm, name, 8);
+    return strstr (nm, "_START") != NULL || strstr (nm, "_END") != NULL;
+}
+
 void R_InitFlats (void)
 {
-    int		i;
-	
-    // (mod) PWAD flat merge: a PWAD that ships its OWN F_START/F_END (e.g. SIGIL II) made
-    // W_GetNumForName("F_START") return the PWAD's marker, collapsing numflats to just its few
-    // flats -- so every IWAD-flat sector got an out-of-range picnum and crashed R_DrawPlanes
-    // (and skyflatnum went negative).  Span the FIRST F_START (the IWAD's) to the LAST F_END
-    // instead, so IWAD + PWAD flats are all in range.  In a plain IWAD the first F_START is the
-    // only one, so this is a no-op.  (Boom/crispy achieve the same by merging flats at load.)
-    { extern lumpinfo_t* lumpinfo; extern int numlumps; int k, fs = -1;
-      for (k = 0; k < numlumps; k++)
-          if (!strncasecmp (lumpinfo[k].name, "F_START", 8)) { fs = k; break; }
-      firstflat = (fs >= 0 ? fs : W_GetNumForName ("F_START")) + 1; }
-    lastflat = W_GetNumForName ("F_END") - 1;
-    numflats = lastflat - firstflat + 1;
-	
+    extern lumpinfo_t*	lumpinfo;
+    extern int		numlumps;
+    int			l, i, in_ns;
+
+    // MERGE flat namespaces: collect the real flats inside EVERY F_START..F_END region,
+    // skipping the sub-markers (F1_START, ...) and any empty region -- exactly as
+    // R_InitSpriteLumps does for sprites.  The old "span first F_START to last F_END" trick
+    // broke whenever a PWAD appended its own (often EMPTY) F_START/F_END at the end of the
+    // file (e.g. e1-arenas.wad): the span then swallowed every intervening non-flat lump
+    // (that PWAD's maps + another WAD's sprite/patch namespaces), inflating numflats from
+    // ~100 to ~1700 and putting garbage lumps in the flat index space.
+    numflats = 0; in_ns = 0;
+    for (l = 0; l < numlumps; l++)
+    {
+	char* n = lumpinfo[l].name;
+	if (IS_F_START(n)) { in_ns = 1; continue; }
+	if (IS_F_END(n))   { in_ns = 0; continue; }
+	if (in_ns && !R_IsFlatMarker(n)) numflats++;
+    }
+
+    flatlumps = Z_Malloc ((numflats ? numflats : 1) * sizeof(*flatlumps), PU_STATIC, 0);
+
+    i = 0; in_ns = 0;
+    for (l = 0; l < numlumps; l++)
+    {
+	char* n = lumpinfo[l].name;
+	if (IS_F_START(n)) { in_ns = 1; continue; }
+	if (IS_F_END(n))   { in_ns = 0; continue; }
+	if (in_ns && !R_IsFlatMarker(n)) flatlumps[i++] = l;
+    }
+
+    // Legacy contiguous-range fields (kept for any code that still references them); flat
+    // index -> lump now goes through flatlumps[] so non-contiguous PWAD flats work too.
+    firstflat = numflats ? flatlumps[0] : 0;
+    lastflat  = numflats ? flatlumps[numflats-1] : 0;
+
     // Create translation table for global animation.
     flattranslation = Z_Malloc ((numflats+1)*4, PU_STATIC, 0);
-    
     for (i=0 ; i<numflats ; i++)
 	flattranslation[i] = i;
 }
@@ -830,19 +863,21 @@ void R_InitTranMap (void)
 //
 int R_FlatNumForName (char* name)
 {
-    int		i;
-    char	namet[9];
+    extern lumpinfo_t*	lumpinfo;
+    int			k;
+    char		namet[9];
 
-    i = W_CheckNumForName (name);
+    // flatlumps[] is the merged, non-contiguous flat list, so a flat number is now a dense
+    // index into it -- not lump-minus-firstflat.  Search from the end so a PWAD flat that
+    // overrides an IWAD one of the same name wins (mirrors W_CheckNumForName's last-match).
+    for (k = numflats-1 ; k >= 0 ; k--)
+	if (!strncasecmp (lumpinfo[flatlumps[k]].name, name, 8))
+	    return k;
 
-    if (i == -1)
-    {
-	namet[8] = 0;
-	memcpy (namet, name,8);
-	fprintf(stderr, "Warning: R_FlatNumForName: %s not found, defaulting to 0\n", namet);
-	return 0;
-    }
-    return i - firstflat;
+    namet[8] = 0;
+    memcpy (namet, name,8);
+    fprintf(stderr, "Warning: R_FlatNumForName: %s not found, defaulting to 0\n", namet);
+    return 0;
 }
 
 
@@ -934,7 +969,7 @@ void R_PrecacheLevel (void)
     {
 	if (flatpresent[i])
 	{
-	    lump = firstflat + i;
+	    lump = flatlumps[i];
 	    flatmemory += lumpinfo[lump].size;
 	    W_CacheLumpNum(lump, PU_CACHE);
 	}

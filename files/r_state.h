@@ -56,9 +56,11 @@ extern int		scaledviewwidth;
 extern int		viewheight;
 
 extern int		firstflat;
+extern int		numflats;
+extern int*		flatlumps;	// flat index -> lump number (merged flat namespaces)
 
 // for global animation
-extern int*		flattranslation;	
+extern int*		flattranslation;
 extern int*		texturetranslation;	
 
 

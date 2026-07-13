@@ -62,7 +62,9 @@ boolean P_IsLiquidFloor (sector_t* sec)
 
     if (!sec)
 	return false;
-    lump = firstflat + sec->floorpic;
+    if (sec->floorpic < 0 || sec->floorpic >= numflats)
+	return false;
+    lump = flatlumps[sec->floorpic];	// dense flat index -> lump number
     if (lump < 0 || lump >= numlumps)
 	return false;
     nm = lumpinfo[lump].name;
