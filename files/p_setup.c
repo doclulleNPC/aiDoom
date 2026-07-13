@@ -516,6 +516,9 @@ void P_LoadLineDefs (int lump)
 	ld->sidenum[0] = SHORT(mld->sidenum[0]);
 	ld->sidenum[1] = SHORT(mld->sidenum[1]);
 
+	if (ld->sidenum[0] == -1)
+	    ld->sidenum[0] = 0;  // Substitute dummy sidedef for missing right side
+
 	if (ld->sidenum[0] != -1)
 	    ld->frontsector = sides[ld->sidenum[0]].sector;
 	else
