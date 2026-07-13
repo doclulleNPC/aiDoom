@@ -27,6 +27,10 @@
 #include "font_atlas.h"
 #include "../files/aidoom_icon.h"	// shared 64x64 RGBA window icon (from aidoom.ico)
 
+#ifdef _WIN32
+#define strcasecmp _stricmp	// MSVC has no strcasecmp (POSIX); _stricmp is the equivalent
+#endif
+
 #define WINW 560
 #define WINH 460
 
