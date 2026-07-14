@@ -110,3 +110,22 @@ run/director
 # SDL3 launcher (built by tools/build_launcher.sh, copied to run/)
 tools/launcher
 run/launcher
+
+# Claude Code session/config directory
+.claude/
+
+# --- Local scratch: dated screenshots + misc PNGs ---
+# (hero.png is the only tracked image; these are throwaway captures)
+2026-*.png
+hero_Launcher.png
+
+# --- run/ scratch & editor artifacts (per-user, not part of the repo) ---
+run/ID0/*.SGN
+run/ID0/*.TXT
+run/ID0/*.DAT
+run/ID0/*.rar
+run/ID0/*.pdf
+run/aidoom.cfg.mini
+run/e1-arenas.dbs
+run/launcher.ini
+run/smk.txt
