@@ -895,6 +895,14 @@ P_DamageMobj
 	return;
     }
 
+    // A deployed sentry turret (MT_TURRET, files/p_turret.c) is the player's own
+    // device: it must never damage the human, the AI buddy, or any friendly actor
+    // -- even on a stray hit (chaingun spread, or someone stepping into its line of
+    // fire).  Bail like the friendly-fire guard below, before any thrust/damage.
+    if (source && source->type == MT_TURRET
+	&& (target->player || (target->flags & MF_FRIEND)))
+	return;
+
     // -nofriendlyfire: the human player and the AI buddy can't hurt each other
     // (default off = vanilla co-op, where they can).  Bail before any thrust,
     // momentum reset, damage or retaliation, so it's as if the shot never hit.
