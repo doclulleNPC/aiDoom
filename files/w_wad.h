@@ -61,6 +61,11 @@ typedef struct
     FILE	*handle;
     int		position;
     int		size;
+    
+    // PK3/ZIP support fields
+    int         zip_idx;            // index in open_zips, -1 if not a zip
+    int         zip_file_index;     // index of the file inside the zip archive
+    unsigned char* mem_data;        // non-NULL if lump is loaded directly from memory
 } lumpinfo_t;
 
 

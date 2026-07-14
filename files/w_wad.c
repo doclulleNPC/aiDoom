@@ -40,6 +40,7 @@ rcsid[] = "$Id: w_wad.c,v 1.5 1997/02/03 16:47:57 b1 Exp $";
 #pragma implementation "w_wad.h"
 #endif
 #include "w_wad.h"
+#include "miniz.h"
 
 
 
@@ -103,10 +104,12 @@ ExtractFileBase
     
     while (*src && *src != '.')
     {
-	if (++length == 9)
-	    I_Error ("Filename base of %s >8 chars",path);
-
-	*dest++ = toupper((int)*src++);
+	if (length < 8)
+	{
+	    *dest++ = toupper((int)*src);
+	    length++;
+	}
+	src++;
     }
 }
 
@@ -147,6 +150,230 @@ extern void *alloca(int);
 int			reloadlump;
 char*			reloadname;
 
+#define MAX_ZIP_FILES 16
+static mz_zip_archive open_zips[MAX_ZIP_FILES];
+static int num_open_zips = 0;
+
+void W_AddZipFile (char *filename)
+{
+    if (num_open_zips >= MAX_ZIP_FILES)
+    {
+        I_Error("W_AddZipFile: exceeded MAX_ZIP_FILES");
+    }
+
+    mz_zip_archive* zip = &open_zips[num_open_zips];
+    memset(zip, 0, sizeof(*zip));
+
+    FILE* handle = fopen(filename, "rb");
+    if (handle == NULL)
+    {
+        // Game WADs live in run/ID0/ -- retry there before giving up, so bare names
+        // resolve without an explicit path.
+        static char id0path[1024];
+        snprintf(id0path, sizeof(id0path), "ID0/%s", filename);
+        handle = fopen(id0path, "rb");
+        if (handle == NULL)
+        {
+            printf(" couldn't open zip/pk3 %s\n", filename);
+            return;
+        }
+        filename = id0path;
+    }
+    fclose(handle);
+
+    if (!mz_zip_reader_init_file(zip, filename, 0))
+    {
+        printf(" couldn't init zip reader for %s\n", filename);
+        return;
+    }
+
+    printf(" adding zip %s\n", filename);
+    int zip_idx = num_open_zips++;
+
+    int num_files = mz_zip_reader_get_num_files(zip);
+
+    int* sprite_indices = malloc(num_files * sizeof(int));
+    int* flat_indices = malloc(num_files * sizeof(int));
+    int* patch_indices = malloc(num_files * sizeof(int));
+    int* map_indices = malloc(num_files * sizeof(int));
+    int* global_indices = malloc(num_files * sizeof(int));
+
+    int num_sprites = 0;
+    int num_flats = 0;
+    int num_patches = 0;
+    int num_maps = 0;
+    int num_globals = 0;
+
+    for (int i = 0; i < num_files; i++)
+    {
+        mz_zip_archive_file_stat file_stat;
+        if (!mz_zip_reader_file_stat(zip, i, &file_stat))
+            continue;
+
+        if (mz_zip_reader_is_file_a_directory(zip, i))
+            continue;
+
+        char* path = file_stat.m_filename;
+        if (strncasecmp(path, "sprites/", 8) == 0)
+        {
+            sprite_indices[num_sprites++] = i;
+        }
+        else if (strncasecmp(path, "flats/", 6) == 0)
+        {
+            flat_indices[num_flats++] = i;
+        }
+        else if (strncasecmp(path, "patches/", 8) == 0)
+        {
+            patch_indices[num_patches++] = i;
+        }
+        else if (strncasecmp(path, "maps/", 5) == 0 && strlen(path) > 9 && strcasecmp(path + strlen(path) - 4, ".wad") == 0)
+        {
+            map_indices[num_maps++] = i;
+        }
+        else
+        {
+            if (strstr(path, "__MACOSX") || strstr(path, ".DS_Store"))
+                continue;
+            global_indices[num_globals++] = i;
+        }
+    }
+
+    int added_lumps = num_globals;
+    if (num_sprites > 0) added_lumps += num_sprites + 2;
+    if (num_flats > 0)    added_lumps += num_flats + 2;
+    if (num_patches > 0)  added_lumps += num_patches + 2;
+
+    int startlump = numlumps;
+    numlumps += added_lumps;
+    lumpinfo = realloc(lumpinfo, numlumps * sizeof(lumpinfo_t));
+    if (!lumpinfo)
+        I_Error("Couldn't realloc lumpinfo for zip");
+
+    lumpinfo_t* lump_p = &lumpinfo[startlump];
+
+    #define SET_ZIP_LUMP(name_str, f_idx) \
+        lump_p->handle = NULL; \
+        lump_p->position = 0; \
+        lump_p->size = 0; \
+        lump_p->zip_idx = zip_idx; \
+        lump_p->zip_file_index = f_idx; \
+        lump_p->mem_data = NULL; \
+        if (f_idx >= 0) { \
+            mz_zip_archive_file_stat st; \
+            mz_zip_reader_file_stat(zip, f_idx, &st); \
+            lump_p->size = (int)st.m_uncomp_size; \
+        } \
+        memset(lump_p->name, 0, 8); \
+        strncpy(lump_p->name, name_str, 8); \
+        lump_p++;
+
+    // 1. Add globals
+    for (int i = 0; i < num_globals; i++)
+    {
+        mz_zip_archive_file_stat file_stat;
+        mz_zip_reader_file_stat(zip, global_indices[i], &file_stat);
+        char base_name[9];
+        ExtractFileBase(file_stat.m_filename, base_name);
+        SET_ZIP_LUMP(base_name, global_indices[i]);
+    }
+
+    // 2. Add sprites
+    if (num_sprites > 0)
+    {
+        SET_ZIP_LUMP("S_START", -1);
+        for (int i = 0; i < num_sprites; i++)
+        {
+            mz_zip_archive_file_stat file_stat;
+            mz_zip_reader_file_stat(zip, sprite_indices[i], &file_stat);
+            char base_name[9];
+            ExtractFileBase(file_stat.m_filename, base_name);
+            SET_ZIP_LUMP(base_name, sprite_indices[i]);
+        }
+        SET_ZIP_LUMP("S_END", -1);
+    }
+
+    // 3. Add flats
+    if (num_flats > 0)
+    {
+        SET_ZIP_LUMP("F_START", -1);
+        for (int i = 0; i < num_flats; i++)
+        {
+            mz_zip_archive_file_stat file_stat;
+            mz_zip_reader_file_stat(zip, flat_indices[i], &file_stat);
+            char base_name[9];
+            ExtractFileBase(file_stat.m_filename, base_name);
+            SET_ZIP_LUMP(base_name, flat_indices[i]);
+        }
+        SET_ZIP_LUMP("F_END", -1);
+    }
+
+    // 4. Add patches
+    if (num_patches > 0)
+    {
+        SET_ZIP_LUMP("P_START", -1);
+        for (int i = 0; i < num_patches; i++)
+        {
+            mz_zip_archive_file_stat file_stat;
+            mz_zip_reader_file_stat(zip, patch_indices[i], &file_stat);
+            char base_name[9];
+            ExtractFileBase(file_stat.m_filename, base_name);
+            SET_ZIP_LUMP(base_name, patch_indices[i]);
+        }
+        SET_ZIP_LUMP("P_END", -1);
+    }
+
+    #undef SET_ZIP_LUMP
+
+    free(sprite_indices);
+    free(flat_indices);
+    free(patch_indices);
+    free(global_indices);
+
+    // 5. Load map WADs
+    for (int i = 0; i < num_maps; i++)
+    {
+        size_t wad_size;
+        void* wad_data = mz_zip_reader_extract_to_heap(zip, map_indices[i], &wad_size, 0);
+        if (!wad_data)
+        {
+            printf(" failed to extract map wad %d\n", map_indices[i]);
+            continue;
+        }
+
+        wadinfo_t* header = (wadinfo_t*)wad_data;
+        if (strncmp(header->identification, "IWAD", 4) != 0 && strncmp(header->identification, "PWAD", 4) != 0)
+        {
+            printf(" embedded wad in zip doesn't have IWAD or PWAD id\n");
+            free(wad_data);
+            continue;
+        }
+
+        int map_numlumps = LONG(header->numlumps);
+        int infotableofs = LONG(header->infotableofs);
+        filelump_t* fileinfo = (filelump_t*)((byte*)wad_data + infotableofs);
+
+        int map_startlump = numlumps;
+        numlumps += map_numlumps;
+        lumpinfo = realloc(lumpinfo, numlumps * sizeof(lumpinfo_t));
+        if (!lumpinfo)
+            I_Error("Couldn't realloc lumpinfo for map in zip");
+
+        lumpinfo_t* map_lump_p = &lumpinfo[map_startlump];
+        for (int j = 0; j < map_numlumps; j++, map_lump_p++, fileinfo++)
+        {
+            map_lump_p->handle = NULL;
+            map_lump_p->position = LONG(fileinfo->filepos);
+            map_lump_p->size = LONG(fileinfo->size);
+            map_lump_p->zip_idx = -1;
+            map_lump_p->zip_file_index = -1;
+            map_lump_p->mem_data = (byte*)wad_data;
+            strncpy(map_lump_p->name, fileinfo->name, 8);
+        }
+    }
+
+    free(map_indices);
+}
+
 
 void W_AddFile (char *filename)
 {
@@ -170,6 +397,13 @@ void W_AddFile (char *filename)
 	reloadlump = numlumps;
     }
 		
+    int fn_len = strlen(filename);
+    if (fn_len >= 4 && (I_strncasecmp(filename + fn_len - 3, "pk3", 3) == 0 || I_strncasecmp(filename + fn_len - 3, "zip", 3) == 0))
+    {
+        W_AddZipFile(filename);
+        return;
+    }
+
     if ( (handle = fopen (filename,"rb")) == NULL)
     {
 	// Game WADs live in run/ID0/ -- retry there before giving up, so bare names
@@ -236,6 +470,9 @@ void W_AddFile (char *filename)
 	lump_p->handle = storehandle;
 	lump_p->position = LONG(fileinfo->filepos);
 	lump_p->size = LONG(fileinfo->size);
+	lump_p->zip_idx = -1;
+	lump_p->zip_file_index = -1;
+	lump_p->mem_data = NULL;
 	strncpy (lump_p->name, fileinfo->name, 8);
     }
 	
@@ -441,11 +678,6 @@ int W_LumpLength (int lump)
 
 
 
-//
-// W_ReadLump
-// Loads the lump into the given buffer,
-//  which must be >= W_LumpLength().
-//
 void
 W_ReadLump
 ( int		lump,
@@ -460,6 +692,31 @@ W_ReadLump
 
     l = lumpinfo+lump;
 	
+    if (l->mem_data != NULL)
+    {
+        memcpy (dest, l->mem_data + l->position, l->size);
+        return;
+    }
+
+    if (l->zip_idx >= 0)
+    {
+        if (l->zip_file_index >= 0)
+        {
+            mz_bool success = mz_zip_reader_extract_to_mem_no_alloc(
+                &open_zips[l->zip_idx],
+                l->zip_file_index,
+                dest,
+                l->size,
+                0,
+                NULL,
+                0
+            );
+            if (!success)
+                I_Error("W_ReadLump: failed to extract zip lump %d", lump);
+        }
+        return;
+    }
+
     // ??? I_BeginRead ();
 	
     if (l->handle == NULL)

@@ -90,8 +90,8 @@
 #define MON_HEX_X  (PAD + 410)		// "Hexen" checkbox
 #define IWAD_Y    362
 #define IWAD_H    22
-#define IWAD_DD_H 80			// dropdown open height
-#define PWAD_Y    390			// extra PWAD selector (one row below IWAD)
+#define PWAD_Y    390			// extra WAD1 selector (one row below IWAD)
+#define WAD2_Y    418			// extra WAD2 selector (one row below WAD1)
 #define LAUNCH_Y  544			// lowered 50px (window grew 50px to match)
 #define LAUNCH_H  34
 
@@ -183,14 +183,16 @@ static iwad_t  iwads[MAX_IWADS];
 static int     iwad_count;
 static int     iwad_sel;			// index into iwads[]
 
-// PWAD list: every other .wad in the wad dirs (NOT a known IWAD, NOT aidoom.wad),
-// offered as an optional extra "-file" load.  pwads[0] is always "(none)".
-#define MAX_PWADS 48
+#define MAX_PWADS 128
 static char    pwads[MAX_PWADS][64];
 static int     pwad_count;
 static int     pwad_sel;			// 0 = none, else index into pwads[]
-static int     pwad_dd_open;			// PWAD dropdown open (mutually exclusive w/ IWAD)
+static int     pwad_dd_open;			// WAD1 dropdown open
 static int     pwad_scroll;			// first visible row when the open list overflows
+
+static int     wad2_sel;			// 0 = none, else index into pwads[]
+static int     wad2_dd_open;			// WAD2 dropdown open
+static int     wad2_scroll;			// first visible row when the open list overflows
 
 // Mode selections.
 static int     buddy_mode = BUDDY_RULE;	// default: buddy on (rule-based)
@@ -577,11 +579,17 @@ static void pwad_add(const char* dir, const char* fname)
 {
     size_t L = fname ? strlen(fname) : 0;
     if (pwad_count >= MAX_PWADS || L < 5 || L >= 60) return;
-    if (strcasecmp(fname + L - 4, ".wad") != 0)  return;    // .wad only
-    if (is_known_iwad(fname) >= 0)                return;   // known DOOM IWADs are the OTHER dropdown
-    if (strcasecmp(fname, "aidoom.wad") == 0)     return;   // our voice PWAD -- never list it
-    if (wad_is_iwad(dir, fname))                  return;   // a full IWAD (hexen/heretic/...) -> not a PWAD
-    if (wad_has_lump(dir, fname, "AISTUFF"))      return;   // aiDoom-internal asset pack -> not a user PWAD
+    int is_wad = (strcasecmp(fname + L - 4, ".wad") == 0);
+    int is_pk3 = (strcasecmp(fname + L - 4, ".pk3") == 0);
+    int is_zip = (strcasecmp(fname + L - 4, ".zip") == 0);
+    if (!is_wad && !is_pk3 && !is_zip) return;
+
+    if (is_wad) {
+        if (is_known_iwad(fname) >= 0)                return;   // known DOOM IWADs are the OTHER dropdown
+        if (strcasecmp(fname, "aidoom.wad") == 0)     return;   // our voice PWAD -- never list it
+        if (wad_is_iwad(dir, fname))                  return;   // a full IWAD (hexen/heretic/...) -> not a PWAD
+        if (wad_has_lump(dir, fname, "AISTUFF"))      return;   // aiDoom-internal asset pack -> not a user PWAD
+    }
     for (int i=1; i<pwad_count; i++)                        // de-dupe (same name in two dirs)
         if (strcasecmp(pwads[i], fname) == 0) return;
     snprintf(pwads[pwad_count], sizeof pwads[0], "%s", fname);
@@ -596,9 +604,9 @@ static void scan_pwads(void)
     char id0[300];
     snprintf(id0, sizeof id0, "%s/ID0", run_dir());
     const char* dirs[2] = { id0, run_dir() };
-    const char* pats[2] = { "*.wad", "*.WAD" };		// glob both cases (Linux is case-sensitive)
+    const char* pats[6] = { "*.wad", "*.WAD", "*.pk3", "*.PK3", "*.zip", "*.ZIP" };
     for (int d = 0; d < 2; d++)
-        for (int p = 0; p < 2; p++) {
+        for (int p = 0; p < 6; p++) {
             int count = 0;
             char** files = SDL_GlobDirectory(dirs[d], pats[p], 0, &count);
             if (!files) continue;
@@ -606,6 +614,7 @@ static void scan_pwads(void)
             SDL_free(files);
         }
     if (pwad_sel >= pwad_count) pwad_sel = 0;
+    if (wad2_sel >= pwad_count) wad2_sel = 0;
 }
 
 // ----------------------------------------------------------------- banner
@@ -764,7 +773,7 @@ static void draw_pwad_dropdown(void)
     rect(x, y, w, h, COL_DD_BG);
     draw_rect_outline(x, y, w, h, COL_DD_BD_R, COL_DD_BD_G, COL_DD_BD_B);
 
-    text(x + 8, y + (h - FONT_CH)/2, "PWAD:", COL_DIM);
+    text(x + 8, y + (h - FONT_CH)/2, "WAD1:", COL_DIM);
     text(x + 8 + 5*FONT_CW + 6, y + (h - FONT_CH)/2,
          pwads[pwad_sel],
          pwad_sel ? 255 : 150, pwad_sel ? 230 : 150, pwad_sel ? 100 : 150);
@@ -810,6 +819,61 @@ static int hit_pwad_dropdown(int mouse_px, int mouse_py)
         if (mouse_px >= PAD && mouse_px <= WINW-PAD &&
             mouse_py >= oy && mouse_py <= oy + IWAD_H)
             return pwad_scroll + i + 1;   // 1-based, scroll-adjusted index
+    }
+    return -1;
+}
+
+static void draw_wad2_dropdown(void)
+{
+    float x = PAD, y = WAD2_Y, w = WINW - 2*PAD, h = IWAD_H;
+    rect(x, y, w, h, COL_DD_BG);
+    draw_rect_outline(x, y, w, h, COL_DD_BD_R, COL_DD_BD_G, COL_DD_BD_B);
+
+    text(x + 8, y + (h - FONT_CH)/2, "WAD2:", COL_DIM);
+    text(x + 8 + 5*FONT_CW + 6, y + (h - FONT_CH)/2,
+         pwads[wad2_sel],
+         wad2_sel ? 255 : 150, wad2_sel ? 230 : 150, wad2_sel ? 100 : 150);
+
+    const char* arrow = wad2_dd_open ? "^" : "v";
+    text(x + w - FONT_CW - 6, y + (h - FONT_CH)/2, arrow, COL_DIM);
+
+    if (wad2_dd_open && pwad_count > 0) {
+        float dy = y + h;
+        int max_scroll = pwad_count - PWAD_SHOW; if (max_scroll < 0) max_scroll = 0;
+        if (wad2_scroll > max_scroll) wad2_scroll = max_scroll;
+        if (wad2_scroll < 0) wad2_scroll = 0;
+        int show = pwad_count < PWAD_SHOW ? pwad_count : PWAD_SHOW;
+        for (int i=0; i<show; i++) {
+            int idx = wad2_scroll + i;
+            float oy = dy + i * IWAD_H;
+            int hover = (mouse_x >= x && mouse_x <= x+w &&
+                         mouse_y >= oy && mouse_y <= oy + IWAD_H);
+            rect(x, oy, w, IWAD_H, hover ? COL_DD_HOV : COL_DD_BG);
+            draw_rect_outline(x, oy, w, IWAD_H, COL_DD_BD_R, COL_DD_BD_G, COL_DD_BD_B);
+            text(x + 8, oy + (IWAD_H - FONT_CH)/2, pwads[idx],
+                 idx==wad2_sel ? 255 : 210, idx==wad2_sel ? 230 : 210, idx==wad2_sel ? 100 : 200);
+            if (i == 0 && wad2_scroll > 0)
+                text(x + w - FONT_CW - 6, oy + (IWAD_H - FONT_CH)/2, "^", COL_DIM);
+            if (i == show-1 && wad2_scroll < max_scroll)
+                text(x + w - FONT_CW - 6, oy + (IWAD_H - FONT_CH)/2, "v", COL_DIM);
+        }
+    }
+}
+
+static int hit_wad2_dropdown(int mouse_px, int mouse_py)
+{
+    if (mouse_px >= PAD && mouse_px <= WINW-PAD &&
+        mouse_py >= WAD2_Y && mouse_py <= WAD2_Y + IWAD_H)
+        return 0;        // toggles the dropdown
+
+    if (!wad2_dd_open) return -1;
+
+    int show = pwad_count < PWAD_SHOW ? pwad_count : PWAD_SHOW;
+    for (int i=0; i<show; i++) {
+        float oy = WAD2_Y + IWAD_H + i * IWAD_H;
+        if (mouse_px >= PAD && mouse_px <= WINW-PAD &&
+            mouse_py >= oy && mouse_py <= oy + IWAD_H)
+            return wad2_scroll + i + 1;   // 1-based, scroll-adjusted index
     }
     return -1;
 }
@@ -974,6 +1038,7 @@ static void save_launcher_prefs(void)
     if (!f) return;
     fprintf(f, "iwad %s\n",     (iwad_sel >= 0 && iwad_sel < iwad_count) ? iwads[iwad_sel].name : "");
     fprintf(f, "pwad %s\n",     (pwad_sel > 0 && pwad_sel < pwad_count) ? pwads[pwad_sel] : "");
+    fprintf(f, "wad2 %s\n",     (wad2_sel > 0 && wad2_sel < pwad_count) ? pwads[wad2_sel] : "");
     fprintf(f, "buddy %d\n",    buddy_mode);
     fprintf(f, "monster %d\n",  mon_mode);
     fprintf(f, "skill %d\n",    opt_skill);
@@ -998,6 +1063,7 @@ static void load_launcher_prefs(void)
         if (sscanf(line, "%31s %279[^\n\r]", key, val) < 1) continue;
         if      (!strcmp(key, "iwad"))    { for (i=0;i<iwad_count;i++) if (!strcmp(iwads[i].name,val)) { iwad_sel=i; break; } }
         else if (!strcmp(key, "pwad"))    { pwad_sel=0; for (i=1;i<pwad_count;i++) if (!strcmp(pwads[i],val)) { pwad_sel=i; break; } }
+        else if (!strcmp(key, "wad2"))    { wad2_sel=0; for (i=1;i<pwad_count;i++) if (!strcmp(pwads[i],val)) { wad2_sel=i; break; } }
         else if (!strcmp(key, "buddy"))     buddy_mode   = atoi(val);
         else if (!strcmp(key, "monster"))   mon_mode     = atoi(val);
         else if (!strcmp(key, "skill"))     opt_skill    = atoi(val);
@@ -1058,6 +1124,7 @@ static void build_command(char* out, int n, const char* iwad_path)
         fn += snprintf(files + fn, sizeof files - fn, " hereticstuff.wad");
     if (opt_hexen && wad_present("hexenstuff.wad"))
         fn += snprintf(files + fn, sizeof files - fn, " hexenstuff.wad");
+
     // SIGIL packs are checksum-verified: a verified pack loads + warps to its own episode; a
     // SIGIL-named file whose MD5 is unknown is rejected (the PWAD setting is silently ignored).
     int sigil_ep = 0;
@@ -1076,6 +1143,22 @@ static void build_command(char* out, int n, const char* iwad_path)
             fn += snprintf(files + fn, sizeof files - fn,
                            strchr(pw, ' ') ? " \"%s\"" : " %s", pw);
     }
+
+    int sigil_ep2 = 0;
+    int sigil2 = (wad2_sel > 0 && wad2_sel < pwad_count)
+               ? launcher_sigil_classify(pwads[wad2_sel], &sigil_ep2) : 0;
+    int load_wad2 = (wad2_sel > 0 && wad2_sel < pwad_count) && (sigil2 != -1);
+    if (load_wad2) {
+        const char* pw = pwads[wad2_sel];
+        int dup = (opt_freedoom && !strcasecmp(pw, "freedoomstuff.wad"))
+               || (opt_heretic  && !strcasecmp(pw, "hereticstuff.wad"))
+               || (opt_hexen    && !strcasecmp(pw, "hexenstuff.wad"))
+               || (load_pwad    && !strcasecmp(pw, pwads[pwad_sel]));
+        if (!dup)
+            fn += snprintf(files + fn, sizeof files - fn,
+                           strchr(pw, ' ') ? " \"%s\"" : " %s", pw);
+    }
+
     if (files[0])
         off += snprintf(out + off, n - off, " -file%s", files);
 
@@ -1086,8 +1169,13 @@ static void build_command(char* out, int n, const char* iwad_path)
     char warp[32] = "";
     if (sigil == 1)
         snprintf(warp, sizeof warp, "%d 1", sigil_ep);		// verified SIGIL -> E5/E3/E6 M1
+    else if (sigil2 == 1)
+        snprintf(warp, sizeof warp, "%d 1", sigil_ep2);
     else if (load_pwad) {
         char w[32]; pwad_first_map_warp(pwads[pwad_sel], w, sizeof w);
+        if (w[0]) snprintf(warp, sizeof warp, "%s", w);
+    } else if (load_wad2) {
+        char w[32]; pwad_first_map_warp(pwads[wad2_sel], w, sizeof w);
         if (w[0]) snprintf(warp, sizeof warp, "%s", w);
     }
     if (!warp[0]) {
@@ -1243,28 +1331,47 @@ static void do_launch(void)
     }
 }
 
-// ----------------------------------------------------------------- paths
 static const char* run_dir(void)
 {
-    // The launcher binary lives in run/ next to aidoom.exe.  argv[0] is the
-    // path the OS used to invoke us; resolve its directory and return it.
     static char path[260];
     static int inited = 0;
     if (!inited) {
-        // Best-effort: use argv[0] if available, else assume CWD/run.
-        // We can't easily get argv from SDL, so we approximate: look at the
-        // executable's location.  In practice, the launcher is launched from
-        // run/ or via a symlink, and the actual binary lives next to aidoom.
-        //
-        // Simplest fallback: CWD if it contains aidoom/aidoom.exe, else the
-        // directory the binary lives in.
-        const char* cwd = SDL_GetCurrentDirectory();
-        if (cwd && (strstr(cwd, "aidoom") || strstr(cwd, "run"))) {
-            snprintf(path, sizeof path, "%s", cwd);
-        } else {
-            snprintf(path, sizeof path, "%s/run",
-                     SDL_GetBasePath() ? SDL_GetBasePath() : ".");
+        const char* base = SDL_GetBasePath();
+        if (base) {
+            snprintf(path, sizeof path, "%s", base);
+            int len = strlen(path);
+            if (len > 0 && (path[len-1] == '/' || path[len-1] == '\\')) {
+                path[len-1] = '\0';
+            }
+            char test_path[512];
+            snprintf(test_path, sizeof test_path, "%s/ID0", path);
+            struct stat st;
+            if (stat(test_path, &st) == 0 && (st.st_mode & S_IFDIR)) {
+                inited = 1;
+                return path;
+            }
         }
+
+        const char* cwd = SDL_GetCurrentDirectory();
+        if (cwd) {
+            char test_path[512];
+            snprintf(test_path, sizeof test_path, "%s/ID0", cwd);
+            struct stat st;
+            if (stat(test_path, &st) == 0 && (st.st_mode & S_IFDIR)) {
+                snprintf(path, sizeof path, "%s", cwd);
+                inited = 1;
+                return path;
+            }
+            
+            snprintf(test_path, sizeof test_path, "%s/run/ID0", cwd);
+            if (stat(test_path, &st) == 0 && (st.st_mode & S_IFDIR)) {
+                snprintf(path, sizeof path, "%s/run", cwd);
+                inited = 1;
+                return path;
+            }
+        }
+
+        snprintf(path, sizeof path, ".");
         inited = 1;
     }
     return path;
@@ -1318,10 +1425,10 @@ int main(int argc, char** argv)
             case SDL_EVENT_QUIT: running = 0; break;
             case SDL_EVENT_KEY_DOWN:
                 if (ev.key.key == SDLK_ESCAPE) {
-                    if (dropdown_open || pwad_dd_open) { dropdown_open = 0; pwad_dd_open = 0; }
+                    if (dropdown_open || pwad_dd_open || wad2_dd_open) { dropdown_open = 0; pwad_dd_open = 0; wad2_dd_open = 0; }
                     else running = 0;
                 }
-                if (ev.key.key == SDLK_RETURN && !dropdown_open && !pwad_dd_open) {
+                if (ev.key.key == SDLK_RETURN && !dropdown_open && !pwad_dd_open && !wad2_dd_open) {
                     do_launch();
                 }
                 break;
@@ -1342,10 +1449,16 @@ int main(int argc, char** argv)
                         int hh = hit_pwad_dropdown(mouse_x, mouse_y);
                         if (hh > 0) pwad_sel = hh - 1;
                         pwad_dd_open = 0;
+                    } else if (wad2_dd_open) {
+                        int hh = hit_wad2_dropdown(mouse_x, mouse_y);
+                        if (hh > 0) wad2_sel = hh - 1;
+                        wad2_dd_open = 0;
                     } else if (hit_iwad_dropdown(mouse_x, mouse_y) == 0) {
                         dropdown_open = 1;
                     } else if (hit_pwad_dropdown(mouse_x, mouse_y) == 0) {
                         pwad_dd_open = 1; pwad_scroll = 0;
+                    } else if (hit_wad2_dropdown(mouse_x, mouse_y) == 0) {
+                        wad2_dd_open = 1; wad2_scroll = 0;
                     } else if (hit_launch_button(mouse_x, mouse_y)) {
                         do_launch();
                     } else {
@@ -1432,7 +1545,7 @@ int main(int argc, char** argv)
                         // Monsters row: toggle the extra-monster WAD checkboxes
                         // (ignored when greyed out -- the PWAD isn't present).
                         if (wad_present("freedoomstuff.wad") &&
-                            hit_checkbox(MON_FD_X, MONSTERS_Y, "FreeDoom", mouse_x, mouse_y))
+                             hit_checkbox(MON_FD_X, MONSTERS_Y, "FreeDoom", mouse_x, mouse_y))
                             opt_freedoom = !opt_freedoom;
                         if (wad_present("hereticstuff.wad") &&
                             hit_checkbox(MON_HER_X, MONSTERS_Y, "Heretic", mouse_x, mouse_y))
@@ -1447,11 +1560,16 @@ int main(int argc, char** argv)
                 mouse_down = 0;
                 break;
             case SDL_EVENT_MOUSE_WHEEL:
-                if (pwad_dd_open) {     // scroll the open PWAD list
+                if (pwad_dd_open) {     // scroll the open WAD1 list
                     int ms = pwad_count - PWAD_SHOW; if (ms < 0) ms = 0;
                     pwad_scroll -= (int)ev.wheel.y;
                     if (pwad_scroll < 0)  pwad_scroll = 0;
                     if (pwad_scroll > ms) pwad_scroll = ms;
+                } else if (wad2_dd_open) {     // scroll the open WAD2 list
+                    int ms = pwad_count - PWAD_SHOW; if (ms < 0) ms = 0;
+                    wad2_scroll -= (int)ev.wheel.y;
+                    if (wad2_scroll < 0)  wad2_scroll = 0;
+                    if (wad2_scroll > ms) wad2_scroll = ms;
                 }
                 break;
             case SDL_EVENT_WINDOW_RESIZED: {
@@ -1527,8 +1645,10 @@ int main(int argc, char** argv)
             else              text(PAD, LAUNCH_Y - 30, g_status, COL_CHECK);
         }
 
-        if (dropdown_open) { draw_pwad_dropdown(); draw_iwad_dropdown(); }
-        else               { draw_iwad_dropdown(); draw_pwad_dropdown(); }
+        if (dropdown_open) { draw_pwad_dropdown(); draw_wad2_dropdown(); draw_iwad_dropdown(); }
+        else if (pwad_dd_open) { draw_iwad_dropdown(); draw_wad2_dropdown(); draw_pwad_dropdown(); }
+        else if (wad2_dd_open) { draw_iwad_dropdown(); draw_pwad_dropdown(); draw_wad2_dropdown(); }
+        else                   { draw_iwad_dropdown(); draw_pwad_dropdown(); draw_wad2_dropdown(); }
 
         SDL_RenderPresent(ren);
     }
