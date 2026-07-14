@@ -236,6 +236,7 @@ typedef enum
     SPR_EGGC,		// Morph Ovum pickup + egg projectile (EGGC)
     SPR_HCHK,		// morph chicken (HCHK) -- generic morph creature (files/p_morph.c)
     SPR_TNT1,		// invisible placeholder (no lumps) -- default for grown DSDHacked states
+    SPR_MTUR,		// deployable sentry turret (MTUR*) -- patch lumps in run/ID0/aidoom.wad
     NUMSPRITES
 
 } spritenum_t;
@@ -1417,6 +1418,10 @@ typedef enum
     S_CHIC_DIE1, S_CHIC_DIE2, S_CHIC_DIE3, S_CHIC_DIE4, S_CHIC_DIE5,
     // Boom push/pull point-source (MT_PUSH/MT_PULL) idle state: invisible + persistent.
     S_TNT1,
+    // Deployable sentry turret (files/p_turret.c): idle look loop, fire loop, death boom.
+    S_TURRET_STND,
+    S_TURRET_FIRE1, S_TURRET_FIRE2,
+    S_TURRET_DIE1, S_TURRET_DIE2, S_TURRET_DIE3, S_TURRET_DIE4, S_TURRET_DIE5,
     NUMSTATES
 } statenum_t;
 
@@ -1654,6 +1659,7 @@ typedef enum {
     MT_CHICKEN,		// (M) generic morph creature -- the Heretic chicken (files/p_morph.c)
     MT_PUSH,		// Boom point-source pusher thing (DoomEd 5001) -- wind/current away
     MT_PULL,		// Boom point-source puller thing (DoomEd 5002) -- toward
+    MT_TURRET,		// deployable auto-firing sentry turret (files/p_turret.c)
     NUMMOBJTYPES
 
 } mobjtype_t;

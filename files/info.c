@@ -70,7 +70,8 @@ char *sprnames_builtin[NUMSPRITES] = {
     // (H) Heretic artifact pickup sprites -- lock-step with spritenum_t (info.h)
     "PTN1","SPHL","PWBK","TRCH","FBMB","INVU","INVS","ATLP",
     "SOAR","EGGC","HCHK",			// Wings / Morph Ovum / morph chicken
-    "TNT1"				// invisible placeholder (mbf/dsdhacked): no lumps -> renders nothing
+    "TNT1",				// invisible placeholder (mbf/dsdhacked): no lumps -> renders nothing
+    "MTUR"				// deployable sentry turret (SPR_MTUR) -- MTUR* patch lumps in run/ID0/aidoom.wad
 };
 
 
@@ -106,6 +107,8 @@ void A_XScream();
 void A_Look();
 void A_Chase();
 void A_FaceTarget();
+void A_TurretLook();		// files/p_turret.c -- deployable sentry turret
+void A_TurretFire();
 void A_PosAttack();
 void A_Scream();
 void A_SPosAttack();
@@ -1121,7 +1124,19 @@ state_t	states_builtin[NUMSTATES] = {
     {SPR_TLP2,32771,4,{NULL},S_TECH2LAMP,0,0},	// S_TECH2LAMP4
     // Boom MT_PUSH/MT_PULL idle: SPR_TNT1 is invisible (no lumps), tics -1 = never advances, loops to
     // itself so the point-source thing persists for the whole level (found via P_GetPushThing).
-    [S_TNT1] = {SPR_TNT1,0,-1,{NULL},S_TNT1,0,0}
+    [S_TNT1] = {SPR_TNT1,0,-1,{NULL},S_TNT1,0,0},
+
+    // Deployable sentry turret (files/p_turret.c).  One art frame (MTUR 'A', 8 rotations);
+    // the fire frames are drawn fullbright (|32768) for a muzzle-flash feel.  Death reuses
+    // the barrel explosion (SPR_BEXP) -- boom + scream, no splash so it can't grief the player.
+    [S_TURRET_STND]  = {SPR_MTUR,0,     10,{A_TurretLook},S_TURRET_STND, 0,0},
+    [S_TURRET_FIRE1] = {SPR_MTUR,32768,  4,{A_TurretFire},S_TURRET_FIRE2,0,0},
+    [S_TURRET_FIRE2] = {SPR_MTUR,32768,  4,{A_TurretFire},S_TURRET_FIRE1,0,0},
+    [S_TURRET_DIE1]  = {SPR_BEXP,32768,  5,{NULL},        S_TURRET_DIE2, 0,0},
+    [S_TURRET_DIE2]  = {SPR_BEXP,32769,  5,{A_Scream},    S_TURRET_DIE3, 0,0},
+    [S_TURRET_DIE3]  = {SPR_BEXP,32770,  5,{NULL},        S_TURRET_DIE4, 0,0},
+    [S_TURRET_DIE4]  = {SPR_BEXP,32771, 10,{NULL},        S_TURRET_DIE5, 0,0},
+    [S_TURRET_DIE5]  = {SPR_BEXP,32772, 10,{NULL},        S_NULL,        0,0}
 };
 
 
@@ -4713,6 +4728,31 @@ mobjinfo_t mobjinfo_builtin[NUMMOBJTYPES] = {
 	S_NULL, S_NULL, S_NULL, S_NULL, sfx_None,
 	0, 8*FRACUNIT, 8*FRACUNIT, 10, 0,
 	sfx_None, MF_NOBLOCKMAP, S_NULL
+    },
+    [MT_TURRET] = {		// deployable sentry turret (files/p_turret.c)
+	-1,			// doomednum (deploy-only; never placed by the map editor)
+	S_TURRET_STND,		// spawnstate (idle look loop)
+	100,			// spawnhealth
+	S_NULL,			// seestate
+	sfx_None,		// seesound
+	8,			// reactiontime
+	sfx_None,		// attacksound (A_TurretFire plays the shot itself)
+	S_NULL,			// painstate (no flinch)
+	0,			// painchance
+	sfx_None,		// painsound
+	S_NULL,			// meleestate
+	S_TURRET_FIRE1,		// missilestate (fire loop; A_TurretLook jumps here)
+	S_TURRET_DIE1,		// deathstate (barrel-style boom)
+	S_NULL,			// xdeathstate
+	sfx_barexp,		// deathsound
+	0,			// speed (never self-propels)
+	16*FRACUNIT,		// radius
+	40*FRACUNIT,		// height
+	1000000,		// mass (effectively immovable -- no knockback when shot)
+	0,			// damage
+	sfx_None,		// activesound
+	MF_SOLID|MF_SHOOTABLE|MF_NOBLOOD,	// flags
+	S_NULL			// raisestate
     }
 };
 

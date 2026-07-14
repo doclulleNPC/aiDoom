@@ -426,38 +426,52 @@ void I_Voice_Stop (void)
 }
 
 
+// Resolve the aidoom asset/voice WAD path: aidoom.cfg `aidoom_wad` (legacy
+// `buddy_wad` still honoured), else the default "aidoom.wad" (W_AddFile resolves
+// the bare name under ID0/).  Shared by the EARLY loader in D_DoomMain (so sprites
+// baked into aidoom.wad, e.g. the turret MTUR*, register with R_InitSprites) and
+// by I_Voice_Init below.
+void I_Voice_ResolveWad (char* buf, int n)
+{
+    if ((!Buddy_CfgGet ("aidoom_wad", buf, n) || !*buf) &&
+        (!Buddy_CfgGet ("buddy_wad",  buf, n) || !*buf))
+        strncpy (buf, "aidoom.wad", n);
+}
+
 void I_Voice_Init (void)
 {
-    // Resolve the voice WAD path: command-line -file takes precedence (via the
-    // existing W_AddFile mechanism in D_DoomMain), else aidoom.cfg `aidoom_wad`
-    // (legacy `buddy_wad` still honoured), else "aidoom.wad" in CWD.
     char wadpath[256];
-    if ((!Buddy_CfgGet ("aidoom_wad", wadpath, sizeof(wadpath)) || !*wadpath) &&
-        (!Buddy_CfgGet ("buddy_wad",  wadpath, sizeof(wadpath)) || !*wadpath))
-        strncpy (wadpath, "aidoom.wad", sizeof(wadpath));
+    I_Voice_ResolveWad (wadpath, sizeof(wadpath));
 
-    // Try to add it; detect success via "is any DS* lump now known?".
-    int oldnumlumps = numlumps;
-    W_AddFile (wadpath);
-    // Grow lumpcache to cover the lumps aidoom.wad just added (W_AddFile doesn't),
-    // and zero the new slots so W_CacheLumpNum sees them as not-yet-cached.
-    if (numlumps > oldnumlumps && lumpcache)
+    // aidoom.wad is normally added EARLY (D_DoomMain, before W_Init/R_InitSprites) so
+    // its sprites register with the sprite system.  If that already loaded it (DS* lump
+    // present), don't add it again.  Otherwise (e.g. a custom path missing from disk at
+    // that point) fall back to the old late add + manual lumpcache grow so the voice
+    // still works -- its sprites just won't be actor-visible in that edge case.
+    if (W_CheckNumForName ("DSCT001") < 0)
     {
-        void** oldcache = lumpcache;
-        lumpcache = (void**)realloc (lumpcache, numlumps * sizeof(*lumpcache));
-        memset (lumpcache + oldnumlumps, 0, (numlumps - oldnumlumps) * sizeof(*lumpcache));
-        // CRITICAL: realloc may have MOVED lumpcache.  Every lump cached so far
-        // (R_Init etc. ran before us) has a zone block whose owner back-pointer
-        // still points into the OLD array; on the next purge Z_Free would write
-        // NULL through that freed address and corrupt the heap (later surfacing
-        // as e.g. a NULL drawseg->curline crash in the sprite renderer).  When
-        // the array moved, re-point each live block's owner to the new slot.
-        if (lumpcache != oldcache)
+        int oldnumlumps = numlumps;
+        W_AddFile (wadpath);
+        // Grow lumpcache to cover the lumps aidoom.wad just added (W_AddFile doesn't),
+        // and zero the new slots so W_CacheLumpNum sees them as not-yet-cached.
+        if (numlumps > oldnumlumps && lumpcache)
         {
-            int i;
-            for (i = 0; i < oldnumlumps; i++)
-                if (lumpcache[i])
-                    Z_ChangeUser (lumpcache[i], &lumpcache[i]);
+            void** oldcache = lumpcache;
+            lumpcache = (void**)realloc (lumpcache, numlumps * sizeof(*lumpcache));
+            memset (lumpcache + oldnumlumps, 0, (numlumps - oldnumlumps) * sizeof(*lumpcache));
+            // CRITICAL: realloc may have MOVED lumpcache.  Every lump cached so far
+            // (R_Init etc. ran before us) has a zone block whose owner back-pointer
+            // still points into the OLD array; on the next purge Z_Free would write
+            // NULL through that freed address and corrupt the heap (later surfacing
+            // as e.g. a NULL drawseg->curline crash in the sprite renderer).  When
+            // the array moved, re-point each live block's owner to the new slot.
+            if (lumpcache != oldcache)
+            {
+                int i;
+                for (i = 0; i < oldnumlumps; i++)
+                    if (lumpcache[i])
+                        Z_ChangeUser (lumpcache[i], &lumpcache[i]);
+            }
         }
     }
     int probe = W_CheckNumForName ("DSCT001");

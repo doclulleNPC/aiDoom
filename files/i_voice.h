@@ -33,6 +33,12 @@
 // spatialised (distance + stereo pan) instead of flat at the player.
 void I_Voice_SayByName (const char* lumpname, int lvol, int rvol);
 
+// Resolve the aidoom asset/voice WAD path (cfg override or default "aidoom.wad").
+// D_DoomMain uses it to add the WAD EARLY -- before W_Init/R_InitSprites -- so any
+// sprites baked into it (e.g. the deployable turret MTUR*) register with the sprite
+// system.  I_Voice_Init then detects it's already loaded and skips re-adding it.
+void I_Voice_ResolveWad (char* buf, int n);
+
 // Speak the buddy's canonical phrase by tag: "contact", "hurt", "clear",
 // "state:<what>", "summon_ok", "wait_hold", "wait_move", "attack_ok",
 // "attack_none", "status:<weapon>[:ammo]".  Resolves to the right lump and

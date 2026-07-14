@@ -71,6 +71,7 @@ static setting_t settings[] = {
     {"Action keys","Next weapon",   "key_nextweapon", T_KEY,0,0,F_DOOMRC},
     {"Action keys","Prev weapon",   "key_prevweapon", T_KEY,0,0,F_DOOMRC},
     {"Action keys","Jump",          "key_jump",       T_KEY,0,0,F_DOOMRC},
+    {"Action keys","Deploy turret", "key_turret",     T_KEY,0,0,F_DOOMRC},
     {"Action keys","Console",       "key_console",    T_KEY,0,0,F_DOOMRC},
 
     {"Buddy keys","Buddy: come",    "key_buddy_come",   T_KEY,0,0,F_DOOMRC},
@@ -212,7 +213,8 @@ static void set_default_int(setting_t* s)
     else if (!strcmp(n,"key_nextweapon"))   v = K_MWHEELUP;
     else if (!strcmp(n,"key_prevweapon"))   v = K_MWHEELDOWN;
     else if (!strcmp(n,"key_jump"))         v = ' ';
-    else if (!strcmp(n,"key_console"))      v = K_F12;
+    else if (!strcmp(n,"key_turret"))       v = 'q';
+    else if (!strcmp(n,"key_console"))      v = 0x60;	/* '`'/'^' backquote (KEY_BACKQUOTE); F12 is the spy key */
     else if (!strcmp(n,"key_buddy_come"))   v = ',';
     else if (!strcmp(n,"key_buddy_attack")) v = '.';
     else if (!strcmp(n,"key_buddy_stay"))   v = '-';

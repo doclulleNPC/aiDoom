@@ -180,6 +180,7 @@ extern int	key_speed;
 extern int	key_nextweapon;
 extern int	key_prevweapon;
 extern int	key_jump;
+extern int	key_turret;
 extern int	key_buddy_come;
 extern int	key_buddy_attack;
 extern int	key_buddy_stay;
@@ -286,6 +287,7 @@ default_t	defaults[] =
     {"key_nextweapon",&key_nextweapon, KEY_MWHEELUP},
     {"key_prevweapon",&key_prevweapon, KEY_MWHEELDOWN},
     {"key_jump",&key_jump, ' '},
+    {"key_turret",&key_turret, 'q'},
     {"autorun",&autorun, 1},
     {"key_console",&key_console, KEY_BACKQUOTE},
     {"key_spy",&key_spy, KEY_F12},	// spy mode (view the AI buddy); default F12

@@ -72,6 +72,7 @@ static int access(char *file, int mode)
 #include "m_menu.h"
 
 #include "i_system.h"
+#include "i_voice.h"		// I_Voice_ResolveWad (add aidoom.wad early for its sprites)
 #include "i_sound.h"
 #include "i_video.h"
 
@@ -1292,6 +1293,22 @@ void D_DoomMain (void)
 
     printf ("Z_Init: Init zone memory allocation daemon. \n");
     Z_Init ();
+
+    // Add aidoom.wad EARLY -- before W_Init/R_InitSprites -- so any sprites baked into it
+    // (e.g. the deployable turret's MTUR* frames) are picked up by the sprite frame table.
+    // The voice code (I_Voice_Init) then sees it's already loaded and skips re-adding it.
+    // (Previously aidoom.wad was added late, for voice/HUD only, so its actor sprites never
+    // registered; the turret art shipped in a separate early turret.wad.)
+    {
+	char aw[256], id0[300];
+	I_Voice_ResolveWad (aw, sizeof(aw));
+	snprintf (id0, sizeof(id0), "ID0/%s", aw);
+	if (aw[0] && (!access (aw, R_OK) || !access (id0, R_OK)))
+	{
+	    D_AddFile (aw);
+	    printf ("aiDoom asset WAD: %s -> loaded early (sprites register with the sprite system)\n", aw);
+	}
+    }
 
     printf ("W_Init: Init WADfiles.\n");
     W_InitMultipleFiles (wadfiles);

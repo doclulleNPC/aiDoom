@@ -71,6 +71,7 @@ rcsid[] = "$Id: g_game.c,v 1.8 1997/02/03 22:45:09 b1 Exp $";
 #include "g_game.h"
 #include "g_agent.h"		// G_AgentActive/BuildTiccmd -- full agent/LLM player control
 #include "p_ai_coop.h"		// P_AICoop_Slot (skip consistency check for the buddy)
+#include "p_turret.h"		// P_TurretDeploy (key_turret hotkey)
 #include "p_invent.h"		// (J) artifact inventory scroll/use
 #include "p_ai_llm.h"		// P_AI_NetService (service director socket every gamestate)
 #include "p_ai_director.h"	// P_Director_Say (level-clear voice line)
@@ -178,6 +179,7 @@ int		key_inv_drop;
 int		key_nextweapon;		// default: mouse wheel up
 int		key_prevweapon;		// default: mouse wheel down
 int		key_jump;		// MOD: jump (default: space)
+int		key_turret;		// MOD: deploy sentry turret (default: 'q')
 int		key_spy;		// spy mode: view another player (the AI buddy in co-op); default F12
 int		autorun = 1;	// always-run; the run key toggles this (G_Responder)
 
@@ -684,6 +686,9 @@ boolean G_Responder (event_t* ev)
 	    { players[consoleplayer].message = (char*) P_AICoop_Wait (); return true; }
 	    if (ev->data1 == key_buddy_mode)
 	    { players[consoleplayer].message = (char*) P_AICoop_ToggleMode (); return true; }
+	    // Deploy a sentry turret in front of the player (costs 25 shells or 50 bullets).
+	    if (ev->data1 == key_turret)
+	    { players[consoleplayer].message = (char*) P_TurretDeploy (&players[consoleplayer]); return true; }
 	    // (J) Heretic-style artifact inventory: scroll select / use selected.
 	    if (ev->data1 == key_inv_left)
 	    { P_InvScroll (&players[consoleplayer], -1); return true; }
