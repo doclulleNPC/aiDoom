@@ -29,6 +29,7 @@
 #include "d_event.h"
 #include "d_items.h"
 #include "p_invent.h"		// inventory: spend a stimpack/medikit to revive
+#include "p_secdrone.h"		// P_AICoop_MaybeSpawnDrone (deploy a friendly Security Drone)
 #include "m_argv.h"
 #include "p_local.h"
 #include "p_mobj.h"
@@ -2070,6 +2071,10 @@ void P_AICoop_BuildCmd (void)
 
     mo = bot->mo;
     memset (cmd, 0, sizeof(*cmd));
+
+    // When surrounded by many enemies, the buddy deploys a friendly Security Drone
+    // (costs it 50 bullets or 25 shells; throttled + capped inside).  files/p_secdrone.c.
+    P_AICoop_MaybeSpawnDrone (bot);
 
     // Progress check.  "stuck" if we tried to move but either barely moved this tic
     // (wedged solid) OR made no NET progress over a ~0.4s window -- the latter

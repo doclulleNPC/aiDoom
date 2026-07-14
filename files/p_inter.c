@@ -895,11 +895,11 @@ P_DamageMobj
 	return;
     }
 
-    // A deployed sentry turret (MT_TURRET, files/p_turret.c) is the player's own
-    // device: it must never damage the human, the AI buddy, or any friendly actor
-    // -- even on a stray hit (chaingun spread, or someone stepping into its line of
-    // fire).  Bail like the friendly-fire guard below, before any thrust/damage.
-    if (source && source->type == MT_TURRET
+    // Player-side helpers -- a deployed sentry turret (MT_TURRET) or any FRIENDLY actor
+    // (the buddy-spawned Security Drone MT_SECDRONE, or a friendly monster) -- must never
+    // damage the human, the AI buddy, or another friendly, even on a stray hit (spread,
+    // or someone stepping into the line of fire).  Bail before any thrust/damage.
+    if (source && (source->type == MT_TURRET || (source->flags & MF_FRIEND))
 	&& (target->player || (target->flags & MF_FRIEND)))
 	return;
 

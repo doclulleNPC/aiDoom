@@ -604,7 +604,14 @@ P_TryMove
 	     && tmfloorz - tmdropoffz > 24*FRACUNIT )
 	    return false;	// don't stand over a dropoff
     }
-    
+
+    // The Hexen Stalker/Serpent lurks in liquid ONLY -- it may never move onto dry
+    // ground (mirrors ZDoom's MF2_CANTLEAVEFLOORPIC, but keyed to any liquid flat via
+    // P_IsLiquidFloor).  Blocking the move here confines it to its nukage/water pool.
+    if ( (thing->type == MT_XSTALKER || thing->type == MT_XSTALKERBOSS)
+	 && !P_IsLiquidFloor (R_PointInSubsector (x, y)->sector) )
+	return false;
+
     // the move is ok,
     // so link the thing into its new position
     P_UnsetThingPosition (thing);

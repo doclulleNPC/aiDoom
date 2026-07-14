@@ -325,6 +325,11 @@ sfxinfo_t S_sfx_builtin[] =
   { "xdratk", false, 70, 0, -1, -1, 0 },
   { "xdrdth", false, 70, 0, -1, -1, 0 },
   { "xdrhit", false, 70, 0, -1, -1, 0 },
+  // Security Drone (files/p_secdrone.c) -- lump = "ds"+name -> DSSECDR1..4.
+  { "secdr1", false, 98, 0, -1, -1, 0 },	// sight
+  { "secdr2", false, 78, 0, -1, -1, 0 },	// active
+  { "secdr3", false, 98, 0, -1, -1, 0 },	// detect/attack
+  { "secdr4", false, 98, 0, -1, -1, 0 },	// death
 };
 
 // DSDHacked (M5): the sound table is growable (see dsdhacked.c dsdh_EnsureSFXCapacity).

@@ -291,6 +291,76 @@ static void HU_Buddy_Text (int x, int y, const char* s) { HU_Buddy_TextT (x, y, 
 // Top-right readout: the buddy's mugshot (by health) followed by two right-aligned
 // message-font lines (HP/armor, weapon/ammo).  The mugshot replaces the old "BUDDY"
 // label; if the BUF* faces are missing it falls back to that text label.
+// The buddy's held artifacts, drawn as pickup-sprite ICONS (frame A0) with a count.
+// Each artifact maps to its DOOM/Heretic pickup lump; a short text TAG is the fallback
+// when that icon lump isn't in the loaded WADs (e.g. the Heretic artifacts under DOOM).
+// arti_none + the ammo-overflow slots are NULL (overflow ammo isn't an inventory item).
+static const char* const buddy_arti_icon[NUMARTIFACTS] =
+{
+    [arti_stimpack]   = "STIMA0", [arti_medikit]   = "MEDIA0", [arti_healthbonus] = "BON1A0",
+    [arti_armorbonus] = "BON2A0", [arti_greenarmor]= "ARM1A0", [arti_bluearmor]   = "ARM2A0",
+    [h_arti_flask]    = "PTN1A0", [h_arti_urn]     = "SPHLA0", [h_arti_tome]      = "PWBKA0",
+    [h_arti_torch]    = "TRCHA0", [h_arti_bomb]    = "FBMBA0", [h_arti_ring]      = "INVUA0",
+    [h_arti_shadow]   = "INVSA0", [h_arti_chaos]   = "ATLPA0", [h_arti_wings]     = "SOARA0",
+    [h_arti_egg]      = "EGGCA0",
+};
+static const char* const buddy_arti_tag[NUMARTIFACTS] =
+{
+    [arti_stimpack]   = "STIM", [arti_medikit]   = "MED",  [arti_healthbonus] = "HP+",
+    [arti_armorbonus] = "AR+",  [arti_greenarmor]= "GARM", [arti_bluearmor]   = "BARM",
+    [h_arti_flask]    = "FLSK", [h_arti_urn]     = "URN",  [h_arti_tome]      = "BSRK",
+    [h_arti_torch]    = "TRCH", [h_arti_bomb]    = "BOMB", [h_arti_ring]      = "INVU",
+    [h_arti_shadow]   = "SHDW", [h_arti_chaos]   = "CHAO", [h_arti_wings]     = "WING",
+    [h_arti_egg]      = "EGG",
+};
+
+// The buddy's OWN artifact inventory, drawn right-to-left from the right margin on a
+// 4th strip line: each held artifact's pickup icon + its count (text tag if no icon).
+// The buddy carries the full artifact set like any co-op player and auto-uses health
+// items (AICoop_AutoHeal); this just shows what it has.  Nothing when the pack is empty.
+static void HU_Buddy_DrawInventory (player_t* bot, int y)
+{
+    int wb = SCREENWIDTH / hires;
+    int x  = wb - 4;			// right edge; we walk leftward
+    int a;
+
+    for (a = NUMARTIFACTS - 1 ; a > arti_none ; a--)
+    {
+	int	 cnt = bot->inventory[a];
+	patch_t* p   = NULL;
+	char	 num[8];
+	int	 nw, ln;
+
+	if (cnt <= 0)
+	    continue;
+
+	if (buddy_arti_icon[a] && (ln = W_CheckNumForName (buddy_arti_icon[a])) >= 0)
+	    p = (patch_t*) W_CacheLumpNum (ln, PU_CACHE);
+
+	snprintf (num, sizeof num, "%d", cnt);
+	nw = HU_Buddy_TextW (num);
+
+	if (p)
+	{
+	    // count just right of the icon, then the icon (offsets compensated so its
+	    // visible top-left lands at (x, y)).
+	    x -= nw;                 HU_Buddy_Text (x, y + 4, num);
+	    x -= SHORT (p->width);   V_DrawPatch (x + SHORT (p->leftoffset),
+						  y + SHORT (p->topoffset), 0, p);
+	    x -= 4;
+	}
+	else if (buddy_arti_tag[a])	// no icon lump -> text tag "TAGxN"
+	{
+	    char t[24];
+	    snprintf (t, sizeof t, "%sx%d", buddy_arti_tag[a], cnt);
+	    x -= HU_Buddy_TextW (t);   HU_Buddy_Text (x, y, t);
+	    x -= 4;
+	}
+	if (x < 0)
+	    break;
+    }
+}
+
 static void HU_Buddy_DrawStrip (player_t* bot)
 {
     int      hp   = bot->health;
@@ -368,6 +438,9 @@ static void HU_Buddy_DrawStrip (player_t* bot)
     }
     HU_Buddy_Text (tx, 12, l2);
     HU_Buddy_Text (tx, 22, l3);
+
+    // The buddy's own artifact inventory, on a 4th line below the status line.
+    HU_Buddy_DrawInventory (bot, 32);
 
     // Mugshot just left of the text block (BUF* patches carry a -5/-2 offset, so
     // V_DrawPatch shifts them right/down a touch -- accounted for in the x below).

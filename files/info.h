@@ -237,6 +237,9 @@ typedef enum
     SPR_HCHK,		// morph chicken (HCHK) -- generic morph creature (files/p_morph.c)
     SPR_TNT1,		// invisible placeholder (no lumps) -- default for grown DSDHacked states
     SPR_MTUR,		// deployable sentry turret (MTUR*) -- patch lumps in run/ID0/aidoom.wad
+    SPR_MNDR,		// Security Drone body (MNDR*) -- from SecurityDrone.pk3, in aidoom.wad
+    SPR_SHT1,		// Security Drone laser shot (SHT1*)
+    SPR_POW1,		// Security Drone laser impact (POW1*)
     NUMSPRITES
 
 } spritenum_t;
@@ -1422,6 +1425,14 @@ typedef enum
     S_TURRET_STND,
     S_TURRET_FIRE1, S_TURRET_FIRE2,
     S_TURRET_DIE1, S_TURRET_DIE2, S_TURRET_DIE3, S_TURRET_DIE4, S_TURRET_DIE5,
+    // Security Drone (files/p_secdrone.c): flying friendly laser drone + its shot.
+    S_SECDR_STND,
+    S_SECDR_RUN1,
+    S_SECDR_ATK1, S_SECDR_ATK2, S_SECDR_ATK3, S_SECDR_ATK4, S_SECDR_ATK5, S_SECDR_ATK6,
+    S_SECDR_PAIN,
+    S_SECDR_DIE1, S_SECDR_DIE2, S_SECDR_DIE3, S_SECDR_DIE4, S_SECDR_DIE5, S_SECDR_DIE6, S_SECDR_DIE7,
+    S_SECDRSHOT1, S_SECDRSHOT2,
+    S_SECDRSHOT_X1, S_SECDRSHOT_X2, S_SECDRSHOT_X3, S_SECDRSHOT_X4, S_SECDRSHOT_X5,
     NUMSTATES
 } statenum_t;
 
@@ -1660,6 +1671,8 @@ typedef enum {
     MT_PUSH,		// Boom point-source pusher thing (DoomEd 5001) -- wind/current away
     MT_PULL,		// Boom point-source puller thing (DoomEd 5002) -- toward
     MT_TURRET,		// deployable auto-firing sentry turret (files/p_turret.c)
+    MT_SECDRONE,	// Security Drone: buddy-spawned flying friendly laser drone (files/p_secdrone.c)
+    MT_SECDRONESHOT,	// its laser projectile
     NUMMOBJTYPES
 
 } mobjtype_t;

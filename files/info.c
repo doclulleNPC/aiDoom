@@ -71,7 +71,8 @@ char *sprnames_builtin[NUMSPRITES] = {
     "PTN1","SPHL","PWBK","TRCH","FBMB","INVU","INVS","ATLP",
     "SOAR","EGGC","HCHK",			// Wings / Morph Ovum / morph chicken
     "TNT1",				// invisible placeholder (mbf/dsdhacked): no lumps -> renders nothing
-    "MTUR"				// deployable sentry turret (SPR_MTUR) -- MTUR* patch lumps in run/ID0/aidoom.wad
+    "MTUR",				// deployable sentry turret (SPR_MTUR) -- MTUR* patch lumps in run/ID0/aidoom.wad
+    "MNDR","SHT1","POW1"		// Security Drone body / laser shot / laser impact (aidoom.wad)
 };
 
 
@@ -109,6 +110,9 @@ void A_Chase();
 void A_FaceTarget();
 void A_TurretLook();		// files/p_turret.c -- deployable sentry turret
 void A_TurretFire();
+void A_SecDroneLook();		// files/p_secdrone.c -- Security Drone (aggressive AI)
+void A_SecDroneChase();
+void A_SecDroneShot();		// Security Drone laser
 void A_PosAttack();
 void A_Scream();
 void A_SPosAttack();
@@ -1132,11 +1136,39 @@ state_t	states_builtin[NUMSTATES] = {
     [S_TURRET_STND]  = {SPR_MTUR,0,     10,{A_TurretLook},S_TURRET_STND, 0,0},
     [S_TURRET_FIRE1] = {SPR_MTUR,32768,  4,{A_TurretFire},S_TURRET_FIRE2,0,0},
     [S_TURRET_FIRE2] = {SPR_MTUR,32768,  4,{A_TurretFire},S_TURRET_FIRE1,0,0},
-    [S_TURRET_DIE1]  = {SPR_BEXP,32768,  5,{NULL},        S_TURRET_DIE2, 0,0},
-    [S_TURRET_DIE2]  = {SPR_BEXP,32769,  5,{A_Scream},    S_TURRET_DIE3, 0,0},
-    [S_TURRET_DIE3]  = {SPR_BEXP,32770,  5,{NULL},        S_TURRET_DIE4, 0,0},
-    [S_TURRET_DIE4]  = {SPR_BEXP,32771, 10,{NULL},        S_TURRET_DIE5, 0,0},
-    [S_TURRET_DIE5]  = {SPR_BEXP,32772, 10,{NULL},        S_NULL,        0,0}
+    // Death: a generic blast (rocket-explosion frames SPR_MISL B/C/D), NOT the barrel boom.
+    [S_TURRET_DIE1]  = {SPR_MISL,32769,  8,{A_Scream},    S_TURRET_DIE2, 0,0},
+    [S_TURRET_DIE2]  = {SPR_MISL,32770,  6,{NULL},        S_TURRET_DIE3, 0,0},
+    [S_TURRET_DIE3]  = {SPR_MISL,32771,  6,{NULL},        S_NULL,        0,0},
+    [S_TURRET_DIE4]  = {SPR_MISL,32771,  1,{NULL},        S_NULL,        0,0},
+    [S_TURRET_DIE5]  = {SPR_MISL,32771,  1,{NULL},        S_NULL,        0,0},
+
+    // Security Drone (files/p_secdrone.c).  MNDR frames: A=0 idle/chase, B=1 firing (bright),
+    // C..H death.  Laser shot uses SHT1 A/B (flight) + POW1 F..J (impact).  A ZDoom->vanilla
+    // port of SecurityDrone.pk3: laser volley of 3 shots, no charge/gib/trail codepointers.
+    [S_SECDR_STND] = {SPR_MNDR,0,      6,{A_SecDroneLook}, S_SECDR_STND, 0,0},
+    [S_SECDR_RUN1] = {SPR_MNDR,0,      2,{A_SecDroneChase},S_SECDR_RUN1, 0,0},
+    [S_SECDR_ATK1] = {SPR_MNDR,0,      4,{A_FaceTarget},  S_SECDR_ATK2, 0,0},
+    [S_SECDR_ATK2] = {SPR_MNDR,32769,  3,{A_SecDroneShot},S_SECDR_ATK3, 0,0},
+    [S_SECDR_ATK3] = {SPR_MNDR,0,      4,{A_FaceTarget},  S_SECDR_ATK4, 0,0},
+    [S_SECDR_ATK4] = {SPR_MNDR,32769,  3,{A_SecDroneShot},S_SECDR_ATK5, 0,0},
+    [S_SECDR_ATK5] = {SPR_MNDR,0,      4,{A_FaceTarget},  S_SECDR_ATK6, 0,0},
+    [S_SECDR_ATK6] = {SPR_MNDR,32769,  3,{A_SecDroneShot},S_SECDR_RUN1, 0,0},
+    [S_SECDR_PAIN] = {SPR_MNDR,0,      2,{A_Pain},        S_SECDR_RUN1, 0,0},
+    [S_SECDR_DIE1] = {SPR_MNDR,32768,  7,{A_Scream},      S_SECDR_DIE2, 0,0},
+    [S_SECDR_DIE2] = {SPR_MNDR,32770,  5,{A_Fall},        S_SECDR_DIE3, 0,0},
+    [S_SECDR_DIE3] = {SPR_MNDR,32771,  5,{NULL},          S_SECDR_DIE4, 0,0},
+    [S_SECDR_DIE4] = {SPR_MNDR,32772,  5,{NULL},          S_SECDR_DIE5, 0,0},
+    [S_SECDR_DIE5] = {SPR_MNDR,32773,  5,{NULL},          S_SECDR_DIE6, 0,0},
+    [S_SECDR_DIE6] = {SPR_MNDR,6,      5,{NULL},          S_SECDR_DIE7, 0,0},
+    [S_SECDR_DIE7] = {SPR_MNDR,7,     -1,{NULL},          S_NULL,       0,0},
+    [S_SECDRSHOT1]   = {SPR_SHT1,32768, 2,{NULL},S_SECDRSHOT2,   0,0},
+    [S_SECDRSHOT2]   = {SPR_SHT1,32769, 2,{NULL},S_SECDRSHOT1,   0,0},
+    [S_SECDRSHOT_X1] = {SPR_POW1,32768, 3,{NULL},S_SECDRSHOT_X2, 0,0},
+    [S_SECDRSHOT_X2] = {SPR_POW1,32769, 3,{NULL},S_SECDRSHOT_X3, 0,0},
+    [S_SECDRSHOT_X3] = {SPR_POW1,32770, 3,{NULL},S_SECDRSHOT_X4, 0,0},
+    [S_SECDRSHOT_X4] = {SPR_POW1,32771, 3,{NULL},S_SECDRSHOT_X5, 0,0},
+    [S_SECDRSHOT_X5] = {SPR_POW1,32772, 3,{NULL},S_NULL,         0,0}
 };
 
 
@@ -4742,9 +4774,9 @@ mobjinfo_t mobjinfo_builtin[NUMMOBJTYPES] = {
 	sfx_None,		// painsound
 	S_NULL,			// meleestate
 	S_TURRET_FIRE1,		// missilestate (fire loop; A_TurretLook jumps here)
-	S_TURRET_DIE1,		// deathstate (barrel-style boom)
+	S_TURRET_DIE1,		// deathstate (generic blast, not the barrel)
 	S_NULL,			// xdeathstate
-	sfx_barexp,		// deathsound
+	sfx_rxplod,		// deathsound (rocket blast, not the barrel boom)
 	0,			// speed (never self-propels)
 	16*FRACUNIT,		// radius
 	40*FRACUNIT,		// height
@@ -4752,6 +4784,56 @@ mobjinfo_t mobjinfo_builtin[NUMMOBJTYPES] = {
 	0,			// damage
 	sfx_None,		// activesound
 	MF_SOLID|MF_SHOOTABLE|MF_NOBLOOD,	// flags
+	S_NULL			// raisestate
+    },
+    [MT_SECDRONE] = {		// Security Drone -- buddy-spawned flying friendly laser drone
+	-1,			// doomednum (spawned by the buddy, not the map)
+	S_SECDR_STND,		// spawnstate
+	50,			// spawnhealth
+	S_SECDR_RUN1,		// seestate
+	sfx_secdr_sight,	// seesound
+	8,			// reactiontime
+	sfx_secdr_detect,	// attacksound
+	S_SECDR_PAIN,		// painstate
+	255,			// painchance
+	sfx_None,		// painsound
+	S_NULL,			// meleestate
+	S_SECDR_ATK1,		// missilestate
+	S_SECDR_DIE1,		// deathstate
+	S_NULL,			// xdeathstate
+	sfx_secdr_death,	// deathsound
+	7,			// speed
+	12*FRACUNIT,		// radius
+	26*FRACUNIT,		// height
+	300,			// mass
+	0,			// damage
+	sfx_secdr_active,	// activesound
+	MF_SOLID|MF_SHOOTABLE|MF_FLOAT|MF_NOGRAVITY|MF_NOBLOOD,	// flags (MF_FRIEND added on spawn)
+	S_NULL			// raisestate
+    },
+    [MT_SECDRONESHOT] = {	// Security Drone laser projectile
+	-1,			// doomednum
+	S_SECDRSHOT1,		// spawnstate
+	1000,			// spawnhealth
+	S_NULL,			// seestate
+	sfx_plasma,		// seesound (fired)
+	8,			// reactiontime
+	sfx_None,		// attacksound
+	S_NULL,			// painstate
+	0,			// painchance
+	sfx_None,		// painsound
+	S_NULL,			// meleestate
+	S_NULL,			// missilestate
+	S_SECDRSHOT_X1,		// deathstate (impact)
+	S_NULL,			// xdeathstate
+	sfx_None,		// deathsound
+	40*FRACUNIT,		// speed
+	10*FRACUNIT,		// radius
+	8*FRACUNIT,		// height
+	100,			// mass
+	4,			// damage (per shot; a volley is 3)
+	sfx_None,		// activesound
+	MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY,	// flags
 	S_NULL			// raisestate
     }
 };
