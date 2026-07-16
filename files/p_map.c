@@ -367,15 +367,22 @@ boolean PIT_CheckThing (mobj_t* thing)
     // check for skulls slamming into things
     if (tmthing->flags & MF_SKULLFLY)
     {
+	// A FRIENDLY charger (the buddy's Security Drone ramming lost-soul style)
+	// must never friendly-fire: fly straight THROUGH the player, the buddy and
+	// other allies without damaging them or aborting the charge.
+	if ((tmthing->flags & MF_FRIEND)
+	    && (thing->player || (thing->flags & MF_FRIEND)))
+	    return true;
+
 	damage = ((P_Random()%8)+1)*tmthing->info->damage;
-	
+
 	P_DamageMobj (thing, tmthing, tmthing, damage);
-	
+
 	tmthing->flags &= ~MF_SKULLFLY;
 	tmthing->momx = tmthing->momy = tmthing->momz = 0;
-	
+
 	P_SetMobjState (tmthing, tmthing->info->spawnstate);
-	
+
 	return false;		// stop moving
     }
 
@@ -388,7 +395,15 @@ boolean PIT_CheckThing (mobj_t* thing)
 	    return true;		// overhead
 	if (tmthing->z+tmthing->height < thing->z)
 	    return true;		// underneath
-		
+
+	// A friendly missile (the buddy's Security Drone laser) passes harmlessly
+	// through the human, the buddy and any other friend instead of exploding on
+	// them, so it carries on to the enemy behind.
+	if (tmthing->target
+	    && (tmthing->target->type == MT_TURRET || (tmthing->target->flags & MF_FRIEND))
+	    && (thing->player || (thing->flags & MF_FRIEND)))
+	    return true;
+
 	if (tmthing->target && (
 	    tmthing->target->type == thing->type || 
 	    (tmthing->target->type == MT_KNIGHT && thing->type == MT_BRUISER)||
@@ -996,6 +1011,14 @@ PTR_AimTraverse (intercept_t* in)
     if (!(th->flags&MF_SHOOTABLE))
 	return true;			// corpse or something
 
+    // A friendly shooter (sentry turret / friendly drone / friendly monster) looks
+    // straight past the human, the buddy and any other friend, so a teammate in the
+    // line of fire can never steal its auto-aim.
+    if (shootthing
+	&& (shootthing->type == MT_TURRET || (shootthing->flags & MF_FRIEND))
+	&& (th->player || (th->flags & MF_FRIEND)))
+	return true;
+
     // check angles to see if the thing can be aimed at
     dist = FixedMul (attackrange, in->frac);
     thingtopslope = FixedDiv (th->z+th->height - shootz , dist);
@@ -1107,7 +1130,15 @@ boolean PTR_ShootTraverse (intercept_t* in)
     
     if (!(th->flags&MF_SHOOTABLE))
 	return true;		// corpse or something
-		
+
+    // A friendly shooter (sentry turret / friendly drone / friendly monster) shoots
+    // straight THROUGH the human, the buddy and any other friend instead of hitting
+    // them -- no blood, no blocked shot -- so it reaches the enemy behind.
+    if (shootthing
+	&& (shootthing->type == MT_TURRET || (shootthing->flags & MF_FRIEND))
+	&& (th->player || (th->flags & MF_FRIEND)))
+	return true;
+
     // check angles to see if the thing can be aimed at
     dist = FixedMul (attackrange, in->frac);
     thingtopslope = FixedDiv (th->z+th->height - shootz , dist);

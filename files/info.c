@@ -113,6 +113,8 @@ void A_TurretFire();
 void A_SecDroneLook();		// files/p_secdrone.c -- Security Drone (aggressive AI)
 void A_SecDroneChase();
 void A_SecDroneShot();		// Security Drone laser
+void A_SecDroneCharge();	// Security Drone lost-soul-style ram (initiate)
+void A_SecDroneChargeTick();	// ...maintain / time out the ram flight
 void A_PosAttack();
 void A_Scream();
 void A_SPosAttack();
@@ -1146,7 +1148,7 @@ state_t	states_builtin[NUMSTATES] = {
     // Security Drone (files/p_secdrone.c).  MNDR frames: A=0 idle/chase, B=1 firing (bright),
     // C..H death.  Laser shot uses SHT1 A/B (flight) + POW1 F..J (impact).  A ZDoom->vanilla
     // port of SecurityDrone.pk3: laser volley of 3 shots, no charge/gib/trail codepointers.
-    [S_SECDR_STND] = {SPR_MNDR,0,      6,{A_SecDroneLook}, S_SECDR_STND, 0,0},
+    [S_SECDR_STND] = {SPR_MNDR,0,      2,{A_SecDroneLook}, S_SECDR_STND, 0,0},	// fast tic: responsive idle roam/scan
     [S_SECDR_RUN1] = {SPR_MNDR,0,      2,{A_SecDroneChase},S_SECDR_RUN1, 0,0},
     [S_SECDR_ATK1] = {SPR_MNDR,0,      4,{A_FaceTarget},  S_SECDR_ATK2, 0,0},
     [S_SECDR_ATK2] = {SPR_MNDR,32769,  3,{A_SecDroneShot},S_SECDR_ATK3, 0,0},
@@ -1155,6 +1157,8 @@ state_t	states_builtin[NUMSTATES] = {
     [S_SECDR_ATK5] = {SPR_MNDR,0,      4,{A_FaceTarget},  S_SECDR_ATK6, 0,0},
     [S_SECDR_ATK6] = {SPR_MNDR,32769,  3,{A_SecDroneShot},S_SECDR_RUN1, 0,0},
     [S_SECDR_PAIN] = {SPR_MNDR,0,      2,{A_Pain},        S_SECDR_RUN1, 0,0},
+    [S_SECDR_CHG1] = {SPR_MNDR,32769,  2,{A_SecDroneChargeTick}, S_SECDR_CHG2, 0,0},	// ram flight (loops until impact/timeout)
+    [S_SECDR_CHG2] = {SPR_MNDR,32769,  2,{A_SecDroneChargeTick}, S_SECDR_CHG1, 0,0},
     [S_SECDR_DIE1] = {SPR_MNDR,32768,  7,{A_Scream},      S_SECDR_DIE2, 0,0},
     [S_SECDR_DIE2] = {SPR_MNDR,32770,  5,{A_Fall},        S_SECDR_DIE3, 0,0},
     [S_SECDR_DIE3] = {SPR_MNDR,32771,  5,{NULL},          S_SECDR_DIE4, 0,0},
@@ -4795,7 +4799,7 @@ mobjinfo_t mobjinfo_builtin[NUMMOBJTYPES] = {
 	8,			// reactiontime
 	sfx_secdr_detect,	// attacksound
 	S_SECDR_PAIN,		// painstate
-	255,			// painchance
+	32,			// painchance (low: aggressive, rarely stunlocked)
 	sfx_None,		// painsound
 	S_NULL,			// meleestate
 	S_SECDR_ATK1,		// missilestate
@@ -4806,9 +4810,9 @@ mobjinfo_t mobjinfo_builtin[NUMMOBJTYPES] = {
 	12*FRACUNIT,		// radius
 	26*FRACUNIT,		// height
 	300,			// mass
-	0,			// damage
+	4,			// damage (multiplier for the lost-soul-style charge ram)
 	sfx_secdr_active,	// activesound
-	MF_SOLID|MF_SHOOTABLE|MF_FLOAT|MF_NOGRAVITY|MF_NOBLOOD,	// flags (MF_FRIEND added on spawn)
+	MF_SHOOTABLE|MF_FLOAT|MF_NOGRAVITY|MF_NOBLOOD,	// NOT solid: never blocks the player; MF_FRIEND added on spawn
 	S_NULL			// raisestate
     },
     [MT_SECDRONESHOT] = {	// Security Drone laser projectile
