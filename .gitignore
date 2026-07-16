@@ -129,3 +129,8 @@ run/aidoom.cfg.mini
 run/e1-arenas.dbs
 run/launcher.ini
 run/smk.txt
+
+# Doom Builder / map editor artifacts (settings, autosaves, backups)
+*.dbs
+*.wad.backup*
+*.wad.*.autosave*
