@@ -36,6 +36,8 @@ config.status
 # Exception: MBF21/DeHackEd test PWADs (kept for exercising the MBF21 + Boom port).
 !run/ID0/Crispy and Brutal.wad
 !run/ID0/Crispy and Brutal TruecolorPNG.wad
+# Exception: e1-arenas.wad is OUR Episode-1 arena map pack (also a released asset).
+!run/ID0/e1-arenas.wad
 doom.cfg
 .doomrc
 doomsav*.dsg
