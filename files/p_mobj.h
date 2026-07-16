@@ -267,6 +267,7 @@ typedef struct mobj_s
 #define MF2_BOSS          0x00000200
 #define MF2_RIP           0x00020000   // rips through things instead of exploding
 #define MF2_FULLVOLSOUNDS 0x00040000
+#define MF2_DONTDRAW      0x00080000   // not rendered (ZDoom RF_INVISIBLE) -- e.g. submerged Serpent
     int			health;
 
     // Movement direction, movement generation (zig-zagging).

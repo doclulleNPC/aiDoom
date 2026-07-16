@@ -513,9 +513,9 @@ static boolean P_Director_SpawnMonsterNear (mobjtype_t mt, fixed_t cx, fixed_t c
 	// Fits where it landed (no wall/thing overlap, enough head room)?
 	if (!P_CheckPosition (mo, x, y) || tmceilingz - tmfloorz < mo->height)
 	    { P_RemoveMobj (mo); continue; }
-	// The Hexen Serpent/Stalker only lurks in liquid -- if it landed on dry
-	// ground, swap it for an ordinary trash monster (don't waste the spawn).
-	if (P_Director_IsLiquidOnly (mt) && !P_IsLiquidFloor (mo->subsector->sector))
+	// The Hexen Serpent/Stalker only lurks in the toxic pools (nukage/slime) -- if it
+	// landed anywhere else, swap it for an ordinary trash monster (don't waste the spawn).
+	if (P_Director_IsLiquidOnly (mt) && !P_IsStalkerFloor (mo->subsector->sector))
 	{
 	    mobjtype_t	repl = P_Director_SafeType (
 		dir_common[P_Random () % (int)(sizeof(dir_common)/sizeof(dir_common[0]))]);
@@ -571,6 +571,18 @@ static boolean P_Director_SpawnGuard (mobjtype_t mt, fixed_t cx, fixed_t cy)
 	mo = P_SpawnMobj (x, y, ONFLOORZ, mt);
 	if (!P_CheckPosition (mo, x, y) || tmceilingz - tmfloorz < mo->height)
 	    { P_RemoveMobj (mo); continue; }
+	// Liquid-only monsters (Stalker/Serpent) may only guard from a nukage/slime pool;
+	// on any other floor swap them for a trash monster (same as the near-spawn path).
+	if (P_Director_IsLiquidOnly (mt) && !P_IsStalkerFloor (mo->subsector->sector))
+	{
+	    mobjtype_t	repl = P_Director_SafeType (
+		dir_common[P_Random () % (int)(sizeof(dir_common)/sizeof(dir_common[0]))]);
+	    P_RemoveMobj (mo);
+	    mt = repl;
+	    mo = P_SpawnMobj (x, y, ONFLOORZ, mt);
+	    if (!P_CheckPosition (mo, x, y) || tmceilingz - tmfloorz < mo->height)
+		{ P_RemoveMobj (mo); continue; }
+	}
 	for (i = 0; i < MAXPLAYERS; i++)
 	    if (playeringame[i] && players[i].mo && P_CheckSight (players[i].mo, mo))
 		{ seen = 1; break; }

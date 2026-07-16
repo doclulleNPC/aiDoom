@@ -43,22 +43,15 @@ rcsid[] = "$Id: p_maputl.c,v 1.5 1997/02/03 22:45:11 b1 Exp $";
 
 
 //
-// P_IsLiquidFloor
-// True when the sector's floor flat is a liquid (water/nukage/slime/lava/blood).
-// Detected by flat-name prefix -- the same liquid flats the animated/damage-floor
-// code in p_spec.c references (NUKAGE*, FWATER*, LAVA*, SLIME*, BLOOD*, FIRELAVA,
-// FIREBLU).  floorpic is (lumpnum - firstflat); resolve back to the lump name and
-// do a case-insensitive prefix compare.  Used to keep the Hexen Serpent/Stalker
-// submerged-only (liquid floors).
+// P_FloorFlatMatches
+// True when the sector's floor flat name starts with one of the given prefixes
+// (case-insensitive).  floorpic is a dense flat index -> flatlumps[] -> lump name.
 //
-boolean P_IsLiquidFloor (sector_t* sec)
+static boolean P_FloorFlatMatches (sector_t* sec, const char* const* prefixes, int nprefix)
 {
-    int		lump;
+    int		lump, i;
     const char*	nm;
     char	up[9];
-    int		i;
-    static const char* const liquids[] =
-	{ "NUKAGE", "FWATER", "LAVA", "SLIME", "BLOOD", "FIRELAVA", "FIREBLU" };
 
     if (!sec)
 	return false;
@@ -78,10 +71,33 @@ boolean P_IsLiquidFloor (sector_t* sec)
     }
     up[8] = 0;
 
-    for (i = 0; i < (int)(sizeof(liquids)/sizeof(liquids[0])); i++)
-	if (!strncmp (up, liquids[i], strlen (liquids[i])))
+    for (i = 0; i < nprefix; i++)
+	if (!strncmp (up, prefixes[i], strlen (prefixes[i])))
 	    return true;
     return false;
+}
+
+//
+// P_IsLiquidFloor
+// True when the sector's floor flat is a liquid (water/nukage/slime/lava/blood).
+// FIREBLU is a wall/decorative texture, not a liquid -- it is deliberately NOT here.
+//
+boolean P_IsLiquidFloor (sector_t* sec)
+{
+    static const char* const liquids[] =
+	{ "NUKAGE", "FWATER", "LAVA", "SLIME", "BLOOD", "FIRELAVA" };
+    return P_FloorFlatMatches (sec, liquids, sizeof(liquids)/sizeof(liquids[0]));
+}
+
+//
+// P_IsStalkerFloor
+// The Hexen Stalker/Serpent lurks ONLY in the toxic pools -- nukage and slime --
+// not water/lava/blood.  Used to gate its spawns and confine its movement.
+//
+boolean P_IsStalkerFloor (sector_t* sec)
+{
+    static const char* const pools[] = { "NUKAGE", "SLIME" };
+    return P_FloorFlatMatches (sec, pools, sizeof(pools)/sizeof(pools[0]));
 }
 
 

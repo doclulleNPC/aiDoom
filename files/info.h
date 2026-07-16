@@ -240,6 +240,7 @@ typedef enum
     SPR_MNDR,		// Security Drone body (MNDR*) -- from SecurityDrone.pk3, in aidoom.wad
     SPR_SHT1,		// Security Drone laser shot (SHT1*)
     SPR_POW1,		// Security Drone laser impact (POW1*)
+    SPR_XSSD,		// Hexen Serpent dive/submerge frames (XSSD*) -- from hexenstuff.wad
     NUMSPRITES
 
 } spritenum_t;
@@ -1371,8 +1372,13 @@ typedef enum
     // Wendigo ice-shard projectile
     S_XICP_MOVE1, S_XICP_MOVE2, S_XICP_MOVE3,
     S_XICP_BOOM1, S_XICP_BOOM2, S_XICP_BOOM3, S_XICP_BOOM4, S_XICP_BOOM5,
-    // Stalker / Serpent (ambusher; hide/dive/surface ritual simplified to a plain chaser)
+    // Stalker / Serpent (authentic ZDoom ritual: submerged invisible+invulnerable chaser,
+    // humps to telegraph, surfaces to attack (then vulnerable), dives back under).
     S_XSSP_LOOK1, S_XSSP_LOOK2,
+    S_XSSP_SEE1, S_XSSP_SEE2,				// invisible underwater chase
+    S_XSSP_HUMP1, S_XSSP_HUMP2, S_XSSP_HUMP3, S_XSSP_HUMP4,	// telegraph bump (visible, still invulnerable)
+    S_XSSP_SURF1, S_XSSP_SURF2,				// surface for attack (become visible + shootable)
+    S_XSSD_DIVE1, S_XSSD_DIVE2, S_XSSD_DIVE3, S_XSSD_DIVE4,	// dive back under (XSSD sprite)
     S_XSSP_WALK1, S_XSSP_WALK2, S_XSSP_WALK3, S_XSSP_WALK4,
     S_XSSP_ATK1, S_XSSP_ATK2, S_XSSP_MEL1, S_XSSP_MIS1,
     S_XSSP_PAIN1, S_XSSP_PAIN2,

@@ -504,6 +504,10 @@ void R_ProjectSprite (mobj_t* thing)
 {
     fixed_t		tr_x;
     fixed_t		tr_y;
+
+    // Fully invisible (ZDoom RF_INVISIBLE) -- e.g. the submerged Hexen Serpent.
+    if (thing->flags2 & MF2_DONTDRAW)
+	return;
     
     fixed_t		gxt;
     fixed_t		gyt;

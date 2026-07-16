@@ -222,6 +222,7 @@ boolean P_ChangeSector (sector_t* sector, boolean crunch);
 // True if the sector's floor flat is a liquid (water/nukage/slime/lava/blood) --
 // used to restrict the Hexen Serpent/Stalker to submerged (liquid) spawns.
 boolean P_IsLiquidFloor (sector_t* sec);
+boolean P_IsStalkerFloor (sector_t* sec);	// nukage/slime only -- Stalker confinement
 
 extern mobj_t*	linetarget;	// who got hit (or NULL)
 

@@ -72,7 +72,8 @@ char *sprnames_builtin[NUMSPRITES] = {
     "SOAR","EGGC","HCHK",			// Wings / Morph Ovum / morph chicken
     "TNT1",				// invisible placeholder (mbf/dsdhacked): no lumps -> renders nothing
     "MTUR",				// deployable sentry turret (SPR_MTUR) -- MTUR* patch lumps in run/ID0/aidoom.wad
-    "MNDR","SHT1","POW1"		// Security Drone body / laser shot / laser impact (aidoom.wad)
+    "MNDR","SHT1","POW1",		// Security Drone body / laser shot / laser impact (aidoom.wad)
+    "XSSD"				// Hexen Serpent dive/submerge frames (SPR_XSSD, hexenstuff.wad)
 };
 
 

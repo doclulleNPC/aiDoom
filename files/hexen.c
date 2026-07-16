@@ -209,6 +209,35 @@ void A_StalkerMissile (mobj_t* actor)
 	S_StartSound (actor, actor->info->attacksound);
 }
 
+// ---- authentic ZDoom Serpent ritual (g_hexen/a_serpent.cpp) ----------------
+// The Serpent lurks submerged: INVISIBLE (MF2_DONTDRAW) and INVULNERABLE (no
+// MF_SHOOTABLE) while it chases underwater; it humps to telegraph, then surfaces
+// to attack (becoming visible + shootable) and dives back under afterwards.
+void A_SerpentHide       (mobj_t* a) { a->flags2 |=  MF2_DONTDRAW; }	// submerge -> invisible
+void A_SerpentUnHide     (mobj_t* a) { a->flags2 &= ~MF2_DONTDRAW; }	// surface  -> visible
+void A_SerpentShootable  (mobj_t* a) { a->flags  |=  MF_SHOOTABLE; }	// surfaced -> vulnerable
+void A_SerpentUnShootable(mobj_t* a) { a->flags  &= ~MF_SHOOTABLE; }	// diving   -> invulnerable
+
+// In the underwater See loop: occasionally raise a hump to telegraph when the
+// target is out of melee reach.  (A_Chase surfaces it to attack when in range.)
+void A_SerpentHumpDecide (mobj_t* a)
+{
+    if (a->target && !P_CheckMeleeRange (a) && P_Random () < 30)
+	P_SetMobjState (a, S_XSSP_HUMP1);
+}
+
+// After surfacing: bite if in reach, else the Serpent Leader spits; otherwise dive.
+void A_SerpentChooseAttack (mobj_t* a)
+{
+    if (!a->target)
+	return;
+    if (P_CheckMeleeRange (a))
+	P_SetMobjState (a, S_XSSP_MEL1);
+    else if (a->type == MT_XSTALKERBOSS)
+	P_SetMobjState (a, S_XSSP_MIS1);
+    // else fall through to the dive (S_XSSP_ATK2's nextstate)
+}
+
 // Death Wyvern / Dragon fireball (crispy A_DragonAttack; the homing FX2 trails
 // are simplified to a single straight fireball).
 void A_DragonAttack (mobj_t* actor)
@@ -606,18 +635,39 @@ void Hexen_Init (void)
     //      ritual is simplified away -- a plain ground ambusher that chases, then
     //      swings in melee or spits at range).  Sprite XSSP (8-9 walk, 10-13 attack,
     //      14-25 die). ----
-    ST (S_XSSP_LOOK1, SPR_XSSP,  7, 10, (actionf_p1)A_Look,         S_XSSP_LOOK2);
-    ST (S_XSSP_LOOK2, SPR_XSSP,  7, 10, (actionf_p1)A_Look,         S_XSSP_LOOK1);
+    // LOOK: submerged (invisible + invulnerable), scanning for prey.
+    ST (S_XSSP_LOOK1, SPR_XSSP,  7, 10, (actionf_p1)A_Look,              S_XSSP_LOOK2);
+    ST (S_XSSP_LOOK2, SPR_XSSP,  7, 10, (actionf_p1)A_Look,              S_XSSP_LOOK1);
+    // SEE: invisible underwater chase.  A_Chase surfaces it (-> meleestate/missilestate =
+    // S_XSSP_SURF1) when the prey is in range; A_SerpentHumpDecide telegraphs at range.
+    ST (S_XSSP_SEE1,  SPR_XSSP,  7,  2, (actionf_p1)A_Chase,             S_XSSP_SEE2);
+    ST (S_XSSP_SEE2,  SPR_XSSP,  7,  3, (actionf_p1)A_SerpentHumpDecide, S_XSSP_SEE1);
+    // HUMP: a telegraph bump breaks the surface (visible, still NOT shootable), then submerges.
+    ST (S_XSSP_HUMP1, SPR_XSSP,  4,  3, (actionf_p1)A_SerpentUnHide,     S_XSSP_HUMP2);
+    ST (S_XSSP_HUMP2, SPR_XSSP,  5,  3, NULL,                           S_XSSP_HUMP3);
+    ST (S_XSSP_HUMP3, SPR_XSSP,  6,  3, NULL,                           S_XSSP_HUMP4);
+    ST (S_XSSP_HUMP4, SPR_XSSP,  5,  3, (actionf_p1)A_SerpentHide,       S_XSSP_SEE1);
+    // SURF: rise to attack -- become visible then shootable (the vulnerable window).
+    ST (S_XSSP_SURF1, SPR_XSSP,  0,  2, (actionf_p1)A_SerpentUnHide,     S_XSSP_SURF2);
+    ST (S_XSSP_SURF2, SPR_XSSP,  1,  3, (actionf_p1)A_SerpentShootable,  S_XSSP_ATK1);
+    // ATK: face + choose bite / spit, then dive.
+    ST (S_XSSP_ATK1,  SPR_XSSP, 10,  6, (actionf_p1)A_FaceTarget,          S_XSSP_ATK2);
+    ST (S_XSSP_ATK2,  SPR_XSSP, 11,  5, (actionf_p1)A_SerpentChooseAttack, S_XSSD_DIVE1);
+    ST (S_XSSP_MEL1,  SPR_XSSP, 13,  6, (actionf_p1)A_StalkerMelee,        S_XSSD_DIVE1);
+    ST (S_XSSP_MIS1,  SPR_XSSP, 13,  6, (actionf_p1)A_StalkerMissile,      S_XSSD_DIVE1);
+    // DIVE: sink back under -- drop shootable, then invisible, resume the underwater chase.
+    ST (S_XSSD_DIVE1, SPR_XSSD,  0,  4, (actionf_p1)A_SerpentUnShootable, S_XSSD_DIVE2);
+    ST (S_XSSD_DIVE2, SPR_XSSD,  3,  4, NULL,                            S_XSSD_DIVE3);
+    ST (S_XSSD_DIVE3, SPR_XSSD,  6,  3, NULL,                            S_XSSD_DIVE4);
+    ST (S_XSSD_DIVE4, SPR_XSSD,  9,  3, (actionf_p1)A_SerpentHide,       S_XSSP_SEE1);
+    // WALK: kept valid (unused by the new ritual) -- fall back to the chase.
     ST (S_XSSP_WALK1, SPR_XSSP,  8,  5, (actionf_p1)A_Chase,        S_XSSP_WALK2);
     ST (S_XSSP_WALK2, SPR_XSSP,  9,  5, (actionf_p1)A_Chase,        S_XSSP_WALK3);
     ST (S_XSSP_WALK3, SPR_XSSP,  8,  5, (actionf_p1)A_Chase,        S_XSSP_WALK4);
-    ST (S_XSSP_WALK4, SPR_XSSP,  9,  5, (actionf_p1)A_Chase,        S_XSSP_WALK1);
-    ST (S_XSSP_ATK1,  SPR_XSSP, 10,  6, (actionf_p1)A_FaceTarget,   S_XSSP_ATK2);
-    ST (S_XSSP_ATK2,  SPR_XSSP, 11,  5, (actionf_p1)A_FaceTarget,   S_XSSP_MEL1);
-    ST (S_XSSP_MEL1,  SPR_XSSP, 13,  5, (actionf_p1)A_StalkerMelee, S_XSSP_WALK1);
-    ST (S_XSSP_MIS1,  SPR_XSSP, 13,  5, (actionf_p1)A_StalkerMissile,S_XSSP_WALK1);
-    ST (S_XSSP_PAIN1, SPR_XSSP, 11,  5, NULL,                       S_XSSP_PAIN2);
-    ST (S_XSSP_PAIN2, SPR_XSSP, 11,  5, (actionf_p1)A_Pain,         S_XSSP_WALK1);
+    ST (S_XSSP_WALK4, SPR_XSSP,  9,  5, (actionf_p1)A_Chase,        S_XSSP_SEE1);
+    // PAIN: only reachable while surfaced/shootable; flinch, then re-attack.
+    ST (S_XSSP_PAIN1, SPR_XSSP, 11,  4, NULL,                       S_XSSP_PAIN2);
+    ST (S_XSSP_PAIN2, SPR_XSSP, 11,  4, (actionf_p1)A_Pain,         S_XSSP_ATK1);
     ST (S_XSSP_DIE1,  SPR_XSSP, 14,  4, NULL,                       S_XSSP_DIE2);
     ST (S_XSSP_DIE2,  SPR_XSSP, 15,  4, (actionf_p1)A_Scream,       S_XSSP_DIE3);
     ST (S_XSSP_DIE3,  SPR_XSSP, 16,  4, (actionf_p1)A_Fall,         S_XSSP_DIE4);
@@ -645,26 +695,29 @@ void Hexen_Init (void)
 
     m = &mobjinfo[MT_XSTALKER];
     m->doomednum = -1;        m->spawnstate  = S_XSSP_LOOK1; m->spawnhealth = 90;
-    m->seestate  = S_XSSP_WALK1; m->seesound  = sfx_x_stsit; m->reactiontime = 8;
+    m->seestate  = S_XSSP_SEE1; m->seesound  = sfx_x_stsit; m->reactiontime = 8;
     m->attacksound = sfx_x_statk; m->painstate = S_XSSP_PAIN1; m->painchance = 96;
-    m->painsound = sfx_x_stpai;   m->meleestate = S_XSSP_ATK1; m->missilestate = S_XSSP_MIS1;
+    // Melee-only: A_Chase surfaces it (-> SURF) ONLY in melee range (no missilestate).
+    m->painsound = sfx_x_stpai;   m->meleestate = S_XSSP_SURF1; m->missilestate = S_NULL;
     m->deathstate = S_XSSP_DIE1;  m->xdeathstate = S_NULL;    m->deathsound = sfx_x_stdth;
     m->speed = 12; m->radius = 32*FRACUNIT; m->height = 70*FRACUNIT; m->mass = 0x7fffffff;
     m->damage = 0; m->activesound = sfx_None;	// crispy serpent: immovable (INT_MAX mass), no active sound
-    m->flags = MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL; m->raisestate = S_NULL;
+    // Starts submerged: NOT shootable + invisible.  Surfaces to attack (see the ritual states).
+    m->flags = MF_SOLID|MF_COUNTKILL; m->flags2 = MF2_DONTDRAW; m->raisestate = S_NULL;
 
     // ---- Stalker boss / Serpent Leader (crispy MT_SERPENTLEADER): same XSSP
     //      states, tougher, prefers the ranged spit.  Liquid-only like the base
     //      stalker.  Reuses every serpent state (incl. the full 12-frame death). ----
     m = &mobjinfo[MT_XSTALKERBOSS];
     m->doomednum = -1;        m->spawnstate  = S_XSSP_LOOK1; m->spawnhealth = 250;
-    m->seestate  = S_XSSP_WALK1; m->seesound  = sfx_x_stsit; m->reactiontime = 8;
+    m->seestate  = S_XSSP_SEE1; m->seesound  = sfx_x_stsit; m->reactiontime = 8;
     m->attacksound = sfx_x_statk; m->painstate = S_XSSP_PAIN1; m->painchance = 64;
-    m->painsound = sfx_x_stpai;   m->meleestate = S_XSSP_MIS1; m->missilestate = S_XSSP_MIS1;
+    // Leader also surfaces at range to SPIT (missilestate set) -- A_SerpentChooseAttack spits.
+    m->painsound = sfx_x_stpai;   m->meleestate = S_XSSP_SURF1; m->missilestate = S_XSSP_SURF1;
     m->deathstate = S_XSSP_DIE1;  m->xdeathstate = S_NULL;    m->deathsound = sfx_x_stdth;
     m->speed = 12; m->radius = 32*FRACUNIT; m->height = 70*FRACUNIT; m->mass = 0x7fffffff;
     m->damage = 0; m->activesound = sfx_None;	// crispy serpent leader: immovable mass
-    m->flags = MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL; m->raisestate = S_NULL;
+    m->flags = MF_SOLID|MF_COUNTKILL; m->flags2 = MF2_DONTDRAW; m->raisestate = S_NULL;
 
     m = &mobjinfo[MT_XSTALKER_FX];
     m->doomednum = -1;        m->spawnstate  = S_XSSF_MOVE1; m->spawnhealth = 1000;
