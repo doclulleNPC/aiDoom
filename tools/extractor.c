@@ -30,6 +30,10 @@
 #include <ctype.h>
 #include <sys/stat.h>
 
+#ifdef _MSC_VER
+#define strcasecmp _stricmp
+#endif
+
 #include "font_atlas.h"
 #include "../files/aidoom_icon.h"	// shared 64x64 RGBA window icon (from aidoom.ico)
 
