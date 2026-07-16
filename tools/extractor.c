@@ -1,11 +1,17 @@
 // extractor -- graphical (SDL3) asset extractor for aiDoom.
 //
 // Replaces the Python asset-extraction scripts (extract_heretic_monsters.py,
-// extract_hexen.py, extract_freedoom2.py): reads YOUR OWN heretic.wad /
-// hexen.wad / freedoom2.wad and builds the palette-converted, renamed monster
-// asset PWADs the engine loads (hereticstuff.wad / hexenstuff.wad /
-// freedoomstuff.wad in run/ID0/).  Nothing is downloaded or redistributed --
-// it only re-packs assets from IWADs you already have.
+// extract_hexen.py, extract_freedoom2.py, extract_doom2.py): reads YOUR OWN
+// heretic.wad / hexen.wad / freedoom2.wad / doom2.wad and builds the
+// palette-converted, renamed monster asset PWADs the engine loads
+// (hereticstuff.wad / hexenstuff.wad / freedoomstuff.wad / doom2stuff.wad in
+// run/ID0/).  Nothing is downloaded or redistributed -- it only re-packs assets
+// from IWADs you already have.
+//
+// The DOOM2 source is special: DOOM2 shares DOOM1's palette, so it copies the
+// DOOM2-exclusive monsters + super shotgun VERBATIM under their real names into
+// doom2stuff.wad, which d_main.c auto-overlays on a DOOM1 launch so the director
+// can spawn DOOM2 monsters and the SSG works (see extract_doom2 below).
 //
 // UI: a dropdown of the source IWADs that are actually present (scanned at
 // startup from run/ and run/ID0/), and an Extract button underneath.  Text is
@@ -279,7 +285,7 @@ static const char* HEXEN_SND_KW[] = {
 #define AISTUFF_NOTE "aiDoom internal asset pack -- loaded by the game, not a user PWAD\n"
 
 // ================================================================= sources
-enum { K_HERETIC, K_HEXEN, K_FREEDOOM };
+enum { K_HERETIC, K_HEXEN, K_FREEDOOM, K_DOOM2 };
 
 typedef struct {
     const char* src;      // source IWAD basename (lowercase)
@@ -289,6 +295,7 @@ typedef struct {
 } source_t;
 
 static const source_t SOURCES[] = {
+    { "doom2.wad",     "doom2stuff.wad",     "DOOM2  \x1a  doom2stuff.wad (monsters + SSG in DOOM1)", K_DOOM2 },
     { "heretic.wad",   "hereticstuff.wad",   "Heretic  \x1a  hereticstuff.wad",   K_HERETIC  },
     { "hexen.wad",     "hexenstuff.wad",     "Hexen  \x1a  hexenstuff.wad",       K_HEXEN    },
     { "freedoom2.wad", "freedoomstuff.wad",  "FreeDoom2  \x1a  freedoomstuff.wad", K_FREEDOOM },
@@ -330,6 +337,19 @@ static int find_wad(const char* basename, char* out, int n)
 static int find_base(char* out, int n)
 {
     static const char* order[] = { "doom2.wad", "doom.wad", "plutonia.wad", "tnt.wad", NULL };
+    for (int i = 0; order[i]; i++)
+        if (find_wad(order[i], out, n)) return 1;
+    return 0;
+}
+
+// The DOOM1 IWAD to diff against when building doom2stuff.wad -- what counts as
+// "already present in DOOM1".  Prefer the full registered/retail doom.wad over
+// shareware doom1.wad (whose sprite set is only episode 1, so it under-reports
+// what DOOM1 has and would pull a few registered-DOOM1 sprites into the pack --
+// harmless, just larger).
+static int find_doom1(char* out, int n)
+{
+    static const char* order[] = { "doom.wad", "doomu.wad", "doom1.wad", NULL };
     for (int i = 0; order[i]; i++)
         if (find_wad(order[i], out, n)) return 1;
     return 0;
@@ -482,6 +502,88 @@ static int extract_freedoom(const char* srcpath, const char* outpath, char* log,
         logf_(log, lcap, "  total        : %d lumps, %.1f MB\n", o.n, obuf_bytes(&o)/1048576.0);
     }
     ofree(&o); wad_free(fw); wad_free(d1);
+    return ok;
+}
+
+// --- DOOM2: build doom2stuff.wad (DOOM2 monsters + super shotgun for DOOM1) --
+//
+// DOOM2 uses the SAME palette as DOOM1, so its assets copy VERBATIM (no remap)
+// under their REAL sprite/sound names.  We diff doom2.wad against a DOOM1 IWAD
+// and keep only what DOOM1 lacks: the extra monsters (revenant, arch-vile,
+// mancubus, arachnotron, chaingunner, hell knight, pain elemental, SS, Keen,
+// boss brain + their projectiles) and the super shotgun (SHT2 first-person
+// weapon + SGN2 pickup, and the DBOPN/DBLOAD/DBCLS/DSHTGN sounds).  Because the
+// names are the genuine DOOM2 codes, the engine's existing MT_*/SPR_*/sfx_*
+// definitions light up with NO info.c changes -- d_main.c auto-overlays this
+// PWAD on a DOOM1 launch (doom2_overlay), the director's P_Director_Doom2Available
+// probe (sprites[SPR_SKEL].numframes) sees the monsters, and g_game.c re-enables
+// wp_supershotgun.  Unlike freedoomstuff.wad (which renames to an F* namespace so
+// it can coexist with a real DOOM2 IWAD), this is only overlaid when the IWAD is
+// DOOM1, so no rename is needed.
+static int extract_doom2(const char* srcpath, const char* outpath, char* log, int lcap)
+{
+    char d1path[600];
+    if (!find_doom1(d1path, sizeof d1path)) {
+        logf_(log, lcap, "ERROR: no DOOM1 IWAD found in ID0/ to diff against.\n"
+                         "  (need doom.wad / doomu.wad / doom1.wad -- can't compute the\n"
+                         "   \"missing in DOOM1\" set without it)\n");
+        return 0;
+    }
+    wad_t* d2 = wad_load(srcpath);
+    wad_t* d1 = wad_load(d1path);
+    if (!d2) { logf_(log, lcap, "ERROR: cannot read %s\n", srcpath); wad_free(d1); return 0; }
+    if (!d1) { logf_(log, lcap, "ERROR: cannot read DOOM1 %s\n", d1path); wad_free(d2); return 0; }
+
+    int s0 = wad_find(d2, "S_START"), s1 = wad_find(d2, "S_END");
+    if (s0 < 0 || s1 < 0 || s1 < s0) {
+        logf_(log, lcap, "ERROR: %s has no S_START/S_END sprite range\n", srcpath);
+        wad_free(d2); wad_free(d1); return 0;
+    }
+    // Scan DOOM1's sprite range for the 4-char codes it already has.  Fall back
+    // to the whole directory if its S_START/S_END markers are absent/odd.
+    int d1s0 = wad_find(d1, "S_START"), d1s1 = wad_find(d1, "S_END");
+    int lo = (d1s0 >= 0 && d1s1 > d1s0) ? d1s0 + 1 : 0;
+    int hi = (d1s0 >= 0 && d1s1 > d1s0) ? d1s1     : d1->n;
+
+    obuf_t o = {0};
+    oadd(&o, "AISTUFF", (const unsigned char*)AISTUFF_NOTE, (int)strlen(AISTUFF_NOTE));
+    oadd(&o, "S_START", NULL, 0);
+    int n_spr = 0;
+    for (int i = s0+1; i < s1; i++) {
+        const char* nm = d2->dir[i].name;
+        if (strlen(nm) < 4) continue;                 // markers / stray lumps
+        int in_d1 = 0;                                // same 4-char code already in DOOM1?
+        for (int j = lo; j < hi && !in_d1; j++)
+            if (strlen(d1->dir[j].name) >= 4 && !strncmp(d1->dir[j].name, nm, 4)) in_d1 = 1;
+        if (in_d1) continue;
+        oadd(&o, nm, d2->data + d2->dir[i].pos, d2->dir[i].size);  // same palette -> verbatim
+        n_spr++;
+    }
+    oadd(&o, "S_END", NULL, 0);
+
+    // DOOM2-exclusive sounds (DS*/DP* in doom2 but not doom1): the new monster
+    // barks plus the super shotgun's DBOPN/DBLOAD/DBCLS/DSHTGN.
+    int n_snd = 0;
+    for (int i = 0; i < d2->n; i++) {
+        const char* nm = d2->dir[i].name;
+        const unsigned char* raw = d2->data + d2->dir[i].pos;
+        int sz = d2->dir[i].size;
+        if (!(nm[0]=='D' && (nm[1]=='S' || nm[1]=='P'))) continue;
+        if (!is_dmx(raw, sz)) continue;
+        if (wad_find(d1, nm) >= 0) continue;          // already in DOOM1 -> not exclusive
+        oadd(&o, nm, raw, sz); n_snd++;
+    }
+
+    int ok = wad_write(outpath, &o);
+    logf_(log, lcap, ok ? "wrote %s\n" : "ERROR: could not write %s\n", outpath);
+    if (ok) {
+        logf_(log, lcap, "  diff base    : %s\n", strrchr(d1path,'/')?strrchr(d1path,'/')+1:d1path);
+        logf_(log, lcap, "  sprites      : %d (DOOM2-only, verbatim -- monsters + SSG)\n", n_spr);
+        logf_(log, lcap, "  sounds       : %d (DOOM2-only DS*/DP*)\n", n_snd);
+        logf_(log, lcap, "  total        : %d lumps, %.1f MB\n", o.n, obuf_bytes(&o)/1048576.0);
+        logf_(log, lcap, "  -> auto-overlaid on a DOOM1 launch (d_main.c doom2_overlay).\n");
+    }
+    ofree(&o); wad_free(d2); wad_free(d1);
     return ok;
 }
 
@@ -642,6 +744,7 @@ static int worker(void* unused)
         case K_HERETIC:  extract_heretic (avail_path[job], out, local, sizeof local); break;
         case K_HEXEN:    extract_hexen   (avail_path[job], out, local, sizeof local); break;
         case K_FREEDOOM: extract_freedoom(avail_path[job], out, local, sizeof local); break;
+        case K_DOOM2:    extract_doom2   (avail_path[job], out, local, sizeof local); break;
     }
 
     SDL_LockMutex(g_lock);
@@ -800,6 +903,7 @@ static int run_one_cli(int si, const char* srcpath, const char* outdir)
         case K_HERETIC:  ok = extract_heretic (srcpath, out, log, sizeof log); break;
         case K_HEXEN:    ok = extract_hexen   (srcpath, out, log, sizeof log); break;
         case K_FREEDOOM: ok = extract_freedoom(srcpath, out, log, sizeof log); break;
+        case K_DOOM2:    ok = extract_doom2   (srcpath, out, log, sizeof log); break;
     }
     fputs(log, stdout);
     return ok ? 0 : 1;
