@@ -332,11 +332,12 @@ void A_SecDroneChargeTick (mobj_t* self)
 }
 
 //
-// Count live, shootable, non-friendly monsters within `range` of `origin` that
-// are actually ENGAGED (awake and pursuing a target).  Idle monsters that are
-// merely standing nearby -- e.g. the pack the buddy spawns next to on an arena
-// map at level start -- have no target yet and are NOT counted, so "surrounded"
-// means surrounded by a live threat, not by furniture.
+// Count live, shootable, non-friendly monsters within `range` of `origin` that are
+// genuinely ENGAGING one of the humans -- i.e. their target is a player or the buddy
+// AND they have line of sight to `origin`.  Mere PRESENCE is not enough: monsters that
+// are asleep, infighting each other, or shooting a turret/drone (target isn't a player)
+// don't count, and neither does a threat hidden behind a wall.  So "surrounded" means
+// surrounded by things actually coming for the squad, not by nearby furniture.
 //
 static int SecDrone_CountThreats (mobj_t* origin, fixed_t range)
 {
@@ -354,9 +355,10 @@ static int SecDrone_CountThreats (mobj_t* origin, fixed_t range)
 	if (!(m->flags & MF_SHOOTABLE))	continue;
 	if (m->flags & MF_CORPSE)	continue;
 	if (m->health <= 0)		continue;
-	if (!m->target)			continue;	// asleep/idle -> not a threat
+	if (!SecDrone_AttackingHuman (m))	continue;	// target must be a player/buddy
 	if (P_AproxDistance (m->x - origin->x, m->y - origin->y) > range)
 	    continue;
+	if (!P_CheckSight (origin, m))	continue;	// actually visible to us, not behind a wall
 	n++;
     }
     return n;
