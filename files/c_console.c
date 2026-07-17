@@ -305,7 +305,7 @@ static void C_Execute (char* line)
 	C_Printf ("arti:   givearti stimpack|medikit|healthbonus|armorbonus|greenarmor|bluearmor|bullets|shells|rockets|cells");
 	C_Printf ("heretic arti: givearti flask|urn|tome|torch|bomb|ring|shadow|chaos|wings|egg");
 	C_Printf ("world:  spawn <thing>  skill <1-5>  map <e> <m> / warp <m>");
-	C_Printf ("view:   crosshair 0..3");
+	C_Printf ("view:   crosshair 0..3  screenblocks <3-11>");
 	C_Printf ("keys:   bind <key> <command> | unbind <key> | bind (list)");
 	C_Printf ("buddy:  where  come  wait/stay  attack  report  buddygod  buddyheal  buddyarm  buddyhome");
 	C_Printf ("monsterAI: director on|off|demo  (LLM<->Doom)");
@@ -477,6 +477,22 @@ static void C_Execute (char* line)
 	if (sscanf (args, "%d", &sk) == 1 && sk >= 1 && sk <= 5)
 	    { gameskill = sk-1; C_Printf ("skill = %d (applies to new maps)", sk); }
 	else C_Printf ("usage: skill <1-5>");
+    }
+    else if (!strcmp(cmd, "screenblocks") || !strcmp(cmd, "viewsize"))
+    {
+	// Set the 3D view size (the old screen-size slider, now console-only).
+	extern int  screenblocks, detailLevel;
+	extern void R_SetViewSize (int blocks, int detail);
+	int b;
+	if (sscanf (args, "%d", &b) == 1 && b >= 3 && b <= 11)
+	{
+	    screenblocks = b;
+	    R_SetViewSize (screenblocks, detailLevel);
+	    C_Printf ("screenblocks = %d", b);
+	}
+	else
+	    C_Printf ("usage: screenblocks <3-11>  (11=fullscreen, 10=+status bar, 3-9=bordered; now %d)",
+		      screenblocks);
     }
     else if (!strcmp(cmd, "spawn") || !strcmp(cmd, "summon") || !strcmp(cmd, "summonfoe"))
     {
