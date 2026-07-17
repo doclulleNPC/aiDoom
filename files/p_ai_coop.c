@@ -30,6 +30,7 @@
 #include "d_items.h"
 #include "p_invent.h"		// inventory: spend a stimpack/medikit to revive
 #include "p_secdrone.h"		// P_AICoop_MaybeSpawnDrone (deploy a friendly Security Drone)
+#include "revmarine.h"		// RevMarine_BuddyTryRevive (buddy revives a dead marine)
 #include "m_argv.h"
 #include "p_local.h"
 #include "p_mobj.h"
@@ -2075,6 +2076,11 @@ void P_AICoop_BuildCmd (void)
     // When surrounded by many enemies, the buddy deploys a friendly Security Drone
     // (costs it 50 bullets or 25 shells; throttled + capped inside).  files/p_secdrone.c.
     P_AICoop_MaybeSpawnDrone (bot);
+
+    // The buddy also revives a nearby Dead Marine when it can afford the field surgery
+    // (>=1 medikit + >=2 stimpacks from its own pack).  ~3x/sec is plenty.  files/revmarine.c.
+    if ((gametic & 15) == 0)
+	RevMarine_BuddyTryRevive (bot);
 
     // Progress check.  "stuck" if we tried to move but either barely moved this tic
     // (wedged solid) OR made no NET progress over a ~0.4s window -- the latter
