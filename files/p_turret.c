@@ -32,6 +32,7 @@
 #include "sounds.h"
 #include "info.h"
 #include "p_turret.h"
+#include "p_ai_coop.h"		// P_AICoop_Active -- turret is a buddy-mode-only perk
 
 // From p_enemy.c -- faces actor->target and sets actor->angle.
 void A_FaceTarget (mobj_t* actor);
@@ -154,6 +155,11 @@ const char* P_TurretDeploy (player_t* player)
 
     if (!player || !player->mo)
 	return "";
+
+    // Buddy-mode-only perk: the turret is squad kit, not something a solo marine
+    // carries.  (Matches how the buddy order keys self-report "(no companion)".)
+    if (!P_AICoop_Active ())
+	return "[Turret] Buddy mode only";
 
     // Cost: 50 bullets first, else 25 shells.
     useClip  = player->ammo[am_clip]  >= TURRET_CLIP_COST;

@@ -11,6 +11,9 @@
 //	from the player's inventory.  The turret cannot move; it has 100 HP and
 //	hitscans nearby enemies like the chaingun at DOUBLE damage.
 //
+//	Buddy-mode-only perk: P_TurretDeploy refuses (with a HUD message) unless
+//	P_AICoop_Active() -- squad kit, not something a solo marine carries.
+//
 //-----------------------------------------------------------------------------
 
 #ifndef __P_TURRET__

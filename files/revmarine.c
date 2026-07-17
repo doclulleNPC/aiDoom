@@ -8,6 +8,8 @@
 //	revived by the human's USE -- exactly like the downed buddy: it stands up as
 //	a friendly marine (MF_FRIEND) that hunts ENEMY monsters through the engine's
 //	friendly-AI path (P_LookForPlayers -> P_FriendNearestEnemy, see p_enemy.c).
+//	Buddy-mode-only perk: P_ReviveMarineNear no-ops unless P_AICoop_Active() --
+//	recruiting allies is squad play, not something a solo marine does.
 //
 //	PLAY sprite (looks like a marine), zombieman-style hitscan (A_PosAttack),
 //	10 HP, and a deliberately slow ~half-the-player pace (a shambling zombie ally).
@@ -27,6 +29,7 @@
 #include "sounds.h"
 #include "p_local.h"
 #include "p_invent.h"			// (J) buddy-mode inventory -- revive is paid from it
+#include "p_ai_coop.h"			// P_AICoop_Active -- reviving an ally is a buddy-mode-only perk
 #include "revmarine.h"
 
 extern state_t *states;
@@ -137,6 +140,11 @@ const char* P_ReviveMarineNear (player_t* presser)
     mobj_t*	mar;
 
     if (!presser || !presser->mo) return NULL;
+
+    // Buddy-mode-only perk: recruiting an ally is squad play.  Silent no-op outside
+    // buddy mode (like P_AICoop_RevivePress with no downed buddy) so USE falls
+    // through to door-opening as normal instead of a confusing message every press.
+    if (!P_AICoop_Active ()) return NULL;
 
     for (th = thinkercap.next; th != &thinkercap; th = th->next)
     {
