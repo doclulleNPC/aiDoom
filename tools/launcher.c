@@ -1060,6 +1060,9 @@ static void load_launcher_prefs(void)
     int i;
     while (fgets(line, sizeof line, f))
     {
+        val[0] = 0;    // empty value (e.g. a cleared "wad2 ") must NOT inherit the
+                       // previous line's val -- sscanf leaves it untouched on no match,
+                       // which used to make a blank WAD2 pick up WAD1's name.
         if (sscanf(line, "%31s %279[^\n\r]", key, val) < 1) continue;
         if      (!strcmp(key, "iwad"))    { for (i=0;i<iwad_count;i++) if (!strcmp(iwads[i].name,val)) { iwad_sel=i; break; } }
         else if (!strcmp(key, "pwad"))    { pwad_sel=0; for (i=1;i<pwad_count;i++) if (!strcmp(pwads[i],val)) { pwad_sel=i; break; } }
