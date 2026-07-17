@@ -224,6 +224,7 @@ extern int	show_buddy_hud;	// hu_buddy.c -- companion top-of-screen HUD
 extern int	show_inventory_hud;	// hu_buddy.c -- (J) artifact inventory readout
 
 extern int	detailLevel;
+extern int	automap_textured;	// textured automap (am_map.c)
 
 extern int	screenblocks;
 
@@ -309,6 +310,7 @@ default_t	defaults[] =
 
     {"screenblocks",&screenblocks, 10},
     {"detaillevel",&detailLevel, 0},
+    {"automap_textured",&automap_textured, 1},	// textured automap: show floor flats
 
     // Video: internal resolution scale (1 = 320x200 ... 6 = 1920x1200) and
     // fullscreen flag.  Applied by i_video.c at startup.

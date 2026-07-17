@@ -24,6 +24,7 @@
 static const char rcsid[] = "$Id: am_map.c,v 1.4 1997/02/03 21:24:33 b1 Exp $";
 
 #include <stdio.h>
+#include <stdlib.h>	// realloc (am_ss_seen -- textured-automap exploration)
 
 
 #include "z_zone.h"
@@ -1361,11 +1362,116 @@ void AM_drawCrosshair(int color)
 
 }
 
+// Textured automap (config `automap_textured`, default on): fill the map with each
+// sector's FLOOR FLAT, sampled per pixel through the BSP so it lines up with the 3D
+// view, and darkened by the sector's light level.  Cheap caching (the flat pointer +
+// light colormap only change when we cross into a differently-lit/floored sector).
+int automap_textured = 1;
+
+// Per-subsector "explored" flags -- set in R_Subsector as the 3D view renders each leaf
+// (so the textured floor is revealed exactly like the walls, not the whole level at once).
+// Cleared per level by AM_ClearSeen (called from P_SetupLevel).
+byte*	am_ss_seen   = NULL;
+int	am_ss_seen_n = 0;	// allocated length
+
+void AM_ClearSeen (void)
+{
+    if (numsubsectors > am_ss_seen_n)
+    {
+	am_ss_seen   = realloc (am_ss_seen, numsubsectors);
+	am_ss_seen_n = numsubsectors;
+    }
+    if (am_ss_seen)
+	memset (am_ss_seen, 0, am_ss_seen_n);
+}
+
+static void AM_drawFlats (void)
+{
+    extern int		numflats;
+    extern int*		flatlumps;
+    extern int*		flattranslation;
+    extern lighttable_t* colormaps;
+    extern int		skyflatnum;
+    extern seg_t*	segs;					// void test: subsector wall segs
+    extern int		R_PointOnSegSide (fixed_t, fixed_t, seg_t*);
+
+    int		fx, fy;
+    int		lastpic = -2;
+    int		lastlight = -1000;
+    byte*	flat = NULL;
+    lighttable_t* cmap = colormaps;
+    // Computer map / IDDT reveal everything, like the walls do.
+    boolean	reveal = cheating || (plr && plr->powers[pw_allmap]);
+
+    // 2x2 block sampling: one BSP lookup + flat sample per block (4x cheaper) at hi-res.
+    for (fy = 0; fy < f_h; fy += 2)
+    {
+	fixed_t	wy = m_y + FTOM (f_h - fy);
+	int	v  = (wy >> FRACBITS) & 63;
+	byte*	r0 = fb + fy * f_w;
+	byte*	r1 = (fy+1 < f_h) ? r0 + f_w : NULL;
+
+	for (fx = 0; fx < f_w; fx += 2)
+	{
+	    fixed_t	 wx = m_x + FTOM (fx);
+	    subsector_t* ss = R_PointInSubsector (wx, wy);
+	    int		 num = ss - subsectors;
+	    sector_t*	 sec;
+	    int		 pic, i;
+	    byte	 px;
+
+	    if (!reveal && !(am_ss_seen && num >= 0 && num < am_ss_seen_n && am_ss_seen[num]))
+		continue;			// not explored yet -> leave background
+
+	    // R_PointInSubsector returns a BSP leaf for ANY point, including the void
+	    // OUTSIDE the level.  A point genuinely inside the subsector is on the FRONT
+	    // side of every one of its segs; if it's on the BACK of any wall it's in the
+	    // void -> leave the background so we don't texture outside the map.
+	    for (i = 0; i < ss->numlines; i++)
+		if (R_PointOnSegSide (wx, wy, &segs[ss->firstline + i]))
+		    break;
+	    if (i < ss->numlines)
+		continue;
+
+	    sec = ss->sector;
+	    pic = sec->floorpic;
+	    if (pic == skyflatnum)		// sky floor -> leave background
+		continue;
+
+	    if (pic != lastpic)
+	    {
+		lastpic = pic;
+		flat = (pic >= 0 && pic < numflats)
+		     ? (byte*) W_CacheLumpNum (flatlumps[flattranslation[pic]], PU_CACHE)
+		     : NULL;
+	    }
+	    if (!flat)
+		continue;
+	    if (sec->lightlevel != lastlight)
+	    {
+		int cm;
+		lastlight = sec->lightlevel;
+		cm = (255 - lastlight) >> 3;	// 0 = bright .. 31 = dark
+		if (cm < 0) cm = 0;
+		if (cm > NUMCOLORMAPS-1) cm = NUMCOLORMAPS-1;
+		cmap = colormaps + cm*256;
+	    }
+
+	    px = cmap[flat[(v<<6) + ((wx >> FRACBITS) & 63)]];
+	    r0[fx] = px;
+	    if (fx+1 < f_w) r0[fx+1] = px;
+	    if (r1) { r1[fx] = px; if (fx+1 < f_w) r1[fx+1] = px; }
+	}
+    }
+}
+
 void AM_Drawer (void)
 {
     if (!automapactive) return;
 
     AM_clearFB(BACKGROUND);
+    if (automap_textured)
+	AM_drawFlats();
     if (grid)
 	AM_drawGrid(GRIDCOLORS);
     AM_drawWalls();
