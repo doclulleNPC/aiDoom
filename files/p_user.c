@@ -244,8 +244,15 @@ void P_DeathThink (player_t* player)
     player->deltaviewheight = 0;
     onground = (player->mo->z <= player->mo->floorz);
     P_CalcHeight (player);
-	
-    if (player->attacker && player->attacker != player->mo)
+
+    // (E) Down (dead, or incapacitated in buddy mode): the view used to be locked.
+    // Let the player still turn the camera left/right; manual turning wins, and the
+    // auto-face-killer below only kicks in when the player isn't turning.
+    if (player->cmd.angleturn)
+	player->mo->angle += (player->cmd.angleturn << 16);
+
+    if (!player->cmd.angleturn
+	&& player->attacker && player->attacker != player->mo)
     {
 	angle = R_PointToAngle2 (player->mo->x,
 				 player->mo->y,

@@ -183,8 +183,9 @@ int		key_turret;		// MOD: deploy sentry turret (default: 'q')
 int		key_spy;		// spy mode: view another player (the AI buddy in co-op); default F12
 int		autorun = 1;	// always-run; the run key toggles this (G_Responder)
 
-// MOD: free-look pitch clamp, in BASE-resolution horizon-shift pixels.
-#define LOOKDIRMAX	56
+// MOD: free-look pitch clamp, in BASE-resolution horizon-shift pixels.  Bumped to a
+// WOOF/crispy-like range so you can look much further up/down (was 56).
+#define LOOKDIRMAX	90
  
 int             mousebfire; 
 int             mousebstrafe; 
