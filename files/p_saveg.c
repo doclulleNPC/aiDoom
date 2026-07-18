@@ -317,7 +317,14 @@ void P_UnArchiveThinkers (void)
 	    break;
 			
 	  default:
-	    I_Error ("Unknown tclass %i in savegame",tclass);
+	    // A stray tclass almost always means the thinker stream is
+	    // misaligned because P_UnArchiveWorld read a different number
+	    // of sectors/lines than were saved -- i.e. the savegame was made
+	    // with a different set of -file PWADs (or a different IWAD/map)
+	    // than is loaded now.  It is not a corrupt save; load the same wads.
+	    I_Error ("Unknown tclass %i in savegame -- savegame/PWAD mismatch?\n"
+		     "Load with the same -iwad and -file wads used to save it.",
+		     tclass);
 	}
 	
     }
