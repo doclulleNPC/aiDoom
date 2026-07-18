@@ -67,7 +67,7 @@ static mobj_t* Turret_FindTarget (mobj_t* self)
 	if (m == self)			continue;
 	if (m->type == MT_PLAYER)	continue;	// never target a human
 	if (m->flags & MF_FRIEND)	continue;	// never target an ally / another turret
-	if (!(m->flags & MF_COUNTKILL))	continue;	// monsters only
+	if (!(m->flags & MF_COUNTKILL) && m->info->seestate == S_NULL)	continue;	// monsters incl. lost souls
 	if (!(m->flags & MF_SHOOTABLE))	continue;
 	if (m->flags & MF_CORPSE)	continue;
 	if (m->health <= 0)		continue;

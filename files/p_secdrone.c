@@ -110,7 +110,7 @@ static mobj_t* SecDrone_BestTarget (mobj_t* self, fixed_t range)
 	    continue;
 	m = (mobj_t*)th;
 	if (m == self)			continue;
-	if (!(m->flags & MF_COUNTKILL))	continue;	// real monsters only
+	if (!(m->flags & MF_COUNTKILL) && m->info->seestate == S_NULL)	continue;	// monsters incl. lost souls
 	if (m->flags & MF_FRIEND)	continue;	// not our allies
 	if (!(m->flags & MF_SHOOTABLE))	continue;
 	if (m->flags & MF_CORPSE)	continue;
@@ -350,7 +350,7 @@ static int SecDrone_CountThreats (mobj_t* origin, fixed_t range)
 	if (th->function.acp1 != (actionf_p1)P_MobjThinker)
 	    continue;
 	m = (mobj_t*)th;
-	if (!(m->flags & MF_COUNTKILL))	continue;	// real monsters only
+	if (!(m->flags & MF_COUNTKILL) && m->info->seestate == S_NULL)	continue;	// monsters incl. lost souls
 	if (m->flags & MF_FRIEND)	continue;	// not our own allies
 	if (!(m->flags & MF_SHOOTABLE))	continue;
 	if (m->flags & MF_CORPSE)	continue;
@@ -443,11 +443,12 @@ void P_AICoop_MaybeSpawnDrone (player_t* bot)
     if (atCap && !heavyFire && !surrounded && !lowHP)
 	useClip = clipCapped;			// clip-capped -> spend clip; else fall to shell
 
-    // Normally one drone at a time; a critically-hurt buddy may put out more (up
-    // to DRONE_MAX_PANIC) as a last resort to survive.
-    maxActive = lowHP ? DRONE_MAX_PANIC : DRONE_MAX_ACTIVE;
+    // Hard rule: at most ONE drone active at a time (no exceptions -- a low-HP buddy
+    // still only ever has one out; lowHP just lets it skip the cooldown to redeploy the
+    // instant its drone dies).
+    maxActive = DRONE_MAX_ACTIVE;
     if (SecDrone_CountActive () >= maxActive)
-	return;					// already have enough out
+	return;					// already have one out
 
     // Spawn just in front of and above the buddy.
     ang  = b->angle;
