@@ -160,6 +160,7 @@ void P_Ticker (void)
     P_Director_Ticker ();	// L4D rule-based director: intensity decay + spawn FSM
     P_MorphTicker ();		// (M) age morph timers; restore expired morphs
     RevMarine_Ticker ();	// (G) revived marines heal +1 HP/sec up to 100
+    { extern void AM_MarkPlayersSeen (void); AM_MarkPlayersSeen (); }	// textured automap: reveal player+buddy live
 
     P_RunThinkers ();
     P_UpdateSpecials ();

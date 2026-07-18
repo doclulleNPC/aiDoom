@@ -1385,6 +1385,28 @@ void AM_ClearSeen (void)
 	memset (am_ss_seen, 0, am_ss_seen_n);
 }
 
+// Reveal the subsector each live player (the human AND the AI buddy) currently stands
+// in.  Called every tic from P_Ticker so the textured automap keeps revealing LIVE --
+// even while it's open, when the 3D view (which normally marks seen via R_Subsector)
+// isn't being drawn -- and so the buddy clears its own fog of war as it roams.
+void AM_MarkPlayersSeen (void)
+{
+    int i;
+    if (!am_ss_seen)
+	return;
+    for (i = 0; i < MAXPLAYERS; i++)
+    {
+	subsector_t* ss;
+	int	     num;
+	if (!playeringame[i] || !players[i].mo)
+	    continue;
+	ss  = R_PointInSubsector (players[i].mo->x, players[i].mo->y);
+	num = ss - subsectors;
+	if (num >= 0 && num < am_ss_seen_n)
+	    am_ss_seen[num] = 1;
+    }
+}
+
 static void AM_drawFlats (void)
 {
     extern int		numflats;
