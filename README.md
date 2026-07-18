@@ -36,6 +36,14 @@ a language model drive monster tactics in real time.
   driven by a small built-in bot: it acquires the nearest visible monster and fires,
   seeks health when hurt, otherwise follows you. A real co-op player (weapons, damage,
   pickups, reborn all work). Off by default. See [AI co-op companion](#ai-co-op-companion--aicoop) below.
+- **Deployable sentry turret** (`files/p_turret.c`, hotkey **`q`**, config `key_turret`) — a
+  buddy-mode perk: toss a turret in front of you (like throwing a medkit) for **50 bullets or
+  25 shells**. It can't move, has **100 HP**, and hitscans nearby enemies like the chaingun at
+  **double damage**. It never hurts you, the buddy, or an ally.
+- **Buddy Security Drone** (`files/p_secdrone.c`) — when the squad is genuinely under attack
+  (enemies actually targeting a player/buddy *and* in sight — not mere presence), the buddy
+  spends **50 bullets / 25 shells** to deploy a friendly flying laser drone (ported from
+  *SecurityDrone.pk3*). It aggressively charges and lasers everything nearby; one at a time.
 - **Pack-hunt monster AI** (`p_enemy.c`, `monster_pack`) — an optional aggressive mode,
   **off by default** (a no-argument launch is plain **vanilla 1993 DOOM** AI): set
   `monster_pack 1` in `aidoom.cfg` to enable it — then monsters acquire the player the
@@ -61,8 +69,17 @@ a language model drive monster tactics in real time.
   and a growing set of Hexen monsters are appended to the engine at runtime from their IWAD
   art (`tools/extract_*`), summonable from the console and mixed into the director's spawns
   when their pack is loaded (launcher checkboxes). See [`HERETIC_HEXEN.md`](HERETIC_HEXEN.md).
-- **Revived dead marines** — pressing USE on a "dead marine" map decoration (in co-op) stands
-  it up as a friendly marine ally that hunts monsters for you (gibs permanently on death).
+  The **Hexen Serpent/Stalker** follows its authentic ZDoom ritual: it lurks **submerged**
+  (invisible + invulnerable) in nukage/slime, humps to telegraph, **surfaces** to bite or spit
+  (the only window it can be hit), then **dives back under** — and it never leaves its pool.
+- **Textured automap** (`files/am_map.c`, config `automap_textured`) — the map draws each
+  sector's floor flat for the areas you've explored (like the walls; computer map / IDDT reveal
+  all), aligned with the 3D view and shaded by sector light. Set the 3D view size from the console
+  with `screenblocks <3-11>`.
+- **Revived dead marines** (`files/revmarine.c`) — pressing USE on a "dead marine" map decoration
+  (thing 15, in buddy mode) stands it up as a friendly marine ally that aggressively hunts monsters
+  (acquires all-around, fires on sight) and **regenerates +1 HP/sec up to 100**; it gibs permanently
+  on death. The **buddy can revive one on its own** when it carries ≥1 medikit and ≥2 stimpacks.
 - Native **Windows build** with Visual Studio 2019 (MSVC) + SDL3; the legacy autotools
   Linux build is still present.
 
@@ -246,6 +263,17 @@ From the **console** (open with `` ` ``) you can direct it:
 The **monster** LLM director (a separate system — it drives the *monsters*, not the
 companion) can be toggled live from the console: `director on` / `director off` /
 `director demo`.
+
+**Squad kit** (all buddy-mode only):
+
+- **Sentry turret** — press **`q`** (config `key_turret`) to toss a turret for **50 bullets
+  or 25 shells**: 100 HP, chaingun fire at double damage, harmless to the squad. (`files/p_turret.c`)
+- **Security drone** — when genuinely swarmed (enemies targeting a player/buddy *and* in sight),
+  the buddy spends **50 bullets / 25 shells** to launch a friendly laser drone that charges and
+  lasers everything nearby; one at a time. (`files/p_secdrone.c`)
+- **Recruit fallen marines** — USE next to a dead marine (thing 15) to raise a friendly ally; it
+  hunts aggressively and heals **+1 HP/sec to 100**. The buddy also revives one on its own if it
+  carries ≥1 medikit and ≥2 stimpacks. (`files/revmarine.c`)
 
 ## Configuration
 
