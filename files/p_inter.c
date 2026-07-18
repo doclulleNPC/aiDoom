@@ -401,6 +401,14 @@ P_TouchSpecialThing
 	  default:
 	    break;
 	}
+	// The pickup test in PIT_CheckThing only checks x/y proximity (radius sum),
+	// with no wall between the toucher and the item.  DOOM walls are infinitely
+	// thin linedefs, so the buddy's box can sit ~16u from a one-sided wall while
+	// an item ~16u on the far side is <36u away -> it would pocket things right
+	// through the wall (very visible: it hugs walls while fighting/pathing).
+	// Require an actual line of sight so it only grabs what it could walk onto.
+	if (!P_CheckSight (toucher, special))
+	    return;
     }
 
     // (H) Heretic artifact pickup (MT_HARTI_*): pocket it into the inventory.
