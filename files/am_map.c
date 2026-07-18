@@ -1403,22 +1403,22 @@ static void AM_drawFlats (void)
     // Computer map / IDDT reveal everything, like the walls do.
     boolean	reveal = cheating || (plr && plr->powers[pw_allmap]);
 
-    // 2x2 block sampling: one BSP lookup + flat sample per block (4x cheaper) at hi-res.
-    for (fy = 0; fy < f_h; fy += 2)
+    // Performance: the expensive part is R_PointInSubsector (a BSP descent) + the seg
+    // void test.  Do those ONCE per BLK x BLK block (the sector/flat barely change over a
+    // few pixels), then fill the whole block sampling the flat PER PIXEL -- so the BSP
+    // cost drops ~BLK*BLK-fold while the floor texture keeps full resolution.
+    #define BLK 4
+    for (fy = 0; fy < f_h; fy += BLK)
     {
 	fixed_t	wy = m_y + FTOM (f_h - fy);
-	int	v  = (wy >> FRACBITS) & 63;
-	byte*	r0 = fb + fy * f_w;
-	byte*	r1 = (fy+1 < f_h) ? r0 + f_w : NULL;
 
-	for (fx = 0; fx < f_w; fx += 2)
+	for (fx = 0; fx < f_w; fx += BLK)
 	{
 	    fixed_t	 wx = m_x + FTOM (fx);
 	    subsector_t* ss = R_PointInSubsector (wx, wy);
 	    int		 num = ss - subsectors;
 	    sector_t*	 sec;
-	    int		 pic, i;
-	    byte	 px;
+	    int		 pic, i, by, bx;
 
 	    if (!reveal && !(am_ss_seen && num >= 0 && num < am_ss_seen_n && am_ss_seen[num]))
 		continue;			// not explored yet -> leave background
@@ -1457,12 +1457,21 @@ static void AM_drawFlats (void)
 		cmap = colormaps + cm*256;
 	    }
 
-	    px = cmap[flat[(v<<6) + ((wx >> FRACBITS) & 63)]];
-	    r0[fx] = px;
-	    if (fx+1 < f_w) r0[fx+1] = px;
-	    if (r1) { r1[fx] = px; if (fx+1 < f_w) r1[fx+1] = px; }
+	    // Fill the block, flat sampled per pixel (full texture detail, cheap array reads).
+	    for (by = 0; by < BLK && fy+by < f_h; by++)
+	    {
+		fixed_t	wyb = m_y + FTOM (f_h - (fy+by));
+		int	v   = (wyb >> FRACBITS) & 63;
+		byte*	row = fb + (fy+by) * f_w;
+		for (bx = 0; bx < BLK && fx+bx < f_w; bx++)
+		{
+		    fixed_t wxb = m_x + FTOM (fx+bx);
+		    row[fx+bx] = cmap[flat[(v<<6) + ((wxb >> FRACBITS) & 63)]];
+		}
+	    }
 	}
     }
+    #undef BLK
 }
 
 void AM_Drawer (void)
