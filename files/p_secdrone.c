@@ -110,6 +110,7 @@ static mobj_t* SecDrone_BestTarget (mobj_t* self, fixed_t range)
 	    continue;
 	m = (mobj_t*)th;
 	if (m == self)			continue;
+	if (m->player)			continue;	// never target the human OR the buddy
 	if (!(m->flags & MF_COUNTKILL) && m->info->seestate == S_NULL)	continue;	// monsters incl. lost souls
 	if (m->flags & MF_FRIEND)	continue;	// not our allies
 	if (!(m->flags & MF_SHOOTABLE))	continue;
@@ -350,6 +351,7 @@ static int SecDrone_CountThreats (mobj_t* origin, fixed_t range)
 	if (th->function.acp1 != (actionf_p1)P_MobjThinker)
 	    continue;
 	m = (mobj_t*)th;
+	if (m->player)			continue;	// never the human or the buddy
 	if (!(m->flags & MF_COUNTKILL) && m->info->seestate == S_NULL)	continue;	// monsters incl. lost souls
 	if (m->flags & MF_FRIEND)	continue;	// not our own allies
 	if (!(m->flags & MF_SHOOTABLE))	continue;
