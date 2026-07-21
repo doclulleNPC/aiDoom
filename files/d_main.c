@@ -33,6 +33,7 @@ static const char rcsid[] = "$Id: d_main.c,v 1.8 1997/02/03 22:45:09 b1 Exp $";
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <ctype.h>	// toupper (DEMOLOOP lump names)
 
 extern int access(char *file, int mode);
 
@@ -62,6 +63,7 @@ static int access(char *file, int mode)
 #include "z_zone.h"
 #include "w_wad.h"
 #include "s_sound.h"
+#include "w_json.h"		// ID24 DEMOLOOP (JSON)
 #include "v_video.h"
 
 #include "f_finale.h"
@@ -474,6 +476,46 @@ int             demosequence;
 int             pagetic;
 char                    *pagename;
 
+// ID24 DEMOLOOP: a JSON-defined title/demo sequence.  When present it replaces the
+// hardcoded intro loop in D_DoAdvanceDemo.  https://doomwiki.org/wiki/DEMOLOOP
+typedef struct { char primary[9], secondary[9]; int seconds, type, wipe; } demoloop_t;
+static demoloop_t*	demoloop;
+static int		numdemoloop;
+
+void D_LoadDemoLoop (void)
+{
+    int		lump = W_CheckNumForName ("DEMOLOOP");
+    json_t*	root;
+    json_t*	data;
+    json_t*	entries;
+    int		i;
+
+    if (lump < 0) return;
+    root = JSON_Parse ((const char*) W_CacheLumpNum (lump, PU_CACHE), W_LumpLength (lump));
+    if (!root) { fprintf (stderr, "DEMOLOOP: JSON parse error -- ignored.\n"); return; }
+
+    data    = JSON_Get (root, "data");
+    entries = JSON_Get (data ? data : root, "entries");	// standard wraps in "data"
+    if (entries && entries->type == JSON_ARR && entries->n > 0)
+    {
+	demoloop = malloc (entries->n * sizeof *demoloop);
+	for (i = 0; i < entries->n; i++)
+	{
+	    json_t*	e = JSON_Index (entries, i);
+	    demoloop_t*	d = &demoloop[numdemoloop];
+	    memset (d, 0, sizeof *d);
+	    { const char* s = JSON_Str (JSON_Get (e, "primarylump"));   int k; for (k=0;k<8&&s[k];k++) d->primary[k]  =(char)toupper((unsigned char)s[k]); }
+	    { const char* s = JSON_Str (JSON_Get (e, "secondarylump")); int k; for (k=0;k<8&&s[k];k++) d->secondary[k]=(char)toupper((unsigned char)s[k]); }
+	    d->seconds = (int) JSON_Num (JSON_Get (e, "duration"), 0);
+	    d->type    = (int) JSON_Num (JSON_Get (e, "type"),     0);
+	    d->wipe    = (int) JSON_Num (JSON_Get (e, "outrowipe"),1);
+	    if (d->primary[0]) numdemoloop++;
+	}
+    }
+    JSON_Free (root);
+    if (numdemoloop) printf ("DEMOLOOP: %d entry(ies) -> custom title/demo loop.\n", numdemoloop);
+}
+
 
 //
 // D_PageTicker
@@ -521,6 +563,25 @@ void D_AdvanceDemo (void)
     usergame = false;               // no save / end game here
     paused = false;
     gameaction = ga_nothing;
+
+    // ID24 DEMOLOOP: cycle the JSON-defined entries instead of the hardcoded loop.
+    if (numdemoloop > 0)
+    {
+	demoloop_t* e;
+	demosequence = (demosequence + 1) % numdemoloop;
+	e = &demoloop[demosequence];
+	if (e->type == 1)			// demo lump
+	    G_DeferedPlayDemo (e->primary);
+	else					// art screen
+	{
+	    gamestate = GS_DEMOSCREEN;
+	    pagename  = e->primary;		// stable storage in the demoloop[] array
+	    pagetic   = (e->seconds > 0 ? e->seconds : 5) * TICRATE;
+	    if (e->secondary[0])
+		S_ChangeMusicByName (e->secondary, false);
+	}
+	return;
+    }
 
     if ( gamemode == retail )
       demosequence = (demosequence+1)%7;
@@ -1342,6 +1403,7 @@ void D_DoomMain (void)
         extern void U_LoadMapInfo (void);
         U_LoadMapInfo ();
     }
+    D_LoadDemoLoop ();		// ID24 DEMOLOOP: custom title/demo sequence
 printf("added\n");
     
 
