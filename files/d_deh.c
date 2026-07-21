@@ -618,6 +618,7 @@ deh_bexptr deh_bexptrs[] =
    {A_WeaponJump,          "A_WeaponJump"},
    {A_WeaponAlert,         "A_WeaponAlert"},
   {NULL,             "A_NULL"},  // Ty 05/16/98
+  {NULL,             NULL},      // Sentinel
 };
 
 // to hold startup code pointers from INFO.C
@@ -817,19 +818,18 @@ void deh_procBexCodePointers(DEHFILE *fpin, FILE* fpout, char *line)
       strcat(key,ptr_lstrip(mnemonic));
 
       found = FALSE;
-      i= -1; // incremented to start at zero at the top of the loop
-      do  // Ty 05/16/98 - fix loop logic to look for null ending entry
+      for (i = 0; deh_bexptrs[i].lookup != NULL; i++)
         {
-          ++i;
-          if (!stricmp(key,deh_bexptrs[i].lookup))
-            {  // Ty 06/01/98  - add  to states[].action for new djgcc version
+          if (!stricmp(key, deh_bexptrs[i].lookup))
+            {
               states[indexnum].action = deh_bexptrs[i].cptr; // assign
               if (fpout) fprintf(fpout,
                                  " - applied %p from codeptr[%d] to states[%d]\n",
                                  deh_bexptrs[i].cptr,i,indexnum);
               found = TRUE;
+              break;
             }
-        } while (!found && (deh_bexptrs[i].lookup != NULL));
+        }
 
       if (!found)
         if (fpout) fprintf(fpout,
@@ -1089,7 +1089,7 @@ void deh_procPointer(DEHFILE *fpin, FILE* fpout, char *line) // done
           states[indexnum].action = deh_codeptr[value];
           if (fpout) fprintf(fpout," - applied %p from codeptr[%ld] to states[%d]\n",deh_codeptr[value],value,indexnum);
           // Write BEX-oriented line to match:
-          for (i=0;i<NUMSTATES;i++)
+          for (i = 0; deh_bexptrs[i].lookup != NULL; i++)
             {
               if (deh_bexptrs[i].cptr.acp1 == deh_codeptr[value].acp1)
                 {
@@ -1710,14 +1710,14 @@ void D_ProcessDehInWads(void)
   extern lumpinfo_t *lumpinfo;
   int i, p;
 
+  for (i = 0; i < numlumps; i++)
+    if (!strncasecmp(lumpinfo[i].name, "DEHACKED", 8))
+      ProcessDehFile(NULL, NULL, i);
+
   p = M_CheckParm("-deh");
   if (p)
     while (++p < myargc && myargv[p][0] != '-')
       ProcessDehFile(myargv[p], NULL, 0);
-
-  for (i = 0; i < numlumps; i++)
-    if (!strncasecmp(lumpinfo[i].name, "DEHACKED", 8))
-      ProcessDehFile(NULL, NULL, i);
 }
 
 // ====================================================================
