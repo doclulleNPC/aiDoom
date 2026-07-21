@@ -1,4 +1,6 @@
-# build_win.ps1 -- native Windows build of aiDoom + the config tool with MinGW gcc.
+# build_win.ps1 -- native Windows build of aiDoom + all tools with MinGW gcc.
+# (game + aidoom_config, gpumon, launcher, director, extractor -- the MinGW analog
+#  of build_all_win.bat, which needs MSVC.)
 #
 # Why this exists: files\Makefile.msvc needs nmake + cl (Visual Studio), and
 # build.sh / tools\build_config.sh need pkg-config -- none of which are present
@@ -72,28 +74,41 @@ $gameSrc = Get-ChildItem (Join-Path $files "*.c") | ForEach-Object { $_.FullName
     -o (Join-Path $files "aidoom.exe") $sdldll -lm -lws2_32 -ldbghelp
 if ($LASTEXITCODE) { throw "gcc (aidoom) failed" }
 
-# --- 2) config tool: aidoom_config.exe ----------------------------------------
-# Its .rc reuses files\aidoom.ico (via --include-dir), and the C file includes
-# files\aidoom_icon.h for the live window icon, so add -I$files.
-Write-Host "[build] compiling aidoom_config.exe ..."
+# --- 2) tools: SDL3 GUI apps (config / gpumon / launcher / director / extractor) ---
+# Each owns main() (SDL_MAIN_HANDLED), has an icon .rc reusing files\aidoom.ico (via
+# --include-dir), and includes files\aidoom_icon.h for the live window icon (so add
+# -I$files). They are GUI apps -> -mwindows (WINDOWS subsystem, no console window),
+# matching tools\Makefile.msvc's /SUBSYSTEM:WINDOWS. director also links psapi (process
+# stats) + ws2_32 (TCP to Ollama).  Same as the game, they link the SDL3 import DLL.
 if (-not (Test-Path (Join-Path $tools "font_atlas.h"))) {
     throw "tools\font_atlas.h missing -- run tools\bake_font.py first."
 }
-& windres (Join-Path $tools "aidoom_config.rc") -O coff --include-dir $files `
-    @windresPP -o (Join-Path $tools "aidoom_config_res.o")
-if ($LASTEXITCODE) { throw "windres (aidoom_config.rc) failed" }
-
-& gcc @cflags "-I$tools" "-I$files" (Join-Path $tools "aidoom_config.c") `
-    (Join-Path $tools "aidoom_config_res.o") `
-    -o (Join-Path $tools "aidoom_config.exe") $sdldll -lm
-if ($LASTEXITCODE) { throw "gcc (aidoom_config) failed" }
-
-# --- 3) stage everything in run\ ----------------------------------------------
-Copy-Item (Join-Path $files "aidoom.exe")        (Join-Path $run "aidoom.exe")        -Force
-Copy-Item (Join-Path $tools "aidoom_config.exe") (Join-Path $run "aidoom_config.exe") -Force
-Copy-Item $sdldll                                (Join-Path $run "SDL3.dll")          -Force
-if (Test-Path (Join-Path $files "aidoom.ico")) {
-    Copy-Item (Join-Path $files "aidoom.ico")    (Join-Path $run "aidoom.ico")        -Force
+$toolTargets = @(
+    @{ name = "aidoom_config"; src = "aidoom_config.c"; libs = @() },
+    @{ name = "gpumon";        src = "gpumon_sdl.c";    libs = @() },
+    @{ name = "launcher";      src = "launcher.c";      libs = @() },
+    @{ name = "director";      src = "director.c";      libs = @("-lpsapi","-lws2_32") },
+    @{ name = "extractor";     src = "extractor.c";     libs = @() }
+)
+foreach ($t in $toolTargets) {
+    Write-Host "[build] compiling $($t.name).exe ..."
+    $res = Join-Path $tools "$($t.name)_res.o"
+    & windres (Join-Path $tools "$($t.name).rc") -O coff --include-dir $files `
+        @windresPP -o $res
+    if ($LASTEXITCODE) { throw "windres ($($t.name).rc) failed" }
+    & gcc @cflags "-mwindows" "-I$tools" "-I$files" (Join-Path $tools $t.src) $res `
+        -o (Join-Path $tools "$($t.name).exe") $sdldll -lm $t.libs
+    if ($LASTEXITCODE) { throw "gcc ($($t.name)) failed" }
 }
 
-Write-Host "[build] done -> run\aidoom.exe, run\aidoom_config.exe, run\SDL3.dll"
+# --- 3) stage everything in run\ ----------------------------------------------
+Copy-Item (Join-Path $files "aidoom.exe") (Join-Path $run "aidoom.exe") -Force
+foreach ($t in $toolTargets) {
+    Copy-Item (Join-Path $tools "$($t.name).exe") (Join-Path $run "$($t.name).exe") -Force
+}
+Copy-Item $sdldll (Join-Path $run "SDL3.dll") -Force
+if (Test-Path (Join-Path $files "aidoom.ico")) {
+    Copy-Item (Join-Path $files "aidoom.ico") (Join-Path $run "aidoom.ico") -Force
+}
+
+Write-Host "[build] done -> run\ : aidoom.exe + $(($toolTargets | ForEach-Object { "$($_.name).exe" }) -join ' + ') + SDL3.dll"
