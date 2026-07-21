@@ -1383,10 +1383,19 @@ void G_DoCompleted (void)
 		, sizeof(wminfo.plyr[i].frags)); 
     } 
  
-    gamestate = GS_INTERMISSION; 
-    viewactive = false; 
-    automapactive = false; 
- 
+    // UMAPINFO nointermission: skip the "level finished" stats screen entirely.
+    // Call G_WorldDone directly (as WI_End would) so any intertext / end-game
+    // finale still shows and the map still advances.
+    if (um && um->nointermission)
+    {
+	G_WorldDone ();
+	return;
+    }
+
+    gamestate = GS_INTERMISSION;
+    viewactive = false;
+    automapactive = false;
+
     if (statcopy)
 	memcpy (statcopy, &wminfo, sizeof(wminfo));
 	

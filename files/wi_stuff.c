@@ -35,6 +35,7 @@ rcsid[] = "$Id: wi_stuff.c,v 1.7 1997/02/03 22:45:13 b1 Exp $";
 #include "i_system.h"
 
 #include "w_wad.h"
+#include "u_mapinfo.h"	// UMAPINFO levelpic / exitpic overrides
 
 #include "g_game.h"
 
@@ -426,17 +427,28 @@ boolean WI_Responder(event_t* ev)
 }
 
 
+// UMAPINFO levelpic override: the custom "entering/finished" name patch for a
+// (0-based episode, 0-based map-index) intermission slot, or NULL for the default.
+static patch_t* WI_LevelPic (int epsd, int mapidx)
+{
+    umap_t* um = U_LookupMap (epsd + 1, mapidx + 1);
+    if (um && um->levelpic[0] && W_CheckNumForName (um->levelpic) >= 0)
+	return (patch_t*) W_CacheLumpName (um->levelpic, PU_CACHE);
+    return NULL;
+}
+
 // Draws "<Levelname> Finished!"
 void WI_drawLF(void)
 {
     int y = WI_TITLEY;
+    patch_t* lp = WI_LevelPic (wbs->epsd, wbs->last);
+    patch_t* nm = lp ? lp : lnames[wbs->last];
 
-    // draw <LevelName> 
-    WI_Patch((BASE_WIDTH - SHORT(lnames[wbs->last]->width))/2,
-		y, FB, lnames[wbs->last]);
+    // draw <LevelName>
+    WI_Patch((BASE_WIDTH - SHORT(nm->width))/2, y, FB, nm);
 
     // draw "Finished!"
-    y += (5*SHORT(lnames[wbs->last]->height))/4;
+    y += (5*SHORT(nm->height))/4;
 
     WI_Patch((BASE_WIDTH - SHORT(finished->width))/2,
 		y, FB, finished);
@@ -448,16 +460,17 @@ void WI_drawLF(void)
 void WI_drawEL(void)
 {
     int y = WI_TITLEY;
+    patch_t* lp = WI_LevelPic (wbs->epsd, wbs->next);
+    patch_t* nm = lp ? lp : lnames[wbs->next];
 
     // draw "Entering"
     WI_Patch((BASE_WIDTH - SHORT(entering->width))/2,
 		y, FB, entering);
 
     // draw level
-    y += (5*SHORT(lnames[wbs->next]->height))/4;
+    y += (5*SHORT(nm->height))/4;
 
-    WI_Patch((BASE_WIDTH - SHORT(lnames[wbs->next]->width))/2,
-		y, FB, lnames[wbs->next]);
+    WI_Patch((BASE_WIDTH - SHORT(nm->width))/2, y, FB, nm);
 
 }
 
@@ -1562,8 +1575,17 @@ void WI_loadData(void)
 	strcpy(name,"INTERPIC");
     }
 
+    // UMAPINFO exitpic: custom "level finished" intermission background (the
+    // finished map is wbs->last).  enterpic (a separate "entering" backdrop) is a
+    // later-stage item -- vanilla WI uses one background for both phases.
+    {
+	umap_t* um = U_LookupMap (wbs->epsd + 1, wbs->last + 1);
+	if (um && um->exitpic[0] && W_CheckNumForName (um->exitpic) >= 0)
+	    strcpy (name, um->exitpic);
+    }
+
     // background
-    bg = W_CacheLumpName(name, PU_CACHE);    
+    bg = W_CacheLumpName(name, PU_CACHE);
     if (WIDESCREENDELTA) memset (screens[1], 0, SCREENWIDTH*SCREENHEIGHT);  // black pillarbox sides
     WI_Patch(0, 0, 1, bg);
 
