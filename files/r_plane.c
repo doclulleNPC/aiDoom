@@ -35,6 +35,7 @@ rcsid[] = "$Id: r_plane.c,v 1.4 1997/02/03 16:47:55 b1 Exp $";
 
 #include "doomdef.h"
 #include "doomstat.h"
+#include "r_skydefs.h"	// ID24 SKYDEFS: scrolling / scaled skies
 
 #include "r_local.h"
 #include "r_sky.h"
@@ -432,6 +433,7 @@ void R_DrawPlanes (void)
 	{
 	    int texture;
 	    angle_t an, flip;
+	    skydef_t* sd = NULL;	// ID24 SKYDEFS entry for this sky, if any
 
 	    if (pl->picnum & PL_SKYFLAT)
 	    {
@@ -460,6 +462,18 @@ void R_DrawPlanes (void)
 		texture = skytexture;
 		an = viewangle;
 		flip = 0;
+
+		// ID24 SKYDEFS: if this sky texture has a definition, apply its
+		// horizontal/vertical scroll (texels/sec) as a time-based offset.
+		sd = R_SkyDefForTexNum (texture);
+		if (sd)
+		{
+		    double t = (double) leveltime / 35.0;	// seconds since level start
+		    if (sd->scrollx != 0)
+			an += (angle_t)(sd->scrollx * t * (double)(1u << ANGLETOSKYSHIFT));
+		    if (sd->scrolly != 0)
+			dc_texturemid += (fixed_t)(sd->scrolly * t * (double)FRACUNIT);
+		}
 	    }
 
 	    // Map sky texture rows 0..100 over screen-top..horizon.  Use the UNPITCHED half-view
@@ -469,6 +483,10 @@ void R_DrawPlanes (void)
 	    { int basecy = viewheight/2;
 	      dc_iscale = (basecy > 0 ? (100*FRACUNIT / basecy) : pspriteiscale) >> detailshift;
 	      dc_iscale = (dc_iscale * 5) / 8; }
+
+	    // SKYDEFS scaley: vertical scale of 100*(1/scaley) -> divide the inverse scale.
+	    if (sd && sd->scaley != 1.0 && sd->scaley > 0)
+		dc_iscale = (fixed_t)(dc_iscale / sd->scaley);
 
 	    // Set the height of the current sky texture for column clamping.
 	    { extern int dc_skyheight;

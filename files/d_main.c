@@ -1420,6 +1420,10 @@ printf("added\n");
 					//   (must run BEFORE R_Init builds sprites[] from sprnames[])
     printf ("R_Init: Init DOOM refresh daemon - ");
     R_Init ();
+    {   // ID24 SKYDEFS: parse the sky-definition lump (needs the texture table from R_Init)
+	extern void R_LoadSkyDefs (void);
+	R_LoadSkyDefs ();
+    }
 
     printf ("\nP_Init: Init Playloop state.\n");
     P_Init ();
