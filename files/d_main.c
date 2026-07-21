@@ -516,6 +516,54 @@ void D_LoadDemoLoop (void)
     if (numdemoloop) printf ("DEMOLOOP: %d entry(ies) -> custom title/demo loop.\n", numdemoloop);
 }
 
+// Case-insensitive string equality (portable; avoids strcasecmp).
+static boolean D_EqCI (const char* a, const char* b)
+{
+    while (*a && *b) { if (tolower((unsigned char)*a) != tolower((unsigned char)*b)) return false; a++; b++; }
+    return *a == *b;
+}
+
+// ID24 GAMECONF: a JSON manifest of general WAD info + engine settings.
+// https://doomwiki.org/wiki/GAMECONF  Most fields are frontend/launcher metadata
+// (iwad/pwads/executable/playertranslations/options); the engine here applies the
+// behavioural `mode` (game mode) and logs the descriptive fields.
+void D_LoadGameConf (void)
+{
+    int		lump = W_CheckNumForName ("GAMECONF");
+    json_t*	root;
+    json_t*	data;
+
+    if (lump < 0) return;
+    root = JSON_Parse ((const char*) W_CacheLumpNum (lump, PU_CACHE), W_LumpLength (lump));
+    if (!root) { fprintf (stderr, "GAMECONF: JSON parse error -- ignored.\n"); return; }
+
+    data = JSON_Get (root, "data");
+    if (data)
+    {
+	const char* title  = JSON_Str (JSON_Get (data, "title"));
+	const char* author = JSON_Str (JSON_Get (data, "author"));
+	const char* exe    = JSON_Str (JSON_Get (data, "executable"));
+	const char* mode   = JSON_Str (JSON_Get (data, "mode"));
+
+	if (title[0])
+	    printf ("GAMECONF: \"%s\"%s%s\n", title, author[0] ? " by " : "", author);
+	if (exe[0])
+	    printf ("GAMECONF: executable target = %s\n", exe);
+	if (mode[0])
+	{
+	    extern GameMode_t gamemode;
+	    if      (D_EqCI (mode, "commercial")) gamemode = commercial;
+	    else if (D_EqCI (mode, "retail"))     gamemode = retail;
+	    else if (D_EqCI (mode, "registered")) gamemode = registered;
+	    else if (D_EqCI (mode, "shareware"))  gamemode = shareware;
+	    printf ("GAMECONF: game mode -> %s\n", mode);
+	}
+	// iwad / pwads / executable / playertranslations / options: launcher-level or
+	// deferred (frontend selects WADs; translations/compat flags not yet wired).
+    }
+    JSON_Free (root);
+}
+
 
 //
 // D_PageTicker
@@ -1404,6 +1452,7 @@ void D_DoomMain (void)
         U_LoadMapInfo ();
     }
     D_LoadDemoLoop ();		// ID24 DEMOLOOP: custom title/demo sequence
+    D_LoadGameConf ();		// ID24 GAMECONF: WAD manifest (applies game mode)
 printf("added\n");
     
 
