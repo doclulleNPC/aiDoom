@@ -24,7 +24,7 @@
 static const char rcsid[] = "$Id: am_map.c,v 1.4 1997/02/03 21:24:33 b1 Exp $";
 
 #include <stdio.h>
-#include <stdlib.h>	// realloc (am_ss_seen -- textured-automap exploration)
+#include <stdlib.h>
 
 
 #include "z_zone.h"
@@ -1368,44 +1368,9 @@ void AM_drawCrosshair(int color)
 // light colormap only change when we cross into a differently-lit/floored sector).
 int automap_textured = 1;
 
-// Per-subsector "explored" flags -- set in R_Subsector as the 3D view renders each leaf
-// (so the textured floor is revealed exactly like the walls, not the whole level at once).
-// Cleared per level by AM_ClearSeen (called from P_SetupLevel).
-byte*	am_ss_seen   = NULL;
-int	am_ss_seen_n = 0;	// allocated length
-
-void AM_ClearSeen (void)
-{
-    if (numsubsectors > am_ss_seen_n)
-    {
-	am_ss_seen   = realloc (am_ss_seen, numsubsectors);
-	am_ss_seen_n = numsubsectors;
-    }
-    if (am_ss_seen)
-	memset (am_ss_seen, 0, am_ss_seen_n);
-}
-
-// Reveal the subsector each live player (the human AND the AI buddy) currently stands
-// in.  Called every tic from P_Ticker so the textured automap keeps revealing LIVE --
-// even while it's open, when the 3D view (which normally marks seen via R_Subsector)
-// isn't being drawn -- and so the buddy clears its own fog of war as it roams.
-void AM_MarkPlayersSeen (void)
-{
-    int i;
-    if (!am_ss_seen)
-	return;
-    for (i = 0; i < MAXPLAYERS; i++)
-    {
-	subsector_t* ss;
-	int	     num;
-	if (!playeringame[i] || !players[i].mo)
-	    continue;
-	ss  = R_PointInSubsector (players[i].mo->x, players[i].mo->y);
-	num = ss - subsectors;
-	if (num >= 0 && num < am_ss_seen_n)
-	    am_ss_seen[num] = 1;
-    }
-}
+// A subsector's floor is revealed once the player has SEEN one of its walls -- we read
+// the line ML_MAPPED flag directly in AM_drawFlats (the same fog-of-war the walls use),
+// so there is no separate per-subsector "explored" table to keep or reset.
 
 static void AM_drawFlats (void)
 {
@@ -1438,12 +1403,26 @@ static void AM_drawFlats (void)
 	{
 	    fixed_t	 wx = m_x + FTOM (fx);
 	    subsector_t* ss = R_PointInSubsector (wx, wy);
-	    int		 num = ss - subsectors;
 	    sector_t*	 sec;
 	    int		 pic, i, by, bx;
 
-	    if (!reveal && !(am_ss_seen && num >= 0 && num < am_ss_seen_n && am_ss_seen[num]))
-		continue;			// not explored yet -> leave background
+	    // Reveal a subsector's floor exactly like its WALLS: only once the player has
+	    // actually seen one of its lines (ML_MAPPED, set in R_StoreWallRange AFTER
+	    // occlusion clipping).  Marking in R_Subsector instead over-revealed rooms behind
+	    // a closed door -- the BSP visits their leaf even when the door fully occludes
+	    // them, so their floor showed before the player ever entered.
+	    if (!reveal)
+	    {
+		int	j;
+		boolean	mapped = false;
+		for (j = 0; j < ss->numlines; j++)
+		{
+		    line_t* ld = segs[ss->firstline + j].linedef;
+		    if (ld && (ld->flags & ML_MAPPED)) { mapped = true; break; }
+		}
+		if (!mapped)
+		    continue;			// not explored yet -> leave background
+	    }
 
 	    // R_PointInSubsector returns a BSP leaf for ANY point, including the void
 	    // OUTSIDE the level.  A point genuinely inside the subsector is on the FRONT

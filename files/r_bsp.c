@@ -599,11 +599,6 @@ void R_Subsector (int num)
     sscount++;
     sub = &subsectors[num];
 
-    // Mark this leaf 'explored' for the textured automap (am_map.c AM_drawFlats), so the
-    // floor is revealed exactly as the player sees it -- not the whole level at once.
-    { extern byte* am_ss_seen; extern int am_ss_seen_n;
-      if (am_ss_seen && num >= 0 && num < am_ss_seen_n) am_ss_seen[num] = 1; }
-
     frontsector = sub->sector;
     count = sub->numlines;
     line = &segs[sub->firstline];

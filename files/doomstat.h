@@ -73,6 +73,10 @@ extern int		doom2_overlay;
 // 1 when the resolved IWAD is heretic.wad (Heretic game mode -- phase 1).
 extern int		heretic_mode;
 
+// -vanilla: purist 1993 mode -- disables the always-on modern deviations
+// (free-look, jump, over/under 3D clipping, no-autoaim, textured automap).
+extern int		vanilla_mode;
+
 // Set if homebrew PWAD stuff has been added.
 extern  boolean	modifiedgame;
 

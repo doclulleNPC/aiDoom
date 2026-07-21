@@ -784,8 +784,6 @@ P_SetupLevel
     rejectmatrix = W_CacheLumpNum (lumpnum+ML_REJECT,PU_LEVEL);
     P_GroupLines ();
 
-    { extern void AM_ClearSeen (void); AM_ClearSeen (); }	// reset textured-automap exploration
-
     bodyqueslot = 0;
     deathmatch_p = deathmatchstarts;
 

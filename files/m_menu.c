@@ -68,6 +68,7 @@ extern boolean		message_dontfuckwithme;
 extern boolean		chat_on;		// in heads-up code
 
 void M_SpriteShadow(int choice);
+void M_AutomapTextured(int choice);
 
 //
 // defaulted values
@@ -395,6 +396,7 @@ enum
     vid_statusbar,  // Status bar style
     vid_dither,     // Light dithering
     vid_shadow,     // Sprite shadows
+    vid_automap,    // Textured automap
     vid_end
 } video_e;
 
@@ -409,7 +411,8 @@ menuitem_t VideoMenu[]=
     {2,"",	M_VideoBackend,'b'},	// GPU Backend
     {2,"",	M_StatusBarStyle,'h'},	// Vanilla / Small / Alt HUD
     {2,"",	M_LightDither,'d'},	// soften light banding
-    {1,"",	M_SpriteShadow,'o'}	// soft sprite shadows
+    {1,"",	M_SpriteShadow,'o'},	// soft sprite shadows
+    {1,"",	M_AutomapTextured,'a'}	// textured (floor-flat) automap
 };
 
 menu_t  VideoDef =
@@ -1043,6 +1046,7 @@ extern int statusbar_style;
 static char* M_StatusBarNames[3] = { "Vanilla", "Small (50%)", "Alt HUD" };
 extern int dither_lighting;
 extern int r_shadows;
+extern int automap_textured;		// am_map.c -- textured (floor-flat) automap
 
 void M_DrawVideo(void)
 {
@@ -1089,6 +1093,10 @@ void M_DrawVideo(void)
     M_WriteText(VideoDef.x, VideoDef.y + LINEHEIGHT*vid_shadow, "Sprite Shadows");
     M_WriteText(VideoDef.x + 130, VideoDef.y + LINEHEIGHT*vid_shadow,
 		r_shadows ? "On" : "Off");
+
+    M_WriteText(VideoDef.x, VideoDef.y + LINEHEIGHT*vid_automap, "Textured Map");
+    M_WriteText(VideoDef.x + 130, VideoDef.y + LINEHEIGHT*vid_automap,
+		automap_textured ? "On" : "Off");
 }
 
 void M_LightDither(int choice)
@@ -1101,6 +1109,12 @@ void M_LightDither(int choice)
 void M_SpriteShadow(int choice)
 {
     r_shadows = !r_shadows;
+    M_SaveDefaults ();
+}
+
+void M_AutomapTextured(int choice)
+{
+    automap_textured = !automap_textured;	// am_map.c (config default: on)
     M_SaveDefaults ();
 }
 
