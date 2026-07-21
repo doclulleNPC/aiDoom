@@ -404,7 +404,14 @@ P_UseSpecialLine
 	P_ChangeSwitchTexture(line,0);
 	G_ExitLevel ();
 	break;
-	
+
+      case 2070:
+	// ID24: S1 Exit + reset inventory (normal)
+	P_ChangeSwitchTexture(line,0);
+	id24_reset_inventory = true;
+	G_ExitLevel ();
+	break;
+
       case 14:
 	// Raise Floor 32 and change texture
 	if (EV_DoPlat(line,raiseAndChange,32))
@@ -476,7 +483,14 @@ P_UseSpecialLine
 	P_ChangeSwitchTexture(line,0);
 	G_SecretExitLevel ();
 	break;
-	
+
+      case 2073:
+	// ID24: S1 Exit + reset inventory (secret)
+	P_ChangeSwitchTexture(line,0);
+	id24_reset_inventory = true;
+	G_SecretExitLevel ();
+	break;
+
       case 55:
 	// Raise Floor Crush
 	if (EV_DoFloor(line,raiseFloorCrush))

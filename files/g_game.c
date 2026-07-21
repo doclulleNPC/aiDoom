@@ -552,6 +552,34 @@ void G_DoLoadLevel (void)
 	    skytexture = R_TextureNumForName (um->skytexture);
     }
 
+    // ID24 reset-exit (specials 2069-2074): the previous map's exit asked for a
+    // fresh start -- strip every player back to pistol-start on this new map.
+    if (id24_reset_inventory)
+    {
+	extern int maxammo[NUMAMMO];
+	int p, k;
+	for (p = 0; p < MAXPLAYERS; p++)
+	{
+	    player_t* pl = &players[p];
+	    if (!playeringame[p]) continue;
+	    memset (pl->weaponowned, 0, sizeof pl->weaponowned);
+	    memset (pl->ammo,        0, sizeof pl->ammo);
+	    memset (pl->cards,       0, sizeof pl->cards);
+	    memset (pl->powers,      0, sizeof pl->powers);
+	    memset (pl->inventory,   0, sizeof pl->inventory);
+	    pl->invslot     = 0;
+	    pl->backpack    = false;
+	    pl->armorpoints = 0;
+	    pl->armortype   = 0;
+	    pl->weaponowned[wp_fist]   = true;
+	    pl->weaponowned[wp_pistol] = true;
+	    pl->readyweapon = pl->pendingweapon = wp_pistol;
+	    pl->ammo[am_clip] = 50;
+	    for (k = 0; k < NUMAMMO; k++) pl->maxammo[k] = maxammo[k];
+	}
+	id24_reset_inventory = false;
+    }
+
     displayplayer = consoleplayer;		// view the guy you are playing
     starttime = I_GetTime (); 
     gameaction = ga_nothing; 
@@ -1221,7 +1249,10 @@ int cpars[32] =
 //
 // G_DoCompleted 
 //
-boolean		secretexit; 
+boolean		secretexit;
+
+// ID24 reset-exit specials (2069-2074): consumed in G_DoLoadLevel.
+boolean		id24_reset_inventory = false; 
 extern char*	pagename; 
  
 void G_ExitLevel (void)

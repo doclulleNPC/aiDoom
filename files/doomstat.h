@@ -77,6 +77,10 @@ extern int		heretic_mode;
 // (free-look, jump, over/under 3D clipping, no-autoaim, textured automap).
 extern int		vanilla_mode;
 
+// ID24 reset-exit line specials (2069-2074): set when the exit taken should
+// strip players back to pistol-start on the next map (applied in G_DoLoadLevel).
+extern boolean		id24_reset_inventory;
+
 // Set if homebrew PWAD stuff has been added.
 extern  boolean	modifiedgame;
 

@@ -720,7 +720,19 @@ P_CrossSpecialLine
 	// EXIT!
 	G_ExitLevel ();
 	break;
-	
+
+      case 2069:
+	// ID24: W1 Exit + reset inventory (normal)
+	id24_reset_inventory = true;
+	G_ExitLevel ();
+	break;
+
+      case 2072:
+	// ID24: W1 Exit + reset inventory (secret)
+	id24_reset_inventory = true;
+	G_SecretExitLevel ();
+	break;
+
       case 53:
 	// Perpetual Platform Raise
 	EV_DoPlat(line,perpetualRaise,0);
@@ -1048,6 +1060,20 @@ P_ShootSpecialLine
 
       case 198:
 	// Boom: G1 Secret Exit Level (gunshot)
+	G_SecretExitLevel ();
+	P_ChangeSwitchTexture(line,0);
+	break;
+
+      case 2071:
+	// ID24: G1 Exit + reset inventory (normal)
+	id24_reset_inventory = true;
+	G_ExitLevel ();
+	P_ChangeSwitchTexture(line,0);
+	break;
+
+      case 2074:
+	// ID24: G1 Exit + reset inventory (secret)
+	id24_reset_inventory = true;
 	G_SecretExitLevel ();
 	P_ChangeSwitchTexture(line,0);
 	break;
