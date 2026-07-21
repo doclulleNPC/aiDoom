@@ -502,6 +502,29 @@ P_FindMinSurroundingLight
 //
 
 //
+// EV_ChangeMusic -- ID24 music-change line specials (2057-2068, 2087-2098).
+// The music lump was resolved from the sidedef texture name at load (front/back).
+// Four behaviours per trigger: loop-or-not, and reset-to-default-or-not when no
+// track is defined.  "once" (W1/S1/G1) clears the special after firing.
+//
+void EV_ChangeMusic (line_t* line, int side)
+{
+    int		music = side ? line->backmusic : line->frontmusic;
+    int		sp    = line->special;
+    boolean	once   = (sp==2057||sp==2059||sp==2061||sp==2063||sp==2065||sp==2067
+			|| sp==2087||sp==2089||sp==2091||sp==2093||sp==2095||sp==2097);
+    boolean	loops  = (sp>=2057 && sp<=2062) || (sp>=2087 && sp<=2092);
+    boolean	resets = (sp>=2087 && sp<=2098);
+
+    if (music >= 0)
+	S_ChangeMusicByLump (music, loops);
+    else if (resets)
+	S_Start ();			// no track defined -> reset to the level default
+
+    if (once)
+	line->special = 0;
+}
+
 // P_CrossSpecialLine - TRIGGER
 // Called every time a thing origin is about
 //  to cross a line with a non 0 special.
@@ -731,6 +754,12 @@ P_CrossSpecialLine
 	// ID24: W1 Exit + reset inventory (secret)
 	id24_reset_inventory = true;
 	G_SecretExitLevel ();
+	break;
+
+      // ID24 music-change (walk): W1 / WR, looping / once, plain / reset
+      case 2057: case 2058: case 2063: case 2064:
+      case 2087: case 2088: case 2093: case 2094:
+	EV_ChangeMusic (line, side);
 	break;
 
       case 53:
@@ -1076,6 +1105,12 @@ P_ShootSpecialLine
 	id24_reset_inventory = true;
 	G_SecretExitLevel ();
 	P_ChangeSwitchTexture(line,0);
+	break;
+
+      // ID24 music-change (gun): G1 / GR, looping / once, plain / reset
+      case 2061: case 2062: case 2067: case 2068:
+      case 2091: case 2092: case 2097: case 2098:
+	EV_ChangeMusic (line, 0);
 	break;
     }
 }

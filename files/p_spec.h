@@ -700,6 +700,9 @@ EV_VerticalDoor
 ( line_t*	line,
   mobj_t*	thing );
 
+// ID24 music-change line specials (2057-2068, 2087-2098).
+void EV_ChangeMusic (line_t* line, int side);
+
 int
 EV_DoDoor
 ( line_t*	line,

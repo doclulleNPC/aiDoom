@@ -84,9 +84,10 @@ S_ChangeMusic
 ( int		music_id,
   int		looping );
 
-// Play music directly by lump name (UMAPINFO music / MUSINFO), bypassing the
-// mus_* enum table.  No-op if the lump is missing or already playing.
+// Play music directly by lump name / number (UMAPINFO music / ID24 music-change /
+// MUSINFO), bypassing the mus_* enum table.  No-op if the lump is bad or playing.
 void S_ChangeMusicByName (const char* lumpname, int looping);
+void S_ChangeMusicByLump (int lumpnum, int looping);
 
 // Stops the music fer sure.
 void S_StopMusic(void);

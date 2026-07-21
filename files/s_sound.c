@@ -710,13 +710,12 @@ S_ChangeMusic
     mus_playing = music;
 }
 
-// Play music directly by lump name (UMAPINFO music / MUSINFO), bypassing the
-// mus_* enum table so ANY lump can be used.  No-op if the lump is missing (keeps
-// the current track) or already playing.
-void S_ChangeMusicByName (const char* lumpname, int looping)
+// Play music directly by lump NUMBER (ID24 music-change / MUSINFO), bypassing the
+// mus_* enum table so ANY lump can be used.  No-op if the lump is bad or already
+// playing.
+void S_ChangeMusicByLump (int lumpnum, int looping)
 {
     static musicinfo_t	umus;
-    int			lumpnum = W_CheckNumForName ((char*) lumpname);
 
     if (lumpnum < 0)
 	return;					// no such lump -> leave music alone
@@ -730,6 +729,12 @@ void S_ChangeMusicByName (const char* lumpname, int looping)
     umus.handle  = I_RegisterSong (umus.data, W_LumpLength (lumpnum));
     I_PlaySong (umus.handle, looping);
     mus_playing = &umus;
+}
+
+// ...same, but by lump NAME (UMAPINFO music / DEMOLOOP art).
+void S_ChangeMusicByName (const char* lumpname, int looping)
+{
+    S_ChangeMusicByLump (W_CheckNumForName ((char*) lumpname), looping);
 }
 
 

@@ -412,6 +412,13 @@ P_UseSpecialLine
 	G_ExitLevel ();
 	break;
 
+      // ID24 music-change (switch): S1 / SR, looping / once, plain / reset.  No
+      // switch-texture flip -- the "texture" name is the music lump.
+      case 2059: case 2060: case 2065: case 2066:
+      case 2089: case 2090: case 2095: case 2096:
+	EV_ChangeMusic (line, side);
+	break;
+
       case 14:
 	// Raise Floor 32 and change texture
 	if (EV_DoPlat(line,raiseAndChange,32))

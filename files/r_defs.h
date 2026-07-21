@@ -234,6 +234,12 @@ typedef struct line_s
 
     // Boom 260: translucent 2S middle texture.  -1 = opaque, 0 = translucent (main_tranmap).
     int		tranlump;
+
+    // ID24 music-change lines (2057-2068, 2087-2098): music lump resolved from the
+    // sidedef's texture name at load (front=top of front side, back=bottom of back
+    // side).  -1 = no track defined.  See p_setup.c + EV_ChangeMusic.
+    int		frontmusic;
+    int		backmusic;
 } line_t;
 
 

@@ -450,6 +450,13 @@ void P_LoadThings (int lump)
 
 
 //
+// Raw sidedef top/bottom texture names, kept from P_LoadSideDefs so P_LoadLineDefs
+// can resolve ID24 music-change lines (whose texture name is a music lump, not a
+// real texture).  Allocated PU_LEVEL; consumed at the end of P_LoadLineDefs.
+// (P_LoadSideDefs runs before P_LoadLineDefs in P_SetupLevel.)
+static char (*sd_raw_top)[9];
+static char (*sd_raw_bot)[9];
+
 // P_LoadLineDefs
 // Also counts secret lines for intermissions.
 //
@@ -530,7 +537,31 @@ void P_LoadLineDefs (int lump)
 	    ld->backsector = 0;
 
 	ld->tranlump = -1;	// Boom 260: opaque unless a 260 special says otherwise (below)
+	ld->frontmusic = ld->backmusic = -1;	// ID24 music-change: resolved below
     }
+
+    // ID24 music-change lines (2057-2068, 2087-2098): the sidedef's texture NAME is a
+    // music lump (front = top of front side, back = bottom of back side).  Resolve it
+    // to a lump number now and clear the fake top texture so it doesn't render.
+    if (sd_raw_top)
+    {
+	line_t* ld = lines;
+	int i;
+	for (i = 0; i < numlines; i++, ld++)
+	{
+	    int sp = ld->special;
+	    if (!((sp >= 2057 && sp <= 2068) || (sp >= 2087 && sp <= 2098)))
+		continue;
+	    if (ld->sidenum[0] >= 0 && ld->sidenum[0] < numsides)
+	    {
+		ld->frontmusic = W_CheckNumForName (sd_raw_top[ld->sidenum[0]]);
+		sides[ld->sidenum[0]].toptexture = 0;
+	    }
+	    if (ld->sidenum[1] >= 0 && ld->sidenum[1] < numsides)
+		ld->backmusic = W_CheckNumForName (sd_raw_bot[ld->sidenum[1]]);
+	}
+    }
+    sd_raw_top = sd_raw_bot = NULL;	// PU_LEVEL memory is reclaimed at the next level load
 
     // Boom 260 (killough 4/11/98): translucent 2S middle textures.  tag 0 -> just this linedef;
     // tag N -> every linedef with that tag.  aiDoom uses the generated main_tranmap (tranlump 0).
@@ -562,12 +593,15 @@ void P_LoadSideDefs (int lump)
     int			i;
     mapsidedef_t*	msd;
     side_t*		sd;
-	
+
     numsides = W_LumpLength (lump) / sizeof(mapsidedef_t);
-    sides = Z_Malloc (numsides*sizeof(side_t),PU_LEVEL,0);	
+    sides = Z_Malloc (numsides*sizeof(side_t),PU_LEVEL,0);
     memset (sides, 0, numsides*sizeof(side_t));
     data = W_CacheLumpNum (lump,PU_STATIC);
-	
+
+    sd_raw_top = Z_Malloc (numsides * 9, PU_LEVEL, 0);
+    sd_raw_bot = Z_Malloc (numsides * 9, PU_LEVEL, 0);
+
     msd = (mapsidedef_t *)data;
     sd = sides;
     for (i=0 ; i<numsides ; i++, msd++, sd++)
@@ -578,8 +612,11 @@ void P_LoadSideDefs (int lump)
 	sd->bottomtexture = R_TextureNumForName(msd->bottomtexture);
 	sd->midtexture = R_TextureNumForName(msd->midtexture);
 	sd->sector = &sectors[SHORT(msd->sector)];
+	// keep the raw names for the ID24 music-line resolution pass
+	memcpy (sd_raw_top[i], msd->toptexture, 8);    sd_raw_top[i][8] = 0;
+	memcpy (sd_raw_bot[i], msd->bottomtexture, 8); sd_raw_bot[i][8] = 0;
     }
-	
+
     Z_Free (data);
 }
 
