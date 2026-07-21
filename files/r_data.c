@@ -159,7 +159,9 @@ int*			texturewidthmask;
 fixed_t*		textureheight;		
 int*			texturecompositesize;
 short**			texturecolumnlump;
-unsigned short**	texturecolumnofs;
+// 32-bit offsets: tall/wide patch lumps exceed 64 KB, so a 16-bit column
+// offset truncated (ZZZGATE 512x512 -> right half garbled).
+unsigned**		texturecolumnofs;
 byte**			texturecomposite;
 
 // for global animation
@@ -203,15 +205,20 @@ R_DrawColumnInCache
     int		count;
     int		position;
     byte*	source;
-    byte*	dest;
-	
-    dest = (byte *)cache + 3;
-	
+    int		topdelta = -1;		// DeePsea tall-patch: track last absolute delta
+
     while (patch->topdelta != 0xff)
     {
+	// Tall patches (>254 rows) encode topdelta cumulatively: if this post's
+	// topdelta is <= the previous, it is a relative continuation.
+	if (patch->topdelta <= topdelta)
+	    topdelta += patch->topdelta;
+	else
+	    topdelta = patch->topdelta;
+
 	source = (byte *)patch + 3;
 	count = patch->length;
-	position = originy + patch->topdelta;
+	position = originy + topdelta;
 
 	if (position < 0)
 	{
@@ -249,7 +256,7 @@ void R_GenerateComposite (int texnum)
     int			i;
     column_t*		patchcol;
     short*		collump;
-    unsigned short*	colofs;
+    unsigned*		colofs;
 	
     texture = textures[texnum];
 
@@ -320,7 +327,7 @@ void R_GenerateLookup (int texnum)
     int			x2;
     int			i;
     short*		collump;
-    unsigned short*	colofs;
+    unsigned*		colofs;
     // VANILLA BUG (tutti-frutti): vanilla read single-patch columns directly
     // from the WAD patch; if the patch didn't span the full texture height the
     // column drawer ran past it -> garbage stripe.  Track each column's
@@ -386,21 +393,20 @@ void R_GenerateLookup (int texnum)
 
 	// Composite the column if it has multiple patches OR a single patch
 	// that doesn't span the full texture height (the latter is the
-	// tutti-frutti fix -- vanilla only checked patchcount > 1).
+	// tutti-frutti fix -- vanilla only checked patchcount > 1) OR the
+	// texture is taller than one post can hold (>254 rows): such a column
+	// is stored as multiple posts (DeePsea tall patch) and cannot be read
+	// directly as flat pixels, so it must go through the composite path.
 	if (patchcount[x] > 1
 	    || coltop[x] > 0
-	    || colbot[x] < texture->height)
+	    || colbot[x] < texture->height
+	    || texture->height > 254)
 	{
 	    // Use the cached block.
 	    collump[x] = -1;
 	    colofs[x] = texturecompositesize[texnum];
-	    
-	    if (texturecompositesize[texnum] > 0x10000-texture->height)
-	    {
-		I_Error ("R_GenerateLookup: texture %i is >64k",
-			 texnum);
-	    }
-	    
+
+	    // 32-bit texturecompositesize + colofs -> no 64k texture limit.
 	    texturecompositesize[texnum] += texture->height;
 	}
     }	
@@ -627,8 +633,8 @@ void R_InitTextures (void)
 			 texture->name);
 	    }
 	}		
-	texturecolumnlump[i] = Z_Malloc (texture->width*2, PU_STATIC,0);
-	texturecolumnofs[i] = Z_Malloc (texture->width*2, PU_STATIC,0);
+	texturecolumnlump[i] = Z_Malloc (texture->width*sizeof(short), PU_STATIC,0);
+	texturecolumnofs[i] = Z_Malloc (texture->width*sizeof(unsigned), PU_STATIC,0);
 
 	j = 1;
 	while (j*2 <= texture->width)

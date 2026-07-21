@@ -234,6 +234,22 @@ flag — this is exactly what Boom's `comp_stairs` does — and never change the
 
 ---
 
+## 12. Tall / large textures from modern PWADs (>254 rows, >64 KB patches)
+
+The 1993 texture composer assumes every texture is ≤254 rows tall and every patch
+lump fits in 64 KB — true for the stock IWADs, false for modern content. Legacy of
+Rust's `ZZZGATE*` portal textures are **512×512**; the symptom was the **left half
+of the portal rendering fine and the right half a scrambled mess of vertical
+streaks** (see the LoR MAP01 gate).
+
+| Symptom | Root cause | Fix | File |
+|---|---|---|---|
+| Right half of a tall/wide texture (e.g. `ZZZGATE1`, 512×512) renders as garbage columns | `texturecolumnofs[]` was `unsigned short` — but the **byte offset** of a column into a >64 KB patch lump exceeds 65535, so every column past ~col 126 truncated (mod 65536) and read the wrong data | make `texturecolumnofs` (and the local `colofs`) **32-bit** (`unsigned`); allocate `width*sizeof(unsigned)` | `r_data.c` |
+| Rows below ~254 of a tall single-patch wall texture are garbage | a >254-row solid column can't be one post (post `length` is a byte), so it is stored as **multiple posts using the DeePsea tall-patch convention** (a post whose `topdelta` ≤ the previous is a *cumulative* continuation). The old code read the raw patch column directly as flat pixels, and `R_DrawColumnInCache` used `topdelta` absolutely | force any texture `height > 254` through the composite path (never the direct single-post shortcut), and make `R_DrawColumnInCache` track a running absolute `topdelta` | `r_data.c` |
+| `R_GenerateLookup: texture is >64k` I_Error on a big texture | the composite-size guard capped a texture at 64 KB (16-bit `colofs` era) | with 32-bit offsets the cap is unnecessary — removed | `r_data.c` |
+
+---
+
 ## How to spot the next one
 
 - Compiler warnings `-Wpointer-to-int-cast` / `-Wint-to-pointer-cast` → §1.
@@ -247,3 +263,6 @@ flag — this is exactly what Boom's `comp_stairs` does — and never change the
 - **Stairs build to the wrong height, or a second staircase off the same switch is
   wrong/missing** → that's the *vanilla* stair-builder bug (§9). It's not yours to
   fix — it's kept for demo/map compat.
+- **Half of a big wall texture is fine and the other half is scrambled vertical
+  streaks** (modern/ID24 PWADs with 256/384/512-tall textures) → tall-texture /
+  >64 KB-patch limits, §12.
