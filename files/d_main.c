@@ -1440,6 +1440,15 @@ void D_DoomMain (void)
 	}
     }
 
+    // ID24 resource WAD (id24res.wad): Legacy-of-Rust sprites/sounds + the SBARDEF
+    // status-bar and its graphics.  Auto-overlaid EARLY (before R_InitSprites) when
+    // present, so the new content's art registers with the sprite/sound systems.
+    if (!access ("ID0/id24res.wad", R_OK) || !access ("id24res.wad", R_OK))
+    {
+	D_AddFile ("id24res.wad");
+	printf ("ID24 resources: id24res.wad -> loaded early (LoR sprites/sounds + SBARDEF)\n");
+    }
+
     printf ("W_Init: Init WADfiles.\n");
     W_InitMultipleFiles (wadfiles);
     {   // DeHackEd/BEX/MBF21: apply every DEHACKED lump + -deh files before the tables are read
