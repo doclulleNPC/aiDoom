@@ -37,6 +37,7 @@ rcsid[] = "$Id: p_enemy.c,v 1.5 1997/02/03 22:45:11 b1 Exp $";
 #include "s_sound.h"
 
 #include "g_game.h"
+#include "u_mapinfo.h"	// UMAPINFO boss actions
 
 // State.
 #include "doomstat.h"
@@ -1790,6 +1791,28 @@ void A_Explode (mobj_t* thingy)
 
 
 //
+// Run one UMAPINFO boss-action line special (unconditionally -- a dead boss has no
+// ->player, so it can't go through the player-gated P_CrossSpecialLine).  Covers the
+// canonical bossaction specials from the UMAPINFO spec plus a Boom-generalized
+// fallback; other specials are a no-op (documented Stage-2 limitation).
+static void U_RunBossActionSpecial (line_t* junk, mobj_t* mo)
+{
+    switch (junk->special)
+    {
+      case 11: case 52:  G_ExitLevel ();       break;	// exit
+      case 51: case 124: G_SecretExitLevel (); break;	// secret exit
+      case 23: case 38:  EV_DoFloor (junk, lowerFloorToLowest); break;	// classic "666"
+      case 30:           EV_DoFloor (junk, raiseToTexture);     break;	// classic "667"
+      case 19: case 36: case 37: case 45:
+			 EV_DoFloor (junk, lowerFloor);            break;
+      case 5:  case 24:  EV_DoFloor (junk, raiseFloor);          break;
+      case 18: case 69:  EV_DoFloor (junk, raiseFloorToNearest); break;
+      default:
+	P_DoGenLineSpecial (junk, mo, 0);	// Boom generalized (walk) -- takes a line*
+	break;
+    }
+}
+
 // A_BossDeath
 // Possibly trigger special effects
 // if on first boss level
@@ -1800,7 +1823,44 @@ void A_BossDeath (mobj_t* mo)
     mobj_t*	mo2;
     line_t	junk;
     int		i;
-		
+
+    // UMAPINFO boss actions REPLACE the hardcoded episode-boss behaviour when the
+    // current map defines its own (or bossaction=clear to suppress them entirely).
+    {
+	umap_t*	um = U_LookupMap (gameepisode, gamemap);
+	if (um && (um->numbossactions > 0 || um->bossaction_clear))
+	{
+	    int j; boolean listed = false;
+	    for (j = 0; j < um->numbossactions; j++)
+		if (um->bossactions[j].type == (int) mo->type) { listed = true; break; }
+	    if (!listed)
+		return;				// not a boss on this map
+
+	    for (i = 0; i < MAXPLAYERS; i++)
+		if (playeringame[i] && players[i].health > 0) break;
+	    if (i == MAXPLAYERS)
+		return;				// nobody alive -> don't fire
+
+	    for (th = thinkercap.next; th != &thinkercap; th = th->next)
+	    {
+		if (th->function.acp1 != (actionf_p1)P_MobjThinker) continue;
+		mo2 = (mobj_t*)th;
+		if (mo2 != mo && mo2->type == mo->type && mo2->health > 0)
+		    return;			// not all of this type dead yet
+	    }
+
+	    memset (&junk, 0, sizeof junk);
+	    for (j = 0; j < um->numbossactions; j++)
+	    {
+		if (um->bossactions[j].type != (int) mo->type) continue;
+		junk.special = (short) um->bossactions[j].special;
+		junk.tag     = (short) um->bossactions[j].tag;
+		U_RunBossActionSpecial (&junk, mo);
+	    }
+	    return;
+	}
+    }
+
     if ( gamemode == commercial)
     {
 	if (gamemap != 7)

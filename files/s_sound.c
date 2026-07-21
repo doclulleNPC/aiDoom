@@ -43,6 +43,7 @@ extern int num_sfx;
 #include "p_local.h"
 
 #include "doomstat.h"
+#include "u_mapinfo.h"	// UMAPINFO per-map music override
 
 
 // Purpose?
@@ -213,7 +214,18 @@ void S_Start(void)
   
   // start new music for the level
   mus_paused = 0;
-  
+
+  // UMAPINFO music override: play the map's named lump instead of the default.
+  {
+    umap_t* um = U_LookupMap (gameepisode, gamemap);
+    if (um && um->music[0])
+    {
+      S_ChangeMusicByName (um->music, true);
+      nextcleanup = 15;
+      return;
+    }
+  }
+
   if (gamemode == commercial)
     mnum = mus_runnin + gamemap - 1;
   else
@@ -696,6 +708,28 @@ S_ChangeMusic
     I_PlaySong(music->handle, looping);
 
     mus_playing = music;
+}
+
+// Play music directly by lump name (UMAPINFO music / MUSINFO), bypassing the
+// mus_* enum table so ANY lump can be used.  No-op if the lump is missing (keeps
+// the current track) or already playing.
+void S_ChangeMusicByName (const char* lumpname, int looping)
+{
+    static musicinfo_t	umus;
+    int			lumpnum = W_CheckNumForName ((char*) lumpname);
+
+    if (lumpnum < 0)
+	return;					// no such lump -> leave music alone
+    if (mus_playing && mus_playing->lumpnum == lumpnum)
+	return;
+
+    S_StopMusic ();
+    memset (&umus, 0, sizeof umus);
+    umus.lumpnum = lumpnum;
+    umus.data    = (void *) W_CacheLumpNum (lumpnum, PU_MUSIC);
+    umus.handle  = I_RegisterSong (umus.data, W_LumpLength (lumpnum));
+    I_PlaySong (umus.handle, looping);
+    mus_playing = &umus;
 }
 
 

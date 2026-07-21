@@ -39,6 +39,7 @@ rcsid[] = "$Id: g_game.c,v 1.8 1997/02/03 22:45:09 b1 Exp $";
 #include "i_system.h"
 
 #include "p_setup.h"
+#include "u_mapinfo.h"	// UMAPINFO map progression / par time
 #include "p_saveg.h"
 #include "p_tick.h"
 
@@ -373,8 +374,9 @@ void G_BuildTiccmd (ticcmd_t* cmd)
 	dclicks = 0;
     }
 
-    // MOD: jump.  Disabled in net games (BT_JUMP would desync a vanilla peer).
-    if (!netgame && gamekeydown[key_jump])
+    // MOD: jump.  Disabled in net games (BT_JUMP would desync a vanilla peer) and in
+    // -vanilla mode (no jump in 1993 DOOM).
+    if (!netgame && !vanilla_mode && gamekeydown[key_jump])
 	cmd->buttons |= BT_JUMP;
 
     // chainsaw overrides
@@ -442,8 +444,9 @@ void G_BuildTiccmd (ticcmd_t* cmd)
     } 
  
     // MOD: free-look -- vertical mouse aims the view (lookdir) instead of moving
-    // forward/back.  Disabled in net games (lookdir isn't carried in the ticcmd).
-    if (!netgame)
+    // forward/back.  Disabled in net games (lookdir isn't carried in the ticcmd) and in
+    // -vanilla mode (no free-look in 1993 DOOM -> the mouse moves forward/back).
+    if (!netgame && !vanilla_mode)
     {
 	player_t* plr = &players[consoleplayer];
 	plr->lookdir += mousey >> 3;
@@ -540,8 +543,16 @@ void G_DoLoadLevel (void)
 	memset (players[i].frags,0,sizeof(players[i].frags)); 
     } 
 		 
-    P_SetupLevel (gameepisode, gamemap, 0, gameskill);    
-    displayplayer = consoleplayer;		// view the guy you are playing    
+    P_SetupLevel (gameepisode, gamemap, 0, gameskill);
+
+    // UMAPINFO sky override (after P_SetupLevel so it wins over the default).
+    {
+	umap_t* um = U_LookupMap (gameepisode, gamemap);
+	if (um && um->skytexture[0] && R_CheckTextureNumForName (um->skytexture) >= 0)
+	    skytexture = R_TextureNumForName (um->skytexture);
+    }
+
+    displayplayer = consoleplayer;		// view the guy you are playing
     starttime = I_GetTime (); 
     gameaction = ga_nothing; 
     Z_CheckHeap ();
@@ -1243,29 +1254,40 @@ void G_DoCompleted (void)
 	if (playeringame[i]) 
 	    G_PlayerFinishLevel (i);        // take away cards and stuff 
 	 
-    if (automapactive) 
-	AM_Stop (); 
-	
-    if ( gamemode != commercial)
+    if (automapactive)
+	AM_Stop ();
+
+    // UMAPINFO: a map record can end the game, redirect the exit, or set par time.
+    // When it defines an explicit next map, its progression fully replaces the
+    // hardcoded episode-end / secret-level logic below.
+    umap_t*  um       = U_LookupMap (gameepisode, gamemap);
+    boolean  um_next  = um && (secretexit ? um->nextsecret[0] : um->nextmap[0]);
+    if (um && (um->endflags & U_END_ANY))
+    {
+	gameaction = ga_victory;	// UMAPINFO end-game -> finale
+	return;
+    }
+
+    if ( gamemode != commercial && !um_next)
 	switch(gamemap)
 	{
 	  case 8:
 	    gameaction = ga_victory;
 	    return;
-	  case 9: 
-	    for (i=0 ; i<MAXPLAYERS ; i++) 
-		players[i].didsecret = true; 
+	  case 9:
+	    for (i=0 ; i<MAXPLAYERS ; i++)
+		players[i].didsecret = true;
 	    break;
 	}
 		
 //#if 0  Hmmm - why?
     if ( (gamemap == 8)
-	 && (gamemode != commercial) ) 
+	 && (gamemode != commercial) && !um_next )
     {
-	// victory 
-	gameaction = ga_victory; 
-	return; 
-    } 
+	// victory
+	gameaction = ga_victory;
+	return;
+    }
 	 
     if ( (gamemap == 9)
 	 && (gamemode != commercial) ) 
@@ -1325,15 +1347,30 @@ void G_DoCompleted (void)
 	    wminfo.next = gamemap;          // go to next level 
     }
 		 
-    wminfo.maxkills = totalkills; 
-    wminfo.maxitems = totalitems; 
+    // UMAPINFO next/nextsecret override (may cross episodes -> u_next_episode/map).
+    if (um_next)
+    {
+	int ep, mp;
+	const char* nm = secretexit ? um->nextsecret : um->nextmap;
+	if (U_ValidateMapName (nm, &ep, &mp))
+	{
+	    wminfo.next    = mp - 1;
+	    u_next_episode = ep;
+	    u_next_map     = mp;
+	}
+    }
+
+    wminfo.maxkills = totalkills;
+    wminfo.maxitems = totalitems;
     wminfo.maxsecret = totalsecret; 
     wminfo.maxfrags = 0; 
     if ( gamemode == commercial )
 	wminfo.partime = 35*cpars[gamemap-1]; 
     else
-	wminfo.partime = 35*pars[gameepisode][gamemap]; 
-    wminfo.pnum = consoleplayer; 
+	wminfo.partime = 35*pars[gameepisode][gamemap];
+    if (um && um->partime > 0)		// UMAPINFO par time (seconds) wins
+	wminfo.partime = 35 * um->partime;
+    wminfo.pnum = consoleplayer;
  
     for (i=0 ; i<MAXPLAYERS ; i++) 
     { 
@@ -1385,11 +1422,18 @@ void G_WorldDone (void)
     }
 } 
  
-void G_DoWorldDone (void) 
-{        
-    gamestate = GS_LEVEL; 
-    gamemap = wminfo.next+1; 
-    G_DoLoadLevel (); 
+void G_DoWorldDone (void)
+{
+    gamestate = GS_LEVEL;
+    gamemap = wminfo.next+1;
+    // UMAPINFO next may cross episodes, which wminfo.next alone can't express.
+    if (u_next_episode)
+    {
+	gameepisode    = u_next_episode;
+	gamemap        = u_next_map;
+	u_next_episode = 0;
+    }
+    G_DoLoadLevel ();
     gameaction = ga_nothing; 
     viewactive = true; 
 } 

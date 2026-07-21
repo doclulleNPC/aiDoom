@@ -119,6 +119,9 @@ char*		wadfiles[MAXWADFILES];
 // monsters (director) and the super shotgun even though doom.wad lacks the assets.
 int		doom2_overlay = 0;
 
+// -vanilla: purist 1993 mode (see doomstat.h).  Set in D_DoomMain from the parm.
+int		vanilla_mode = 0;
+
 // Set when the resolved IWAD is heretic.wad (Heretic game mode -- phase 1):
 // resolves map things through the Heretic doomednum table and skips unported ones.
 int		heretic_mode = 0;
@@ -1015,6 +1018,12 @@ static void D_PrintHelp (void)
 "  -infight          monsters' projectiles hurt same-species (infighting on)\n"
 "  -nofriendlyfire   player and AI buddy can't damage each other (alias -noff)\n"
 "\n"
+"GAMEPLAY\n"
+"  -vanilla          purist 1993 mode: no free-look, no jump, infinitely-tall\n"
+"                    actors, auto-aim on, plain automap (disables the modern extras)\n"
+"  -infinitetall     vanilla infinitely-tall actors (no over/under 3D clipping)\n"
+"  -autoaim          restore vanilla vertical auto-aim (off by default)\n"
+"\n"
 "DEMOS\n"
 "  -record <lmp>     record a demo      -playdemo <lmp>  play a demo\n"
 "  -timedemo <lmp>   benchmark a demo   -maxdemo <n>     max demo size\n"
@@ -1087,6 +1096,18 @@ void D_DoomMain (void)
     // -autoaim: restore vanilla vertical aim-assist (off by default -> the human shoots where
     // they look, so shots can be placed precisely / land headshots).
     if (M_CheckParm ("-autoaim")) autoaim = 1;
+    // -vanilla: purist 1993 mode -- switch OFF every always-on modern deviation at once:
+    // no free-look and no jump (gated in g_game.c on vanilla_mode), vanilla infinitely-tall
+    // actors (no over/under 3D clipping), vanilla auto-aim ON, and the plain untextured
+    // automap.  Opt-in features (AI buddy/director) still require their own flags.
+    if (M_CheckParm ("-vanilla"))
+    {
+	extern int automap_textured;
+	vanilla_mode     = 1;
+	over_under       = 0;	// vanilla: actors are infinitely tall
+	autoaim          = 1;	// vanilla: vertical aim-assist on
+	automap_textured = 0;	// vanilla: line automap, no floor flats
+    }
     // -nofriendlyfire (alias -noff): the player and the AI buddy can't damage each other.
     { extern int ff_protect;
       ff_protect = (M_CheckParm ("-nofriendlyfire") || M_CheckParm ("-noff")) ? 1 : 0; }
@@ -1316,6 +1337,10 @@ void D_DoomMain (void)
         extern void D_ProcessDehInWads (void);
         printf ("DEH: Applying DeHackEd/BEX/MBF21 patches.\n");
         D_ProcessDehInWads ();
+    }
+    {   // UMAPINFO: per-map level name / progression / music / sky / bossaction
+        extern void U_LoadMapInfo (void);
+        U_LoadMapInfo ();
     }
 printf("added\n");
     

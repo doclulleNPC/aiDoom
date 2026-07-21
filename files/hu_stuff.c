@@ -32,6 +32,7 @@ rcsid[] = "$Id: hu_stuff.c,v 1.4 1997/02/03 16:47:52 b1 Exp $";
 #include "m_swap.h"
 
 #include "hu_stuff.h"
+#include "u_mapinfo.h"	// UMAPINFO per-map level name override
 #include "hu_lib.h"
 #include "hu_buddy.h"
 #include "w_wad.h"
@@ -495,7 +496,27 @@ void HU_Start(void)
 	 s = HU_TITLE2;
 	 break;
     }
-    
+
+    // UMAPINFO levelname override (with the automap "MAPxx: " label prefix unless
+    // the map set label=clear or a custom label).  Falls back to the IWAD name above.
+    {
+	umap_t* um = U_LookupMap (gameepisode, gamemap);
+	static char umtitle[128];
+	if (um && um->levelname)
+	{
+	    if (um->label && um->label[0])	// custom prefix
+		snprintf (umtitle, sizeof umtitle, "%s %s", um->label, um->levelname);
+	    else if (um->label_clear)		// no prefix
+		snprintf (umtitle, sizeof umtitle, "%s", um->levelname);
+	    else				// default "MAPxx: name"
+	    {
+		char mn[9]; U_MapName (gameepisode, gamemap, mn);
+		snprintf (umtitle, sizeof umtitle, "%s: %s", mn, um->levelname);
+	    }
+	    s = umtitle;
+	}
+    }
+
     while (*s)
 	HUlib_addCharToTextLine(&w_title, *(s++));
 
