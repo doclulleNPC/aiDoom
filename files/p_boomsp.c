@@ -201,6 +201,43 @@ void P_SpawnScrollers(void)
         case 85:                  // jff 1/30/98 2-way scroll
           Add_Scroller(sc_side, -FRACUNIT, 0, -1, lines[i].sidenum[0], accel);
           break;
+
+        // ---- ID24 scrolling-texture specials (2082-2086) --------------------
+        // These scroll BOTH the front and the back sidedef of a line.
+        case 2082:                // scroll front+back texture left
+          Add_Scroller(sc_side,  FRACUNIT, 0, -1, l->sidenum[0], accel);
+          if (l->sidenum[1] >= 0)
+            Add_Scroller(sc_side, FRACUNIT, 0, -1, l->sidenum[1], accel);
+          break;
+
+        case 2083:                // scroll front+back texture right
+          Add_Scroller(sc_side, -FRACUNIT, 0, -1, l->sidenum[0], accel);
+          if (l->sidenum[1] >= 0)
+            Add_Scroller(sc_side, -FRACUNIT, 0, -1, l->sidenum[1], accel);
+          break;
+
+        case 2084:                // tagged lines: scroll both sides by their offsets
+          for (s=-1; (s = P_FindLineFromLineTag(l,s)) >= 0;)
+            {
+              int fs = lines[s].sidenum[0], bs = lines[s].sidenum[1];
+              if (fs >= 0) Add_Scroller(sc_side, -sides[fs].textureoffset, sides[fs].rowoffset, -1, fs, accel);
+              if (bs >= 0) Add_Scroller(sc_side, -sides[bs].textureoffset, sides[bs].rowoffset, -1, bs, accel);
+            }
+          break;
+
+        case 2085:                // tagged lines: both sides scroll via sector movement
+        case 2086:                // ...accelerative variant
+          {
+            int ctl = sides[*l->sidenum].sector - sectors;
+            int acc = (special == 2086) ? 1 : 0;
+            for (s=-1; (s = P_FindLineFromLineTag(l,s)) >= 0;)
+              {
+                int fs = lines[s].sidenum[0], bs = lines[s].sidenum[1];
+                if (fs >= 0) Add_Scroller(sc_side, dx, dy, ctl, fs, acc);
+                if (bs >= 0) Add_Scroller(sc_side, dx, dy, ctl, bs, acc);
+              }
+          }
+          break;
         }
     }
 }
