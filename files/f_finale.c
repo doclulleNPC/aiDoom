@@ -41,6 +41,8 @@ rcsid[] = "$Id: f_finale.c,v 1.5 1997/02/03 21:26:34 b1 Exp $";
 
 #include "doomstat.h"
 #include "r_state.h"
+#include "g_game.h"		// secretexit
+#include "u_mapinfo.h"		// UMAPINFO intertext / end-game finales
 
 // ?
 //#include "doomstat.h"
@@ -85,6 +87,13 @@ char*	t6text = T6TEXT;
 char*	finaletext;
 char*	finaleflat;
 
+// UMAPINFO finale state (0 => a plain IWAD finale; see F_StartFinale).
+static int	um_endflags;		// U_END_* for this finale
+static boolean	um_nextlevel;		// after the text, continue to the next level
+static char	um_endpic[9];		// U_END_ART graphic
+
+extern boolean	secretexit;		// g_game.c: which exit was taken
+
 void	F_StartCast (void);
 void	F_CastTicker (void);
 boolean F_CastResponder (event_t *ev);
@@ -99,6 +108,43 @@ void F_StartFinale (void)
     gamestate = GS_FINALE;
     viewactive = false;
     automapactive = false;
+
+    // UMAPINFO: intermission story text (intertext / intertextsecret) and/or the
+    // end-game triggers (endgame / endcast / endbunny / endpic) override the
+    // hardcoded IWAD finale below.
+    um_endflags = 0; um_nextlevel = false; um_endpic[0] = 0;
+    {
+	umap_t*	um = U_LookupMap (gameepisode, gamemap);
+	if (um)
+	{
+	    char*   txt   = secretexit
+			  ? (um->intertextsecret_clear ? NULL : um->intertextsecret)
+			  : (um->intertext_clear       ? NULL : um->intertext);
+	    boolean isend = (um->endflags & U_END_ANY) != 0;
+
+	    if (txt || isend || um->interbackdrop[0] || um->intermusic[0])
+	    {
+		um_endflags  = um->endflags;
+		um_nextlevel = !isend;			// intertext continues; endgame ends
+		if (um->endflags & U_END_ART) memcpy (um_endpic, um->endpic, 9);
+
+		if (um->intermusic[0]) S_ChangeMusicByName (um->intermusic, true);
+		else                   S_ChangeMusic (gamemode == commercial ? mus_read_m : mus_victor, true);
+
+		if (isend && !txt)			// pure end-game, no story text
+		{
+		    if (um->endflags & U_END_CAST) { F_StartCast (); return; }
+		    finalestage = 1; finalecount = 0;	// bunny / endpic / standard graphic
+		    return;
+		}
+
+		finaleflat = um->interbackdrop[0] ? um->interbackdrop : "FLOOR4_8";
+		finaletext = txt ? txt : " ";
+		finalestage = 0; finalecount = 0;
+		return;
+	    }
+	}
+    }
 
     // Okay - IWAD dependend stuff.
     // This has been changed severly, and
@@ -228,16 +274,36 @@ void F_Ticker (void)
     
     // advance animation
     finalecount++;
-	
+
     if (finalestage == 2)
     {
 	F_CastTicker ();
 	return;
     }
-	
+
+    // UMAPINFO finale: once the story text has scrolled (or the player skips with a
+    // button), continue to the next level or roll the chosen end-game screen.
+    if (um_nextlevel || um_endflags)
+    {
+	boolean	textdone = finalecount > (int)strlen (finaletext)*TEXTSPEED + TEXTWAIT;
+	boolean	skip     = false;
+	if (finalecount > 50)
+	    for (i = 0; i < MAXPLAYERS; i++)
+		if (players[i].cmd.buttons) { skip = true; break; }
+
+	if (!finalestage && (textdone || skip))
+	{
+	    if (um_endflags & U_END_CAST) { F_StartCast (); return; }
+	    if (um_nextlevel)             { gameaction = ga_worlddone; return; }
+	    finalecount = 0; finalestage = 1; wipegamestate = -1;	// end graphic / bunny
+	    if (um_endflags & U_END_BUNNY) S_StartMusic (mus_bunny);
+	}
+	return;
+    }
+
     if ( gamemode == commercial)
 	return;
-		
+
     if (!finalestage && finalecount>strlen (finaletext)*TEXTSPEED + TEXTWAIT)
     {
 	finalecount = 0;
@@ -707,6 +773,10 @@ void F_Drawer (void)
 
     if (!finalestage)
 	F_TextWrite ();
+    else if (um_endflags & U_END_ART)		// UMAPINFO endpic
+	V_DrawPatch (0,0,0, W_CacheLumpName (um_endpic, PU_CACHE));
+    else if (um_endflags & U_END_BUNNY)		// UMAPINFO endbunny
+	F_BunnyScroll ();
     else
     {
 	switch (gameepisode)

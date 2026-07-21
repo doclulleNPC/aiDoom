@@ -1397,12 +1397,25 @@ void G_DoCompleted (void)
 //
 // G_WorldDone 
 //
-void G_WorldDone (void) 
-{ 
-    gameaction = ga_worlddone; 
+void G_WorldDone (void)
+{
+    gameaction = ga_worlddone;
 
-    if (secretexit) 
-	players[consoleplayer].didsecret = true; 
+    if (secretexit)
+	players[consoleplayer].didsecret = true;
+
+    // UMAPINFO intertext: show the story screen (F_StartFinale) before the next
+    // level, for ANY map that defines it -- not just the hardcoded DOOM2 clusters.
+    {
+	umap_t*	um  = U_LookupMap (gameepisode, gamemap);
+	char*	txt = um ? (secretexit ? (um->intertextsecret_clear ? NULL : um->intertextsecret)
+				       : (um->intertext_clear       ? NULL : um->intertext)) : NULL;
+	if (um && (txt || um->interbackdrop[0] || um->intermusic[0]))
+	{
+	    F_StartFinale ();
+	    return;
+	}
+    }
 
     if ( gamemode == commercial )
     {
