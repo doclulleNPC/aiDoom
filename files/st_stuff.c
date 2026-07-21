@@ -40,6 +40,7 @@ rcsid[] = "$Id: st_stuff.c,v 1.6 1997/02/03 22:45:13 b1 Exp $";
 #include "g_game.h"
 
 #include "st_stuff.h"
+#include "st_sbardef.h"	// ID24 SBARDEF data-driven status bar
 #include "st_lib.h"
 #include "r_local.h"
 
@@ -1119,6 +1120,9 @@ void ST_Drawer (boolean fullscreen, boolean refresh)
     // Do red-/gold-shifts from damage/items
     ST_doPaletteStuff();
 
+    // ID24 SBARDEF (opt-in via -sbardef): draw the data-driven bar instead.
+    if (ST_SBARDEF_Active ()) { ST_SBARDEF_Draw (fullscreen); return; }
+
     // If just after ST_Start(), refresh all
     if (st_firsttime) ST_doRefresh();
     // Otherwise, update as little as possible
@@ -1144,6 +1148,11 @@ static patch_t* ST_CachePatch (const char* name)
 // fullscreen HUD (health bottom-left + ammo bottom-right).  Styles 1/2 overlay a
 // full-height view (forced in R_ExecuteSetViewSize when this is non-zero).
 int statusbar_style = 0;
+
+// Accessors for the ID24 SBARDEF renderer (files/st_sbardef.c): the current face
+// patch and the player's face-background (NULL in single player).
+patch_t* ST_SBFace (void)     { return faces[st_faceindex]; }
+patch_t* ST_SBFaceBack (void) { return faceback; }
 
 // Draw num with the big "tall" font, left edge at (x,y); returns x past the digits.
 static int ST_TallNum (int x, int y, int num)
@@ -1562,6 +1571,7 @@ void ST_Init (void)
 {
     veryfirsttime = 0;
     ST_loadData();
+    ST_SBARDEF_Init ();		// ID24: parse the SBARDEF lump (patches are loaded now)
     // Width is the full SCREENWIDTH (the V_CopyRect row stride); height is the
     // status bar height scaled up by hires.
     screens[4] = (byte *) Z_Malloc(SCREENWIDTH*ST_HEIGHT*hires, PU_STATIC, 0);
