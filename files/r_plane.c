@@ -473,6 +473,7 @@ void R_DrawPlanes (void)
 			an += (angle_t)(sd->scrollx * t * (double)(1u << ANGLETOSKYSHIFT));
 		    if (sd->scrolly != 0)
 			dc_texturemid += (fixed_t)(sd->scrolly * t * (double)FRACUNIT);
+		    if (sd->type == 1 && sd->firebuf) R_SkyFireUpdate (sd);	// ID24: advance fire sim
 		}
 	    }
 
@@ -490,7 +491,8 @@ void R_DrawPlanes (void)
 
 	    // Set the height of the current sky texture for column clamping.
 	    { extern int dc_skyheight;
-	      dc_skyheight = textureheight[texture] >> FRACBITS; }
+	      dc_skyheight = (sd && sd->type == 1 && sd->firebuf) ? sd->fireh
+			   : (textureheight[texture] >> FRACBITS); }
 
 	    // Sky is allways drawn full bright,
 	    //  i.e. colormaps[0] is used.
@@ -506,7 +508,9 @@ void R_DrawPlanes (void)
 		{
 		    angle_t col_angle = ((an + xtoviewangle[x]) ^ flip) >> ANGLETOSKYSHIFT;
 		    dc_x = x;
-		    dc_source = R_GetColumn(texture, col_angle);
+		    dc_source = (sd && sd->type == 1 && sd->firebuf)
+			      ? R_SkyFireColumn (sd, col_angle >> 2)	// ID24 fire sky
+			      : R_GetColumn (texture, col_angle);
 		    R_DrawSkyColumn ();
 		}
 	    }

@@ -23,9 +23,19 @@ typedef struct
     double	scrolly;	// texels/sec, vertical
     double	scalex;		// (unused yet)
     double	scaley;		// vertical scale divisor (100*(1/scaley))
+
+    // fire sky (type 1): a Fabien-Sanglard doom-fire simulation.
+    unsigned char* firepal;	// game-palette indices, decay(0)..bright(N-1)
+    int		firepaln;
+    int		fireupdatetics;	// sim step interval (updatetime * TICRATE)
+    unsigned char* firebuf;	// firew*fireh fire-palette indices
+    int		firew, fireh;
+    int		firelasttic;
 } skydef_t;
 
 void		R_LoadSkyDefs (void);			// parse the SKYDEFS lump if present
 skydef_t*	R_SkyDefForTexNum (int texnum);		// active skydef for a texture, or NULL
+void		R_SkyFireUpdate (skydef_t* sd);		// advance the fire sim (once/frame)
+unsigned char*	R_SkyFireColumn (skydef_t* sd, int col_angle);	// one game-palette column
 
 #endif	// __R_SKYDEFS__
