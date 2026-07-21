@@ -51,8 +51,11 @@ typedef struct umap_s
     char	music[9];		// map music lump ("" = default)
     char	skytexture[9];		// sky texture ("" = default)
     char	endpic[9];		// U_END_ART graphic
+    char	endfinale[9];		// custom end-game finale lump (shown as end art)
     char	exitpic[9];		// intermission "finished" background
     char	enterpic[9];		// intermission "entering" background
+    char	exitanim[9];		// intermission exit animation (patch)
+    char	enteranim[9];		// intermission enter animation (patch)
     char	interbackdrop[9];	// intertext backdrop flat/patch
     char	intermusic[9];		// intertext music
     int		partime;		// par time in SECONDS (0 = unset)

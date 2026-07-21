@@ -230,6 +230,9 @@ static void ParseProperty (scan_t* s, umap_t* mape)
     else if (!strcasecmp (key, "music")      && s->type == TK_STRING) CopyLumpName (mape->music,      s->str);
     else if (!strcasecmp (key, "exitpic")    && s->type == TK_STRING) CopyLumpName (mape->exitpic,    s->str);
     else if (!strcasecmp (key, "enterpic")   && s->type == TK_STRING) CopyLumpName (mape->enterpic,   s->str);
+    else if (!strcasecmp (key, "exitanim")   && s->type == TK_STRING) CopyLumpName (mape->exitanim,   s->str);
+    else if (!strcasecmp (key, "enteranim")  && s->type == TK_STRING) CopyLumpName (mape->enteranim,  s->str);
+    else if (!strcasecmp (key, "endfinale")  && s->type == TK_STRING) { mape->endflags |= U_END_ART; CopyLumpName (mape->endfinale, s->str); CopyLumpName (mape->endpic, s->str); }
     else if (!strcasecmp (key, "interbackdrop") && s->type == TK_STRING) CopyLumpName (mape->interbackdrop, s->str);
     else if (!strcasecmp (key, "intermusic") && s->type == TK_STRING) CopyLumpName (mape->intermusic, s->str);
     else if (!strcasecmp (key, "partime")    && s->type == TK_INT)    mape->partime = s->num;
