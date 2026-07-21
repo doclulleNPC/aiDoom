@@ -261,6 +261,33 @@ void R_DrawSkyColumn (void)
     } while (count--);
 }
 
+// Like R_DrawSkyColumn but palette index 0 is transparent -- used to overlay an
+// ID24 SKYDEFS foreground sky layer (type 2) on top of the background sky.
+void R_DrawSkyColumnMasked (void)
+{
+    int		count;
+    byte*	dest;
+    fixed_t	frac, fracstep;
+    int		row;
+    byte	s;
+
+    count = dc_yh - dc_yl;
+    if (count < 0) return;
+    dest = ylookup[dc_yl] + columnofs[dc_x];
+    fracstep = dc_iscale;
+    frac = dc_texturemid + (dc_yl-centery)*fracstep;
+    do
+    {
+	row = frac>>FRACBITS;
+	if (row < 0)                  row = 0;
+	else if (row >= dc_skyheight) row = dc_skyheight - 1;
+	s = dc_source[row];
+	if (s) *dest = dc_colormap[s];		// index 0 = transparent
+	dest += SCREENWIDTH;
+	frac += fracstep;
+    } while (count--);
+}
+
 
 
 // UNUSED.

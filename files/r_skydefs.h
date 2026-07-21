@@ -31,6 +31,11 @@ typedef struct
     unsigned char* firebuf;	// firew*fireh fire-palette indices
     int		firew, fireh;
     int		firelasttic;
+
+    // foreground layer (type 2): a second texture drawn over the sky, palette
+    // index 0 = transparent.
+    char	fgname[9];
+    double	fgmid, fgscrollx, fgscrolly;
 } skydef_t;
 
 void		R_LoadSkyDefs (void);			// parse the SKYDEFS lump if present

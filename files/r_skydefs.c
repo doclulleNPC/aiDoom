@@ -95,6 +95,18 @@ void R_LoadSkyDefs (void)
 		    sd->firelasttic = -1;
 		}
 	    }
+	    // foreground layer (type 2)
+	    if (sd->type == 2)
+	    {
+		json_t* fg = JSON_Get (s, "foregroundtex");
+		if (fg)
+		{
+		    CopyName8 (sd->fgname, JSON_Str (JSON_Get (fg, "name")));
+		    sd->fgmid     = JSON_Num (JSON_Get (fg, "mid"),     0);
+		    sd->fgscrollx = JSON_Num (JSON_Get (fg, "scrollx"), 0);
+		    sd->fgscrolly = JSON_Num (JSON_Get (fg, "scrolly"), 0);
+		}
+	    }
 	    if (sd->name[0]) numskydefs++;
 	}
     }
@@ -113,7 +125,7 @@ void R_LoadSkyDefs (void)
 
     JSON_Free (root);
     printf ("SKYDEFS: %d sky(s), %d flat mapping(s)"
-	    " (scrolling + scaley + fire applied; foreground/flatmapping deferred).\n",
+	    " (scrolling + scaley + fire + foreground applied; flatmapping deferred).\n",
 	    numskydefs, numflatmaps);
 }
 

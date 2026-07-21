@@ -514,6 +514,35 @@ void R_DrawPlanes (void)
 		    R_DrawSkyColumn ();
 		}
 	    }
+
+	    // ID24 SKYDEFS foreground (type 2): overlay a second texture with
+	    // palette-0 transparency over the background sky just drawn.
+	    if (sd && sd->type == 2 && sd->fgname[0])
+	    {
+		extern int R_CheckTextureNumForName (char*);
+		extern void R_DrawSkyColumnMasked (void);
+		extern int dc_skyheight;
+		int fgtex = R_CheckTextureNumForName (sd->fgname);
+		if (fgtex >= 0)
+		{
+		    double  t   = (double) leveltime / 35.0;
+		    angle_t fan = viewangle + (angle_t)(sd->fgscrollx * t * (double)(1u << ANGLETOSKYSHIFT));
+		    dc_texturemid = skytexturemid + (fixed_t)(sd->fgmid * FRACUNIT)
+				  + (fixed_t)(sd->fgscrolly * t * (double)FRACUNIT);
+		    dc_skyheight  = textureheight[fgtex] >> FRACBITS;
+		    dc_colormap   = colormaps;
+		    for (x = pl->minx; x <= pl->maxx; x++)
+		    {
+			dc_yl = pl->top[x]; dc_yh = pl->bottom[x];
+			if (dc_yl <= dc_yh)
+			{
+			    angle_t ca = ((fan + xtoviewangle[x]) ^ flip) >> ANGLETOSKYSHIFT;
+			    dc_x = x; dc_source = R_GetColumn (fgtex, ca);
+			    R_DrawSkyColumnMasked ();
+			}
+		    }
+		}
+	    }
 	    continue;
 	}
 	
