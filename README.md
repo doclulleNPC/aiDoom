@@ -20,7 +20,7 @@ a language model drive monster tactics in real time.
   320×200 … 1920×1200 (`hires` 1–6), switchable at runtime from an **Options → Video**
   menu (no upscaling of a fixed 320×200 image).
 - **Soft Sprite Shadows** — *Doom Retro*-style translucent floor shadows under all sprite objects (projected at floor height), toggleable via the Options → Video menu.
-- **Boom & MBF Map Compatibility** — Full support for Boom-format level features: loads large modern maps via ZDBSP extended nodes (`XNOD`/`ZNOD`), decodes and processes all **generalized linedef specials** (doors, floors, ceilings, plats, stairs, crushers, and locked doors), supports **generalized sector types** (bitfielded secrets, friction, wind, push/pull), and handles thinkers including **deep water (242)**, **sky transfers (271/272)** with rotation, offsets, and flipping, conveyors/scrollers, and custom `ANIMATED`/`SWITCHES` lumps. See `BOOM_COMPAT.md`.
+- **Boom & MBF Map Compatibility** — Full support for Boom-format level features: loads large modern maps via ZDBSP extended nodes (`XNOD`/`ZNOD`), decodes and processes all **generalized linedef specials** (doors, floors, ceilings, plats, stairs, crushers, and locked doors), supports **generalized sector types** (bitfielded secrets, friction, wind, push/pull), and handles thinkers including **deep water (242)**, **sky transfers (271/272)** with rotation, offsets, and flipping, conveyors/scrollers, and custom `ANIMATED`/`SWITCHES` lumps. See `docs/BOOM_COMPAT.md`.
 - **Quake-style console** (`files/c_console.c`) — open with **`` ` ``** (backquote);
   scrollback + input line over a dimmed view, commands: `help clear echo quit god
   noclip give map`/`warp`.  (**F12** is the spy view — watch the AI buddy.)
@@ -58,17 +58,17 @@ a language model drive monster tactics in real time.
   director that tracks player stress and spawns monsters out of sight behind you in a
   build-up → peak → relax cycle, drops emergency items when you're hurting, guards the level
   exit, and can **resurrect dead monsters** (Arch-Vile style). A spoken game-master persona
-  narrates spawns/phases/your death. See [`DIRECTOR_MODES.md`](DIRECTOR_MODES.md).
+  narrates spawns/phases/your death. See [`docs/DIRECTOR_MODES.md`](docs/DIRECTOR_MODES.md).
 - **Artifact inventory** — a Heretic/Hexen-style held-item inventory (scroll `[` `]`, use
   `Enter`, drop `d`): a **buddy-only DOOM "overflow"** set (the excess health/ammo/armor you
   pocket at the cap, with a **second wind** that spends a stored medikit to survive a lethal
   hit), the full **Heretic artifacts** (flask, urn, tome, torch, time bomb, ring, shadowsphere,
   chaos device, wings of flight, morph ovum), plus generic flight + monster-morph subsystems
-  and true invisibility. See [`INVENTORY.md`](INVENTORY.md).
+  and true invisibility. See [`docs/INVENTORY.md`](docs/INVENTORY.md).
 - **Heretic & Hexen monsters** (`files/heretic.c`, `files/hexen.c`) — the full Heretic roster
   and a growing set of Hexen monsters are appended to the engine at runtime from their IWAD
   art (`tools/extract_*`), summonable from the console and mixed into the director's spawns
-  when their pack is loaded (launcher checkboxes). See [`HERETIC_HEXEN.md`](HERETIC_HEXEN.md).
+  when their pack is loaded (launcher checkboxes). See [`docs/HERETIC_HEXEN.md`](docs/HERETIC_HEXEN.md).
   The **Hexen Serpent/Stalker** follows its authentic ZDoom ritual: it lurks **submerged**
   (invisible + invulnerable) in nukage/slime, humps to telegraph, **surfaces** to bite or spit
   (the only window it can be hit), then **dives back under** — and it never leaves its pool.
@@ -240,7 +240,7 @@ Behaviour (intentionally simple — straight-line movement, no pathfinding):
   **Dijkstra search over the BSP sub-sector graph** (centroids as nodes, two-sided
   segs as edges, penalties for closed doors / damaging floors), then string-pulls
   to the furthest straight-reachable waypoint — so it finds you around walls and
-  corners instead of just walking into the nearest wall. See `Pathfinding.md`.
+  corners instead of just walking into the nearest wall. See `docs/Pathfinding.md`.
 - **Yields** — when you bump into it (e.g. it's blocking a doorway/exit) it steps
   straight away from you so you can get past, rather than standing in the way.
 - **Doors** — when blocked (e.g. pushing a closed door) it taps *Use* **once** and
@@ -313,15 +313,15 @@ writes one on exit; the editor shows those defaults too.
 
 ## Documentation
 
-- `INVENTORY.md` — the artifact / item inventory systems (DOOM overflow, Heretic artifacts, flight/morph)
-- `BUDDY_PORTING.md` — how the AI co-op buddy behaves (decision tree, revive, auto-heal, voice)
-- `BUDDY_HUD.md` / `BUDDY_VOICE.md` — the buddy's HUD strip and spoken-line catalogue
-- `DIRECTOR_MODES.md` — the AI director(s): rule-based L4D, LLM, demo
-- `HERETIC_HEXEN.md` — the Heretic/Hexen monster & asset ports
-- `BOOM_COMPAT.md` — the Boom and MBF map/level compatibility details
-- `AGENT_CONTROL.md` — full player- and monster-control API & TCP protocol
-- `MONSTER_AGENT_GUIDE.md` — guide to directing monsters with an LLM
-- `GPUMON.md` — the GPU monitor (`gpumon`, SDL3)
+- `docs/INVENTORY.md` — the artifact / item inventory systems (DOOM overflow, Heretic artifacts, flight/morph)
+- `docs/BUDDY_PORTING.md` — how the AI co-op buddy behaves (decision tree, revive, auto-heal, voice)
+- `docs/BUDDY_HUD.md` / `docs/BUDDY_VOICE.md` — the buddy's HUD strip and spoken-line catalogue
+- `docs/DIRECTOR_MODES.md` — the AI director(s): rule-based L4D, LLM, demo
+- `docs/HERETIC_HEXEN.md` — the Heretic/Hexen monster & asset ports
+- `docs/BOOM_COMPAT.md` — the Boom and MBF map/level compatibility details
+- `docs/AGENT_CONTROL.md` — full player- and monster-control API & TCP protocol
+- `docs/MONSTER_AGENT_GUIDE.md` — guide to directing monsters with an LLM
+- `docs/GPUMON.md` — the GPU monitor (`gpumon`, SDL3)
 - `run/README.md` — the launchers in `run/`
 - `CLAUDE.md` — architecture notes & build/porting gotchas
 

@@ -84,7 +84,7 @@ GUI** (the old `start_*` scripts are obsolete, kept as a backup in `tools/script
 ### 64-bit portability (LP64) caveats
 
 > A full running log of age-of-the-code fixes (64-bit, modern compiler, hi-res,
-> undersized buffers, tooling) lives in **`LEGACY_FIXES.md`** — add new ones there.
+> undersized buffers, tooling) lives in **`docs/LEGACY_FIXES.md`** — add new ones there.
 
 The code assumes `sizeof(ptr) == sizeof(int) == 4` (1996 DOS/x86). Building 64-bit
 required fixing these; the **same class of bug still lurks** in the netcode
@@ -138,7 +138,7 @@ add modern AI — keep them clearly distinct:
   line protocol. Hooks: `A_Chase` (`p_enemy.c`) diverts to `A_LLMChase` for
   directed monsters, `P_Ticker` calls `P_AI_Ticker`, `P_SetupLevel` calls
   `P_AI_Reset`. Directives live in a side-table keyed by `mobj_t*` (no
-  struct/savegame change). Protocol + design: **`AGENT_CONTROL.md` §12–13**
+  struct/savegame change). Protocol + design: **`docs/AGENT_CONTROL.md` §12–13**
   (player control is §1–11). The ready-to-run client is the native SDL3
   `tools/director.c` (talks to Ollama; no Python).
 - **L4D-style rule director** (`files/p_ai_director.c`/`.h`, `-director`) —
@@ -152,13 +152,13 @@ add modern AI — keep them clearly distinct:
   ammo (`P_Director_Stressed`) hordes and special/boss spawns are suppressed so it
   never death-spirals. **Spoken game-master voice:** a separate ElevenLabs persona
   (`DD*` lumps, `P_Director_Voice`/`P_Director_Say`) narrates spawns/phases/items
-  — see **`BUDDY_VOICE.md`**.
+  — see **`docs/BUDDY_VOICE.md`**.
 - **AI co-op companion / "buddy"** (`files/p_ai_coop.c`/`.h`, `-aicoop`) — a
   second marine (player 2) filled by a small built-in bot each tic: acquires the
   nearest visible monster and fires, seeks health when hurt, else follows you.
   A real co-op player (weapons/damage/pickups/reborn all work). Has its own HUD
   (`hu_buddy.c`, top-of-screen strip, config `show_buddy_hud`) and an optional
-  spoken voice (see below). Design docs: **`BUDDY_HUD.md`**, **`BUDDY_PORTING.md`**.
+  spoken voice (see below). Design docs: **`docs/BUDDY_HUD.md`**, **`docs/BUDDY_PORTING.md`**.
 - **Pack-hunt monster AI** (`p_enemy.c`, config `monster_pack 1`) — monsters
   acquire the player on spawn (even with no LoS) and steer toward nearby allies,
   so they gather and assault in groups.
@@ -167,7 +167,7 @@ add modern AI — keep them clearly distinct:
   `run/llm_player.py`, or the built-in `demo` brain) issues high-level intents over a TCP
   line protocol (`map`/`observe` + `goto/target/attack/use/…`); a 35 Hz C REFLEX in
   `G_AgentBuildTiccmd` turns them into ticcmds (buddy-grade nav, kiting, door-use, weapon-up).
-  Hook: `G_BuildTiccmd` (`g_game.c`). Full as-built reference: **`AIPLAYER.md`**.
+  Hook: `G_BuildTiccmd` (`g_game.c`). Full as-built reference: **`docs/AIPLAYER.md`**.
 
 Related gameplay flags worth knowing: `-infight` (same-species infighting),
 `-nofriendlyfire`/`-noff` (player ↔ buddy don't hurt each other), `-infinitetall`
@@ -198,7 +198,7 @@ so shots can be placed/headshot; the AI buddy keeps autoaim), plus free-look (mo
   plays them by tag on **two separate SDL streams** (buddy positional via
   `I_Voice_Say`; Director "voice of god" via `I_Director_Say`), so both can talk at
   once. No live TTS at runtime. Mind the 8-byte lump-name rule (below). Design:
-  **`BUDDY_VOICE.md`**.
+  **`docs/BUDDY_VOICE.md`**.
 - **Multiplayer netcode client** (`files/d_netcl.c`/`.h`) — a clean-room
   reimplementation of the Chocolate/Crispy-Doom network protocol (connection state
   machine + reliable layer + GAMEDATA tic windows). Transport-side **only**;
@@ -206,12 +206,12 @@ so shots can be placed/headshot; the AI buddy keeps autoaim), plus free-look (mo
   peer-to-peer `d_net.c`.
 
 There is a large set of design docs at the repo root (one per feature):
-`AGENT_CONTROL.md` (agent/LLM control *design*) and `AIPLAYER.md` (the shipped `-aiplayer`
-*as-built*), `AIDOOM_PARAMETERS.md`, `BUDDY_*.md`, `GPUMON.md`,
-`Pathfinding.md`, `VISIBILITY_CACHE.md`, `YAPB_ARCHITECTURE.md`, `Collision.md`,
-`HD_TEXTURES.md` (how the `../sdldoom-sdl3` sibling does true-color PNG texture/
+`docs/AGENT_CONTROL.md` (agent/LLM control *design*) and `docs/AIPLAYER.md` (the shipped `-aiplayer`
+*as-built*), `docs/AIDOOM_PARAMETERS.md`, `BUDDY_*.md`, `docs/GPUMON.md`,
+`docs/Pathfinding.md`, `docs/VISIBILITY_CACHE.md`, `docs/YAPB_ARCHITECTURE.md`, `docs/Collision.md`,
+`docs/HD_TEXTURES.md` (how the `../sdldoom-sdl3` sibling does true-color PNG texture/
 sprite/voxel replacement — a porting reference, not yet implemented here),
-plus `LEGACY_FIXES.md` (the running log of age-of-the-code fixes). Consult the
+plus `docs/LEGACY_FIXES.md` (the running log of age-of-the-code fixes). Consult the
 matching doc before touching a subsystem.
 
 ### Variable internal resolution (hi-res renderer + Video menu)
