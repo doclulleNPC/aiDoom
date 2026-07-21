@@ -42,5 +42,6 @@ void		R_LoadSkyDefs (void);			// parse the SKYDEFS lump if present
 skydef_t*	R_SkyDefForTexNum (int texnum);		// active skydef for a texture, or NULL
 void		R_SkyFireUpdate (skydef_t* sd);		// advance the fire sim (once/frame)
 unsigned char*	R_SkyFireColumn (skydef_t* sd, int col_angle);	// one game-palette column
+int		R_SkyForFlat (int picnum);	// SKYDEFS flatmapping: flat->sky texnum, or -1
 
 #endif	// __R_SKYDEFS__

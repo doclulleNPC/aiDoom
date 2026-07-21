@@ -428,8 +428,9 @@ void R_DrawPlanes (void)
 	    continue;
 
 	
-	// sky flat
-	if (pl->picnum == skyflatnum || (pl->picnum & PL_SKYFLAT))
+	// sky flat -- plus ID24 SKYDEFS flatmapping (an arbitrary flat drawn as a sky)
+	int mappedsky = R_SkyForFlat (pl->picnum);	// -1 unless flatmapped
+	if (pl->picnum == skyflatnum || (pl->picnum & PL_SKYFLAT) || mappedsky >= 0)
 	{
 	    int texture;
 	    angle_t an, flip;
@@ -459,7 +460,7 @@ void R_DrawPlanes (void)
 	    else
 	    {
 		dc_texturemid = skytexturemid;
-		texture = skytexture;
+		texture = (mappedsky >= 0) ? mappedsky : skytexture;	// flatmapped sky
 		an = viewangle;
 		flip = 0;
 

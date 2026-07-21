@@ -19,6 +19,10 @@
 
 extern int	R_CheckTextureNumForName (char* name);
 
+#ifdef _WIN32
+#define strncasecmp _strnicmp
+#endif
+
 static skydef_t*	skydefs;
 static int		numskydefs;
 
@@ -125,7 +129,7 @@ void R_LoadSkyDefs (void)
 
     JSON_Free (root);
     printf ("SKYDEFS: %d sky(s), %d flat mapping(s)"
-	    " (scrolling + scaley + fire + foreground applied; flatmapping deferred).\n",
+	    " (scrolling + scaley + fire + foreground + flatmapping applied).\n",
 	    numskydefs, numflatmaps);
 }
 
@@ -136,6 +140,22 @@ skydef_t* R_SkyDefForTexNum (int texnum)
 	if (skydefs[i].name[0] && R_CheckTextureNumForName (skydefs[i].name) == texnum)
 	    return &skydefs[i];
     return NULL;
+}
+
+// SKYDEFS flatmapping: a flat that should render as a sky -> the sky texture num,
+// or -1.  Lets arbitrary flats become skies globally (no transfer line / MAPINFO).
+int R_SkyForFlat (int picnum)
+{
+    extern int*		flatlumps;
+    extern int		numflats;
+    extern lumpinfo_t*	lumpinfo;
+    char nm[9]; int i;
+    if (numflatmaps <= 0 || picnum < 0 || picnum >= numflats) return -1;
+    memcpy (nm, lumpinfo[flatlumps[picnum]].name, 8); nm[8] = 0;
+    for (i = 0; i < numflatmaps; i++)
+	if (!strncasecmp (nm, flatmaps[i].flat, 8))
+	    return R_CheckTextureNumForName (flatmaps[i].sky);
+    return -1;
 }
 
 // One Fabien-Sanglard doom-fire spread step over the whole buffer, throttled to
