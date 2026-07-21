@@ -1462,6 +1462,11 @@ void D_DoomMain (void)
     }
     D_LoadDemoLoop ();		// ID24 DEMOLOOP: custom title/demo sequence
     D_LoadGameConf ();		// ID24 GAMECONF: WAD manifest (applies game mode)
+    {   // ID24 Legacy-of-Rust content: install the new sprites/sounds/states/things
+	// from the generated tables BEFORE R_Init (so R_InitSprites sees the sprites).
+	extern void ID24_Init (void);
+	ID24_Init ();
+    }
 printf("added\n");
     
 

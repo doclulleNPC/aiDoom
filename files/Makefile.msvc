@@ -26,7 +26,7 @@ RES = aidoom.res
 OBJS = \
 	am_map.obj c_console.obj c_llm.obj d_deh.obj d_items.obj d_main.obj d_net.obj d_netcl.obj doomdef.obj doomstat.obj \
 	dsdhacked.obj dstrings.obj f_finale.obj f_wipe.obj g_agent.obj g_game.obj hu_buddy.obj hu_lib.obj hu_stuff.obj \
-	i_compat.obj i_main.obj i_mus.obj i_opl.obj opl3.obj i_net.obj i_udp.obj i_sound.obj i_system.obj i_video.obj i_voice.obj info.obj \
+	i_compat.obj i_main.obj i_mus.obj i_opl.obj opl3.obj i_net.obj i_udp.obj i_sound.obj i_system.obj i_video.obj i_voice.obj id24.obj info.obj \
 	heretic.obj freedoom.obj hexen.obj \
 	m_argv.obj m_bbox.obj m_cheat.obj m_fixed.obj m_menu.obj m_misc.obj \
 	m_random.obj m_swap.obj p_ai_director.obj p_ai_llm.obj p_ai_coop.obj p_ceilng.obj p_doors.obj p_enemy.obj \

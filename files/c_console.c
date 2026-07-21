@@ -275,6 +275,17 @@ static int C_MobjByName (const char* s)
 	int x = Hexen_TypeByName (s);
 	if (x >= 0) return x;
     }
+    // ID24 Legacy-of-Rust monsters (ghoul/banshee/...) -- when id24res.wad is loaded.
+    if (s[0])
+    {
+	extern int ID24_Available (void);
+	extern int ID24_TypeByName (const char* s);
+	if (ID24_Available ())
+	{
+	    int d = ID24_TypeByName (s);
+	    if (d >= 0) return d;
+	}
+    }
     return -1;
 }
 
