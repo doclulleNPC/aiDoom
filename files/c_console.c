@@ -362,6 +362,7 @@ static void C_Execute (char* line)
     else if (!strcmp(cmd, "give"))
     {
 	int w, k, i;
+	extern int ID24_Give (void*, const char*);
 	for (i = 0 ; args[i] ; i++) args[i] = tolower(args[i]);	// case-insensitive
 	if (!*args)
 	    C_Printf ("usage: give all|weapons|ammo|keys|armor|health|<weapon>|<key>");
@@ -376,6 +377,7 @@ static void C_Execute (char* line)
 	      if (weaponinfo[w].ammo < NUMAMMO) pl->ammo[weaponinfo[w].ammo]=pl->maxammo[weaponinfo[w].ammo];
 	      C_Printf ("gave %s.", args); }
 	else if ((k = C_CardByName(args)) >= 0) { pl->cards[k]=true; C_Printf("gave %s.", args); }
+	else if (ID24_Give (pl, args)) C_Printf ("gave %s.", args);	// ID24 weapon / fuel
 	else C_Printf ("give: unknown '%s'", args);
     }
     else if (!strcmp(cmd, "givearti"))

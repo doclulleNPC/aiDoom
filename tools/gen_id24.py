@@ -220,6 +220,22 @@ o.append("};\n")
 o.append("static const struct { int doomednum,spawnstate,spawnhealth,seestate,seesound,reactiontime,attacksound,painstate,painchance,painsound,meleestate,missilestate,deathstate,xdeathstate,deathsound,speed,radius,height,mass,damage,activesound,flags,raisestate,fastspeed,meleerange,infight,projgrp,splashgrp,mbf21flags,dropthing; } id24_mobj[ID24_NMOBJ] = {")
 for m in mobjs:
     o.append("  {%(doomednum)d,%(spawnstate)d,%(spawnhealth)d,%(seestate)d,%(seesound)d,%(reactiontime)d,%(attacksound)d,%(painstate)d,%(painchance)d,%(painsound)d,%(meleestate)d,%(missilestate)d,%(deathstate)d,%(xdeathstate)d,%(deathsound)d,%(speed)d,%(radius)d,%(height)d,%(mass)d,%(damage)d,%(activesound)d,%(flags)d,%(raisestate)d,%(fastspeed)d,%(meleerange)d,%(infight)d,%(projgrp)d,%(splashgrp)d,%(mbf21flags)d,%(dropthing)d}," % m)
+o.append("};\n")
+
+# ---- weapons: index(sym), feat, ammo(sym), up,down,ready,atk,flash, ... ----
+weapons = []
+for r in split_rows(table_region("weapons")):
+    f = split_fields(r)
+    if len(f) < 8: continue
+    ammo = 4  # am_fuel (new ammo type, index 4)
+    up = ref(num(f[3]),'state'); dn = ref(num(f[4]),'state'); rd = ref(num(f[5]),'state')
+    ak = ref(num(f[6]),'state'); fl = ref(num(f[7]),'state')
+    weapons.append((ammo, up, dn, rd, ak, fl))
+o.append("#define ID24_NWPN %d" % len(weapons))
+o.append("// {ammo, upstate, downstate, readystate, atkstate, flashstate}")
+o.append("static const int id24_wpn[ID24_NWPN][6] = {")
+for (am,up,dn,rd,ak,fl) in weapons:
+    o.append("  {%d,%d,%d,%d,%d,%d}," % (am,up,dn,rd,ak,fl))
 o.append("};\n#endif")
 
 open(OUT, "w", encoding="utf-8").write("\n".join(o) + "\n")

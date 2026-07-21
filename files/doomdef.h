@@ -30,7 +30,7 @@
 // Global parameters/defines.
 //
 // DOOM version
-enum { VERSION_NUM =  116 };
+enum { VERSION_NUM =  117 };	// bumped: player_t grew (am_fuel ammo + 2 ID24 weapons)
 
 // Demo format version -- DECOUPLED from VERSION_NUM (which auto-bumps for savegame struct
 // changes).  The stock IWAD attract demos are version 109 (DOOM 1.9); keeping the demo
@@ -215,6 +215,8 @@ typedef enum
     wp_bfg,
     wp_chainsaw,
     wp_supershotgun,
+    wp_incinerator,	// ID24 Legacy of Rust
+    wp_calamityblade,	// ID24 Legacy of Rust (Heatwave generator)
 
     NUMWEAPONS,
     
@@ -231,8 +233,9 @@ typedef enum
     am_shell,	// Shotgun / double barreled shotgun.
     am_cell,	// Plasma rifle, BFG.
     am_misl,	// Missile launcher.
+    am_fuel,	// ID24 Legacy-of-Rust: Incinerator / Heatwave (Calamity Blade).
     NUMAMMO,
-    am_noammo	// Unlimited for chainsaw / fist.	
+    am_noammo	// Unlimited for chainsaw / fist.
 
 } ammotype_t;
 

@@ -19,9 +19,14 @@
 #include <ctype.h>
 
 #include "doomtype.h"
+#include "doomdef.h"
 #include "info.h"
 #include "sounds.h"
+#include "d_items.h"
+#include "d_player.h"
 #include "id24_gen.h"
+
+extern weaponinfo_t	weaponinfo[];
 
 // DSDHacked dynamic-table growth (files/dsdhacked.c).
 extern void dsdh_EnsureSpritesCapacity  (int limit);
@@ -188,7 +193,38 @@ void ID24_Init (void)
 		m->droppeditem      = id24_res (id24_mobj[i].dropthing);
 	}
 
+	// --- weapons: fill the appended wp_incinerator / wp_calamityblade slots.
+	// (weaponinfo[] auto-zero-fills the 2 new NUMWEAPONS entries; we set them here
+	// since they reference the runtime-installed ID24 states.)
+	for (i = 0; i < ID24_NWPN && (wp_incinerator + i) < NUMWEAPONS; i++)
+	{
+		weaponinfo_t* wi = &weaponinfo[wp_incinerator + i];
+		wi->ammo       = (ammotype_t) id24_wpn[i][0];	// am_fuel
+		wi->upstate    = id24_res (id24_wpn[i][1]);
+		wi->downstate  = id24_res (id24_wpn[i][2]);
+		wi->readystate = id24_res (id24_wpn[i][3]);
+		wi->atkstate   = id24_res (id24_wpn[i][4]);
+		wi->flashstate = id24_res (id24_wpn[i][5]);
+	}
+
 	id24_installed = true;
-	printf ("ID24: installed %d sprites, %d sounds, %d states, %d things"
-		" (Legacy of Rust content).\n", ID24_NSPR, ID24_NSFX, ID24_NSTATE, ID24_NMOBJ);
+	printf ("ID24: installed %d sprites, %d sounds, %d states, %d things, %d weapons"
+		" (Legacy of Rust content).\n", ID24_NSPR, ID24_NSFX, ID24_NSTATE, ID24_NMOBJ, ID24_NWPN);
+}
+
+// Console "give <name>": grant an ID24 weapon (+ full fuel) or fuel ammo.  Returns 1
+// if handled.  `pl` is a player_t*.
+int ID24_Give (void* pl_v, const char* s)
+{
+	player_t* pl = (player_t*) pl_v;
+	if (!id24_installed || !pl || !s) return 0;
+	if (!strcmp (s, "incinerator"))
+	{ pl->weaponowned[wp_incinerator] = true; pl->pendingweapon = wp_incinerator;
+	  pl->ammo[am_fuel] = pl->maxammo[am_fuel]; return 1; }
+	if (!strcmp (s, "heatwave") || !strcmp (s, "calamityblade") || !strcmp (s, "blade"))
+	{ pl->weaponowned[wp_calamityblade] = true; pl->pendingweapon = wp_calamityblade;
+	  pl->ammo[am_fuel] = pl->maxammo[am_fuel]; return 1; }
+	if (!strcmp (s, "fuel"))
+	{ pl->ammo[am_fuel] = pl->maxammo[am_fuel]; return 1; }
+	return 0;
 }
