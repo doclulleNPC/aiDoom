@@ -406,8 +406,7 @@ static void AICoop_VoicePan (mobj_t* lis, mobj_t* src, int* lvol, int* rvol)
 
 static void AICoop_SayTag (const char* tag)
 {
-    extern int I_Director_Busy (void);
-    if (I_Director_Busy () || I_Voice_Busy ()) return;
+    if (I_Voice_Busy ()) return;			// don't overlap the buddy's own line
     mobj_t*	src = AICoop_Mo ();				// the buddy = sound source
     mobj_t*	lis = playeringame[displayplayer] ? players[displayplayer].mo : NULL;
     int		lvol = 127, rvol = 127;
@@ -425,8 +424,13 @@ static int vp_cur = -1;          // tier of the line currently sounding (-1 = id
 static boolean AICoop_VoiceGate (int prio)
 {
     extern int I_Director_Busy (void);
-    if (I_Director_Busy ()) return false;         // Director is speaking -> Buddy silent!
-    if (I_Voice_Busy ()) return false;            // Only 1 line at once! Never interrupt/overlap.
+    // Defer ONLY ambient chatter to the Director (it keeps the voice-of-god dominant).
+    // Important lines -- kills, weapon pickups, command acks, going down -- still play
+    // on the buddy's OWN stream (the two personas have separate streams so they mix).
+    // Fully muting the buddy while the Director had any audio queued silenced it in
+    // -director mode, where the rule Director talks almost continuously.
+    if (prio == VP_AMBIENT && I_Director_Busy ()) return false;
+    if (I_Voice_Busy ()) return false;            // Only 1 buddy line at once! Never self-overlap.
 
     if (gametic - vp_last[prio] < VP_GAP[prio])   // per-tier rate limit
         return false;

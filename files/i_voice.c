@@ -380,8 +380,11 @@ static void play_on_stream (SDL_AudioStream* stream, int* bound,
 void I_Voice_SayByName (const char* lumpname, int lvol, int rvol)
 {
     static int bound = 0;
-    if (I_Director_Busy ()) return;         // Director is speaking -> buddy stays silent
-    if (I_Voice_Busy ()) return;            // Already talking -> don't start a second line
+    // Director-priority is decided by the caller (p_ai_coop AICoop_VoiceGate), which
+    // defers only ambient chatter -- so DON'T block every buddy line here on the
+    // Director, or the buddy goes fully silent whenever the Director has audio queued
+    // (the -director "buddy isn't talking" bug).  Buddy still can't overlap itself.
+    if (I_Voice_Busy ()) return;
     play_on_stream (voice_stream, &bound, lumpname, lvol, rvol);
 }
 
