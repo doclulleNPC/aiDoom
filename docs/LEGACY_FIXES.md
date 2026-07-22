@@ -247,6 +247,39 @@ streaks** (see the LoR MAP01 gate).
 | Right half of a tall/wide texture (e.g. `ZZZGATE1`, 512×512) renders as garbage columns | `texturecolumnofs[]` was `unsigned short` — but the **byte offset** of a column into a >64 KB patch lump exceeds 65535, so every column past ~col 126 truncated (mod 65536) and read the wrong data | make `texturecolumnofs` (and the local `colofs`) **32-bit** (`unsigned`); allocate `width*sizeof(unsigned)` | `r_data.c` |
 | Rows below ~254 of a tall single-patch wall texture are garbage | a >254-row solid column can't be one post (post `length` is a byte), so it is stored as **multiple posts using the DeePsea tall-patch convention** (a post whose `topdelta` ≤ the previous is a *cumulative* continuation). The old code read the raw patch column directly as flat pixels, and `R_DrawColumnInCache` used `topdelta` absolutely | force any texture `height > 254` through the composite path (never the direct single-post shortcut), and make `R_DrawColumnInCache` track a running absolute `topdelta` | `r_data.c` |
 | `R_GenerateLookup: texture is >64k` I_Error on a big texture | the composite-size guard capped a texture at 64 KB (16-bit `colofs` era) | with 32-bit offsets the cap is unnecessary — removed | `r_data.c` |
+| A tall texture composited **correctly** but still drawn as a 128-row band tiled vertically (whole `ZZZGATE` gate scrambled, not just the right half) | every 8bpp column drawer hardcoded the vanilla 128-row wrap `dc_source[(frac>>FRACBITS)&127]`, so a 512-row composite column was only ever sampled in rows 0–127 and repeated 4× | add a per-column `dc_texheight` and a pow2/modulo height-mask in `R_DrawColumn`/`Low`/`Dither`/`TLColumn` (128 → the vanilla `&127`, so no change for stock textures); callers set `dc_texheight` to the real height (walls: `r_segs.c`; posted sprite/masked columns reset it to 128 in `R_DrawMaskedColumn`) | `r_draw.c`, `r_segs.c`, `r_things.c` |
+
+---
+
+## 13. DSDHacked thing numbers collide with aiDoom's appended builtin mobjtypes
+
+A DSDHacked/DECOHack patch (Legacy of Rust's `id1.wad`) defines its new things
+starting at **Thing 151** — the vanilla+MBF boundary in dsda-doom, where the patch
+author assumed free slots. aiDoom instead packs Heretic/Hexen/Freedoom/etc. monsters
+into builtin `mobjinfo[]` indices 138–208, so `Thing 151` lands on `MT_HMINOTAURFX`
+and friends. Symptom: **LoR's Ghouls and 3100-range scenery all spawn as
+`P_SpawnMapThing: unknown type` and vanish**, because the DEH set (e.g.)
+`mobjinfo[150].doomednum = 3007` and then `Heretic_Init()`/`Hexen_Init()`/… — which
+ran *after* the DEH — overwrote those slots with their own actors, wiping the
+DEH-assigned editor numbers.
+
+**Fix:** run the appended-mobjtype installers (`Heretic_Init`, `Hexen_Init`,
+`Freedoom_Init`, `RevMarine_Init`, `Morph_Init`, `HereticInv_Init`) **before**
+`D_ProcessDehInWads()` instead of after, so the DEHACKED's Thing edits win. They only
+populate static tables, so they're safe that early (before `R_Init`/`P_Init`). File:
+`d_main.c`.
+
+---
+
+## 14. Boom `SWITCHES` lump larger than `MAXSWITCHES`
+
+`MAXSWITCHES` was 50; id1.wad's Boom `SWITCHES` lump ships **85 pairs**. The loader's
+`index >= MAXSWITCHES*2 - 2` guard silently dropped everything past pair 49 — the
+LoR-appended switches (`SW1GATE/SW2GATE`, `SW1BAS1`, `SW1RAIL1/2`, `SW1ROCK6`,
+`SW1TC1`) among them. Symptom: **a switch works (the linedef action fires) but its
+texture never swaps** because the pair isn't in `switchlist[]`. Fix: raise
+`MAXSWITCHES` to 128 (the `alphSwitchList[]` fallback loop breaks at its NUL
+terminator, so a larger cap is safe). File: `p_spec.h`.
 
 ---
 
@@ -265,4 +298,11 @@ streaks** (see the LoR MAP01 gate).
   fix — it's kept for demo/map compat.
 - **Half of a big wall texture is fine and the other half is scrambled vertical
   streaks** (modern/ID24 PWADs with 256/384/512-tall textures) → tall-texture /
-  >64 KB-patch limits, §12.
+  >64 KB-patch limits, §12. If the *whole* texture is a vertically-tiled 128-row
+  band instead, the composite is fine but a drawer is still `&127`-wrapping → §12
+  (`dc_texheight`).
+- **A modern (DSDHacked/ID24) PWAD's new monsters/scenery spawn as
+  `unknown type … skipped`** while its remapped vanilla things are fine → the new
+  Thing numbers collide with aiDoom's appended builtin mobjtypes, §13.
+- **A wall switch triggers its action but its graphic never flips** → the switch
+  pair fell off the end of a `SWITCHES` lump bigger than `MAXSWITCHES`, §14.

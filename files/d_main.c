@@ -523,6 +523,11 @@ static boolean D_EqCI (const char* a, const char* b)
     return *a == *b;
 }
 
+// Set when a GAMECONF declares `executable: id24` (i.e. we are actually playing a
+// Legacy-of-Rust / ID24-target set, not plain DOOM2 with id24res.wad merely
+// auto-overlaid).  Used to auto-enable the ID24 SBARDEF status bar (st_sbardef.c).
+int	gameconf_id24 = 0;
+
 // ID24 GAMECONF: a JSON manifest of general WAD info + engine settings.
 // https://doomwiki.org/wiki/GAMECONF  Most fields are frontend/launcher metadata
 // (iwad/pwads/executable/playertranslations/options); the engine here applies the
@@ -548,7 +553,10 @@ void D_LoadGameConf (void)
 	if (title[0])
 	    printf ("GAMECONF: \"%s\"%s%s\n", title, author[0] ? " by " : "", author);
 	if (exe[0])
+	{
 	    printf ("GAMECONF: executable target = %s\n", exe);
+	    if (D_EqCI (exe, "id24")) gameconf_id24 = 1;
+	}
 	if (mode[0])
 	{
 	    extern GameMode_t gamemode;
@@ -1451,6 +1459,19 @@ void D_DoomMain (void)
 
     printf ("W_Init: Init WADfiles.\n");
     W_InitMultipleFiles (wadfiles);
+    {   // Fill aiDoom's *appended* builtin mobjtypes (Heretic/Hexen/Freedoom/RevMarine/
+	// Morph/HereticInv) BEFORE applying the DEHACKED.  A DSDHacked patch (e.g. Legacy
+	// of Rust's id1.wad) numbers its new things from the vanilla+MBF boundary (~Thing
+	// 151), which lands directly on these appended builtin slots.  Running the installers
+	// first lets the DEH's Thing edits OVERWRITE them (the DEH wins) -- otherwise these
+	// ran after the DEH and clobbered the DEH-defined LoR monsters/decorations, so they
+	// spawned as "unknown type" (no Ghouls, missing scenery).  These installers only
+	// populate static tables, so they're safe this early (before R_Init/P_Init).
+	extern void Heretic_Init(void), Hexen_Init(void), Freedoom_Init(void),
+		    RevMarine_Init(void), Morph_Init(void), HereticInv_Init(void);
+	Heretic_Init (); Hexen_Init (); Freedoom_Init ();
+	RevMarine_Init (); Morph_Init (); HereticInv_Init ();
+    }
     {   // DeHackEd/BEX/MBF21: apply every DEHACKED lump + -deh files before the tables are read
         extern void D_ProcessDehInWads (void);
         printf ("DEH: Applying DeHackEd/BEX/MBF21 patches.\n");
@@ -1552,13 +1573,6 @@ printf("added\n");
 
     printf ("\nP_Init: Init Playloop state.\n");
     P_Init ();
-
-    Heretic_Init ();		// fill the appended Heretic monster states/mobjinfo
-    Hexen_Init ();		// fill the appended Hexen monster states/mobjinfo
-    Freedoom_Init ();		// clone the DOOM2 monsters into the MT_FD_* slots
-    RevMarine_Init ();		// (G) fill the revived-friendly-marine states/mobjinfo
-    Morph_Init ();		// (M) fill the generic morph creature (chicken) states/mobjinfo
-    HereticInv_Init ();		// (H) fill the Heretic artifact pickup states/mobjinfo
 
     printf ("I_Init: Setting up machine state.\n");
     I_Init ();

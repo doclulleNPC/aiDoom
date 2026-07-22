@@ -498,8 +498,11 @@ typedef struct
 
 
 
- // max # of wall switches in a level
-#define MAXSWITCHES		50
+ // max # of wall switches in a level.  Boom SWITCHES lumps can be large: Legacy
+ // of Rust's id1.wad ships 85 pairs, so a 50-cap silently dropped the LoR
+ // switches at the tail (SW1GATE/SW2GATE etc.) -> the switch worked but never
+ // swapped its graphic.  Sized well above any real SWITCHES lump.
+#define MAXSWITCHES		128
 
  // VANILLA BUG (button overflow): vanilla's 16 (4 players x 4) made
  // P_StartButton I_Error ("no button slots left") when many switches animated at

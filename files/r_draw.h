@@ -36,6 +36,7 @@ extern int		dc_yh;
 extern fixed_t		dc_iscale;
 extern fixed_t		dc_texturemid;
 extern int		dc_skyheight;
+extern int		dc_texheight;	// full texture height for tall-column masking
 
 // first pixel in a column
 extern byte*		dc_source;		

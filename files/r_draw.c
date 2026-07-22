@@ -130,6 +130,13 @@ fixed_t			dc_iscale;
 fixed_t			dc_texturemid;
 int			dc_skyheight = 128;
 
+// Full height (rows) of the texture the current column belongs to.  Vanilla
+// hardcoded a 128-row wrap (`&127`), which tiled any texture taller than 128
+// (e.g. Legacy of Rust's 512x512 ZZZGATE portal -> scrambled).  Callers set this
+// to the real texture height before drawing (r_segs.c walls, r_things.c sprites);
+// it defaults to 128 so anything that forgets behaves exactly as vanilla.
+int			dc_texheight = 128;
+
 // first pixel in a column (possibly virtual) 
 byte*			dc_source;		
 
@@ -176,16 +183,28 @@ void R_DrawColumn (void)
     // Inner loop that does the actual texture mapping,
     //  e.g. a DDA-lile scaling.
     // This is as fast as it gets.
-    do 
     {
-	// Re-map color indices from wall texture column
-	//  using a lighting/special effects LUT.
-	*dest = dc_colormap[dc_source[(frac>>FRACBITS)&127]];
-
-	dest += SCREENWIDTH;
-	frac += fracstep;
-
-    } while (count--);
+	int heightmask = dc_texheight - 1;
+	if (dc_texheight & heightmask)		// non-power-of-two: modulo wrap
+	{
+	    heightmask = dc_texheight << FRACBITS;
+	    if (frac < 0) while ((frac += heightmask) < 0) ;
+	    else          while (frac >= heightmask) frac -= heightmask;
+	    do {
+		*dest = dc_colormap[dc_source[frac>>FRACBITS]];
+		dest += SCREENWIDTH;
+		if ((frac += fracstep) >= heightmask) frac -= heightmask;
+	    } while (count--);
+	}
+	else					// power-of-two (128 -> vanilla &127)
+	{
+	    do {
+		*dest = dc_colormap[dc_source[(frac>>FRACBITS) & heightmask]];
+		dest += SCREENWIDTH;
+		frac += fracstep;
+	    } while (count--);
+	}
+    }
 }
 
 
@@ -215,13 +234,29 @@ void R_DrawTLColumn (void)
     fracstep = dc_iscale;
     frac = dc_texturemid + (dc_yl-centery)*fracstep;
 
-    do
     {
-	// foreground texel (already colormapped) over the current screen pixel via the tranmap
-	*dest = dc_tranmap[(*dest<<8) + dc_colormap[dc_source[(frac>>FRACBITS)&127]]];
-	dest += SCREENWIDTH;
-	frac += fracstep;
-    } while (count--);
+	int heightmask = dc_texheight - 1;
+	if (dc_texheight & heightmask)		// non-power-of-two: modulo wrap
+	{
+	    heightmask = dc_texheight << FRACBITS;
+	    if (frac < 0) while ((frac += heightmask) < 0) ;
+	    else          while (frac >= heightmask) frac -= heightmask;
+	    do {
+		*dest = dc_tranmap[(*dest<<8) + dc_colormap[dc_source[frac>>FRACBITS]]];
+		dest += SCREENWIDTH;
+		if ((frac += fracstep) >= heightmask) frac -= heightmask;
+	    } while (count--);
+	}
+	else
+	{
+	    do {
+		// foreground texel (already colormapped) over the current screen pixel via the tranmap
+		*dest = dc_tranmap[(*dest<<8) + dc_colormap[dc_source[(frac>>FRACBITS) & heightmask]]];
+		dest += SCREENWIDTH;
+		frac += fracstep;
+	    } while (count--);
+	}
+    }
 }
 
 
@@ -382,15 +417,30 @@ void R_DrawColumnLow (void)
     fracstep = dc_iscale; 
     frac = dc_texturemid + (dc_yl-centery)*fracstep;
     
-    do 
     {
-	// Hack. Does not work corretly.
-	*dest2 = *dest = dc_colormap[dc_source[(frac>>FRACBITS)&127]];
-	dest += SCREENWIDTH;
-	dest2 += SCREENWIDTH;
-	frac += fracstep; 
-
-    } while (count--);
+	int heightmask = dc_texheight - 1;
+	if (dc_texheight & heightmask)		// non-power-of-two: modulo wrap
+	{
+	    heightmask = dc_texheight << FRACBITS;
+	    if (frac < 0) while ((frac += heightmask) < 0) ;
+	    else          while (frac >= heightmask) frac -= heightmask;
+	    do {
+		*dest2 = *dest = dc_colormap[dc_source[frac>>FRACBITS]];
+		dest += SCREENWIDTH; dest2 += SCREENWIDTH;
+		if ((frac += fracstep) >= heightmask) frac -= heightmask;
+	    } while (count--);
+	}
+	else
+	{
+	    do {
+		// Hack. Does not work corretly.
+		*dest2 = *dest = dc_colormap[dc_source[(frac>>FRACBITS) & heightmask]];
+		dest += SCREENWIDTH;
+		dest2 += SCREENWIDTH;
+		frac += fracstep;
+	    } while (count--);
+	}
+    }
 }
 
 
@@ -698,13 +748,31 @@ void R_DrawColumnDither (void)
     frac = dc_texturemid + (dc_yl-centery)*fracstep;
     drow = r_dith[dc_x & 3];
     y = dc_yl;
-    do {
-	lighttable_t* cm = (dc_litfrac > drow[y & 3]) ? dc_colormap2 : dc_colormap;
-	*dest = cm[dc_source[(frac>>FRACBITS)&127]];
-	dest += SCREENWIDTH;
-	frac += fracstep;
-	y++;
-    } while (count--);
+    {
+	int heightmask = dc_texheight - 1;
+	if (dc_texheight & heightmask)		// non-power-of-two: modulo wrap
+	{
+	    heightmask = dc_texheight << FRACBITS;
+	    if (frac < 0) while ((frac += heightmask) < 0) ;
+	    else          while (frac >= heightmask) frac -= heightmask;
+	    do {
+		lighttable_t* cm = (dc_litfrac > drow[y & 3]) ? dc_colormap2 : dc_colormap;
+		*dest = cm[dc_source[frac>>FRACBITS]];
+		dest += SCREENWIDTH; y++;
+		if ((frac += fracstep) >= heightmask) frac -= heightmask;
+	    } while (count--);
+	}
+	else
+	{
+	    do {
+		lighttable_t* cm = (dc_litfrac > drow[y & 3]) ? dc_colormap2 : dc_colormap;
+		*dest = cm[dc_source[(frac>>FRACBITS) & heightmask]];
+		dest += SCREENWIDTH;
+		frac += fracstep;
+		y++;
+	    } while (count--);
+	}
+    }
 }
 
 void R_DrawSpanDither (void)

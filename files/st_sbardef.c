@@ -117,7 +117,11 @@ void ST_SBARDEF_Init (void)
     json_t *root, *data, *nf, *sb;
     int i;
 
-    use_sbardef = (M_CheckParm ("-sbardef") > 0) || use_sbardef_cfg;
+    // Auto-enable when actually playing an ID24 set (GAMECONF `executable: id24`,
+    // i.e. Legacy of Rust) so its custom bar is used without a flag; -sbardef / the
+    // config force it on for other WADs that ship a SBARDEF.
+    { extern int gameconf_id24;
+      use_sbardef = (M_CheckParm ("-sbardef") > 0) || use_sbardef_cfg || gameconf_id24; }
     if (lump < 0) return;
 
     root = JSON_Parse ((const char*) W_CacheLumpNum (lump, PU_CACHE), W_LumpLength (lump));
@@ -180,7 +184,7 @@ static boolean SlotOwned (player_t* p, int slot)
     return false;
 }
 
-static int NumVal (player_t* p, int t)
+static int NumVal (player_t* p, int t, int param)
 {
     ammotype_t a = weaponinfo[p->readyweapon].ammo;
     int f, i;
@@ -188,8 +192,12 @@ static int NumVal (player_t* p, int t)
       case 0: return p->health;
       case 1: return p->armorpoints;
       case 2: f = 0; for (i=0;i<MAXPLAYERS;i++) f += p->frags[i]; return f;
-      case 3: case 4: return (a < NUMAMMO) ? p->ammo[a] : 0;
-      case 5: return (a < NUMAMMO) ? p->maxammo[a] : 0;
+      // param is an ammo-type index (0..NUMAMMO-1).  Bound-check UNSIGNED so a
+      // negative/garbage param (id24res.wad's bar ships a 0x90000000 sentinel)
+      // can't index p->ammo[] out of bounds -> the crash this replaced.
+      case 3: return ((unsigned)param < NUMAMMO) ? p->ammo[param] : 0;	// ammo of type `param`
+      case 4: return ((unsigned)a     < NUMAMMO) ? p->ammo[a]     : 0;	// selected weapon's ammo
+      case 5: return ((unsigned)param < NUMAMMO) ? p->maxammo[param] : 0;	// maxammo of type `param`
     }
     return 0;
 }
@@ -237,7 +245,10 @@ static void DrawElem (player_t* p, sbe_t* e, int ox, int oy)
     for (i = 0; i < e->nconds; i++)
 	if (!CondOK (p, e->conds[i].cond, e->conds[i].param)) return;
 
-    x = ox + e->x + WIDESCREENDELTA;
+    // NB: WIDESCREENDELTA is applied ONCE by the caller (ST_SBARDEF_Draw) as the
+    // initial ox, not here -- adding it per element would multiply it by the
+    // nesting depth and drift nested widgets rightward in widescreen.
+    x = ox + e->x;
     y = oy + e->y;
 
     switch (e->type) {
@@ -250,8 +261,8 @@ static void DrawElem (player_t* p, sbe_t* e, int ox, int oy)
 	break; }
       case SBE_FACEBG: { patch_t* g = ST_SBFaceBack (); if (g) V_DrawPatch (x, y, 0, g); break; }
       case SBE_FACE:   { patch_t* g = ST_SBFace ();     if (g) V_DrawPatch (x, y, 0, g); break; }
-      case SBE_NUMBER: if (e->font>=0) DrawNum (&fonts[e->font], x, y, NumVal (p, e->numtype), e->align, false); break;
-      case SBE_PERCENT:if (e->font>=0) DrawNum (&fonts[e->font], x, y, NumVal (p, e->numtype), e->align, true);  break;
+      case SBE_NUMBER: if (e->font>=0) DrawNum (&fonts[e->font], x, y, NumVal (p, e->numtype, e->param), e->align, false); break;
+      case SBE_PERCENT:if (e->font>=0) DrawNum (&fonts[e->font], x, y, NumVal (p, e->numtype, e->param), e->align, true);  break;
       case SBE_CANVAS: break;	// container -- just offsets its children
       default: break;
     }
@@ -272,5 +283,6 @@ void ST_SBARDEF_Draw (boolean fullscreen)
     }
     if (!bar) return;
     basey = bar->fullscreen ? 0 : (BASE_HEIGHT - bar->height);	// classic bar sits at the bottom
-    for (i = 0; i < bar->nkids; i++) DrawElem (p, &bar->kids[i], 0, basey);
+    // WIDESCREENDELTA applied once here as the root x-origin (see DrawElem).
+    for (i = 0; i < bar->nkids; i++) DrawElem (p, &bar->kids[i], WIDESCREENDELTA, basey);
 }

@@ -369,9 +369,15 @@ void R_DrawMaskedColumn (column_t* column)
     int64_t	topscreen;
     int64_t 	bottomscreen;
     fixed_t	basetexturemid;
-	
+
     basetexturemid = dc_texturemid;
-	
+
+    // Posted columns (sprites, psprites, 2S masked mids) are clipped per-post to
+    // their on-screen extent, so the classic 128-row wrap is correct here -- and
+    // resetting keeps a tall wall texture's dc_texheight (set in r_segs.c) from
+    // leaking into the next sprite/masked column drawn.
+    dc_texheight = 128;
+
     for ( ; column->topdelta != 0xff ; ) 
     {
 	// calculate unclipped screen coordinates
