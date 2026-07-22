@@ -188,6 +188,11 @@ static int NumVal (player_t* p, int t, int param)
 {
     ammotype_t a = weaponinfo[p->readyweapon].ammo;
     int f, i;
+    // id24res.wad's SBARDEF names the ID24 fuel-ammo row with a native-type
+    // sentinel (0x90000000) instead of a plain 0..3 ammo index (the four base
+    // slots can't name an ID24-added type).  aiDoom's sole extended ammo type is
+    // am_fuel, so resolve the sentinel there; anything else out of range -> 0.
+    if (param == (int)0x90000000) param = am_fuel;
     switch (t) {
       case 0: return p->health;
       case 1: return p->armorpoints;
