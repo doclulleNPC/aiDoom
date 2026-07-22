@@ -1428,7 +1428,12 @@ typedef enum
     // Boom push/pull point-source (MT_PUSH/MT_PULL) idle state: invisible + persistent.
     S_TNT1,
     // Deployable sentry turret (files/p_turret.c): idle look loop, fire loop, death boom.
-    S_TURRET_STND,
+    // RELOCATED to a high base: DSDHacked patches (Legacy of Rust defines frames up to
+    // ~1566) share this state-index space and would otherwise clobber these aiDoom-actor
+    // states (turret idle/fire lost A_TurretLook/A_TurretFire -> deployed as inert junk).
+    // The built-in state array is sparse across the gap, but dsdhacked.c memcpy's it whole
+    // when it grows, so these high entries survive.  Keep well clear of any real frame range.
+    S_TURRET_STND = 2500,
     S_TURRET_FIRE1, S_TURRET_FIRE2,
     S_TURRET_DIE1, S_TURRET_DIE2, S_TURRET_DIE3, S_TURRET_DIE4, S_TURRET_DIE5,
     // Security Drone (files/p_secdrone.c): flying friendly laser drone + its shot.
@@ -1677,7 +1682,11 @@ typedef enum {
     MT_CHICKEN,		// (M) generic morph creature -- the Heretic chicken (files/p_morph.c)
     MT_PUSH,		// Boom point-source pusher thing (DoomEd 5001) -- wind/current away
     MT_PULL,		// Boom point-source puller thing (DoomEd 5002) -- toward
-    MT_TURRET,		// deployable auto-firing sentry turret (files/p_turret.c)
+    // RELOCATED above any realistic DSDHacked thing range (Legacy of Rust uses up to
+    // Thing 209) so its DEHACKED can't overwrite the turret/drone with its own scenery --
+    // that collision made the deployed turret spawn as a LoR lamp, and it lets LoR's lamp
+    // keep its own low slot.  Sparse gap is fine (dsdhacked.c copies the whole array).
+    MT_TURRET = 1000,	// deployable auto-firing sentry turret (files/p_turret.c)
     MT_SECDRONE,	// Security Drone: buddy-spawned flying friendly laser drone (files/p_secdrone.c)
     MT_SECDRONESHOT,	// its laser projectile
     NUMMOBJTYPES
