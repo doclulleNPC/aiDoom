@@ -118,11 +118,25 @@ boolean deh_pars = FALSE; // in wi_stuff to allow pars in modified games
 // ====================================================================
 // Any of these can be changed using the bex extensions
 #include "dstrings.h"  // to get the initial values
-// (M2b) BEX string / level-name replacement deferred: aiDoom's strings are compile-time
-// #defines, not a runtime table.  Minimal stub so the gameplay parser links.
+#include "dstrings_bex.h"
 typedef struct { char **ppstr; char *lookup; } deh_strs;
-static deh_strs deh_strlookup[] = { { 0, "" } };
-static int deh_numstrlookup = 0;
+
+// BEX [STRINGS]: aiDoom's HUD strings are compile-time #defines, so we keep a runtime
+// char* per pickup message (initialised from the #define) and register it by mnemonic.
+// A DEHACKED "GOTPLASMA = ..." now actually replaces the message (Legacy of Rust renames
+// the cell/plasma/BFG pickups).  p_inter.c uses these deh_* pointers instead of the raw
+// #defines.  Extend BEX_PICKUP_STRINGS (dstrings_bex.h) to cover more strings.
+#define X(name) char* deh_##name = name;
+BEX_PICKUP_STRINGS(X)
+#undef X
+
+static deh_strs deh_strlookup[] = {
+#define X(name) { &deh_##name, #name },
+  BEX_PICKUP_STRINGS(X)
+#undef X
+  { 0, "" }
+};
+static int deh_numstrlookup = sizeof(deh_strlookup)/sizeof(deh_strlookup[0]) - 1;
 
 void deh_procThing(DEHFILE *, FILE*, char *);
 void deh_procFrame(DEHFILE *, FILE*, char *);
@@ -1461,9 +1475,45 @@ void deh_procError(DEHFILE *fpin, FILE* fpout, char *line)
 // Returns: void
 //
 void deh_procStrings(DEHFILE *fpin, FILE* fpout, char *line)
-{ char inbuffer[DEH_BUFFERMAX]; (void)fpout; (void)line;   // (M2b) deferred -- consume the block
-  while (!dehfeof(fpin) && (dehfgets(inbuffer, sizeof inbuffer, fpin)))
-    { lfstrip(inbuffer); if (!*inbuffer) break; }
+{
+  char		key[DEH_MAXKEYLEN];
+  char		inbuffer[DEH_BUFFERMAX];
+  long		value;
+  char*		strval = "";
+  static int	maxstrlen = 128;		// grows as needed
+  static char*	holdstring = NULL;		// accumulates the (maybe multi-line) value
+
+  if (!holdstring) holdstring = malloc (maxstrlen + 1);
+  *holdstring = '\0';
+  strncpy (inbuffer, line, DEH_BUFFERMAX-1); inbuffer[DEH_BUFFERMAX-1] = '\0';
+
+  while (!dehfeof(fpin) && *inbuffer)
+  {
+    if (!dehfgets (inbuffer, sizeof inbuffer, fpin)) break;
+    if (*inbuffer == '#') continue;			// comment
+    lfstrip (inbuffer);
+    if (!*inbuffer && !*holdstring) break;		// blank line ends the block
+    if (!*holdstring)					// first line -> the "KEY = value"
+      if (!deh_GetData (inbuffer, key, &value, &strval, fpout)) continue;
+
+    while ((int)(strlen(holdstring) + strlen(inbuffer)) > maxstrlen)
+    {
+      maxstrlen = strlen(holdstring) + strlen(inbuffer);
+      holdstring = realloc (holdstring, maxstrlen + 1);
+    }
+    strcat (holdstring, ptr_lstrip ((*holdstring) ? inbuffer : strval));
+    rstrip (holdstring);
+    if (*holdstring && holdstring[strlen(holdstring)-1] == '\\')	// line-continuation
+    {
+      holdstring[strlen(holdstring)-1] = '\0';
+      continue;						// keep concatenating
+    }
+    if (*holdstring)					// a complete KEY = value
+    {
+      deh_procStringSub (key, NULL, holdstring, fpout);	// replace by mnemonic
+      *holdstring = '\0';
+    }
+  }
 }
 
 // ====================================================================
