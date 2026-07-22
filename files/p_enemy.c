@@ -1417,6 +1417,62 @@ void A_VileChase (mobj_t* actor)
 
 
 //
+// A_HealChase (MBF21)
+// Like A_VileChase, but a DEHACKED-defined healer picks its own heal animation and
+// sound: args[0] = state the healer jumps to on a successful raise (0 = don't change
+// state), args[1] = sound played at the corpse (0 = silent).  Falls through to A_Chase
+// when there's nothing to raise.
+//
+void A_HealChase (mobj_t* actor)
+{
+    int		xl, xh, yl, yh, bx, by;
+    mobjinfo_t*	info;
+    mobj_t*	temp;
+    int		healstate;
+    int		healsound;
+
+    if (!actor || !actor->state) return;
+    healstate = (int) actor->state->args[0];
+    healsound = (int) actor->state->args[1];
+
+    if (actor->movedir != DI_NODIR)
+    {
+	viletryx = actor->x + actor->info->speed*xspeed[actor->movedir];
+	viletryy = actor->y + actor->info->speed*yspeed[actor->movedir];
+
+	xl = (viletryx - bmaporgx - MAXRADIUS*2)>>MAPBLOCKSHIFT;
+	xh = (viletryx - bmaporgx + MAXRADIUS*2)>>MAPBLOCKSHIFT;
+	yl = (viletryy - bmaporgy - MAXRADIUS*2)>>MAPBLOCKSHIFT;
+	yh = (viletryy - bmaporgy + MAXRADIUS*2)>>MAPBLOCKSHIFT;
+
+	vileobj = actor;
+	for (bx=xl ; bx<=xh ; bx++)
+	  for (by=yl ; by<=yh ; by++)
+	    if (!P_BlockThingsIterator(bx,by,PIT_VileCheck))
+	    {
+		temp = actor->target;
+		actor->target = corpsehit;
+		A_FaceTarget (actor);
+		actor->target = temp;
+
+		if (healstate) P_SetMobjState (actor, (statenum_t)healstate);
+		if (healsound)  S_StartSound (corpsehit, healsound);
+		info = corpsehit->info;
+		P_SetMobjState (corpsehit, info->raisestate);
+		corpsehit->height = info->height;	// crispy ghost-monster fix (see A_VileChase)
+		corpsehit->radius = info->radius;
+		corpsehit->flags  = info->flags;
+		corpsehit->health = info->spawnhealth;
+		corpsehit->target = NULL;
+		return;
+	    }
+    }
+
+    A_Chase (actor);
+}
+
+
+//
 // A_VileStart
 //
 void A_VileStart (mobj_t* actor)

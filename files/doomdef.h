@@ -30,7 +30,7 @@
 // Global parameters/defines.
 //
 // DOOM version
-enum { VERSION_NUM =  118 };	// bumped: player_t grew (am_fuel ammo + 2 ID24 weapons)
+enum { VERSION_NUM =  119 };	// bumped: player_t grew (am_fuel ammo + 2 ID24 weapons)
 
 // Demo format version -- DECOUPLED from VERSION_NUM (which auto-bumps for savegame struct
 // changes).  The stock IWAD attract demos are version 109 (DOOM 1.9); keeping the demo

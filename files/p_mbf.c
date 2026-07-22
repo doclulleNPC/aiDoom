@@ -110,8 +110,8 @@ void A_RadiusDamage (mobj_t *actor)
   if (actor->state) P_RadiusAttack (actor, actor->target, (int)actor->state->args[0]);
 }
 void A_NoiseAlert (mobj_t *a) { if (a->target) P_NoiseAlert (a->target, a); }
-void A_HealChase (mobj_t *actor)   // no P_HealCorpse in aiDoom -> just keep chasing
-{ extern void A_Chase (mobj_t*); A_Chase (actor); }
+// A_HealChase (MBF21) lives in p_enemy.c beside A_VileChase -- it needs the vile
+// corpse-raise machinery (PIT_VileCheck / corpsehit / viletryx).
 void A_SeekTracer (mobj_t *actor)
 {
   angle_t exact, maxturn;
@@ -199,4 +199,38 @@ void A_Mushroom (mobj_t *actor)   // classic MBF: normal explosion + a cloud of 
       mo->flags &= ~MF_NOGRAVITY;
     }
 }
-void A_LineEffect (mobj_t *a)        { (void)a; }
+// A_LineEffect (MBF, killough 11/98): the thing activates a linedef special on itself.
+// misc1 = linedef type, misc2 = sector tag.  Tries a USE (switch) trigger first, then a
+// CROSS (walk) trigger, exactly like a fake player stepping on/pressing a tagged line.
+// Fires at most once per thing (MIF_LINEDONE), so a looping state can't spam it.
+void A_LineEffect (mobj_t *mo)
+{
+    extern boolean P_UseSpecialLine (mobj_t* thing, line_t* line, int side);
+    extern void    P_CrossSpecialLine (int linenum, int side, mobj_t* thing);
+    static player_t junkplayer;			// fake, "alive" player for the trigger
+
+    if (!mo || !mo->state || numlines <= 0) return;
+    if (mo->intflags & MIF_LINEDONE)	return;	// already used up for this thing
+
+    line_t junk = lines[0];			// a throwaway linedef based off the first
+    junk.special = (short) mo->state->misc1;	// the linedef type to run
+    if (junk.special)
+    {
+	player_t* oldplayer = mo->player;
+	mo->player = &junkplayer;
+	junkplayer.health = 100;
+	junk.tag = (short) mo->state->misc2;	// target sector tag
+
+	if (!P_UseSpecialLine (mo, &junk, 0))	// try USE (switch-type)...
+	{					// ...else CROSS (walk-type): run it via lines[0]
+	    line_t save = lines[0];
+	    lines[0] = junk;
+	    P_CrossSpecialLine (0, 0, mo);
+	    junk.special = lines[0].special;	// pick up a one-shot special getting cleared
+	    lines[0] = save;
+	}
+	if (!junk.special)			// non-repeatable special consumed
+	    mo->intflags |= MIF_LINEDONE;
+	mo->player = oldplayer;
+    }
+}

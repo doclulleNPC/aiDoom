@@ -297,9 +297,16 @@ typedef struct mobj_s
     mapthing_t		spawnpoint;	
 
     // Thing being chased/attacked for tracers.
-    struct mobj_s*	tracer;	
-    
+    struct mobj_s*	tracer;
+
+    // MBF internal flags (MIF_*): runtime-only bookkeeping, e.g. A_LineEffect's
+    // "already fired" latch.  Saved with the mobj but not gameplay-visible.
+    int			intflags;
+
 } mobj_t;
+
+// MBF internal flags (mobj_t.intflags)
+#define MIF_LINEDONE	0x00000001	// A_LineEffect has already run for this thing
 
 
 
