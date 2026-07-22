@@ -364,30 +364,42 @@ fixed_t		spryscale;
 int64_t		sprtopscreen;
 int		r_shadows = 1;
 
-void R_DrawMaskedColumn (column_t* column)
+void R_DrawMaskedColumn (column_t* column, int texheight)
 {
     int64_t	topscreen;
     int64_t 	bottomscreen;
     fixed_t	basetexturemid;
+    int		topdelta = -1;		// DeePsea tall-patch absolute-topdelta accumulator
 
     basetexturemid = dc_texturemid;
 
-    // Posted columns (sprites, psprites, 2S masked mids) are clipped per-post to
-    // their on-screen extent, so the classic 128-row wrap is correct here -- and
-    // resetting keeps a tall wall texture's dc_texheight (set in r_segs.c) from
-    // leaking into the next sprite/masked column drawn.
-    dc_texheight = 128;
+    // Posted columns clip per-post to their on-screen extent.  `texheight` is the
+    // vertical wrap height: 128 for sprites/psprites (vanilla -- and it keeps a tall
+    // wall's dc_texheight from leaking in from r_segs), but a 2S masked mid-texture
+    // passes its REAL height so tall (>128) posts don't wrap on themselves (Legacy of
+    // Rust's 512-tall ZZZGATE portal has 246-row posts).
+    dc_texheight = texheight;
 
-    for ( ; column->topdelta != 0xff ; ) 
+    for ( ; column->topdelta != 0xff ; )
     {
+	// Tall patches (>254 rows, e.g. the 512-tall ZZZGATE gate) store lower rows with
+	// the DeePsea convention: a topdelta <= the previous one is RELATIVE to it, not
+	// absolute.  Accumulate so the gate's lower half lands below its upper half rather
+	// than overlapping it.  Normal (strictly-increasing) patches take the else branch
+	// every post, so their placement is byte-for-byte unchanged.
+	if (column->topdelta <= topdelta)
+	    topdelta += column->topdelta;
+	else
+	    topdelta = column->topdelta;
+
 	// calculate unclipped screen coordinates
 	//  for post
-	topscreen = sprtopscreen + (int64_t)spryscale*column->topdelta;
+	topscreen = sprtopscreen + (int64_t)spryscale*topdelta;
 	bottomscreen = topscreen + (int64_t)spryscale*column->length;
 
 	dc_yl = (int)((topscreen+FRACUNIT-1)>>FRACBITS);
 	dc_yh = (int)((bottomscreen-1)>>FRACBITS);
-		
+
 	if (dc_yh >= mfloorclip[dc_x])
 	    dc_yh = mfloorclip[dc_x]-1;
 	if (dc_yl <= mceilingclip[dc_x])
@@ -396,16 +408,16 @@ void R_DrawMaskedColumn (column_t* column)
 	if (dc_yl <= dc_yh)
 	{
 	    dc_source = (byte *)column + 3;
-	    dc_texturemid = basetexturemid - (column->topdelta<<FRACBITS);
-	    // dc_source = (byte *)column + 3 - column->topdelta;
+	    dc_texturemid = basetexturemid - (topdelta<<FRACBITS);
+	    // dc_source = (byte *)column + 3 - topdelta;
 
 	    // Drawn by either R_DrawColumn
 	    //  or (SHADOW) R_DrawFuzzColumn.
-	    colfunc ();	
+	    colfunc ();
 	}
 	column = (column_t *)(  (byte *)column + column->length + 4);
     }
-	
+
     dc_texturemid = basetexturemid;
 }
 
@@ -452,7 +464,7 @@ R_DrawVisSprite
 		    texturecolumn = frac>>FRACBITS;
 		    column = (column_t *) ((byte *)patch +
 					   LONG(patch->columnofs[texturecolumn]));
-		    R_DrawMaskedColumn (column);
+		    R_DrawMaskedColumn (column, 128);	// sprite shadow -- vanilla wrap
 		}
 
 		spryscale = saved_spryscale;
@@ -493,7 +505,7 @@ R_DrawVisSprite
 #endif
 	column = (column_t *) ((byte *)patch +
 			       LONG(patch->columnofs[texturecolumn]));
-	R_DrawMaskedColumn (column);
+	R_DrawMaskedColumn (column, 128);	// sprite -- vanilla 128-row wrap
     }
 
     colfunc = basecolfunc;

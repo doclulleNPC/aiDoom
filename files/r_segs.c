@@ -197,8 +197,10 @@ R_RenderMaskedSegRange
 	    sprtopscreen = (int64_t)centeryfrac - (int64_t)FixedMul(dc_texturemid, spryscale);
 	    dc_iscale = 0xffffffffu / (unsigned)spryscale;
 
-	    // draw the texture
-	    R_DrawMaskedColumn (col);
+	    // draw the texture -- pass the real texture height so a tall (>128) 2S mid
+	    // texture (Legacy of Rust's 512-tall ZZZGATE portal) neither wraps on itself
+	    // nor overlaps its own lower half (tall-patch topdelta handled in the drawer).
+	    R_DrawMaskedColumn (col, textureheight[texnum] >> FRACBITS);
 	    maskedtexturecol[dc_x] = MAXSHORT;
 	}
 	spryscale += rw_scalestep;
