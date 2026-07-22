@@ -794,7 +794,11 @@ static mobj_t* AICoop_FindItem (mobj_t* self)
 	if (d > COOP_ITEM_RANGE)	continue;
 	// Leave items the human is closer to -- otherwise the buddy snatches the
 	// pickup right as the player walks up to it (looks like it "vanishes").
-	if (pl && P_AproxDistance (m->x - pl->x, m->y - pl->y) < d) continue;
+	// EXCEPTION: an item the player deliberately DROPPED (MF_DROPPED, e.g. a
+	// medikit handed to the buddy from the inventory) is fair game even right
+	// next to the human -- that's the whole point of dropping it.
+	if (!(m->flags & MF_DROPPED)
+	    && pl && P_AproxDistance (m->x - pl->x, m->y - pl->y) < d) continue;
 	if (best && d >= bestd)		continue;	// not closer -> skip the trace
 	if (!AICoop_CanReach (self, m->x, m->y, true)) continue;	// can't walk there
 
