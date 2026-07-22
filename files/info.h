@@ -1214,8 +1214,17 @@ typedef enum
     S_TECH2LAMP2,
     S_TECH2LAMP3,
     S_TECH2LAMP4,
+    // === aiDoom appended actor states RELOCATED to a high base ==============
+    // Everything below (Heretic/Hexen/Freedoom/turret/drone/... states) is aiDoom's
+    // own additions.  DSDHacked WADs (Legacy of Rust defines frames 1100-1566) share
+    // this state-index space; if our builtins sat there, a partial LoR "Frame N ="
+    // edit (which only sets sprite/tics/next, NOT the sprite subnumber) would inherit
+    // OUR leftover subnumber -> the Ghoul idled on GHUL frame 'N' (a dissolve frame,
+    // the "green ring") instead of 'A'.  Basing the block at 4000 leaves 967..3999 a
+    // clean/empty slate so LoR's partial frame edits get proper defaults (subnumber 0).
+    // The built-in table is sparse across the gap, but dsdhacked.c memcpy's it whole.
     // --- Heretic mummy (filled at runtime by Heretic_Init in heretic.c) ---
-    S_HMUM_LOOK1, S_HMUM_LOOK2,
+    S_HMUM_LOOK1 = 4000, S_HMUM_LOOK2,
     S_HMUM_WALK1, S_HMUM_WALK2, S_HMUM_WALK3, S_HMUM_WALK4,
     S_HMUM_ATK1,  S_HMUM_ATK2,  S_HMUM_ATK3,
     S_HMUM_PAIN1, S_HMUM_PAIN2,
@@ -1428,12 +1437,8 @@ typedef enum
     // Boom push/pull point-source (MT_PUSH/MT_PULL) idle state: invisible + persistent.
     S_TNT1,
     // Deployable sentry turret (files/p_turret.c): idle look loop, fire loop, death boom.
-    // RELOCATED to a high base: DSDHacked patches (Legacy of Rust defines frames up to
-    // ~1566) share this state-index space and would otherwise clobber these aiDoom-actor
-    // states (turret idle/fire lost A_TurretLook/A_TurretFire -> deployed as inert junk).
-    // The built-in state array is sparse across the gap, but dsdhacked.c memcpy's it whole
-    // when it grows, so these high entries survive.  Keep well clear of any real frame range.
-    S_TURRET_STND = 2500,
+    // (Sits inside the relocated 4000+ block above, clear of the DSDHacked frame range.)
+    S_TURRET_STND,
     S_TURRET_FIRE1, S_TURRET_FIRE2,
     S_TURRET_DIE1, S_TURRET_DIE2, S_TURRET_DIE3, S_TURRET_DIE4, S_TURRET_DIE5,
     // Security Drone (files/p_secdrone.c): flying friendly laser drone + its shot.
@@ -1611,8 +1616,15 @@ typedef enum {
     MT_MISC84,
     MT_MISC85,
     MT_MISC86,
+    // === aiDoom appended mobjtypes RELOCATED to a high base ==================
+    // Same reason as the state block above: DSDHacked WADs (Legacy of Rust numbers
+    // Things up to 209) share this index space.  With our builtins sitting there, a
+    // LoR "Thing N =" edit landed on OUR actor and inherited its leftover fields (the
+    // deployed turret came out as a LoR lamp; LoR's own breakable lamp lost its slot).
+    // Basing at 1000 leaves 137..999 empty so LoR's things get clean slots, and our
+    // actors resolve by their own DoomEd numbers.  Sparse gap; dsdhacked.c copies whole.
     // --- Heretic monsters (additive; mobjinfo filled by Heretic_Init) ---
-    MT_HMUMMY,		// Heretic mummy / golem
+    MT_HMUMMY = 1000,	// Heretic mummy / golem
     MT_HCLINK,		// Heretic sabreclaw
     MT_HIMP,		// Heretic gargoyle
     MT_HKNIGHT,		// Heretic undead warrior (knight)
@@ -1682,11 +1694,8 @@ typedef enum {
     MT_CHICKEN,		// (M) generic morph creature -- the Heretic chicken (files/p_morph.c)
     MT_PUSH,		// Boom point-source pusher thing (DoomEd 5001) -- wind/current away
     MT_PULL,		// Boom point-source puller thing (DoomEd 5002) -- toward
-    // RELOCATED above any realistic DSDHacked thing range (Legacy of Rust uses up to
-    // Thing 209) so its DEHACKED can't overwrite the turret/drone with its own scenery --
-    // that collision made the deployed turret spawn as a LoR lamp, and it lets LoR's lamp
-    // keep its own low slot.  Sparse gap is fine (dsdhacked.c copies the whole array).
-    MT_TURRET = 1000,	// deployable auto-firing sentry turret (files/p_turret.c)
+    // (Sits inside the relocated 1000+ block above, clear of the DSDHacked thing range.)
+    MT_TURRET,		// deployable auto-firing sentry turret (files/p_turret.c)
     MT_SECDRONE,	// Security Drone: buddy-spawned flying friendly laser drone (files/p_secdrone.c)
     MT_SECDRONESHOT,	// its laser projectile
     NUMMOBJTYPES
