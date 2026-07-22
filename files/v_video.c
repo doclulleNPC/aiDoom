@@ -214,60 +214,65 @@ V_DrawPatch
     int		count;
     int		col;
     column_t*	column;
-    byte*	desttop;
     byte*	dest;
     byte*	source;
     int		w;
     int		s = hires;		// 320x200 -> screen scale factor
-    int		i, j;
+    int		i, a, b;
+    int		basew = SCREENWIDTH / hires;	// base-space width of the target (widescreen-aware)
 
     y -= SHORT(patch->topoffset);
     x -= SHORT(patch->leftoffset);
-#ifdef RANGECHECK
-    if (x<0
-	||x+SHORT(patch->width) >SCREENWIDTH/hires	// widescreen: wider base space
-	|| y<0
-	|| y+SHORT(patch->height)>BASE_HEIGHT
-	|| (unsigned)scrn>4)
+
+    if ((unsigned)scrn > 4)
     {
-      fprintf( stderr, "Patch at %d,%d exceeds LFB\n", x,y );
-      // No I_Error abort - what is up with TNT.WAD?
-      fprintf( stderr, "V_DrawPatch: bad patch (ignored)\n");
-      return;
+	fprintf (stderr, "V_DrawPatch: bad screen %d (ignored)\n", scrn);
+	return;
     }
-#endif
 
+    // Wide ID24 status-bar graphics (e.g. the 576px STBAR, drawn centred at a
+    // negative base x) legitimately overhang the 320-wide base frame.  Clip per
+    // column/row instead of rejecting the whole patch: the old RANGECHECK bailed
+    // out on any overhang -> blank/black ID24 status bar plus a per-frame flood of
+    // "exceeds LFB" to stderr.  In-bounds patches draw exactly as before.
     if (!scrn)
-	V_MarkRect (x, y, SHORT(patch->width), SHORT(patch->height));
-
-    col = 0;
-    // (x,y) are in 320x200 space; scale up to the real screen buffer.
-    desttop = screens[scrn] + (y*s)*SCREENWIDTH + x*s;
+    {
+	int x0 = x < 0 ? 0 : x, y0 = y < 0 ? 0 : y;
+	int x1 = x + SHORT(patch->width);  if (x1 > basew)       x1 = basew;
+	int y1 = y + SHORT(patch->height); if (y1 > BASE_HEIGHT) y1 = BASE_HEIGHT;
+	if (x1 > x0 && y1 > y0) V_MarkRect (x0, y0, x1 - x0, y1 - y0);
+    }
 
     w = SHORT(patch->width);
 
-    for ( ; col<w ; col++, desttop += s)
+    for (col = 0; col < w; col++)
     {
+	int bx = x + col;			// this column's base x
+	if (bx < 0 || bx >= basew)		// off the left/right edge -> skip
+	    continue;
+
 	column = (column_t *)((byte *)patch + LONG(patch->columnofs[col]));
 
 	// step through the posts in a column
 	while (column->topdelta != 0xff )
 	{
+	    int	td = column->topdelta;
 	    source = (byte *)column + 3;
-	    dest = desttop + (column->topdelta*s)*SCREENWIDTH;
-	    count = column->length;
+	    count  = column->length;
 
-	    while (count--)
+	    for (i = 0; i < count; i++, source++)
 	    {
+		int by = y + td + i;		// this pixel's base y
+		if (by < 0 || by >= BASE_HEIGHT)	// above/below the frame -> skip
+		    continue;
+		dest = screens[scrn] + (by*s)*SCREENWIDTH + bx*s;
 		// expand one source pixel into an s x s block
-		for (i=0 ; i<s ; i++)
+		for (a = 0; a < s; a++)
 		{
-		    byte* d = dest + i*SCREENWIDTH;
-		    for (j=0 ; j<s ; j++)
-			d[j] = *source;
+		    byte* d = dest + a*SCREENWIDTH;
+		    for (b = 0; b < s; b++)
+			d[b] = *source;
 		}
-		source++;
-		dest += s*SCREENWIDTH;
 	    }
 	    column = (column_t *)(  (byte *)column + column->length
 				    + 4 );
