@@ -171,15 +171,22 @@ const char* P_TurretDeploy (player_t* player)
     ang = p->angle;
     fine = ang >> ANGLETOFINESHIFT;
 
-    // Spawn just in front of the player at chest height, then throw it.
+    // Spawn just in front of the player at chest height, then throw it.  Spawn AT the
+    // player and step forward with P_TryMove so a wall (or other blocker) between the
+    // player and the target spot stops it -- otherwise P_SpawnMobj would happily place
+    // the turret straight through a wall you're standing against.
     dist = p->radius + 24*FRACUNIT;
     x = p->x + FixedMul (dist, finecosine[fine]);
     y = p->y + FixedMul (dist, finesine[fine]);
     z = p->z + 24*FRACUNIT;
 
-    t = P_SpawnMobj (x, y, z, MT_TURRET);
+    t = P_SpawnMobj (p->x, p->y, z, MT_TURRET);
     if (!t)
 	return "";
+    {   // nudge to the spot in front; if blocked by a wall it stays at the player's feet
+	extern boolean P_TryMove (mobj_t* thing, fixed_t x, fixed_t y);
+	P_TryMove (t, x, y);
+    }
 
     // Only charge the player once we know the turret actually spawned (bullets first).
     if (useClip) player->ammo[am_clip]  -= TURRET_CLIP_COST;
