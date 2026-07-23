@@ -256,7 +256,7 @@ P_ChangeSwitchTexture
     texTop = sides[line->sidenum[0]].toptexture;
     texMid = sides[line->sidenum[0]].midtexture;
     texBot = sides[line->sidenum[0]].bottomtexture;
-	
+
     sound = sfx_swtchn;
 
     // EXIT SWITCH?
@@ -319,7 +319,7 @@ P_UseSpecialLine
 ( mobj_t*	thing,
   line_t*	line,
   int		side )
-{               
+{
     if (!side && P_DoGenLineSpecial (line, thing, 1)) return true;   // Boom generalized (switch)
 
     // Err...
@@ -454,7 +454,28 @@ P_UseSpecialLine
 	if (EV_DoFloor(line,lowerFloorToLowest))
 	    P_ChangeSwitchTexture(line,0);
 	break;
-	
+
+      // --- Boom extended S1 (switch, once) floor/ceiling types used by Legacy of Rust ---
+      case 159:
+	// Boom S1: Floor Lower to Lowest, Change Texture and Type (the S1 form of
+	// classic 37; aiDoom's lowerAndChange uses the trigger model rather than
+	// Boom's numeric model, but the floor motion + texture/type change match).
+	if (EV_DoFloor(line,lowerAndChange))
+	    P_ChangeSwitchTexture(line,0);
+	break;
+
+      case 164:
+	// Boom S1: Start Crusher, Fast/large damage
+	if (EV_DoCeiling(line,fastCrushAndRaise))
+	    P_ChangeSwitchTexture(line,0);
+	break;
+
+      case 166:
+	// Boom S1: Ceiling Raise to Highest surrounding ceiling
+	if (EV_DoCeiling(line,raiseToHighest))
+	    P_ChangeSwitchTexture(line,0);
+	break;
+
       case 29:
 	// Raise Door
 	if (EV_DoDoor(line,normal))
@@ -710,9 +731,15 @@ P_UseSpecialLine
 	EV_LightTurnOn(line,35);
 	P_ChangeSwitchTexture(line,1);
 	break;
-			
+
+      case 195:
+	// Boom SR: silent Teleport (preserves angle/relative position)
+	if (EV_SilentTeleport(line,side,thing))
+	    P_ChangeSwitchTexture(line,1);
+	break;
+
     }
-	
+
     return true;
 }
 
