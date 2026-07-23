@@ -151,6 +151,8 @@ typedef	struct
     int		floorlightsec;	// Boom 213: floor lit by this control sector's light, or -1
     int		ceilinglightsec;// Boom 261: ceiling lit by this control sector's light, or -1
     int		sky;		// Boom 271/272 sky transfer: control line index | PL_SKYFLAT
+    int		cachedheight;	// WiggleHack II (R_FixWiggle): cached sector height...
+    int		scaleindex;	// ...and its derived scale-precision index
 } sector_t;
 
 
