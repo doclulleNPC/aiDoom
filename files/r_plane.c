@@ -261,7 +261,17 @@ static visplane_t* new_visplane (unsigned hash)
     visplane_t*	check = freetail;
 
     if (!check)
+    {
+	// Fresh allocation: Z_Malloc does NOT zero, but the old fixed visplanes[]
+	// lived in the BSS and started zeroed.  Several columns of bottom[] (outside
+	// the [minx,maxx] range, or unwritten 0xffff-top columns) are read by
+	// R_MakeSpans -- if they hold garbage they can feed R_MapPlane a bogus row
+	// (crash: "R_MapPlane: ... at 65535", the 0xffff sentinel).  Zero it so a
+	// fresh plane behaves exactly like the old BSS array; reused planes off the
+	// free list already carry valid (bounded) row data from their last use.
 	check = Z_Malloc (sizeof(*check), PU_STATIC, 0);	// grow: no fixed cap
+	memset (check, 0, sizeof(*check));
+    }
     else if (!(freetail = freetail->next))
 	freehead = &freetail;
 
