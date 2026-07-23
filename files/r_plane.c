@@ -50,16 +50,24 @@ planefunction_t		ceilingfunc;
 //
 
 // Here comes the obnoxious "visplane".
-// Raised from the vanilla 128: big open Boom/modern maps (and the hi-res renderer,
-// which splits more spans) blow past 128 -> "R_DrawPlanes: visplane overflow"
-// (boomedit.wad hit 130).  A flat array (not Boom's growable hash) keeps it simple
-// and safe -- the BSP renderer holds visplane_t* across the frame, so a realloc that
-// moved them would dangle.  1024 * ~7.7KB (top/bottom[MAXWIDTH]) ~= 8MB of zeroed BSS.
-#define MAXVISPLANES	1024
-visplane_t		visplanes[MAXVISPLANES];
-visplane_t*		lastvisplane;
+//
+// TRULY dynamic now (killough's hash, ported from MBF/Nugget): MAXVISPLANES is no
+// longer a cap on the number of visplanes -- only the number of hash *buckets*.
+// Each visplane_t is allocated individually (Z_Malloc, PU_STATIC) and reused via a
+// free list, so the visplane_t* the BSP renderer holds across the frame stay put
+// (no realloc dangling -- the reason the old code used a fixed 1024 array + I_Error).
+// Overflowing is now impossible short of running out of RAM: complex Boom/limit-
+// removing maps (or the hi-res renderer, which splits more spans) can't crash.
+#define MAXVISPLANES	128		/* hash buckets -- must be a power of two */
+static visplane_t*	visplanes[MAXVISPLANES];	// killough: hash table of chains
+static visplane_t*	freetail;			// killough: head of the free list
+static visplane_t**	freehead = &freetail;		// killough: tail insert pointer
 visplane_t*		floorplane;
 visplane_t*		ceilingplane;
+
+// killough: hash a visplane's defining fields to a bucket index
+#define visplane_hash(picnum,lightlevel,height) \
+  (((unsigned)(picnum)*3 + (unsigned)(lightlevel) + (unsigned)(height)*7) & (MAXVISPLANES-1))
 
 // ? (sized for the maximum internal resolution)
 #define MAXOPENINGS	MAXWIDTH*64
@@ -219,9 +227,13 @@ void R_ClearPlanes (void)
 	ceilingclip[i] = -1;
     }
 
-    lastvisplane = visplanes;
+    // killough: move all visplanes from the hash chains onto the free list for reuse
+    for (i=0 ; i<MAXVISPLANES ; i++)
+	for (*freehead = visplanes[i], visplanes[i] = NULL ; *freehead ; )
+	    freehead = &(*freehead)->next;
+
     lastopening = openings;
-    
+
     // texture calculation
     memset (cachedheight, 0, sizeof(cachedheight));
 
@@ -239,6 +251,27 @@ void R_ClearPlanes (void)
 
 
 //
+// new_visplane
+// killough: pull a visplane_t off the free list (allocating one if the list is
+// empty) and link it into hash bucket `hash`.  Individually allocated -> the
+// pointer is stable for the life of the frame (never moved by a realloc).
+//
+static visplane_t* new_visplane (unsigned hash)
+{
+    visplane_t*	check = freetail;
+
+    if (!check)
+	check = Z_Malloc (sizeof(*check), PU_STATIC, 0);	// grow: no fixed cap
+    else if (!(freetail = freetail->next))
+	freehead = &freetail;
+
+    check->next = visplanes[hash];
+    visplanes[hash] = check;
+    return check;
+}
+
+
+//
 // R_FindPlane
 //
 visplane_t*
@@ -250,6 +283,7 @@ R_FindPlane
   fixed_t	yoffs )
 {
     visplane_t*	check;
+    unsigned	hash;			// killough
 
     if (picnum == skyflatnum || (picnum & PL_SKYFLAT))
     {
@@ -258,26 +292,18 @@ R_FindPlane
 	xoffs = yoffs = 0;
     }
 
-    for (check=visplanes; check<lastvisplane; check++)
-    {
+    // New visplane algorithm uses hash table -- killough
+    hash = visplane_hash (picnum, lightlevel, height);
+
+    for (check=visplanes[hash] ; check ; check=check->next)
 	if (height == check->height
 	    && picnum == check->picnum
 	    && lightlevel == check->lightlevel
 	    && xoffs == check->xoffs		// Boom: differently-scrolled flats
 	    && yoffs == check->yoffs)		// must not merge into one visplane
-	{
-	    break;
-	}
-    }
-    
-			
-    if (check < lastvisplane)
-	return check;
-		
-    if (lastvisplane - visplanes == MAXVISPLANES)
-	I_Error ("R_FindPlane: no more visplanes");
-		
-    lastvisplane++;
+	    return check;
+
+    check = new_visplane (hash);
 
     check->height = height;
     check->picnum = picnum;
@@ -340,22 +366,27 @@ R_CheckPlane
 	pl->maxx = unionh;
 
 	// use the same one
-	return pl;		
+	return pl;
     }
-	
-    // make a new visplane
-    lastvisplane->height = pl->height;
-    lastvisplane->picnum = pl->picnum;
-    lastvisplane->lightlevel = pl->lightlevel;
-    lastvisplane->xoffs = pl->xoffs;
-    lastvisplane->yoffs = pl->yoffs;
 
-    pl = lastvisplane++;
-    pl->minx = start;
-    pl->maxx = stop;
+    // make a new visplane (killough: dynamically allocated, hashed like the source)
+    {
+	unsigned	hash = visplane_hash (pl->picnum, pl->lightlevel, pl->height);
+	visplane_t*	newpl = new_visplane (hash);
 
-    memset (pl->top,0xff,sizeof(pl->top));
-		
+	newpl->height = pl->height;
+	newpl->picnum = pl->picnum;
+	newpl->lightlevel = pl->lightlevel;
+	newpl->xoffs = pl->xoffs;
+	newpl->yoffs = pl->yoffs;
+
+	pl = newpl;
+	pl->minx = start;
+	pl->maxx = stop;
+
+	memset (pl->top,0xff,sizeof(pl->top));
+    }
+
     return pl;
 }
 
@@ -407,27 +438,26 @@ void R_DrawPlanes (void)
     int			x;
     int			stop;
     int			angle;
-				
+    int			i;
+
 #ifdef RANGECHECK
     if ((unsigned)(ds_p - drawsegs) > maxdrawsegs)
 	I_Error ("R_DrawPlanes: drawsegs overflow (%i)",
 		 ds_p - drawsegs);
-    
-    if (lastvisplane - visplanes > MAXVISPLANES)
-	I_Error ("R_DrawPlanes: visplane overflow (%i)",
-		 lastvisplane - visplanes);
-    
+
     if (lastopening - openings > MAXOPENINGS)
 	I_Error ("R_DrawPlanes: opening overflow (%i)",
 		 lastopening - openings);
 #endif
 
-    for (pl = visplanes ; pl < lastvisplane ; pl++)
+    // killough: walk every hash bucket's chain of visplanes
+    for (i=0 ; i<MAXVISPLANES ; i++)
+    for (pl = visplanes[i] ; pl ; pl = pl->next)
     {
 	if (pl->minx > pl->maxx)
 	    continue;
 
-	
+
 	// sky flat -- plus ID24 SKYDEFS flatmapping (an arbitrary flat drawn as a sky)
 	int mappedsky = R_SkyForFlat (pl->picnum);	// -1 unless flatmapped
 	if (pl->picnum == skyflatnum || (pl->picnum & PL_SKYFLAT) || mappedsky >= 0)

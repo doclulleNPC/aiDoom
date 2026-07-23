@@ -210,6 +210,23 @@ flag — this is exactly what Boom's `comp_stairs` does — and never change the
   aiDoom ships this code **unchanged on purpose.** Don't "tidy" the increment order or
     the `secnum` reuse — both are load-bearing for compatibility.
 
+- **Pain Elemental 20-lost-soul cap** (`A_PainShootSkull`, `p_enemy.c`, `if (count > 20)
+  return;`). Vanilla refuses to spawn a Lost Soul once 20 already exist in the level.
+  It's a real behaviour maps and speedruns rely on (a room full of Pain Elementals
+  self-limits); kept as-is. (Boom made this optional via `comp_pain`; we default to the
+  vanilla cap and don't expose the flag.)
+
+- **Wallrunning** (`P_XYMovement`, `p_mobj.c`). The vanilla clipped-move code lets an
+  actor sliding along certain wall angles keep almost its full speed along the wall
+  instead of losing the blocked component — the basis of the classic "wallrun" speed
+  trick. Standard 1993 code, unchanged.
+
+- **"Line 0 in every blockmap cell."** Vanilla's blockmap generator (and thus every
+  IWAD/PWAD blockmap) begins each cell's line list with linedef 0, which can make one
+  extra line get collision-checked per block. Our int-blockmap rebuild (`P_CreateBlockMap`,
+  §—see the extended-nodes work) reproduces the leading `0` on purpose so behaviour
+  matches the stock blockmap it replaces.
+
 ---
 
 ## 10. Dead Marine (Thing 15) Revival Interference
@@ -285,6 +302,74 @@ terminator, so a larger cap is safe). File: `p_spec.h`.
 
 ---
 
+## 16. Vanilla-bug audit (what aiDoom fixes vs keeps)
+
+A sweep of the well-known 1993/94 DOOM bugs against the current source. The rule of
+thumb: **crash / overflow / rendering-corruption bugs are fixed** (they never affected
+the demo checksum — they either `I_Error`'d or drew garbage), while **playsim-logic
+bugs are kept** (see §9 — changing them desyncs demos and the maps that exploit them).
+
+### Fixed (crash / overflow / corruption — safe to correct)
+
+| Vanilla bug | What went wrong | aiDoom | Where |
+|---|---|---|---|
+| **spechit overflow** | crossing >8 specials in one `P_TryMove` smashed a fixed `spechit[8]` (the famous Doom II MAP… "linedef deletion"/reboot glitch) | `spechit[]` grows dynamically (`numspechit`) | `p_map.c` |
+| **intercepts overflow** | `P_PathTraverse` overran a fixed `intercepts[]` (blockmap/hitscan corruption on dense maps) | grows via realloc from `MAXINTERCEPTS` | `p_maputl.c` |
+| **Tutti-frutti** | a wall texture shorter than the wall repeated undefined heap as garbage pixels | short columns are zero-filled at composite time | `r_data.c` |
+| **Ghost monsters** | an Arch-Vile resurrecting a monster crushed to 0 height left it with a 0 radius → intangible, floats through walls | height/radius restored from `mobjinfo` on resurrect (crispy fix) | `p_enemy.c` |
+| **Medusa** | multi-patch columns on a sky/masked draw thrashed the column renderer | subsumed by the tall-texture / composite-column work | §12, `r_data.c` |
+| **Visplane overflow** | >128 visplanes → `I_Error("visplane overflow")` (hard crash on big open/Boom maps) | **truly dynamic** — see §16.1 below | `r_plane.c` |
+| **Sidedef/blockmap 16-bit caps** | limit-removing maps (LoR MAP13: 60423 sidedefs) overflowed `short` indices → crash | `int` sidenum + int blockmap / `P_CreateBlockMap` rebuild + ZNOD nodes | §see extended-nodes work, `p_setup.c` |
+| **Wall "wiggle"** | tall walls visibly rippled/wobbled as you moved (fixed-point scale precision) | WiggleHack II (per-sector scale clamp + vertical precision) | §16.2, `r_segs.c`/`r_main.c` |
+| **"…REALLY need!" medikit message** | heal applied before the low-health test, so the message was unreachable | health sampled before healing | §15, `p_inter.c` |
+
+### Raised-but-still-capped (watch these)
+
+| Limit | Vanilla | aiDoom | Note |
+|---|---|---|---|
+| drawsegs (`MAXDRAWSEGS`) | 256 | grows dynamically | ok |
+| vissprites | 128 | grows dynamically | ok |
+| **openings** (`MAXOPENINGS`) | `SCREENWIDTH*64` | `MAXWIDTH*64`, **hard `I_Error`** | not dynamic — a pathological seg-heavy view could still overflow |
+
+### Kept on purpose (playsim / demo compat) → see §9
+
+Stair-builder bug (height-before-check + `secnum` clobber), Pain-Elemental 20-Lost-Soul
+cap, wallrunning, blockmap "line 0 in every cell." Also **supported as features** (not
+bugs to fix): deep-water / self-referencing sectors (Boom 242 `R_FakeFlat`), sky-transfer
+(Boom 271/272), and **voodoo dolls** — extra Player-1 starts each call `P_SpawnPlayer`
+(no `if (p->mo) return` guard), so the surplus marine mobjs stay in the thinker list
+sharing `players[0]`, exactly as vanilla. Lost Souls spawned inside a wall by
+`A_PainShootSkull` are `P_TryMove`-checked and removed if they don't fit (crispy/MBF
+behaviour), so no in-wall souls.
+
+### 16.1 Visplanes are now truly dynamic (killough hash)
+
+The old code raised the vanilla `MAXVISPLANES` from 128 to a **fixed 1024 array** but
+still `I_Error`'d on overflow — because the BSP renderer holds `visplane_t*` across a
+frame, a growable array that `realloc`'d would dangle those pointers. The proper fix
+(ported from MBF/Nugget, originally killough) makes `MAXVISPLANES` (now 128) a count of
+**hash buckets, not a cap**: each `visplane_t` is `Z_Malloc`'d individually and recycled
+through a free list, so its address is stable for the frame and the number of visplanes
+is bounded only by RAM. `visplane_t` gained a `next` hash-chain link (`r_defs.h`);
+`R_FindPlane`/`R_CheckPlane` hash on `(picnum,lightlevel,height)`; `R_ClearPlanes` moves
+every plane back to the free list; `R_DrawPlanes` walks all buckets. Verified on
+`BOOMEDIT.WAD` (the map that first blew past 128) — no overflow, floors/skies/scrolling
+flats all correct.
+
+### 16.2 WiggleHack II (tall-wall shimmer)
+
+Vanilla computes wall texture scale with a fixed-point precision (`heightbits`) tuned for
+128-tall walls; on much taller walls (modern/ID24 geometry) the accumulated rounding made
+the texture visibly "wiggle" vertically as the view moved. WiggleHack II (from Woof/
+prboom, originally Bruce Lewis) picks the precision **per sector** from its max wall
+height (`R_FixWiggle`, an 8-entry `scale_values` table, `sector_t.cachedheight/scaleindex`
+in `r_defs.h`) and clamps the scale to `max_rwscale` (extern'd, shared with
+`R_ScaleFromGlobalAngle`'s clamp in `r_main.c`). `R_StoreWallRange` shifts world heights
+by the runtime `invhgtbits` and uses a 64-bit `topfrac`. Purely a renderer-precision
+change — no playsim effect.
+
+---
+
 ## How to spot the next one
 
 - Compiler warnings `-Wpointer-to-int-cast` / `-Wint-to-pointer-cast` → §1.
@@ -308,3 +393,9 @@ terminator, so a larger cap is safe). File: `p_spec.h`.
   Thing numbers collide with aiDoom's appended builtin mobjtypes, §13.
 - **A wall switch triggers its action but its graphic never flips** → the switch
   pair fell off the end of a `SWITCHES` lump bigger than `MAXSWITCHES`, §14.
+- **`R_DrawPlanes: opening overflow`** (a huge, seg-dense view) → the one renderer
+  limit that is still a hard cap, not dynamic (§16, "raised-but-still-capped").
+  Visplanes themselves can no longer overflow (§16.1).
+- **Tall walls shimmer/wiggle vertically as you move** → that's the scale-precision
+  wiggle; it should already be fixed by WiggleHack II (§16.2). If it regresses, check
+  `R_FixWiggle`/`max_rwscale` in `r_segs.c`/`r_main.c`.

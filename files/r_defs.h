@@ -489,9 +489,10 @@ typedef struct
 
 //
 // Now what is a visplane, anyway?
-// 
-typedef struct
+//
+typedef struct visplane_s
 {
+  struct visplane_s*	next;		// killough: hash-chain link (dynamic visplanes, r_plane.c)
   fixed_t		height;
   int			picnum;
   int			lightlevel;
