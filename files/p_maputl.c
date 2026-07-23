@@ -536,7 +536,7 @@ P_BlockLinesIterator
   boolean(*func)(line_t*) )
 {
     int			offset;
-    short*		list;
+    int*		list;		// blockmap is int now (limit-removing)
     line_t*		ld;
 	
     if (x<0

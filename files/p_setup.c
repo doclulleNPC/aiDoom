@@ -27,6 +27,7 @@ rcsid[] = "$Id: p_setup.c,v 1.5 1997/02/03 22:45:12 b1 Exp $";
 
 
 #include <math.h>
+#include <limits.h>
 
 #include "z_zone.h"
 
@@ -88,9 +89,9 @@ side_t*		sides;
 // Blockmap size.
 int		bmapwidth;
 int		bmapheight;	// size in mapblocks
-short*		blockmap;	// int for larger maps
+int*		blockmap;	// int: limit-removing blockmap (big maps + >32767 line indices)
 // offsets in blockmap are from here
-short*		blockmaplump;		
+int*		blockmaplump;
 // origin of block map
 fixed_t		bmaporgx;
 fixed_t		bmaporgy;
@@ -648,29 +649,178 @@ void P_LoadSideDefs (int lump)
 }
 
 
+// P_CreateBlockMap (jff/killough, via MBF/PrBoom/Woof): build a fresh blockmap from the
+// linedefs.  Needed when the WAD blockmap is absent or too big for the 16-bit on-disk
+// offsets (a blockmap over 65535 shorts, e.g. Legacy of Rust MAP13's 76134, can't be
+// addressed, which crashed collision).  Produces an int blockmaplump (no size limit).
+#define blkshift  7			// cell size = 128 map units
+#define blkmask   ((1<<blkshift)-1)
+#define blkmargin 0
+
+typedef struct linelist_s { long num; struct linelist_s* next; } linelist_t;
+
+static void AddBlockLine (linelist_t** lists, int* count, int* done, int blockno, long lineno)
+{
+    linelist_t* l;
+    if (done[blockno]) return;
+    l = Z_Malloc (sizeof(linelist_t), PU_STATIC, 0);
+    l->num = lineno;
+    l->next = lists[blockno];
+    lists[blockno] = l;
+    count[blockno]++;
+    done[blockno] = 1;
+}
+
+static void P_CreateBlockMap (void)
+{
+    int		xorg, yorg, nrows, ncols, NBlocks, i, j;
+    long	linetotal = 0;
+    linelist_t** blocklists;
+    int*	blockcount;
+    int*	blockdone;
+    int		map_minx = INT_MAX, map_miny = INT_MAX, map_maxx = INT_MIN, map_maxy = INT_MIN;
+
+    if (numvertexes)
+    { map_minx = map_maxx = vertexes[0].x; map_miny = map_maxy = vertexes[0].y; }
+    for (i = 0; i < numvertexes; i++)
+    {
+	fixed_t t;
+	if ((t = vertexes[i].x) < map_minx) map_minx = t; else if (t > map_maxx) map_maxx = t;
+	if ((t = vertexes[i].y) < map_miny) map_miny = t; else if (t > map_maxy) map_maxy = t;
+    }
+    map_minx >>= FRACBITS; map_maxx >>= FRACBITS; map_miny >>= FRACBITS; map_maxy >>= FRACBITS;
+
+    xorg = map_minx - blkmargin;
+    yorg = map_miny - blkmargin;
+    ncols = (map_maxx + blkmargin - xorg + 1 + blkmask) >> blkshift;
+    nrows = (map_maxy + blkmargin - yorg + 1 + blkmask) >> blkshift;
+    NBlocks = ncols * nrows;
+
+    blocklists = Z_Malloc (NBlocks * sizeof(*blocklists), PU_STATIC, 0);
+    blockcount = Z_Malloc (NBlocks * sizeof(*blockcount), PU_STATIC, 0);
+    blockdone  = Z_Malloc (NBlocks * sizeof(*blockdone),  PU_STATIC, 0);
+    memset (blocklists, 0, NBlocks * sizeof(*blocklists));
+    memset (blockcount, 0, NBlocks * sizeof(*blockcount));
+
+    for (i = 0; i < NBlocks; i++)
+    { blocklists[i] = Z_Malloc (sizeof(linelist_t), PU_STATIC, 0);
+      blocklists[i]->num = -1; blocklists[i]->next = NULL; blockcount[i]++; }
+
+    for (i = 0; i < numlines; i++)
+    {
+	int x1 = lines[i].v1->x >> FRACBITS, y1 = lines[i].v1->y >> FRACBITS;
+	int x2 = lines[i].v2->x >> FRACBITS, y2 = lines[i].v2->y >> FRACBITS;
+	int dx = x2 - x1, dy = y2 - y1;
+	int vert = !dx, horiz = !dy;
+	int spos = (dx ^ dy) > 0, sneg = (dx ^ dy) < 0;
+	int bx, by;
+	int minx = x1 > x2 ? x2 : x1, maxx = x1 > x2 ? x1 : x2;
+	int miny = y1 > y2 ? y2 : y1, maxy = y1 > y2 ? y1 : y2;
+
+	memset (blockdone, 0, NBlocks * sizeof(int));
+
+	bx = (x1 - xorg) >> blkshift; by = (y1 - yorg) >> blkshift;
+	AddBlockLine (blocklists, blockcount, blockdone, by * ncols + bx, i);
+	bx = (x2 - xorg) >> blkshift; by = (y2 - yorg) >> blkshift;
+	AddBlockLine (blocklists, blockcount, blockdone, by * ncols + bx, i);
+
+	if (!vert)		// intersect with each column's left edge
+	  for (j = 0; j < ncols; j++)
+	  {
+	    int x = xorg + (j << blkshift);
+	    int y = (dy * (x - x1)) / dx + y1;
+	    int yb = (y - yorg) >> blkshift, yp = (y - yorg) & blkmask;
+	    if (yb < 0 || yb > nrows - 1 || x < minx || x > maxx) continue;
+	    AddBlockLine (blocklists, blockcount, blockdone, ncols * yb + j, i);
+	    if (yp == 0)
+	    {
+	      if (sneg)      { if (yb>0 && miny<y) AddBlockLine(blocklists,blockcount,blockdone,ncols*(yb-1)+j,i);
+			       if (j>0 && minx<x)  AddBlockLine(blocklists,blockcount,blockdone,ncols*yb+j-1,i); }
+	      else if (horiz){ if (yb>0 && miny<y) AddBlockLine(blocklists,blockcount,blockdone,ncols*(yb-1)+j,i); }
+	      else if (spos) { if (yb>0 && j>0 && miny<y) AddBlockLine(blocklists,blockcount,blockdone,ncols*(yb-1)+j-1,i); }
+	    }
+	    else if (j>0 && minx<x) AddBlockLine (blocklists, blockcount, blockdone, ncols*yb+j-1, i);
+	  }
+
+	if (!horiz)		// intersect with each row's bottom edge
+	  for (j = 0; j < nrows; j++)
+	  {
+	    int y = yorg + (j << blkshift);
+	    int x = (dx * (y - y1)) / dy + x1;
+	    int xb = (x - xorg) >> blkshift, xp = (x - xorg) & blkmask;
+	    if (xb < 0 || xb > ncols - 1 || y < miny || y > maxy) continue;
+	    AddBlockLine (blocklists, blockcount, blockdone, ncols * j + xb, i);
+	    if (xp == 0)
+	    {
+	      if (sneg)      { if (j>0 && miny<y)  AddBlockLine(blocklists,blockcount,blockdone,ncols*(j-1)+xb,i);
+			       if (xb>0 && minx<x) AddBlockLine(blocklists,blockcount,blockdone,ncols*j+xb-1,i); }
+	      else if (vert) { if (j>0 && miny<y)  AddBlockLine(blocklists,blockcount,blockdone,ncols*(j-1)+xb,i); }
+	      else if (spos) { if (xb>0 && j>0 && miny<y) AddBlockLine(blocklists,blockcount,blockdone,ncols*(j-1)+xb-1,i); }
+	    }
+	    else if (j>0 && miny<y) AddBlockLine (blocklists, blockcount, blockdone, ncols*(j-1)+xb, i);
+	  }
+    }
+
+    memset (blockdone, 0, NBlocks * sizeof(int));
+    for (i = 0, linetotal = 0; i < NBlocks; i++)
+    { AddBlockLine (blocklists, blockcount, blockdone, i, 0); linetotal += blockcount[i]; }
+
+    blockmaplump = Z_Malloc (sizeof(*blockmaplump) * (4 + NBlocks + linetotal), PU_LEVEL, 0);
+    blockmaplump[0] = bmaporgx = xorg << FRACBITS;
+    blockmaplump[1] = bmaporgy = yorg << FRACBITS;
+    blockmaplump[2] = bmapwidth  = ncols;
+    blockmaplump[3] = bmapheight = nrows;
+
+    for (i = 0; i < NBlocks; i++)
+    {
+	linelist_t* bl = blocklists[i];
+	long offs = blockmaplump[4+i] = (i ? blockmaplump[4+i-1] : 4 + NBlocks) + (i ? blockcount[i-1] : 0);
+	while (bl) { linelist_t* tmp = bl->next; blockmaplump[offs++] = bl->num; Z_Free (bl); bl = tmp; }
+    }
+    blockmap = blockmaplump + 4;
+
+    Z_Free (blocklists); Z_Free (blockcount); Z_Free (blockdone);
+    printf ("P_LoadBlockMap: rebuilt blockmap (%d x %d cells)\n", ncols, nrows);
+}
+
 //
 // P_LoadBlockMap
 //
 void P_LoadBlockMap (int lump)
 {
     int		i;
-    int		count;
-	
-    blockmaplump = W_CacheLumpNum (lump,PU_LEVEL);
-    blockmap = blockmaplump+4;
-    count = W_LumpLength (lump)/2;
+    int		count = (lump >= 0) ? W_LumpLength (lump)/2 : 0;	// shorts in the on-disk lump
 
-    for (i=0 ; i<count ; i++)
-	blockmaplump[i] = SHORT(blockmaplump[i]);
-		
-    bmaporgx = blockmaplump[0]<<FRACBITS;
-    bmaporgy = blockmaplump[1]<<FRACBITS;
-    bmapwidth = blockmaplump[2];
-    bmapheight = blockmaplump[3];
-	
+    // Rebuild if the WAD blockmap is missing, degenerate, or too big for its 16-bit offsets
+    // (over 65535 shorts -> some list offset can't be represented, so collision is broken).
+    if (lump < 0 || count < 4 || count > 0x10000 || M_CheckParm ("-blockmap"))
+    {
+	P_CreateBlockMap ();
+    }
+    else
+    {
+	short* wad = W_CacheLumpNum (lump, PU_LEVEL);
+	blockmaplump = Z_Malloc (count * sizeof(*blockmaplump), PU_LEVEL, 0);
+	blockmaplump[0] = SHORT (wad[0]);			// origin x (signed)
+	blockmaplump[1] = SHORT (wad[1]);			// origin y (signed)
+	blockmaplump[2] = (int)(unsigned short) SHORT (wad[2]);	// width  (unsigned)
+	blockmaplump[3] = (int)(unsigned short) SHORT (wad[3]);	// height (unsigned)
+	for (i = 4; i < count; i++)
+	{
+	    short t = SHORT (wad[i]);				// offsets + line indices are UNSIGNED;
+	    blockmaplump[i] = (t == -1) ? -1 : (int)(unsigned short) t;	// keep the 0xFFFF list terminator as -1
+	}
+	Z_Free (wad);
+	blockmap = blockmaplump + 4;
+	bmaporgx = blockmaplump[0] << FRACBITS;
+	bmaporgy = blockmaplump[1] << FRACBITS;
+	bmapwidth  = blockmaplump[2];
+	bmapheight = blockmaplump[3];
+    }
+
     // clear out mobj chains
-    count = sizeof(*blocklinks)* bmapwidth*bmapheight;
-    blocklinks = Z_Malloc (count,PU_LEVEL, 0);
+    count = sizeof(*blocklinks) * bmapwidth * bmapheight;
+    blocklinks = Z_Malloc (count, PU_LEVEL, 0);
     memset (blocklinks, 0, count);
 }
 
@@ -831,8 +981,7 @@ P_SetupLevel
 	
     leveltime = 0;
 	
-    // note: most of this ordering is important	
-    P_LoadBlockMap (lumpnum+ML_BLOCKMAP);
+    // note: most of this ordering is important
     P_LoadVertexes (lumpnum+ML_VERTEXES);
     P_LoadSectors (lumpnum+ML_SECTORS);
     P_LoadSideDefs (lumpnum+ML_SIDEDEFS);
@@ -844,7 +993,12 @@ P_SetupLevel
 	P_LoadNodes (lumpnum+ML_NODES);
 	P_LoadSegs (lumpnum+ML_SEGS);
     }
-	
+
+    // AFTER vertexes/linedefs (+ extended nodes): P_LoadBlockMap may need to REBUILD the
+    // blockmap from the linedef geometry (WAD blockmap missing or too big), which reads
+    // lines[]/vertexes[] -- so it can't run first like the stock order did.
+    P_LoadBlockMap (lumpnum+ML_BLOCKMAP);
+
     rejectmatrix = W_CacheLumpNum (lumpnum+ML_REJECT,PU_LEVEL);
     P_GroupLines ();
 
