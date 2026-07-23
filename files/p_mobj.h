@@ -261,10 +261,19 @@ typedef struct mobj_s
 #define MF2_SHORTMRANGE   0x00000002
 #define MF2_DMGIGNORED    0x00000004
 #define MF2_NORADIUSDMG   0x00000008   // not hurt by radius/splash damage
-#define MF2_FORCERADIUSDMG 0x00000010
-#define MF2_RANGEHALF     0x00000040
-#define MF2_NOTHRESHOLD   0x00000080
+#define MF2_FORCERADIUSDMG 0x00000010  // radius damage ignores NORADIUSDMG
+#define MF2_HIGHERMPROB   0x00000020   // higher min missile-attack probability (37.5% vs 22%)
+#define MF2_RANGEHALF     0x00000040   // use half the real distance for missile-attack probability
+#define MF2_NOTHRESHOLD   0x00000080   // no target threshold (retaliates instantly)
+#define MF2_LONGMELEE     0x00000100   // long melee range (revenant)
 #define MF2_BOSS          0x00000200
+#define MF2_MAP07BOSS1    0x00000400   // MAP07 boss 1 (mancubus): A_BossDeath lowers floor tag 666
+#define MF2_MAP07BOSS2    0x00000800   // MAP07 boss 2 (arachnotron): raises floor tag 667
+#define MF2_E1M8BOSS      0x00001000   // E1M8 boss: lowers floor tag 666
+#define MF2_E2M8BOSS      0x00002000   // E2M8 boss: exit
+#define MF2_E3M8BOSS      0x00004000   // E3M8 boss: exit
+#define MF2_E4M6BOSS      0x00008000   // E4M6 boss: opens door tag 666
+#define MF2_E4M8BOSS      0x00010000   // E4M8 boss: lowers floor tag 666
 #define MF2_RIP           0x00020000   // rips through things instead of exploding
 #define MF2_FULLVOLSOUNDS 0x00040000
 #define MF2_DONTDRAW      0x00080000   // not rendered (ZDoom RF_INVISIBLE) -- e.g. submerged Serpent

@@ -1048,9 +1048,12 @@ P_DamageMobj
 			
     target->reactiontime = 0;		// we're awake now...	
 
-    if ( (!target->threshold || target->type == MT_VILE)
+    // mbf21: MF2_NOTHRESHOLD generalises the arch-vile's "no target threshold" (retaliate
+    // instantly), MF2_DMGIGNORED generalises "other things ignore its attacks".  Vanilla
+    // MT_VILE keeps both via the type checks; the flags add them for DEHACKED actors.
+    if ( (!target->threshold || target->type == MT_VILE || (target->flags2 & MF2_NOTHRESHOLD))
 	 && source && source != target
-	 && source->type != MT_VILE
+	 && source->type != MT_VILE && !(source->flags2 & MF2_DMGIGNORED)
 	 && !(mobjinfo[target->type].infighting_group != 0		// mbf21: same infighting-group -> no infighting
 	      && mobjinfo[target->type].infighting_group == mobjinfo[source->type].infighting_group)
 	 && !((target->flags & MF_FRIEND) && source->player) )	// a friendly (revived marine / summon) never turns on the human

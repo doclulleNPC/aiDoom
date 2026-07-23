@@ -237,32 +237,36 @@ boolean P_CheckMissileRange (mobj_t* actor)
 
     dist >>= 16;
 
-    if (actor->type == MT_VILE)
+    // mbf21: MF2_SHORTMRANGE/LONGMELEE/RANGEHALF/HIGHERMPROB generalise the hardcoded
+    // arch-vile / revenant / cyberdemon-spider-lostsoul behaviours to any DEHACKED actor.
+    // Vanilla types keep their behaviour via the type check; the flag adds it for others.
+    if (actor->type == MT_VILE || (actor->flags2 & MF2_SHORTMRANGE))
     {
-	if (dist > 14*64)	
+	if (dist > 14*64)
 	    return false;	// too far away
     }
-	
 
-    if (actor->type == MT_UNDEAD)
+
+    if (actor->type == MT_UNDEAD || (actor->flags2 & MF2_LONGMELEE))
     {
-	if (dist < 196)	
+	if (dist < 196)
 	    return false;	// close for fist attack
 	dist >>= 1;
     }
-	
+
 
     if (actor->type == MT_CYBORG
 	|| actor->type == MT_SPIDER
-	|| actor->type == MT_SKULL)
+	|| actor->type == MT_SKULL
+	|| (actor->flags2 & MF2_RANGEHALF))
     {
 	dist >>= 1;
     }
-    
+
     if (dist > 200)
 	dist = 200;
-		
-    if (actor->type == MT_CYBORG && dist > 160)
+
+    if ((actor->type == MT_CYBORG || (actor->flags2 & MF2_HIGHERMPROB)) && dist > 160)
 	dist = 160;
 		
     if (P_Random () < dist)
@@ -1915,6 +1919,36 @@ void A_BossDeath (mobj_t* mo)
 	    }
 	    return;
 	}
+    }
+
+    // mbf21: an actor tagged with a boss flag (from DEHACKED) triggers that boss's map
+    // special regardless of type/episode/map.  Vanilla actors without these flags fall
+    // through to the hardcoded episode logic below.
+    if (mo->flags2 & (MF2_MAP07BOSS1|MF2_MAP07BOSS2|MF2_E1M8BOSS|MF2_E2M8BOSS
+		      |MF2_E3M8BOSS|MF2_E4M6BOSS|MF2_E4M8BOSS))
+    {
+	for (i = 0; i < MAXPLAYERS; i++)
+	    if (playeringame[i] && players[i].health > 0) break;
+	if (i == MAXPLAYERS) return;			// nobody alive -> don't fire
+
+	for (th = thinkercap.next; th != &thinkercap; th = th->next)
+	{
+	    if (th->function.acp1 != (actionf_p1)P_MobjThinker) continue;
+	    mo2 = (mobj_t*)th;
+	    if (mo2 != mo && mo2->type == mo->type && mo2->health > 0)
+		return;					// another of this boss still alive
+	}
+
+	memset (&junk, 0, sizeof junk);
+	if (mo->flags2 & (MF2_MAP07BOSS1 | MF2_E1M8BOSS | MF2_E4M8BOSS))
+	    { junk.tag = 666; EV_DoFloor (&junk, lowerFloorToLowest); }
+	if (mo->flags2 & MF2_MAP07BOSS2)
+	    { junk.tag = 667; EV_DoFloor (&junk, raiseToTexture); }
+	if (mo->flags2 & MF2_E4M6BOSS)
+	    { junk.tag = 666; EV_DoDoor (&junk, blazeOpen); }
+	if (mo->flags2 & (MF2_E2M8BOSS | MF2_E3M8BOSS))
+	    G_ExitLevel ();
+	return;
     }
 
     if ( gamemode == commercial)
