@@ -51,6 +51,7 @@ extern int maxammo[], clipammo[];	// p_inter.c (deh_procAmmo)
 char *dehReformatStr(char *string);
 char *ptr_lstrip(char *p);
 void lfstrip(char *s);                                     // used before its def (MSVC C2371)
+void rstrip(char *s);                                      // used before its def (MSVC C2371)
 boolean deh_GetData(char *s, char *k, long *l, char **strval, FILE *fpout);
 #include "doomstat.h"
 #include "sounds.h"
