@@ -127,10 +127,16 @@ suite** — verification is done by running the game.
 
 ## Architecture
 
-### The AI / "Director" systems (all flag-gated, off by default)
+### The AI / "Director" systems
 
-A no-argument launch is **vanilla 1993 DOOM**. Four independent, opt-in systems
-add modern AI — keep them clearly distinct:
+**Defaults:** a plain no-flag launch now runs the **rule-based L4D spawn director**
+(`-director`) **plus the AI co-op buddy** (`-coop`, player 2) — both are ON by default
+(gated in `P_Director_Init` / `P_AICoop_Init` on `vanilla_mode`, `netgame`, and
+`-record`). **`-vanilla`** turns them (and every other modern deviation) off for the
+bare 1993 game. Demo playback is unaffected: the director is gated on `!demoplayback`
+in `p_tick.c`, and the buddy self-disables because `G_DoPlayDemo` restores
+`playeringame[]` from the demo header. The LLM variants (`-aidirector`, `-aicoop`,
+`-aiplayer`) are still opt-in. The independent systems — keep them clearly distinct:
 
 - **LLM "AI Director"** (`files/p_ai_llm.c`/`.h`, `-aidirector [port]` or the
   built-in scripted `-aidemo`) — an external director (an LLM, a script, or the

@@ -1216,7 +1216,9 @@ void D_DoomMain (void)
     // -vanilla: purist 1993 mode -- switch OFF every always-on modern deviation at once:
     // no free-look and no jump (gated in g_game.c on vanilla_mode), vanilla infinitely-tall
     // actors (no over/under 3D clipping), vanilla auto-aim ON, and the plain untextured
-    // automap.  Opt-in features (AI buddy/director) still require their own flags.
+    // automap.  It also turns off the now-DEFAULT AI systems: a plain no-flag launch runs
+    // the rule-based L4D spawn director + the AI co-op buddy (player 2); -vanilla (checked
+    // in P_Director_Init / P_AICoop_Init via vanilla_mode) gives you the bare 1993 game.
     if (M_CheckParm ("-vanilla"))
     {
 	extern int automap_textured;

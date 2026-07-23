@@ -136,6 +136,14 @@ void P_AICoop_Init (void)
 	if (buddy_react > 70) buddy_react = 70;
     }
 
+    // Default ON: a plain single-player launch (no flags) gets the rule-based AI buddy
+    // (player 2).  Opt out for -vanilla (purist 1993 mode), a netgame (co-op is SP-only),
+    // or demo RECORDING.  Demo PLAYBACK is self-gating: G_DoPlayDemo overwrites
+    // playeringame[] from the demo header, and P_AICoop_BuildCmd early-outs when
+    // playeringame[coop_slot] is false -- so attract demos stay vanilla.
+    if (!coop && !aicoop && !vanilla_mode && !netgame && !M_CheckParm ("-record"))
+	coop = 1;
+
     if (!coop && !aicoop)
 	return;
 

@@ -160,6 +160,11 @@ void P_Director_Init (void)
 {
     dir_on  = (M_CheckParm ("-director") > 0);
     dir_llm = (M_CheckParm ("-aidirector") > 0) || (M_CheckParm ("-aidemo") > 0);
+    // Default ON: a plain launch (no flags) gets the rule-based L4D director.  Opt out
+    // for -vanilla (purist 1993 mode), a netgame, or demo RECORDING -- so recorded demos
+    // stay vanilla-portable (playback is already gated on demoplayback in p_tick.c).
+    if (!dir_on && !dir_llm && !vanilla_mode && !netgame && !M_CheckParm ("-record"))
+	dir_on = 1;
     if (dir_on)
 	fprintf (stderr, "P_Director: rule-based L4D director ON (-director)\n");
     else if (dir_llm)

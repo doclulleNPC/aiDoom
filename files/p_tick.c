@@ -157,7 +157,8 @@ void P_Ticker (void)
 	    P_PlayerThink (&players[i]);
 			
     P_AI_Ticker ();		// LLM AI Director: poll orders, age timers
-    P_Director_Ticker ();	// L4D rule-based director: intensity decay + spawn FSM
+    if (!demoplayback)		// keep demo playback (incl. the title-screen attract demos)
+	P_Director_Ticker ();	// vanilla: the L4D director's spawns would desync a recorded demo
     P_MorphTicker ();		// (M) age morph timers; restore expired morphs
     RevMarine_Ticker ();	// (G) revived marines heal +1 HP/sec up to 100
 
