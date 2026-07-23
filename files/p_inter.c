@@ -121,11 +121,28 @@ P_GiveAmmo
     if (player->ammo[ammo] > player->maxammo[ammo])
 	player->ammo[ammo] = player->maxammo[ammo];
 
-    // If non zero ammo, 
+    // mbf21 WPF_AUTOSWITCHFROM: if the ready weapon is flagged to be switched away from
+    // when ammo is picked up, and picking this ammo up just made a higher-slot weapon
+    // usable (its ammopershot was more than we had, now <= what we have), switch to it.
+    // (Vanilla weapons set ammopershot 0, so this never fires for them.)
+    if ((weaponinfo[player->readyweapon].flags & WPF_AUTOSWITCHFROM)
+	&& weaponinfo[player->readyweapon].ammo != ammo)
+    {
+	int i;
+	for (i = NUMWEAPONS - 1; i > player->readyweapon; --i)
+	    if (player->weaponowned[i]
+		&& !(weaponinfo[i].flags & WPF_NOAUTOSWITCHTO)
+		&& weaponinfo[i].ammo == ammo
+		&& weaponinfo[i].ammopershot > oldammo
+		&& weaponinfo[i].ammopershot <= player->ammo[ammo])
+	    { player->pendingweapon = i; break; }
+    }
+
+    // If non zero ammo,
     // don't change up weapons,
     // player was lower on purpose.
     if (oldammo)
-	return true;	
+	return true;
 
     // We were down to zero,
     // so select a new weapon.

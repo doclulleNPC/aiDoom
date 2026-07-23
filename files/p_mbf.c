@@ -133,6 +133,16 @@ void A_MonsterBulletAttack (mobj_t *actor)
 }
 // MBF21: halt the actor.
 void A_Stop (mobj_t *actor) { actor->momx = actor->momy = actor->momz = 0; }
+// MBF: the DOOM-beta lost soul's melee-ish burst (damage = random(1..8) * info->damage).
+void A_BetaSkullAttack (mobj_t *actor)
+{
+  int damage;
+  if (!actor->target || actor->target->type == MT_SKULL) return;
+  if (actor->info->attacksound) S_StartSound (actor, actor->info->attacksound);
+  A_FaceTarget (actor);
+  damage = (P_Random() % 8 + 1) * actor->info->damage;
+  P_DamageMobj (actor->target, actor, actor, damage);
+}
 void A_RadiusDamage (mobj_t *actor)
 {
   if (actor->state) P_RadiusAttack (actor, actor->target, (int)actor->state->args[0]);
