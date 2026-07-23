@@ -1,14 +1,16 @@
-// w_inflate.c -- zlib decompression, isolated from the DOOM headers.
+// w_inflate.c -- zlib-stream decompression, isolated from the DOOM headers.
 //
-// <zlib.h> transitively declares the POSIX close() function, which clashes with
-// p_spec.h's `close` enum constant, so it can't be included in the play-sim TU.
-// Keep the one zlib user here where no DOOM headers are pulled in.
+// Uses the vendored miniz (files/miniz.c/.h, already linked for the zip/pk3 loader in
+// w_wad.c) through its zlib-compatible API, so there is NO external libz dependency --
+// the Windows (MinGW / MSVC) builds ship no system zlib.  miniz's header is
+// self-contained (unlike <zlib.h>, which transitively declares POSIX close(), clashing
+// with p_spec.h's `close` enum), and this TU pulls in no DOOM headers anyway.
 //
 // Used by p_setup.c for ZNOD (zlib-compressed extended BSP nodes).
 
 #include <stdlib.h>
 #include <string.h>
-#include <zlib.h>
+#include "miniz.h"
 
 typedef unsigned char byte;
 
