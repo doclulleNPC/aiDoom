@@ -318,8 +318,16 @@ EV_DoFloor
 	    floor->direction = -1;
 	    floor->sector = sec;
 	    floor->speed = FLOORSPEED;
-	    floor->floordestheight = 
+	    floor->floordestheight =
 		P_FindLowestFloorSurrounding(sec);
+	    break;
+
+	  case lowerFloorToNearest:		// Boom: down to next lower neighbour
+	    { extern fixed_t P_FindNextLowestFloor (sector_t*, fixed_t);
+	      floor->direction = -1;
+	      floor->sector = sec;
+	      floor->speed = FLOORSPEED;
+	      floor->floordestheight = P_FindNextLowestFloor(sec, sec->floorheight); }
 	    break;
 
 	  case turboLower:
@@ -571,3 +579,105 @@ EV_BuildStairs
     return rtn;
 }
 
+
+
+//
+// T_MoveElevator
+// Boom (types 227-238): moves a sector's floor and ceiling together in lockstep,
+// keeping the floor-to-ceiling gap constant, so the whole sector rides like a lift.
+// The trailing plane is only moved once the leading plane's move this tic succeeds
+// (so a blocked plane stalls the pair together instead of shearing the gap).
+//
+void T_MoveElevator (elevator_t* elevator)
+{
+    result_e	res;
+
+    if (elevator->direction < 0)	// moving down: ceiling leads
+    {
+	res = T_MovePlane (elevator->sector, elevator->speed,
+			   elevator->ceilingdestheight, false, 1, elevator->direction);
+	if (res == ok || res == pastdest)
+	    T_MovePlane (elevator->sector, elevator->speed,
+			 elevator->floordestheight, false, 0, elevator->direction);
+    }
+    else				// moving up: floor leads
+    {
+	res = T_MovePlane (elevator->sector, elevator->speed,
+			   elevator->floordestheight, false, 0, elevator->direction);
+	if (res == ok || res == pastdest)
+	    T_MovePlane (elevator->sector, elevator->speed,
+			 elevator->ceilingdestheight, false, 1, elevator->direction);
+    }
+
+    if (!(leveltime & 7))
+	S_StartSound ((mobj_t *)&elevator->sector->soundorg, sfx_stnmov);
+
+    if (res == pastdest)		// reached destination -- done
+    {
+	elevator->sector->floordata = NULL;
+	elevator->sector->ceilingdata = NULL;
+	elevator->sector->specialdata = NULL;
+	P_RemoveThinker (&elevator->thinker);
+	S_StartSound ((mobj_t *)&elevator->sector->soundorg, sfx_pstop);
+    }
+}
+
+//
+// EV_DoElevator
+// Spawn an elevator thinker on every sector tagged by `line`.  Returns 1 if any
+// elevator was started (so a switch flips its texture).
+//
+int EV_DoElevator (line_t* line, elevator_e elevtype)
+{
+    extern fixed_t P_FindNextLowestFloor (sector_t*, fixed_t);
+    int		secnum = -1;
+    int		rtn = 0;
+    sector_t*	sec;
+    elevator_t*	elevator;
+
+    while ((secnum = P_FindSectorFromLineTag (line, secnum)) >= 0)
+    {
+	sec = &sectors[secnum];
+
+	// don't start a second thinker on a sector already in motion
+	if (sec->floordata || sec->ceilingdata || sec->specialdata)
+	    continue;
+
+	rtn = 1;
+	elevator = Z_Malloc (sizeof(*elevator), PU_LEVSPEC, 0);
+	P_AddThinker (&elevator->thinker);
+	sec->floordata   = elevator;
+	sec->ceilingdata = elevator;
+	sec->specialdata = elevator;	// also block classic floor/ceiling specials
+	elevator->thinker.function.acp1 = (actionf_p1) T_MoveElevator;
+	elevator->type   = elevtype;
+	elevator->sector = sec;
+	elevator->speed  = ELEVATORSPEED;
+
+	switch (elevtype)
+	{
+	  case elevateUp:
+	    elevator->direction = 1;
+	    elevator->floordestheight = P_FindNextHighestFloor (sec, sec->floorheight);
+	    elevator->ceilingdestheight =
+		elevator->floordestheight + sec->ceilingheight - sec->floorheight;
+	    break;
+
+	  case elevateDown:
+	    elevator->direction = -1;
+	    elevator->floordestheight = P_FindNextLowestFloor (sec, sec->floorheight);
+	    elevator->ceilingdestheight =
+		elevator->floordestheight + sec->ceilingheight - sec->floorheight;
+	    break;
+
+	  case elevateCurrent:	// ride to the height of the floor that triggered it
+	    elevator->floordestheight = line->frontsector->floorheight;
+	    elevator->ceilingdestheight =
+		elevator->floordestheight + sec->ceilingheight - sec->floorheight;
+	    elevator->direction =
+		elevator->floordestheight > sec->floorheight ? 1 : -1;
+	    break;
+	}
+    }
+    return rtn;
+}

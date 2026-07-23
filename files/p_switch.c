@@ -476,6 +476,22 @@ P_UseSpecialLine
 	    P_ChangeSwitchTexture(line,0);
 	break;
 
+      case 221:
+	// Boom S1: Floor Lower to Next Lower Neighbour Floor
+	if (EV_DoFloor(line,lowerFloorToNearest))
+	    P_ChangeSwitchTexture(line,0);
+	break;
+
+      case 229:		// Boom S1: Elevator up to next floor
+	if (EV_DoElevator(line,elevateUp))     P_ChangeSwitchTexture(line,0);
+	break;
+      case 233:		// Boom S1: Elevator down to next floor
+	if (EV_DoElevator(line,elevateDown))   P_ChangeSwitchTexture(line,0);
+	break;
+      case 237:		// Boom S1: Elevator to current (triggering) floor
+	if (EV_DoElevator(line,elevateCurrent)) P_ChangeSwitchTexture(line,0);
+	break;
+
       case 29:
 	// Raise Door
 	if (EV_DoDoor(line,normal))
@@ -736,6 +752,16 @@ P_UseSpecialLine
 	// Boom SR: silent Teleport (preserves angle/relative position)
 	if (EV_SilentTeleport(line,side,thing))
 	    P_ChangeSwitchTexture(line,1);
+	break;
+
+      case 230:		// Boom SR: Elevator up to next floor
+	if (EV_DoElevator(line,elevateUp))      P_ChangeSwitchTexture(line,1);
+	break;
+      case 234:		// Boom SR: Elevator down to next floor
+	if (EV_DoElevator(line,elevateDown))    P_ChangeSwitchTexture(line,1);
+	break;
+      case 238:		// Boom SR: Elevator to current (triggering) floor
+	if (EV_DoElevator(line,elevateCurrent)) P_ChangeSwitchTexture(line,1);
 	break;
 
     }

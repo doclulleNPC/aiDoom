@@ -344,9 +344,12 @@ enum
     tc_flash,
     tc_strobe,
     tc_glow,
-    tc_endspecials
+    tc_endspecials,
+    // Appended AFTER the terminator so tc_endspecials keeps value 7 -- older saves
+    // (which never contain an elevator) still read their terminator correctly.
+    tc_elevator
 
-} specials_e;	
+} specials_e;
 
 
 
@@ -371,8 +374,9 @@ void P_ArchiveSpecials (void)
     lightflash_t*	flash;
     strobe_t*		strobe;
     glow_t*		glow;
+    elevator_t*		elevator;
     int			i;
-	
+
     // save off the current thinkers
     for (th = thinkercap.next ; th != &thinkercap ; th=th->next)
     {
@@ -470,10 +474,21 @@ void P_ArchiveSpecials (void)
 	    glow->sector = (sector_t *)(glow->sector - sectors);
 	    continue;
 	}
+
+	if (th->function.acp1 == (actionf_p1)T_MoveElevator)
+	{
+	    *save_p++ = tc_elevator;
+	    PADSAVEP();
+	    elevator = (elevator_t *)save_p;
+	    memcpy (elevator, th, sizeof(*elevator));
+	    save_p += sizeof(*elevator);
+	    elevator->sector = (sector_t *)(elevator->sector - sectors);
+	    continue;
+	}
     }
-	
+
     // add a terminating marker
-    *save_p++ = tc_endspecials;	
+    *save_p++ = tc_endspecials;
 
 }
 
@@ -502,8 +517,9 @@ void P_UnArchiveSpecials (void)
     lightflash_t*	flash;
     strobe_t*		strobe;
     glow_t*		glow;
-	
-	
+    elevator_t*		elevator;
+
+
     // read in saved thinkers
     while (1)
     {
@@ -594,7 +610,20 @@ void P_UnArchiveSpecials (void)
 	    glow->thinker.function.acp1 = (actionf_p1)T_Glow;
 	    P_AddThinker (&glow->thinker);
 	    break;
-				
+
+	  case tc_elevator:
+	    PADSAVEP();
+	    elevator = Z_Malloc (sizeof(*elevator), PU_LEVEL, NULL);
+	    memcpy (elevator, save_p, sizeof(*elevator));
+	    save_p += sizeof(*elevator);
+	    elevator->sector = P_SaveSector ((intptr_t)elevator->sector);
+	    elevator->sector->floordata   = elevator;
+	    elevator->sector->ceilingdata = elevator;
+	    elevator->sector->specialdata = elevator;
+	    elevator->thinker.function.acp1 = (actionf_p1)T_MoveElevator;
+	    P_AddThinker (&elevator->thinker);
+	    break;
+
 	  default:
 	    I_Error ("P_UnarchiveSpecials:Unknown tclass %i "
 		     "in savegame",tclass);

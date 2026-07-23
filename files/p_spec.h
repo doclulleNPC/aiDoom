@@ -918,6 +918,11 @@ typedef enum
   genFloorChg0,
   genFloorChgT,
   genBuildStair,
+
+  // Boom: lower floor to next lower neighbouring floor (types 219-222).
+  // Appended at the end so existing floor->type values (saved in floormove_t)
+  // keep their numbers -> savegame-compatible.
+  lowerFloorToNearest,
 } floor_e;
 
 
@@ -979,6 +984,37 @@ EV_DoFloor
   floor_e	floortype );
 
 void T_MoveFloor( floormove_t* floor);
+
+//
+// Boom elevators (linedef types 227-238): move a sector's floor and ceiling
+// together as one rigid block, keeping the gap constant.
+//
+typedef enum
+{
+    elevateUp,
+    elevateDown,
+    elevateCurrent
+} elevator_e;
+
+typedef struct
+{
+    thinker_t	thinker;
+    elevator_e	type;
+    sector_t*	sector;
+    int		direction;
+    fixed_t	floordestheight;
+    fixed_t	ceilingdestheight;
+    fixed_t	speed;
+} elevator_t;
+
+#define ELEVATORSPEED (FRACUNIT*4)
+
+void T_MoveElevator (elevator_t* elevator);
+
+int
+EV_DoElevator
+( line_t*	line,
+  elevator_e	elevtype );
 
 //
 // P_TELEPT
