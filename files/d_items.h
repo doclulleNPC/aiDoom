@@ -30,6 +30,14 @@
 #endif
 
 
+// MBF21 weapon flags (weaponinfo_t.flags), set via DEHACKED "MBF21 Bits".
+#define WPF_NOTHRUST		0x00000001	// its attacks don't thrust things
+#define WPF_SILENT		0x00000002	// silent -- firing doesn't alert monsters
+#define WPF_NOAUTOFIRE		0x00000004	// won't autofire when swapped to with fire held
+#define WPF_FLEEMELEE		0x00000008	// monsters treat it as a melee weapon (AI only)
+#define WPF_AUTOSWITCHFROM	0x00000010	// auto-switch away from when ammo is picked up
+#define WPF_NOAUTOSWITCHTO	0x00000020	// never auto-switched to when ammo is picked up
+
 // Weapon info: sprite frames, ammunition use.
 typedef struct
 {
@@ -39,6 +47,8 @@ typedef struct
     int		readystate;
     int		atkstate;
     int		flashstate;
+    int		flags;		// mbf21 WPF_* weapon flags
+    int		ammopershot;	// mbf21: ammo per shot (0 = vanilla per-weapon amount)
 
 } weaponinfo_t;
 

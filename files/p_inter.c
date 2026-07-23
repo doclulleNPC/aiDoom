@@ -130,45 +130,48 @@ P_GiveAmmo
     // We were down to zero,
     // so select a new weapon.
     // Preferences are not user selectable.
+    // mbf21 WPF_NOAUTOSWITCHTO: never auto-switch TO a weapon flagged with it.
+#define AUTOSWITCH(w) (player->weaponowned[w] && !(weaponinfo[w].flags & WPF_NOAUTOSWITCHTO))
     switch (ammo)
     {
       case am_clip:
 	if (player->readyweapon == wp_fist)
 	{
-	    if (player->weaponowned[wp_chaingun])
+	    if (AUTOSWITCH(wp_chaingun))
 		player->pendingweapon = wp_chaingun;
-	    else
+	    else if (!(weaponinfo[wp_pistol].flags & WPF_NOAUTOSWITCHTO))
 		player->pendingweapon = wp_pistol;
 	}
 	break;
-	
+
       case am_shell:
 	if (player->readyweapon == wp_fist
 	    || player->readyweapon == wp_pistol)
 	{
-	    if (player->weaponowned[wp_shotgun])
+	    if (AUTOSWITCH(wp_shotgun))
 		player->pendingweapon = wp_shotgun;
 	}
 	break;
-	
+
       case am_cell:
 	if (player->readyweapon == wp_fist
 	    || player->readyweapon == wp_pistol)
 	{
-	    if (player->weaponowned[wp_plasma])
+	    if (AUTOSWITCH(wp_plasma))
 		player->pendingweapon = wp_plasma;
 	}
 	break;
-	
+
       case am_misl:
 	if (player->readyweapon == wp_fist)
 	{
-	    if (player->weaponowned[wp_missile])
+	    if (AUTOSWITCH(wp_missile))
 		player->pendingweapon = wp_missile;
 	}
       default:
 	break;
     }
+#undef AUTOSWITCH
 	
     return true;
 }
@@ -936,7 +939,8 @@ P_DamageMobj
 	&& !(target->flags & MF_NOCLIP)
 	&& (!source
 	    || !source->player
-	    || source->player->readyweapon != wp_chainsaw))
+	    || (source->player->readyweapon != wp_chainsaw		// mbf21 WPF_NOTHRUST: this
+		&& !(weaponinfo[source->player->readyweapon].flags & WPF_NOTHRUST))))	// weapon doesn't push
     {
 	ang = R_PointToAngle2 ( inflictor->x,
 				inflictor->y,

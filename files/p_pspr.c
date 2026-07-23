@@ -253,7 +253,8 @@ void P_FireWeapon (player_t* player)
     P_SetMobjState (player->mo, S_PLAY_ATK1);
     newstate = weaponinfo[player->readyweapon].atkstate;
     P_SetPsprite (player, ps_weapon, newstate);
-    P_NoiseAlert (player->mo, player->mo);
+    if (!(weaponinfo[player->readyweapon].flags & WPF_SILENT))	// mbf21: silent weapon doesn't wake monsters
+	P_NoiseAlert (player->mo, player->mo);
 }
 
 
@@ -316,10 +317,11 @@ A_WeaponReady
     {
 	if ( !player->attackdown
 	     || (player->readyweapon != wp_missile
-		 && player->readyweapon != wp_bfg) )
+		 && player->readyweapon != wp_bfg
+		 && !(weaponinfo[player->readyweapon].flags & WPF_NOAUTOFIRE)) )	// mbf21
 	{
 	    player->attackdown = true;
-	    P_FireWeapon (player);		
+	    P_FireWeapon (player);
 	    return;
 	}
     }

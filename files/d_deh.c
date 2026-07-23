@@ -1288,6 +1288,12 @@ void deh_procWeapon(DEHFILE *fpin, FILE* fpout, char *line)
                 if (!strcasecmp(key,deh_weapon[5]))  // Firing frame
                   weaponinfo[indexnum].flashstate = value;
                 else
+                if (!strcasecmp(key,"MBF21 Bits"))    // mbf21 weapon flags (WPF_*)
+                  weaponinfo[indexnum].flags = value;
+                else
+                if (!strcasecmp(key,"Ammo per shot")) // mbf21 ammo-per-shot
+                  weaponinfo[indexnum].ammopershot = value;
+                else
                   if (fpout) fprintf(fpout,"Invalid weapon string index for '%s'\n",key);
     }
   return;
