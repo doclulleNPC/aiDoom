@@ -212,7 +212,9 @@ typedef struct line_s
 
     // Visual appearance: SideDefs.
     //  sidenum[1] will be -1 if one sided
-    short	sidenum[2];			
+    // int (not short): limit-removing maps can have >32767 sidedefs, which overflow a short
+    // index (Legacy of Rust MAP13 has 60423) -- P_LoadLineDefs reads them unsigned into this.
+    int		sidenum[2];
 
     // Neat. Another bounding box, for the extent
     //  of the LineDef.

@@ -264,10 +264,12 @@ void P_LoadSectors (int lump)
 }
 
 
-// ZDBSP / Boom "extended nodes": when a map is built with uncompressed extended nodes the NODES
-// lump starts with "XNOD" (SSECTORS + SEGS lumps are empty) and carries new vertices, subsectors,
-// segs and 32-bit nodes itself.  Detect + load the whole thing here.  (ZNOD = zlib-compressed and
-// the GL variants are not handled yet.)  Returns true if it consumed the lump.
+// ZDBSP / Boom "extended nodes": when a map is built with extended nodes the NODES lump
+// starts with a 4-byte magic (SSECTORS + SEGS lumps are empty) and carries new vertices,
+// subsectors, segs and 32-bit nodes itself.  We handle the plain "XNOD" format and the
+// zlib-compressed "ZNOD" variant (ZDBSP `-z`, common in modern WADs) -- ZNOD is just XNOD
+// deflated, so we inflate then run the same parser.  (GL-node variants XGL*/ZGL* have a
+// different seg layout and are still not handled.)  Returns true if it consumed the lump.
 extern angle_t R_PointToAngle2 (fixed_t, fixed_t, fixed_t, fixed_t);
 
 static fixed_t P_SegOffset (fixed_t x1, fixed_t y1, fixed_t x2, fixed_t y2)
@@ -277,17 +279,34 @@ static fixed_t P_SegOffset (fixed_t x1, fixed_t y1, fixed_t x2, fixed_t y2)
     return (fixed_t)(sqrt (dx*dx + dy*dy) * FRACUNIT);
 }
 
+// zlib inflate lives in w_inflate.c -- <zlib.h> can't be included here (it pulls in a
+// POSIX close() that clashes with p_spec.h's `close` enum).  Returns a malloc'd buffer.
+extern byte* W_InflateZlib (byte* src, unsigned srclen, unsigned* outlen);
+
 boolean P_LoadNodes_Extended (int lump)
 {
     byte*   data = W_CacheLumpNum (lump, PU_STATIC);
+    byte*   ibuf = NULL;		// inflated body for the compressed (ZNOD) variant
     byte*   p;
     unsigned origv, newv, i;
     unsigned nsub, nseg, nnod;
 
-    if (W_LumpLength (lump) < 8 || memcmp (data, "XNOD", 4) != 0)
+    if (W_LumpLength (lump) < 8)
     { Z_Free (data); return false; }
 
-    p = data + 4;
+    if (memcmp (data, "XNOD", 4) == 0)
+    {
+	p = data + 4;				// uncompressed: parse in place
+    }
+    else if (memcmp (data, "ZNOD", 4) == 0)
+    {
+	unsigned ilen = 0;			// zlib-compressed: inflate then parse
+	ibuf = W_InflateZlib (data + 4, W_LumpLength (lump) - 4, &ilen);
+	if (!ibuf || ilen < 8) { free (ibuf); Z_Free (data); return false; }
+	p = ibuf;
+    }
+    else
+    { Z_Free (data); return false; }		// XNOD/ZNOD only (GL variants unhandled)
     #define RD32() ( p += 4, (unsigned)(p[-4] | (p[-3]<<8) | (p[-2]<<16) | ((unsigned)p[-1]<<24)) )
     #define RD16() ( p += 2, (unsigned short)(p[-2] | (p[-1]<<8)) )
 
@@ -347,9 +366,10 @@ boolean P_LoadNodes_Extended (int lump)
     }
     #undef RD32
     #undef RD16
+    free (ibuf);			// NULL for the uncompressed XNOD path -- free(NULL) is fine
     Z_Free (data);
-    printf ("P_LoadNodes: extended (XNOD) nodes -- %u verts, %u ssectors, %u segs, %u nodes\n",
-            origv + newv, nsub, nseg, nnod);
+    printf ("P_LoadNodes: extended (%s) nodes -- %u verts, %u ssectors, %u segs, %u nodes\n",
+            ibuf ? "ZNOD" : "XNOD", origv + newv, nsub, nseg, nnod);
     return true;
 }
 
@@ -520,8 +540,15 @@ void P_LoadLineDefs (int lump)
 	    ld->bbox[BOXTOP] = v1->y;
 	}
 
-	ld->sidenum[0] = SHORT(mld->sidenum[0]);
-	ld->sidenum[1] = SHORT(mld->sidenum[1]);
+	// Read sidenum UNSIGNED: 0xFFFF is the "no sidedef" sentinel (== -1); every other value
+	// is a valid index.  Reading it as a signed short (the old SHORT()) broke maps with more
+	// than 32767 sidedefs -- a high index came out NEGATIVE, slipped past the "== -1" test,
+	// and indexed sides[] out of bounds -> a NULL/garbage frontsector and a crash in
+	// P_GroupLines.  Common in ZDBSP/extended-node maps (e.g. Legacy of Rust MAP13).
+	{ unsigned short s0 = (unsigned short) SHORT(mld->sidenum[0]);
+	  unsigned short s1 = (unsigned short) SHORT(mld->sidenum[1]);
+	  ld->sidenum[0] = (s0 == 0xFFFF || s0 >= numsides) ? -1 : (int) s0;
+	  ld->sidenum[1] = (s1 == 0xFFFF || s1 >= numsides) ? -1 : (int) s1; }
 
 	if (ld->sidenum[0] == -1)
 	    ld->sidenum[0] = 0;  // Substitute dummy sidedef for missing right side

@@ -78,7 +78,7 @@ echo "[build] compiling aidoom $fork (SDL3 $(pkg-config --modversion sdl3)) ..."
     -Wno-implicit-int -Wno-implicit-function-declaration \
     -Wno-int-conversion -Wno-return-mismatch \
     -DSDL_MAIN_HANDLED $(pkg-config --cflags sdl3) \
-    *.c -o aidoom $(pkg-config --libs sdl3) -lm )
+    *.c -o aidoom $(pkg-config --libs sdl3) -lz -lm )
 
 # Always copy the artifact(s) into run/ so the launcher finds them there.
 # (Linux/macOS link SDL3 from the system, so there is no DLL to copy here;
