@@ -1,153 +1,104 @@
-# AI/LLM-Verbesserungen für aidoom
+# AI/LLM improvements for aiDoom
 
-Mögliche Richtungen, wie das LLM/AI-System in aidoom über die bestehende
-Director-Implementierung hinaus verbessert werden könnte. Stand: aktuelle
-Session.
+This file is a capability matrix plus a deliberately short backlog. Several items in the old version were already shipped but were still written as future work—the documentation equivalent of a zombie state that forgot to die.
 
-## Was schon da ist
+## Shipped today
 
-- `files/p_ai_llm.c`/`.h` (~725 Zeilen): LLM-Director für Monster via TCP-
-  Line-Protocol oder eingebauter `-aidemo`-Modus. Off außer mit `-aidirector
-  [port]` oder `-aidemo`. Hooks in `A_Chase` (`p_enemy.c`), `P_Ticker`,
-  `P_SetupLevel`. Direktiven in Side-Table keyed by `mobj_t*`.
-- `files/p_ai_coop.c`/`.h` (~1148 Zeilen): Regelbasierter Co-op-Buddy
-  (`-aicoop`), deterministisch, BSP-Dijkstra-Pathfinding. Konsolen-Cmds
-  `where`/`come`/`wait`/`attack`/`report`.
-- `files/i_voice.c`: Offline-OGG-Sprachausgabe für den Buddy via `aidoom.wad`.
-- `AGENT_CONTROL.md` §1-13: Director-Protokoll-Spec (Player §1-11, Monster
-  §12-13). `MONSTER_AGENT_GUIDE.md`, `doom_agent_api_architecture.md`,
-  `doom_agent_api_vizdoom.md`: weitere Director-Doku.
+| Capability | Source / status |
+|---|---|
+| Rule-based buddy | `files/p_ai_coop.c`; enabled with `-coop` or `-aicoop`. |
+| LLM buddy directive layer | `files/p_ai_llm.c` parses `buddy order=...` and applies high-level state through the buddy controller. |
+| Monster LLM tactics | `act order=...` side-table directives, executed from the monster chase path. |
+| Director pacing | `files/p_ai_director.c`: stress model, phases, checked spawns, exit/objective pressure, safety gates and supplies. |
+| Structured monster observation | Player, buddy, monsters, visibility/distances, regions, links and director stress. |
+| Two voice streams | `files/i_voice.c`: buddy `DS*` and Director `DD*` streams. |
+| Shared navigation | BSP-subsector graph and `P_AICoop_NextWaypoint`; current `PF_AStar` search behaves as Dijkstra because `h=0`. |
+| Pack hunt | Current monster pack configuration/path where enabled. |
+| Agent player control | `-aiplayer [port|demo]`, separate protocol/reflex controller in `files/g_agent.c`. |
 
-## 1. Buddy-Gehirn mit LLM kombinieren
+The buddy is one fixed slot. There is no `-aicoop N` multi-buddy mode.
 
-Aktuell rein regelbasierte FSM mit starren Distanz-Threshold-Übergängen
-(FOLLOW/FIGHT/HEAL/HOLD/COME/GRAB). LLM-Director-Aufsatz könnte:
+## 1. Better LLM buddy coordination
 
-- **Kontextbewusst entscheiden**: "Buddy steht im Nukage, sollte flüchten"
-  vs "Buddy ist voll HP, kann offensiv pushen". Aktuell prüft `p_ai_coop.c`
-  das nur grob (Escape-nukage seit 2026).
-- **Predictive flanking** basierend auf Player-Position und Map-Geometrie:
-  vorhersagen wo Monster spawnen, sich dahinter positionieren.
-- **Trade-off-Decisions** statt harter Priorität: heilen vs item-grabben
-  vs player-decken — aktuell deterministische Priority-Kette.
+Already implemented at a basic high-level layer: the director can send `buddy order=engage|defend|hold|regroup|retreat|goto|grab` and the buddy keeps its autonomous C reflex behavior underneath.
 
-**Umsetzungsidee**: Zweite Director-Connection pro `players[coop_slot]`,
-eigener kleiner Prompt-Loop ("Du bist Spieler 2, HP=X, Armor=Y, Player 1
-ist Z units entfernt, Monster in Sichtweite:..."). Regelbasierter
-`p_ai_coop.c` bleibt als Fallback wenn LLM nicht erreichbar oder Latency
-zu hoch.
+Useful future work would be:
 
-**Impact**: Höchster Gameplay-Impact, weil der Buddy aktuell der schwächste
-AI-Teil ist. Konsolen-Kommandos `where`/`come`/`wait`/`attack` könnten
-optional LLM-Antworten statt statischer Strings geben.
+- richer order arguments with explicit target/route expiry;
+- acknowledgements or an observation field confirming the active directive;
+- clearer conflict rules between human keyboard orders, local bot policy and LLM orders;
+- separate combat/support directives rather than one overloaded state.
 
-## 2. Schlaueres Monster-Verhalten (LLM-Attack-Patterns)
+Do not describe this as an unimplemented “LLM buddy layer” anymore.
 
-Aktuell hat jedes Monster nur Vanilla-AI (state machine in `p_enemy.c`).
-LLM könnte pro Monster-Typ unterschiedliche Direktiven generieren:
+## 2. Richer monster tactics
 
-- **Imp vs Sergeant**: "Sergeant gibt Vorwarn-Schuss ab, Imp charges frontal"
-- **Cacodemon**: "fliegt zur Seite, dann Fireball aus off-angle"
-- **Arch-Vile**: "resurrect-Pattern: erst defensive Position, dann Resurrect
-  vom gefallenen Monster, nicht sofort offensiv"
+The current rule selector assigns focus, left/right flank and fallback. The LLM can request more orders, but the executor still has a small tactical vocabulary and one directive slot per monster.
 
-`p_ai_llm.c` hat schon eine Tag-basierte Direktiven-Tabelle, aber die ist
-**statisch** (vorgegebene Befehle). LLM könnte **dynamische Attack-Patterns**
-basierend auf Situation generieren: "Monster X greift aus Schatten von
-Position Y an" statt nur "Monster X, attackiere Spieler".
+Potential improvements:
 
-**Impact**: Mittlerer Aufwand, hoher Difficulty-Impact. Mehr Spieltiefe
-ohne Monster-Stats zu ändern.
+- per-monster role/formation state rather than overwrite-only directives;
+- squad membership and explicit handoff/expiry;
+- better door/ambush execution;
+- projectile timing and cover evaluation;
+- a safe, bounded sequence primitive instead of pretending `after` queues commands.
 
-## 3. Director-Broadcast über Map-State
+## 3. Director map-state coordination
 
-Aktuell sieht der Director hauptsächlich `player_t`-Daten. Erweiterung:
+Already implemented beyond the original proposal. The observation includes:
 
-- **Monster-Positionen broadcasten** (alive, wo, type) → Director kann
-  "Schicke die 3 Imps am Corridor in den Hinterhalt"
-- **Sector-Information**: "Player ist in nukage-damaging floor", "Player
-  hat gerade Keycard X aufgehoben" → Director kann gezielt Monster spawnen
-  oder Türen schließen
-- **Sound-basiert**: "Player hat Schuss abgegeben, alle Monster in Hörweite
-  wissen wo er ist" — kombiniert mit DOOM's Sound-Propagation
+- monster positions/types/HP/regions;
+- player and optional buddy state;
+- visibility and distances;
+- region centroids and open/door/locked links;
+- director intensity, recent damage and ammo percentage.
 
-**Umsetzung**: Director-Side bekommt erweiterten Snapshot in
-`P_AI_Ticker` (siehe `p_ai_llm.c`). Bidirektional: Director kann dann auch
-`spawn_extra_monster(type, x, y)`-Calls zurück ans Spiel senden.
+The rule director also uses objective/exit detection and shared navigation to bias pressure. Keep future additions focused on information quality and cost, not on re-implementing a broadcast that already exists.
 
-## 4. Reinforcement-Learning-Hybrid
+## 4. Persistent learning
 
-Regelbasiert für **harte Constraints** (nicht durch Türen gehen die closed
-sind, nicht in nukage laufen wenn HP low — beides schon implementiert) +
-LLM für **strategische Entscheidungen** (welches Monster zuerst, wann flüchten,
-wann pushen).
+Not implemented. A file such as `~/.aidoom/ai_memory.dat` remains a proposal and is not part of the current runtime.
 
-Constraint-Layer ist deterministisch (= Demo-/Netplay-kompatibel), LLM-Layer
-ist strategisch und kann Latency haben ohne dass die Playsim blockiert
-(async queue wie schon im aktuellen Director).
+If added later, keep learned state out of deterministic gameplay unless it is explicitly versioned/seeded. Prefer a tool-side analytics file first.
 
-## 5. Buddy-Mikrofon/Sprach-Coordination
+## 5. RL/headless hybrid
 
-`i_voice.c` existiert schon (offline OGG via `aidoom.wad`). Erweiterung:
+Not implemented. There is no shipped `-headless` mode, server-side reward, `done` flag, fixed step API or frame-skip wrapper in the AI modules. The proposal/comparison docs may describe these as architecture options, but they must be labelled as such.
 
-- **Echtzeit-Sprach-Coordination**: Buddy sagt "flanking left", Player
-  versteht (über Hotkey oder Text-Overlay)
-- **Director spricht mit Buddy UND Player**: zwei Audio-Streams, Director
-  koordiniert beide
+A future implementation would need explicit ownership of:
 
-## 6. Multi-Agent-Coordination
+- video/audio initialization;
+- tic stepping and action repeat;
+- reset/save lifecycle;
+- reward/done semantics;
+- deterministic seed and episode boundaries.
 
-Wenn mehrere Buddies (z.B. `-aicoop 3` für 3 AI-Buddies): LLM koordiniert
-die als Squad. Aktuell würde jeder Buddy unabhängig agieren (jeder hat
-eigene `coop_state`-Variable, eigene Direktiven-Warteschlange).
+## 6. Voice and coordination
 
-Squad-Taktiken:
-- "Buddy 1 zieht Aggro frontal, Buddy 2 umgeht links"
-- "Buddies wechseln sich beim Heal-Item-Tragen ab"
-- "Squad-Position Formation um Player 1"
+The two streams are already shipped. Remaining improvements are catalogue/UX work:
 
-## 7. Memory / Lernfähigkeit
+- expose voice-gate drops in a debug console rather than silently losing every rejected line;
+- add localization/alternate persona bundles;
+- make the Director's 16 s ambient and 6 s forced-line floor configurable only if there is a real use case;
+- keep WAD tag names byte-checked.
 
-Director schreibt State in `~/.aidoom/ai_memory.dat`:
+## 7. Multi-agent coordination
 
-- Welche Attack-Patterns haben gegen diesen Player-Typ funktioniert
-- Welche Monster-Spawns sind gefährlich auf welcher Map
-- Welche Item-Locations sind gut
+Not implemented beyond one buddy plus the separate monster director. A real multi-agent design would need stable registry identities, ownership/arbitration and savegame semantics before adding more actors.
 
-Beim nächsten Start gleicher Map: Director nutzt Memory für bessere
-Strategien. Über Zeit lernt das System pro Map und pro Spieler-Stil.
+## 8. Recommended order
 
-## 8. Tool-Use statt nur Text-Directives
+1. Improve observability/acknowledgement without changing simulation.
+2. Make the one-slot directive semantics explicit in clients.
+3. Add targeted tactical executors (door/cover/formation) behind flags.
+4. Only then evaluate persistent learning or multi-agent state.
+5. Treat headless RL as a separate environment project, not a small console option.
 
-Aktuell ist das LLM-Protokoll text-basiert ("attack:2" etc.). Mit
-Function-Calling könnte das LLM:
+## Related docs
 
-- Map-Editor-Aktionen auslösen ("spawn extra ammo here")
-- Sector-Tags ändern
-- Script-Events triggern
-
-Mächtig aber gefährlich — könnte Savegames zerstören. Eher was für
-Creative-Mode oder Fork. Braucht striktes Sandboxing (LLM darf nur
-genehmigte Tools aufrufen, nicht beliebiges Map-Manipulation).
-
-## Priorisierung
-
-| # | Idee                    | Aufwand | Impact | Empfehlung       |
-|---|-------------------------|---------|--------|------------------|
-| 1 | Buddy-LLM-Hook          | Mittel  | Hoch   | **Zuerst**       |
-| 2 | Monster-Attack-Patterns | Mittel  | Hoch   | **Parallel**     |
-| 3 | Map-State-Broadcast     | Klein   | Mittel | Mit #1+#2        |
-| 4 | RL-Hybrid               | Groß    | Mittel | Nach #1+#2       |
-| 5 | Voice-Coordination      | Mittel  | Niedrig| Polish           |
-| 6 | Multi-Agent-Squad       | Groß    | Mittel | Bei Bedarf       |
-| 7 | Memory/Learning         | Mittel  | Mittel | Mit #2           |
-| 8 | Tool-Use                | Groß    | ?      | Creative-Mode    |
-
-## Siehe auch
-
-- `files/p_ai_llm.c`/`.h` — Director-Implementation
-- `files/p_ai_coop.c`/`.h` — Buddy-Implementation
-- `AGENT_CONTROL.md` §12-13 — Director-Protocol
-- `MONSTER_AGENT_GUIDE.md` — Wie Monster als Agents funktionieren
-- `doom_agent_api_architecture.md` — Architektur-Overview
-- `doom_agent_api_vizdoom.md` — Vergleich mit ViZDoom
+- `docs/MONSTER_AGENT_GUIDE.md` — shipped monster/director protocol.
+- `docs/AIPLAYER.md` — shipped player-agent protocol.
+- `docs/DIRECTOR_MODES.md` — rule versus LLM pacing.
+- `docs/BUDDY_PORTING.md` — buddy behavior.
+- `docs/BUDDY_VOICE.md` — voice gate and assets.
+- `docs/doom_agent_api_architecture.md` and `docs/doom_agent_api_vizdoom.md` — proposals/comparisons only.

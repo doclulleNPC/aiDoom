@@ -1,113 +1,95 @@
-# HERETIC_SUPPORT_PLAN.md — plan for **full** Heretic support
+# HERETIC_SUPPORT_PLAN.md — plan for full Heretic support
 
-Where we are vs. where "full Heretic" is, and a phased path between them.
+This is the forward-looking plan for turning the current additive Heretic actor/artifact support into a real Heretic game mode. The current source already has a phase-1 boot/survival path and an additive actor pack; the work below must not be read as saying those pieces are absent.
 
-## Status
-- **Phase 1 — DONE** (commit `557a620`): `heretic.wad` is detected (`heretic_mode`), and a
-  Heretic level now **loads and runs without crashing** — `P_SpawnMapThing` resolves the
-  Heretic doomednums of our 10 ported monsters + 10 artifacts (`P_HereticThingType`) and
-  skips unported things instead of `I_Error`-ing, plus a chain of `heretic_mode`-gated
-  boot-survival guards (missing DOOM sfx → silence, missing music/switch/HUD/status-bar/
-  sprite lumps → skip). 39 monsters spawn on E1M1; **DOOM is byte-for-byte unaffected**.
-  *Caveat:* the Heretic content is still **invisible/silent** — the native Heretic sprites,
-  palette, weapons, status bar, keys, specials, sound and music are not wired yet (below).
-- **Phases 2–9 — TODO.** Next highest-value: make the content visible (Phase 2 data tables:
-  native Heretic sprite names + the Heretic palette) and the player armed (Phase 3 weapons).
+## Current status
 
-## Where we are now (the additive pack)
-aiDoom plays **DOOM**; Heretic content is bolted on as an optional *pack* over the DOOM engine
-(approach A in `HERETIC_HEXEN.md`):
-- **Monsters** — all 10, appended at runtime (`files/heretic.c`, `Heretic_Init`), summonable +
-  director-spawned when `hereticstuff.wad` is loaded.
-- **Artifacts** — all 10, the Heretic inventory effects (`files/p_inv_heretic.c`); flight +
-  chicken-morph are generic subsystems (`INVENTORY.md`). Currently console-given.
-- **Sounds** — the Heretic SFX (`DS`-prefixed, `sfx_h_*`).
-- **Assets** — `tools/extract_heretic_monsters.py` palette-converts Heretic sprites/sounds
-  into `run/ID0/hereticstuff.wad`.
+### Implemented foundation
 
-What's missing for **full** Heretic = playing `heretic.wad` as a real game: the Corvus player,
-the 8 weapons, Heretic levels/specials, the status bar, ammo/episode/menu/finale — i.e. a
-**Heretic game mode**, not a DOOM level with Heretic monsters sprinkled in.
+- `files/d_main.c` detects an IWAD whose basename contains `heretic` and sets `heretic_mode`.
+- Heretic map thing numbers are resolved through `P_HereticThingType` in `files/heretic.c`; unsupported things are skipped instead of aborting.
+- `Heretic_Init` appends the current Heretic actors; `HereticInv_Init` appends the artifact pickup actors/effects.
+- Native Heretic sprite names are remapped before `R_Init` builds sprite frames.
+- Missing DOOM-only sound lumps fall back to silence; missing weapon/status/switch art is guarded to avoid startup crashes.
+- The current artifact module appends ten pickup actors/effects (`files/p_inv_heretic.c`); full Heretic map placement and the always-on native inventory UI remain planned.
+### Explicit boundary
 
-## Target: a Heretic GAME MODE (approach B)
-Chocolate-Heretic ships as a *separate binary* with Heretic's own `info.c`/`p_*`/`sb_bar`/…
-Doing it **in one binary** means selecting Heretic's data + a few behavior deltas at startup
-when `heretic.wad` is the IWAD, while DOOM stays the default. The engines share the same
-Chocolate/Doom lineage (BSP renderer, blockmap, thinkers, fixed-point), so the renderer,
-collision, and most of `p_map`/`p_mobj` are reusable — the work is **data tables + the
-subsystems Heretic does differently**.
+`heretic_mode` is not yet a complete mission/game-mode switch. The current engine still uses the DOOM player, weapons, status bar, menu, specials and progression paths in places where Heretic-specific behavior is required. Some Heretic map content is therefore skipped or falls back safely.
 
-## The pieces (each is a phase)
+## Target
 
-### 1. Game-mode detection & boot
-- `IdentifyVersion` (`d_main.c`): recognise `heretic.wad` (its `E1M1`+the `_` lumps / the
-  Heretic IWAD header) → set a new `gamemission == heretic` (and a `GameMode`/episode count).
-- Pick Heretic vs DOOM **data tables** at boot (see 2). Gate the existing DOOM-only paths
-  (status bar, finale, menu graphics) on the mission.
+Support `heretic.wad` as a real playable game mode while keeping ordinary DOOM startup behavior unchanged. The safest architecture is still a mission-selected active data/subsystem set, but the existing additive installer pattern should be reused only where it does not create hard-coded enum/table conflicts.
 
-### 2. Data tables (states / mobjinfo / sprites / sounds)
-- Heretic's full `states[]` + `mobjinfo[]` (player, weapons, all items/decorations, not just
-  the 10 monsters we have). Cleanest: a **second set of tables** selected at boot (like the
-  Heretic monster `*_Init` but for the *whole* game), OR compile crispy's `heretic/info.c`
-  into a parallel `hinfo.c` and point `states`/`mobjinfo`/`sprnames`/`S_sfx` at it in Heretic
-  mode. Enum collisions are the catch — Heretic mode wants its OWN `SPR_`/`S_`/`MT_`/`sfx_`
-  numbering, so the engine must index through the *active* table, not hard-coded DOOM enums.
-- This is the **biggest** item; it's what makes #3–#8 mostly "port the table + the few funcs".
+## Phases
 
-### 3. The player & weapons (`p_pspr`, `p_user`, `d_items`)
-- The Corvus player: Heretic `player_t` extras (the inventory is always-on; `weaponowned`,
-  the 6 ammo types `am_goldwand…am_mace`, `maxammo`).
-- 8 weapons + **Tome of Power** (each weapon has a normal + tomed firing func): Staff,
-  Gauntlets, Elven Wand, Ethereal Crossbow, Dragon Claw, Hellstaff, Phoenix Rod, Firemace —
-  port `heretic/p_pspr.c` (the `A_Fire*` funcs + their projectiles).
-- Weapon-pickup/switch logic (slots differ from DOOM).
+### 1. Detection and boot hardening — substantially present
 
-### 4. Inventory (mostly done)
-- Reuse `p_inv_heretic.c`; in Heretic mode make the artifacts **map-placeable** with their
-  real Heretic doomednums (they're `doomednum=-1` now to avoid DOOM collisions), turn the
-  always-on inventory bar on, and wire the "fly"/"morph" the player can suffer (enemy egg).
+Keep the current detection and skip/fallback guards, but make the mode explicit in startup diagnostics and centralize the mission decision. The mode must be selected before sprite/sound/player tables are initialized.
 
-### 5. Level data & specials (`p_setup`, `p_spec`, `p_floor`/`p_plats`/…)
-- Heretic map things resolve through the Heretic `doomednum`→`mobjtype` table (#2).
-- Heretic **line/sector specials** differ: wind/current sectors, the friction/scroll, the
-  different door/lift speeds & the `P_AmbientSound`/flickering. Port `heretic/p_spec.c` deltas
-  (a per-mission branch where they diverge).
+### 2. Full Heretic data tables
 
-### 6. Status bar & HUD (`sb_bar` ≈ our `st_stuff`)
-- Heretic's status bar (the inventory ribbon, the health **chain**, the artifact count, the
-  ammo icons, the tome flash). A Heretic `st_*` variant drawn in Heretic mode.
+Port or integrate the complete Heretic `states[]`, `mobjinfo[]`, sprite-name and sound tables, including player, weapons, items, decorations and map-placeable things. Avoid using the additive monster enum numbers as if they were a full alternate Heretic table.
 
-### 7. Menu / intermission / finale / title
-- Heretic title/credits/help, the intermission tally, the finale text + the underwater/“E2 to
-  be continued” screens, the menu graphics (`M_*` Heretic art). Mission-branch in `m_menu.c`,
-  `wi_stuff.c`, `f_finale.c`, `d_main.c` page drawer.
+Required decisions:
 
-### 8. Sound & music
-- Heretic SFX names/ids (we have the clips; need the full `sfx_*` table in Heretic mode) +
-  the Heretic MUS/MIDI music through the existing `i_mus.c` FM synth.
+- active table pointers versus a separate mission namespace;
+- how DeHackEd/DSDHacked applies in Heretic mode;
+- how renderer sprite indices remain valid;
+- savegame/demo versioning for a different mission.
 
-### 9. Episodes & skill
-- Heretic episode/skill menu (3 episodes in `heretic.wad`, 5 in the extended `hexen.wad`-era
-  "Shadow of the Serpent Riders"), the warp/`-skill` ("Thou art a Smite-Meister") names.
+### 3. Corvus player and weapons
 
-## Suggested phasing (each ships runnable)
-1. **Boot + tables**: detect `heretic.wad`, select Heretic `states/mobjinfo/sprnames/sfx`,
-   spawn the Corvus at a Heretic start, walk a Heretic level with the monsters we have
-   (no weapons yet → use the staff stub). Proves the data-table switch.
-2. **Weapons**: the 8 weapons + Tome (port `heretic/p_pspr.c`).
-3. **Status bar + inventory bar** (Heretic `sb_bar`), artifacts map-placeable.
-4. **Specials** (wind/scroll/flicker/ambient + the door/lift deltas).
-5. **Menu / intermission / finale / music / episodes** — the shell.
+Port the Heretic player fields, ammo types, weapon ownership/switching, eight weapons, Tome of Power modes and projectiles from the C reference source. The current artifact system must become the always-on Heretic inventory path rather than a console-only additive convenience.
 
-## Risks / decisions
-- **Dual data tables in one binary** is the crux: either runtime-select pointers
-  (`states`/`mobjinfo`/… become `extern`-pointers set at boot) — touches every file that
-  indexes them by a hard DOOM enum — or keep two binaries (chocolate-heretic style) and just
-  share assets. The pointer approach is the "one aiDoom" goal but is the riskiest refactor.
-- The renderer / collision / netcode are **reusable as-is** (same lineage).
-- Source of truth is `../crispy-doom/src/heretic/` — it's the same C, so most of this is
-  port-and-branch, not invent.
+### 4. Artifact/map integration
+
+Assign the real Heretic doomed numbers to map-placeable artifacts in Heretic mode, while retaining collision-safe additive numbers in ordinary DOOM mode. Wire inventory selection/use/drop, Wings, Morph Ovum and mode-specific HUD behavior to the active mission.
+
+### 5. Level specials and map semantics
+
+Port Heretic wind/current, friction/scroll, door/lift timing, ambient/flicker and related sector/line differences. Keep fixed-point/tic-locked semantics and do not silently apply Heretic specials to ordinary DOOM maps.
+
+### 6. Status bar and HUD
+
+Add the Corvus chain health display, ammo/artifact ribbon, Tome flash and mission-specific HUD assets. The current `HU_Buddy`/inventory overlay is not a substitute for the Heretic status bar.
+
+### 7. Menus, intermission, finale and title
+
+Add Heretic title/help/menu graphics, episode/intermission flow and finale pages behind `heretic_mode`. Guard DOOM-only lump lookups; do not solve missing art by masking every lookup with a random DOOM patch.
+
+### 8. Sound and music
+
+Complete the Heretic SFX table and map every native sound name. Reuse the current MUS/FM playback only where the format/patch semantics match; validate music lookup separately from SFX fallback.
+
+### 9. Episodes, skill and saves
+
+Implement Heretic episode/skill names, progression and warp rules. Define a mission-aware save signature and reject incompatible saves cleanly rather than loading a DOOM player/table layout into Heretic state.
+
+## Stop-points
+
+Each phase should leave a runnable artifact:
+
+1. mode detection + safe boot;
+2. active Heretic tables and a walkable map;
+3. Corvus/weapons;
+4. status/inventory;
+5. specials;
+6. shell/progression/finale;
+7. save/demo compatibility.
+
+Do not claim “full Heretic” until a real Heretic map can be played from start through progression with native weapons, status, specials and audio.
+
+## Risks
+
+- One binary with alternate active tables touches many hard-coded DOOM enum accesses.
+- Appended additive actors and mission-native actors can collide in editor numbers/sprite names.
+- `mobj_t` extras such as `special1/2` affect savegame layout and require the auto-versioning process.
+- Heretic's renderer palette and status art cannot be treated as optional if visual correctness is the goal.
+- DOOM regression testing must remain a separate gate after every mission change.
 
 ## Related
-`HERETIC_HEXEN.md` (the additive pack + monster status), `INVENTORY.md` (the artifact +
-flight/morph subsystems already built), `CLAUDE.md` (engine architecture).
+
+- `docs/HERETIC_HEXEN.md` — additive actor/asset status.
+- `docs/INVENTORY.md` — artifact implementation boundary.
+- `files/heretic.c`, `files/p_inv_heretic.c`, `files/d_main.c` — current foundation.
+- `CLAUDE.md` — build, save-version and engine architecture constraints.

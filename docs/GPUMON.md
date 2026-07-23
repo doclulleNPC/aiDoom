@@ -66,7 +66,7 @@ folder). Keys used:
 | Key | Meaning | Default |
 |-----|---------|---------|
 | `gpu_host` | host running the GPU (falls back to `ollama_host`) | `localhost` |
-| `gpu_user` | SSH user on that host | `lubee` |
+| `gpu_user` | SSH user on that host | tool default is `lubee`; the config app may write an empty value |
 | `gpu_ssh_port` | SSH port | `22` |
 | `ollama_host` | host serving Ollama (for the `/api/ps` model readout) | = `gpu_host` |
 
@@ -152,10 +152,7 @@ so the **first** connection to a new host trusts and records its key automatical
 
 ## Run
 
-Run `run/gpumon` (Linux/macOS) / `run\gpumon.exe` (Windows). It polls every ~2 s and
-draws load / memory / temp / power bars plus the loaded Ollama model. **On a
-connection error it stops** (no silent auto-retry) and shows a **Reconnect** button —
-click it to try again (this also re-probes which tool to use). `Esc` quits.
+The monitor polls roughly every two seconds. A connection error pauses automatic polling and shows **Reconnect**; clicking it re-probes the backend. Only the window-close event quits; `Esc` is ignored by the current SDL3 event loop.
 
 ---
 

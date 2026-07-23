@@ -1,209 +1,103 @@
-# Wie baue ich in Doom eine Steuerung der Monster durch LLM ein?
+# Monster LLM control — design rationale and shipped boundary
 
-**TL;DR:** Das ist die "AI Director"-Variante. Das Repo hat bereits die
-detaillierte Antwort: siehe **`AGENT_CONTROL.md` §12 "Letting an LLM control
-the monsters"** — die hier ist die Kurzfassung, mit einer anderen
-Betonung und einem paar eigenen Akzenten.
+## Scope
 
----
+This document explains why an LLM can be useful for high-level monster tactics, then states the boundary of what is actually shipped. The operational protocol is `docs/MONSTER_AGENT_GUIDE.md`; the player-agent protocol is `docs/AIPLAYER.md`.
 
-## 0. Die ehrliche Empfehlung in einem Satz
+## 1. Keep Doom's simulation
 
-Hör auf, **jeden** Monster jeden Tic vom LLM denken zu lassen. Lass die
-existierende C-KI weiter ihre 35-Hz-Reflexe machen, und lass das LLM in
-Sekunden-Abständen **Squad-Orders** an die Monster schicken. Die Reflexe
-sind umsonst, das LLM macht nur die Taktik, die der Original-AI
-fehlt.
+The engine's actor state machine, thinker list, fixed-point geometry, blockmap collision and `P_CheckSight` remain authoritative. An external model should not directly rewrite arbitrary `mobj_t` fields or run off-tic wall-clock logic.
 
----
+The model supplies intent at a slower cadence. The C layer stores a directive and executes it on the normal 35 Hz tic flow. This preserves the existing collision, attack and animation code while allowing tactics such as focus, flank or fallback.
 
-## 1. Was man vom Original-Doom behält — und was nicht
+## 2. Three control granularities
 
-Vanilla-Doom-Monster-KI (`p_enemy.c` + `info.c`) ist *berüchtigt* primitiv:
+1. **Per-tic motor control:** too large and too latency-sensitive for a remote LLM.
+2. **State-machine replacement:** powerful but destroys vanilla behavior and compatibility.
+3. **High-level tactical intent:** the shipped compromise. The LLM chooses an order/destination; `A_LLMChase` and the existing movement/attack states execute it.
 
-  * **Greedy chase**: Monster laufen stur auf den Spieler zu.
-  * **Infighting**: Monster, die sich gegenseitig sehen, ballern aufeinander,
-    oft genug aus Versehen.
-  * **Keine Flanken, kein Rückzug, kein Regrouping, keine Türen-Taktik**.
+The current director also accepts pacing commands (`spawn`, item spawn and `director relax`) separately from monster `act` tactics.
 
-Was schon funktioniert und **nicht** neu gebaut werden muss:
+## 3. Where the hook lives
 
-  * `A_Chase` — Pathing via `P_NewChaseDir` (8 `movedir`-States)
-  * `A_FaceTarget` — aiming
-  * `A_*Attack` — fire/transitions in der State-Machine
-  * `P_CheckSight` — line-of-sight check (kostet fast nix)
-  * mobj-Thinker-List — Iteration über alle lebenden Monster
+The implemented path is:
 
-**Plan:** LLM ersetzt die *Taktik*, nicht die Reflexe. Du hookst einmal in
-`A_Chase` und überschreibst nur die Anweisung, nicht die Ausführung.
+- `files/p_ai_llm.c` / `.h` — TCP line parser, observations and directive side table;
+- `files/p_enemy.c` — monster chase hook diverts directed monsters to `A_LLMChase`;
+- `files/p_tick.c` / game ticker path — AI network service and per-tic integration;
+- `files/p_ai_director.c` — LLM/rule pacing, spawns, stress and announcements;
+- `files/p_ai_coop.c` — shared waypoint navigation and optional buddy directives.
 
----
+The side table is keyed by `mobj_t *`; no monster directive fields were added to savegame structs.
 
-## 2. Drei Granularitäten — eine ist richtig
+## 4. Actual observation
 
-| Variante                           | LLM-Calls | Skaliert?  | Wenn ja, dann...                  |
-|------------------------------------|-----------|------------|------------------------------------|
-| (a) Jedes Monster, jeder Tic       | pro Tick  | **Nein**   | Nur für EINEN Boss                |
-| (b) Director / Squad-Commander     | pro Sek.  | **Ja**     | Standard-Empfehlung                |
-| (c) Selektiv: 1 Boss smart, Rest Vanilla | pro Sek. | **Ja, billig** | Bester Impact/Effort |
+The current `observe` reply is JSON, but the transport is a plain newline command protocol. It includes, where available:
 
-**(b) ist die Antwort für 95% der Fälle.** LLM sieht pro Encounter einen
-kompakten JSON, gibt Gruppen-Orders aus ("Imps: links flanken", "Gruppe B:
-zurückfallen"), die C-Schicht führt sie aus.
+- player position, angle, health, armor, weapon and region;
+- optional buddy position/health/armor/weapon/ammo/state/region, distances and route;
+- live monsters with ID, type, position, HP, region, visibility to player/buddy, distances and current order;
+- region centroids and topology links labelled open/door/locked;
+- director intensity/state/recent damage/ammo percentage;
+- a no-level response with `nolevel=true`.
 
----
+The server is polled by the client. It is not an event-driven push API.
 
-## 3. Wo genau der Hook sitzt (auf aiDoom zugeschnitten)
+## 5. Actual action surface
 
-In `p_enemy.c`, in `A_Chase`:
+Monster tactics:
 
-```c
-void A_Chase (mobj_t* actor)
-{
-    if (P_AI_Active (actor)) {   // <-- neu (side-table lookup, kein mobj_t-Feld)
-        A_LLMChase(actor);
-        return;
-    }
-    /* ... existing vanilla logic ... */
-}
+```text
+act order=<none|chase|hold|fallback|flank_left|flank_right|focus_fire|ambush|use_door> ids=<id-list|all> [focus=0|1] [x=... y=...] [for=tics] [after=tics]
 ```
 
-`A_LLMChase` (neues Modul `p_ai_llm.c`) liest die Direktive und führt sie
-mit den existierenden Primitives aus — `P_NewChaseDir`, `A_FaceTarget`,
-Attack-State-Transition.
+Pacing:
 
-**Wichtig — und das ist der Grund warum das Repo-Doc es richtig macht:**
-
-  * **Direktiven NICHT in `mobj_t` speichern.** `p_saveg.c` macht
-    `memcpy` auf der ganzen Struct beim Speichern/Laden; ein neues
-    Feld drinnen bricht Savegames. Lösung: **Side-Table** mit
-    `mobj_t*` als Key.
-  * **Modul:** neues `p_ai_llm.c` in `doom_SOURCES` aufnehmen, in
-    `Makefile`. (Keine Header-Dependencies im Makefile — `make clean`
-    nach Header-Änderungen, siehe `CLAUDE.md`.)
-
----
-
-## 4. Observation — was das LLM sieht
-
-Ein *Encounter*, nicht jeder Tic. Update **event-driven**: Spieler betritt
-Raum, Monster wird getroffen, Sichtlinie ändert sich, Spieler schießt.
-
-```json
-{
-  "encounter_id": "room3_imps",
-  "player": {
-    "pos": [1024, -256, 0],
-    "health": 78, "armor": 50, "weapon": "shotgun"
-  },
-  "monsters": [
-    {"id": "imp_1", "pos": [1100, -200, 0], "hp": 60,
-     "state": "chase", "can_see_player": true},
-    {"id": "imp_2", "pos": [1180, -240, 0], "hp": 60,
-     "state": "chase", "can_see_player": false}
-  ],
-  "geometry": {
-    "room": "room3",
-    "exits": ["door_n", "door_w"],
-    "player_can_reach": ["door_n"]
-  },
-  "player_dmg_last_3s": 18
-}
+```text
+spawn type=<name> count=<1..8>
+spawn item=<medkit|ammo>
+director relax
 ```
 
-Drei Quellen, allesamt free oder fast free:
+Buddy layer:
 
-  * **Player-State** aus `players[consoleplayer]` (C, instant)
-  * **Monster-Liste** durch `thinkercap.next`-Iteration, gefiltert auf
-    `mobj_t` mit `function.acp1 == P_MobjThinker` und in Encounter-Range
-  * **Geometrie** aus BSP/Blockmap — einmalig pro Map-Lookup,
-    cached in der Direktive
-
-Kein Pixel. Kein CV. Kein Halluzinieren. LLM bekommt Wahrheit.
-
----
-
-## 5. Action — was das LLM zurückgibt
-
-Nicht "Monster 1: turn 15°". Sondern:
-
-```json
-{
-  "directives": [
-    {"ids": ["imp_1"],  "order": "flank_left",  "for_tics": 70},
-    {"ids": ["imp_2"],  "order": "fallback",    "for_tics": 70},
-    {"ids": ["imp_1","imp_2"], "order": "focus_fire", "after_tics": 70}
-  ],
-  "tactical_notes": "Imps split: one baits, one flanks from door_w"
-}
+```text
+buddy order=<engage|defend|hold|regroup|retreat|goto|grab> ...
 ```
 
-`for_tics` / `after_tics` sind die Latency-Versicherung: Monster führen
-den letzten Order aus, während das LLM über den nächsten nachdenkt. Der
-Loop wartet **nie** auf das Modell.
+Utility:
 
-Order-Typen, die die C-Schicht kennen muss (klein halten!):
+```text
+reset
+wake
+```
 
-  * `chase` / `hold` / `fallback` / `flank_left` / `flank_right`
-  * `ambush` (Position via `x=`/`y=` übergeben)
-  * `focus_fire` (auf wen, via `focus=`)
-  * `use_door`
+There is one directive slot per monster. `after` delays that directive; it is not a queue. A subsequent `act` overwrites the stored order.
 
-Mehr nicht. Mehr ist micromanagement und der LLM wird schlecht drin.
+## 6. What is not shipped
 
----
+The following remain design proposals rather than current engine APIs:
 
-## 6. LLM-Modellwahl — die unausgesprochene Wahrheit
+- gRPC/MCP as a native transport;
+- stdin/stdout JSON `OBS`/`ACT` framing;
+- a `-headless` no-video/no-audio stepped environment;
+- server-side reward/done/reset semantics for RL;
+- a teleporter-specific order;
+- arbitrary encounter IDs or named monster objects independent of the current registry.
 
-Nimm nicht das stärkste Modell. Nimm das **schnellste** das noch mitdenkt.
+Use `docs/doom_agent_api_architecture.md` and `docs/doom_agent_api_vizdoom.md` as proposals/comparisons, not as implementation references.
 
-  * **Claude Haiku / GPT-4o-mini / Gemini Flash** für Encounter-Taktik:
-    unter 500 ms Antwortzeit, gut genug für "flank" / "fallback".
-  * Größere Modelle nur für **Boss-Design** oder für den einen (c)-Boss.
+## 7. Determinism and compatibility
 
-Latenz ist wichtiger als Intelligenz. Ein 3-Sekunden-LLM, das den
-perfekten Plan ausheckt, ist 3 Sekunden in denen die Monster in der
-Wand hängen.
+The C execution is tic-locked, but an external LLM changes the command stream and can be nondeterministic. Do not promise vanilla demo or netplay compatibility. The rule director is also gameplay code, not a proof of network synchronization.
 
----
+The current navigation helper is historically named `PF_AStar`, but the heuristic is disabled and the search behaves as Dijkstra. Door use is approximate high-level behavior, not a fully modelled teleporter/door planner.
 
-## 7. Was man dabei gewinnt
+## 8. Source map
 
-| Original-Doom                          | LLM-Director                    |
-|----------------------------------------|---------------------------------|
-| Greedy chase                          | Flanking, Bait-and-Switch       |
-| Infighting (zufällig)                  | Gezielt — Monster koordinieren  |
-| Kein Rückzug                           | "Fall back, regroup"            |
-| Türen = Hindernis                      | Monster können tactical Türen nutzen |
-| Kein Target-Prio                       | "Schwächster Spieler" / "Schwerer Bewaffneter" |
-| Alle Monster gleich hart               | Encounter-Tuning: leichter Raum vs. Boss |
-
-Im Effekt: ein **tactical AI Director** (cf. Left 4 Dead) — pro Encounter
-LLM-gesteuert, statt per Difficulty-Slider.
-
----
-
-## 8. Wo diese Antwort im Repo weitergeht
-
-Das hier ist die Kurzfassung. Für die echte Implementierung siehe:
-
-  * **`AGENT_CONTROL.md` §12** "Letting an LLM control the *monsters*" — die
-    ausführliche Version mit p_ai_llm.c-Skelett, A_LLMChase-Verhalten,
-    Savegame-Konflikt-Warnung, Determinismus-Caveat.
-  * **`AGENT_CONTROL.md` §12** "A nice hybrid" — der LLM-vs-LLM-Modus:
-    Spieler auf ViZDoom (oder §2 Player-Hook), Monster auf In-Engine
-    Director. **Genau der Modus, der "LLM spielt Doom als Dungeon-Master"
-    wahr macht.**
-
----
-
-## 9. Was diese Antwort *nicht* abdeckt (bewusst)
-
-  * **Wo LLM-State persistiert wird** (RAM vs. Disk): in der Side-Table,
-    Schlüssel `mobj_t*`, ist RAM — pro Map-Reset weg. Das ist Absicht
-    (Taktik ist encounter-spezifisch), nicht übersehen.
-  * **Netcode-/Demo-Kompatibilität**: Monster-AI nutzt `P_Random()` hart
-    (move-dir, pain-chance). LLM-Direktiven brechen das. Singleplayer ja,
-    Demo/Netcode nein. Steht im Repo-Doc §12 "Same two caveats".
-  * **Cost-Budget**: bei 5 Encounter/s × Haiku ist man bei ein paar
-    Cent/Stunde. Kein Thema. Wollte es nur erwähnt haben.
+- `files/p_ai_llm.c`, `files/p_ai_llm.h` — protocol/serializer/directives.
+- `files/p_ai_director.c`, `files/p_ai_director.h` — pacing and rule/LLM director.
+- `files/p_enemy.c` — chase integration.
+- `files/p_ai_coop.c` — buddy and navigation.
+- `docs/MONSTER_AGENT_GUIDE.md` — operator guide.
+- `docs/AGENT_CONTROL.md` — wider design history.

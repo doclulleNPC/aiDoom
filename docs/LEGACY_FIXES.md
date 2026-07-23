@@ -1,14 +1,8 @@
 # Legacy fixes — making 1996 DOOM behave on 2020s hardware
 
-This is a running log of bugs and limitations that stem purely from the **age of
-the code**: the engine is id Software's 1993/1996 C, written for a 32-bit DOS/x86
-world with a fixed 320×200 display, a small heap, K&R-ish C, and an early-90s
-compiler. None of these are "real" gameplay bugs — they are assumptions that were
-true then and are false now (64-bit pointers, modern compilers, hi-res displays,
-gigabytes of RAM).
+This is the source-backed running log of portability fixes in the current aiDoom tree. The entries cover 64-bit layout, modern compilers, variable internal resolution, large modern WADs, SDL3 tooling and the new AI/asset subsystems. It is a historical fix log: an entry can describe a bug that is already fixed, while the final section gives the current diagnostic symptom.
 
-**When you fix another one of these, add an entry here** (symptom → root cause →
-fix → files). Categories below.
+**Last source audit:** 2026-07-22. When adding a new entry, record symptom → root cause → fix → files and distinguish a historical regression from a still-open limitation.
 
 ---
 

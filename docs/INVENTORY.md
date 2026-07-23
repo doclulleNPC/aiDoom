@@ -1,103 +1,79 @@
-# INVENTORY.md — artifact / item inventory systems
+# INVENTORY.md — artifact and item inventory systems
 
-aiDoom adds a Heretic/Hexen-style **inventory** on top of the 1993 engine: a held list of
-items you scroll through and use, drawn bottom-centre (`HU_Inventory_Drawer`, config
-`show_inventory_hud`). The held counts live in `player_t.inventory[NUMARTIFACTS]` + the
-selected slot `player_t.invslot` (so they ride along in the savegame's wholesale `player_t`
-memcpy; changing the artifact set bumps the engine `VERSION_NUM` and cleanly rejects stale
-saves).
+This document separates the small Doom co-op overflow inventory from the Heretic artifact system. The two systems share UI/configuration helpers but are not the same inventory model.
 
-There are **three independent item sets** sharing the same machinery (scroll / use / drop /
-HUD). The generic engine is in `files/p_invent.c`; the Heretic effects in
-`files/p_inv_heretic.c`; the generic flight + morph subsystems in `files/p_morph.c` and
-`p_user.c`.
+## Current key defaults
 
-## Keys (configurable in `aidoom_config` / `aidoom.cfg`)
-| Action | Default | Bind |
+The configuration key defaults are the current source defaults: `show_buddy_hud=1`, `show_inventory_hud=1`, `key_buddy_come=,`, `key_buddy_attack=.`, `key_buddy_stay=KEY_MINUS`, `key_buddy_mode=-1` (unbound), and arrow keys for the four inventory actions.
+
+| Action | Default | Config key |
 |---|---|---|
-| Select previous item | `[` | `key_inv_left` |
-| Select next item | `]` | `key_inv_right` |
-| Use selected item | `Enter` | `key_inv_use` |
-| Drop selected item | `d` | `key_inv_drop` |
+| Select previous item | Left Arrow | `key_inv_left` |
+| Select next item | Right Arrow | `key_inv_right` |
+| Use selected item | Down Arrow | `key_inv_use` |
+| Drop selected item | Up Arrow | `key_inv_drop` |
 
-Scrolling skips empty slots and wraps. **Drop** (`P_DropArtifact`) spawns the item's pickup
-mobj on the ground a little in front of you (tossed, so you don't instantly re-grab it; it
-stays at your feet if a wall blocks) and removes it from the inventory.
+The selection skips empty slots and wraps. Users can rebind all four actions in the config/menu system.
 
-## 1. DOOM "overflow" inventory — **buddy-only**
-Modelled as a co-op convenience: it is **only active when you play with the buddy**
-(`-coop` / `-aicoop`; gated on `P_AICoop_Active()` in `P_StoreOverflow`). Solo play is
-vanilla — a stimpack at full health just stays on the floor.
+## 1. Doom overflow inventory — buddy-only
 
-When you pick up a health/armor/ammo item while already **at its cap** (so vanilla DOOM
-would waste/refuse it), the surplus is pocketed instead:
+The overflow path is intentionally conservative: in solo play a health pickup at full health remains on the floor, as in vanilla Doom. With `-coop` or `-aicoop`, `P_StoreOverflow` can let the player/buddy path retain health and ammo pickups that would otherwise be wasted (`files/p_invent.c`, `files/p_inter.c`, `files/p_ai_coop.c`).
 
-| Picked up at cap | Stored as | Use effect |
-|---|---|---|
-| Stimpack (HP ≥ 100) | `arti_stimpack` | +10 HP |
-| Medikit (HP ≥ 100) | `arti_medikit` | +25 HP |
-| Health bonus (HP ≥ 200) | `arti_healthbonus` | +1 HP (cap 200) |
-| Armor bonus / green / blue (at cap) | `arti_armorbonus` / `_greenarmor` / `_bluearmor` | re-give the armor |
-| Bullets / shells / rockets / cells (at max) | `arti_ammo_*` (stores the **amount**) | refill up to max |
+The buddy has a small held-artifact state used for automatic support behavior. It is not a general arbitrary-item bag and it does not replace Doom's normal weapon/ammo inventory.
 
-Implemented as a uniform pattern in `P_TouchSpecialThing` (`p_inter.c`): if the normal
-`P_GiveBody/Armor/Ammo` fails (at cap), `P_StoreOverflow(...)` pockets it, else the pickup
-falls through to vanilla "leave it".
+### Second wind
 
-**Second wind.** In buddy mode, when an otherwise-lethal hit would kill a human, a stored
-**medikit or stimpack is spent automatically to keep them standing** (`P_InventorySecondWind`,
-hooked in `P_DamageMobj`): health is set to the item's heal value (25 / 10) instead of dying.
-Never for the buddy itself (it has its own L4D down/revive).
+`P_InventorySecondWind` is called from damage handling. When enabled by the companion inventory path, a medikit or stimpack can be consumed to prevent the supported marine from dropping all the way out:
 
-**Buddy auto-heal.** The buddy spends its own held health artifacts when hurt
-(`AICoop_AutoHeal`, value order medikit → flask → stimpack → urn → health bonus) before
-hunting for a med-pack.
+- medikit: 25 HP;
+- stimpack: 10 HP.
 
-## 2. Heretic artifacts (`files/p_inv_heretic.c`)
-The real Heretic artifacts, with sprites extracted into `run/ID0/hereticstuff.wad` by
-`tools/extract_heretic_monsters.py`. Currently obtained via the
-console `givearti <name>` (their real Heretic doomednums would collide with DOOM things, so
-the pickup items are `doomednum = -1`); effects work without the wad, only the on-floor icon
-needs it (gated by `HereticInv_Available`).
+This is separate from the buddy's downed/revive state. The buddy itself is not revived through second wind; it uses the explicit co-op revive flow described in `docs/BUDDY_PORTING.md`.
 
-| Artifact | Effect |
-|---|---|
-| Quartz Flask | +25 HP |
-| Mystic Urn | +100 HP |
-| Tome of Power | Berserk (DOOM has no powered weapons — simplified) |
-| Torch | infrared light, ~120 s |
-| Time Bomb | spawns a fused bomb → `A_Explode` (radius 128) |
-| Ring of Invincibility | `pw_invulnerability`, 30 s |
-| Shadowsphere | `pw_invisibility` + MF_SHADOW, 60 s (true invisibility — see below) |
-| Chaos Device | teleport to the level start, with fog |
-| **Wings of Wrath** | flight (generic `pw_flight`) |
-| **Morph Ovum** | fires an egg → morphs the hit monster into a chicken |
+## 2. Heretic artifacts
 
-The use dispatcher in `P_UseArtifact` routes `h_arti_*` slots to `ApplyHereticArtifact`.
+The Heretic artifact implementation lives in `files/p_invent.c`, `files/p_inv_heretic.c`, `files/p_morph.c`, and the player fields in `files/d_player.h`. The current artifact set is:
 
-### Generic flight & morph (reusable by DOOM / Heretic / Hexen)
-- **Flight** is a plain timed power `pw_flight` (`doomdef.h`, handled in `p_user.c`): float
-  (MF_NOGRAVITY), jump to rise, climb/descend by the look pitch. Any inventory can grant it.
-- **Morph** (`files/p_morph.c`): `P_MorphMonster(target, morphtype, tics)` turns a monster
-  into a parameterised morph-creature (Heretic → chicken; Hexen → pig later) via a side-table
-  (no `mobj_t`/savegame change); `P_MorphTicker` counts down and morphs it back (with a
-  space-check), `P_MorphReset` clears it on level load.
+- Quartz Flask
+- Mystic Urn
+- Tome of Power
+- Torch
+- Time Bomb of the Ancients
+- Ring of Invincibility
+- Shadow Sphere
+- Morph Ovum
+- Wings of Wrath
+- Chaos Device
 
-### True invisibility
-`pw_invisibility` (DOOM blursphere **and** the Heretic Shadowsphere) now makes the player/buddy
-genuinely invisible to monsters: `P_LookForPlayers` won't acquire an invisible target and
-`A_Chase` forgets one it isn't actively retaliating against — **only once you shoot a monster
-does it come after you** (the shot sets its threshold in `P_DamageMobj`).
+The exact enum/field names are `h_arti_flask` through `h_arti_egg` in `files/d_player.h`.
 
-## 3. Hexen artifacts — planned
-The generic flight + morph building blocks are in place (the Heretic Wings/Morph use them);
-the Hexen item set (Flechette, Porkalator → pig morph, Disc of Repulsion, …) is future work.
+### Implemented behavior
 
-## Console
-`givearti <name>` gives any artifact for testing — DOOM overflow names
-(stimpack/medikit/healthbonus/armorbonus/greenarmor/bluearmor/bullets/shells/rockets/cells)
-and Heretic names (flask/urn/tome/torch/bomb/ring/shadow/chaos/wings/egg).
+- Pickup, selection, use and drop are implemented through the inventory helpers.
+- The Quartz Flask and Mystic Urn provide the current healing effects.
+- Tome, Torch, Ring, Shadow Sphere, Chaos Device and Wings have their current ported effects where the corresponding player/game-mode hooks are active.
+- Wings use the generic flight support.
+- Morph Ovum calls the generic morph subsystem (`P_MorphMonster` in `files/p_morph.c`) and turns eligible monsters into the current supported morph form.
+- True invisibility changes monster target acquisition/visibility behavior through the player/mobj and enemy paths.
 
-## Related docs
-`BUDDY_PORTING.md` (the co-op buddy), `HERETIC_HEXEN.md` (the monster/asset ports),
-`DIRECTOR_MODES.md` (the AI director), `CLAUDE.md` (architecture).
+This is additive content support, not a promise that aiDoom is a complete Heretic game mode. Full Corvus weapons, Heretic status-bar behavior, level progression and all original artifacts remain part of `docs/HERETIC_SUPPORT_PLAN.md`.
+
+## 3. Hexen artifacts
+
+The Hexen artifact set—Flechette, Porkalator, Disc of Repulsion and related class-specific behavior—is planned. The generic flight/morph building blocks exist, but the complete Hexen item and player system is not implemented.
+
+## Console and HUD
+
+The artifact inventory HUD is drawn by `HU_Inventory_Drawer` in `files/hu_buddy.c` and is controlled by `show_inventory_hud`. The selected artifact and held count appear in the bottom-center overlay when an artifact is selected/held.
+
+The buddy's own artifact readout is a separate fourth line in the buddy HUD. See `docs/BUDDY_HUD.md`.
+
+Buddy/admin console commands (`buddyheal`, `buddyarm`, `buddyhome`, etc.) are not artifact-selection commands; they are debug/control helpers implemented in `files/c_console.c`.
+
+## Source map
+
+- Generic inventory and overflow: `files/p_invent.c`, `files/p_inter.c`.
+- Heretic artifacts: `files/p_inv_heretic.c`, `files/d_player.h`.
+- Morphing: `files/p_morph.c`.
+- Player input/config defaults: `files/m_misc.c`, `files/g_game.c`.
+- HUD: `files/hu_buddy.c`, `files/hu_buddy.h`.

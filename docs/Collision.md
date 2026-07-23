@@ -1,30 +1,39 @@
-# Doom Collision: Blockmap vs BSP-Tree
+# Doom collision: background reading
 
-> John Carmack sagt in dem Doc zum Release vom Code von Classic Doom etwas über BSP statt Blockmaps zu benutzen für die Collision Detection? Erkläre.
+This is a short background note about the collision architecture inherited from classic Doom. It is not a complete description of every aiDoom collision extension; for implementation details, read `files/p_map.c`, `files/p_maputl.c`, `files/p_sight.c` and the relevant docs under `docs/`.
 
-Ja, deine Erinnerung ist absolut richtig! Wenn John Carmack über das Design von Classic Doom (und später Quake) spricht, reflektiert er oft über eine der Designentscheidungen, die er im Nachhinein anders gelöst hätte: die Kollisionsabfrage (Collision Detection) über die Blockmap statt über den BSP-Tree (Binary Space Partitioning).
+## 1. The two spatial systems in classic Doom
 
-Hier ist die genaue Erklärung, was er damit meint, warum er es damals so gemacht hat und warum er es später bereute.
+### Blockmap
 
-## 1. Die beiden Systeme in Doom
+The blockmap divides the map into fixed-size square cells. Each cell stores references to lines and things that overlap it. During movement or hitscan, Doom visits the cells crossed by the query and tests only the nearby candidates.
 
-**Der BSP-Tree (für die Grafik):** Doom nutzt einen BSP-Tree, um das Level in voneinander abgetrennte Bereiche (Subsektoren) zu unterteilen. Dadurch weiß die Engine blitzschnell, welche Wände am nächsten zum Spieler stehen und in welcher Reihenfolge sie gezeichnet werden müssen. Der BSP-Tree teilt den Raum geometrisch perfekt auf.
+In aiDoom, the blockmap remains the main broad-phase collision/index structure. The code walks blockmap lines/things through the `PIT_*` and `P_BlockThingsIterator` paths in `files/p_map.c` and `files/p_maputl.c`.
 
-**Die Blockmap (für die Kollision):** Für die Bewegung von Monstern, Spielern und Projektilen nutzte Carmack stattdessen ein simples, separates Gittermodell – die Blockmap. Das gesamte Level wird dabei in Planquadrate von 128×128 Einheiten unterteilt. Jedes Quadrat speichert eine Liste der Wände (Linedefs) und Objekte (Mobjs), die sich darin befinden. Bewegt sich etwas, muss das Spiel nur die Objekte in den direkt umliegenden Quadraten prüfen.
+### BSP tree
 
-## 2. Warum wurde die Blockmap genutzt?
+The BSP tree partitions the map into subsectors for rendering and spatial lookup. It is excellent for deciding which sectors/segments are visible and for locating the subsector containing an actor. It is not, by itself, a full swept-volume collision solver.
 
-Anfang der 90er-Jahre (auf 386er- und 486er-PCs) war Rechenleistung extrem knapp. Carmack wählte die Blockmap, weil sie eine extrem billige und schnelle mathematische Abfrage erlaubte. Es ist im Code viel einfacher und performanter zu sagen: "Der Spieler ist in Planquadrat X/Y, prüfe nur die fünf Objekte dort", als sich jedes Mal durch die verschachtelte Baumstruktur des BSP-Trees zu hangeln.
+aiDoom also uses the BSP subsector graph for buddy/agent navigation (`files/p_ai_coop.c`), but that is path planning, not a replacement for physical collision.
 
-## 3. Carmacks Kritik: Warum die Blockmap ein Fehler war
+## 2. Why Doom used the blockmap
 
-Als John Carmack den Quellcode von Doom Ende 1997 freigab (und in späteren Texten/Interviews), wies er darauf hin, dass die Trennung von Grafik (BSP) und Kollision (Blockmap) zu massiven Problemen führte:
+The blockmap was cheap on 1993 hardware and easy to use for both line and thing queries. A moving actor usually needs to test a small neighborhood, not the entire map. Fixed-point arithmetic and the 35 Hz tic simulation make the result deterministic.
 
-- **Redundanz und Speicherverschwendung:** Das Spiel musste zwei komplett unterschiedliche Raumstrukturen für dasselbe Level im Speicher halten und berechnen.
-- **Berühmte Gameplay-Bugs (Der "All-Ghosts"- und "Blockmap"-Bug):** Da das Gitter starr ist, kam es zu Rundungsfehlern und Logiklücken. Wenn ein Objekt beispielsweise genau auf der Grenze zweier Blöcke stand, passierte es regelmäßig, dass die Kollisionsabfrage versagte. Projektile (wie Schrotflinten-Pellets oder Raketen) flogen dann einfach spurlos durch Gegner oder Wände hindurch (bekannt als Hitscan-Spannweiten-Fehler). In extremen Fällen konnte die Kollision für das ganze Level versagen und alle Monster wurden zu "Geistern" (der All-Ghosts-Effekt).
+The price is that the blockmap is a coarse spatial index. The final collision checks still have to handle actor radii, line openings, step height, floors/ceilings and the special rules of Doom's movement model.
 
-## Wie er es später gelöst hat (Quake)
+## 3. What a Quake-style approach changes
 
-Carmack erkannte diesen Fehler recht schnell. Schon bei der Entwicklung von Quake verwarf er das Konzept starrer Blockmaps komplett. In Quake (und der darauffolgenden id-Tech-Engines) wird der BSP-Tree nicht nur für das Rendering der Grafik genutzt, sondern auch direkt für die Kollisionsabfrage verwendet (mithilfe sogenannter Clip Nodes).
+Later engines made more extensive use of BSP/clip-node or similar convex-volume queries for collision. That can give cleaner geometric separation, but it requires a different map representation and a substantially different movement solver. It is not a drop-in optimization for classic Doom.
 
-Wenn Carmack also sagt, er hätte lieber den BSP-Tree für die Kollision in Doom genutzt, meint er: Hätte er die mathematische Präzision des BSP-Baums von Anfang an auch auf die Bewegung angewendet, wäre Doom vollkommen frei von den typischen "Durch-die-Wand-schießen"- oder "Durch-Gegner-hindurchgleiten"-Bugs gewesen.
+Therefore the useful engineering conclusion is not "replace Doom's blockmap with a BSP tree". It is:
+
+- keep the blockmap broad phase for compatibility;
+- use BSP/subsector data where it is a good index (rendering, navigation, location);
+- improve specific collision predicates only when the gameplay contract requires it.
+
+## 4. aiDoom-specific caveats
+
+The current port adds over/under actor movement by default and keeps a compatibility flag, `-infinitetall`, for vanilla infinitely-tall actor collision. `PIT_CheckThing` in `files/p_map.c` is the relevant path.
+
+Other collision-related features include checked monster spawning (`P_SpawnMonsterChecked` in `files/p_mobj.c`), projectile/thing blocking, and the buddy's pathfinder/door handling. These are separate layers and should not be conflated with the original blockmap design.

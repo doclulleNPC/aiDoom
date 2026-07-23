@@ -1,330 +1,88 @@
-# BUDDY_HUD.md — Companion HUD
+# BUDDY_HUD.md — companion and artifact HUDs
 
-Small HUD overlay for the AI co-op companion ("buddy") in aidoom, pinned to the
-**top-right corner**. It is drawn in the small Doom HUD message font
-(`hu_font` / `STCFN*`) at the same size and native colour as the in-game pickup
-messages, via `V_DrawPatch` (which handles the hi-res scaling), plus an animated
-**mugshot** (`BUF*` faces baked into `aidoom.wad`) to the left of the text.
+**Source audit:** 2026-07-22. The implementation described here is the current `hu_buddy.c` path; earlier TTF/strip experiments are historical only.
 
-> NOTE: the sections below ("Umgesetzt", most of "History"/"Fixes"/"Xvfb")
-> describe an **earlier design** — a centred top strip using a custom
-> `HU_Buddy_DrawPatchHalf` half-scaled-STBAR renderer and a TTF atlas. That was
-> **replaced** by the current top-right, message-font + mugshot readout. They are
-> kept as history; the accurate current behaviour is this header and the code in
-> `files/hu_buddy.c`.
+The active implementation is `files/hu_buddy.c` / `files/hu_buddy.h`. It no longer uses the older centered TTF strip described in historical notes. The current buddy HUD is rendered with Doom patch/font assets in the game overlay.
 
-Source: `files/hu_buddy.h`, `files/hu_buddy.c`
-Hooks: `files/hu_stuff.c` (`HU_Buddy_Drawer` + `HU_Inventory_Drawer` from
-         `HU_Drawer`; `HU_Buddy_Ticker` from `HU_Ticker`),
-       `files/d_main.c` (`HU_Buddy_Init` after `HU_Init`),
-       `files/i_video.c` (`HU_Buddy_SetRes` after `ST_SetRes`),
-       `files/m_misc.c` (`show_buddy_hud` / `show_inventory_hud` config keys).
+## Buddy HUD
 
----
+`HU_Buddy_Drawer` draws the companion panel when:
 
-## Was der Code aktuell tut
+- the game is in the appropriate level/draw state;
+- `show_buddy_hud` is enabled;
+- the buddy slot exists and `playeringame[slot]` is active.
 
-- **Rechtsbündiger Readout oben rechts**, BASE- / wide-base-Koords, gezeichnet in
-  der kleinen Doom-HUD-Message-Font (`hu_font`) via `V_DrawPatch` /
-  `V_DrawPatchTranslated` — **kein** eigener Patch-Half-Renderer, **keine** TTF-Atlas,
-  **keine** Separator-Linien mehr.
-- **Animierter Mugshot** (`BUF*`-Faces aus `aidoom.wad`, `tools/bake_buddy_face.py`),
-  ST-Style-Statemachine (`HU_Buddy_FaceTick`), pro Tic aus `HU_Buddy_Ticker`
-  aktualisiert; fehlt die WAD, fällt der Readout auf ein `"BUDDY"`-Textlabel zurück.
-- **Text-Layout**, rechtsbündig (`tx = wb - 4 - textw`):
-  - Zeile 1: `HP <n>  AR <n>` — die HP-Zahl per `V_HealthTrans` gefärbt
-    (>75 grün, >25 gelb, sonst rot).
-  - Zeile 2: Waffen-Name (`FIST/PISTOL/SHOTGUN/CHAINGUN/ROCKET/PLASMA/BFG/CHAINSAW/SSG`)
-    + Ammo (nur bei Waffen mit Munition).
-  - Zeile 3: State-Name aus `P_AICoop_State()`
-    (`FOLLOWING/ATTACKING/HEALING/HOLDING/COMING/GRABBING`).
-- **Downed-Zustand** (`bot->playerstate == PST_DEAD`, inkapazitiert ≠ tot):
-  ersetzt die Stats durch `BUDDY DOWN` / `REVIVE: USE` und zeigt im Mugshot-Slot
-  einen **8-Richtungs-Kompass-Pfeil** (`RARR*` PNGs) der vom Menschen zum Buddy zeigt.
-- **Config-Toggles** in `m_misc.c`'s `defaults[]` (beide Default 1 = ON):
-  `show_buddy_hud` und `show_inventory_hud`, persistiert via
-  `M_LoadDefaults`/`M_SaveDefaults`.
-- **Auto-On**: rendert auch ohne aktiven Buddy problemlos (frühe Returns wenn
-  `P_AICoop_Slot() < 0` bzw. `!playeringame[slot]` → no-op).
-- **(J) Artifact-Inventory-HUD** (`HU_Inventory_Drawer`, Toggle `show_inventory_hud`):
-  eine **unten-zentrierte** Zeile knapp über der Status-Bar mit dem aktuell
-  gewählten Artefakt und Menge, z.B. `QUARTZ FLASK X3`; no-op wenn nichts
-  gewählt/gehalten. Nutzt dieselben Text-Helper (`HU_Buddy_Text`/`HU_Buddy_TextW`).
-- **Hooks**:
-  - `HU_Buddy_Init()` aus `D_DoomMain` direkt nach `HU_Init` (aktuell leerer Body —
-    `hu_font` wird schon von `HU_Init` geladen).
-  - `HU_Buddy_Drawer()` + `HU_Inventory_Drawer()` aus `HU_Drawer` (`hu_stuff.c`),
-    laufen nach `ST_Drawer`.
-  - `HU_Buddy_Ticker()` aus `HU_Ticker` (`hu_stuff.c`) — treibt die Mugshot-Animation.
-  - `HU_Buddy_SetRes()` aus `V_SetRes` (`i_video.c`), no-op (stable API).
+It works for both `-coop` and `-aicoop`, because both modes run the buddy. The downed state is drawn rather than being suppressed.
 
----
+### Layout
 
-## Done
+The panel is anchored at the **top-right** and contains:
 
-- [x] Eigene `files/hu_buddy.h` mit public API (`HU_Buddy_Init`/`Drawer`/
-      `SetRes` + `extern int show_buddy_hud`).
-- [x] Eigenes `files/hu_buddy.c` mit Patch-Half-Renderer, TTF-Sub-Sampler,
-      Widget-Komposition und Layout.
-- [x] `HU_Buddy_Init` ist mittlerweile ein leerer Body — `hu_font` (die kleine
-      Doom-HUD-Message-Font) wird schon von `HU_Init` geladen; die `BUF*`-Mugshot-
-      Faces werden lazy in `HU_Buddy_LoadFaces` gecacht.
-- [x] `HU_Buddy_Drawer` (+ `HU_Inventory_Drawer`) in `HU_Drawer` (`hu_stuff.c`) integriert.
-- [x] `HU_Buddy_Ticker` in `HU_Ticker` (`hu_stuff.c`) integriert.
-- [x] `HU_Buddy_Init` in `D_DoomMain` (`d_main.c`) integriert.
-- [x] `HU_Buddy_SetRes` in `V_SetRes` (`i_video.c`) integriert.
-- [x] `show_buddy_hud` + `show_inventory_hud` extern decl + `defaults[]`-Einträge in `m_misc.c`.
-- [x] Build clean, keine neuen Warnings oder Errors.
-- [x] Game-Run-Test (xvfb headless): binary startet, initialisiert alle
-      Subsysteme, `HU_Buddy_Init: Companion HUD.` im stderr, Buddy läuft
-      (`PLD 56 navok=1 state=0` Pathfinding-Spuren), `HU_Buddy_Drawer` läuft
-      jeden Frame, kein Crash, kein Speicherleck.
-- [x] CMake + Build.sh greifen das neue `hu_buddy.c` automatisch via
-      `file(GLOB ... files/*.c)` bzw. `gcc ... *.c`.
+- an animated `BUF*` buddy mugshot;
+- three status lines for the current health/armor/weapon/ammo/behavior display;
+- a fourth line for the buddy's own held artifact inventory icons/counts;
+- `BUDDY DOWN` / revive guidance when downed;
+- an eight-direction `RARR*` arrow from the human toward the downed buddy.
 
----
+Text uses the message-font helpers in `hu_buddy.c`. The source function set—not historical helper names—is authoritative for rendering behavior.
 
-## Todo (offene Punkte / Dinge die noch verifiziert werden müssen)
+## Human artifact HUD
 
-- [ ] **Visuelle Verifikation im echten Game**: in Xvfb-Tests konnte ich
-      das HUD nicht im Screenshot sehen — das deutet stark auf ein
-      Xvfb-spezifisches `SDL_RenderPresent`/Buffer-Sync-Problem hin, nicht
-      auf einen Code-Bug. Im echten Run mit echtem Window-Manager sollte
-      das HUD sichtbar sein. **Bitte selbst testen**:
-      `cd ~/Source/aidoom && ./build.sh && ./run/aidoom -iwad doom.wad -aicoop`.
-- [ ] **Patch-Half-Skalierung visuell prüfen**: mein `HU_Buddy_DrawPatchHalf`
-      ist handgeschrieben (kein V_DrawPatch-Reuse weil das nicht
-      beliebig skalieren kann) und muss gegen die Original-STBAR-Optik
-      verglichen werden. Wenn Glyphen verzerrt/verkehrt herum aussehen,
-      ist vermutlich der `leftoffset`/`topoffset`-Sub-Sampling-Offset der
-      Bug — easy fix.
-- [ ] **Tuning der Layout-X-Offsets**: `X_HP_LABEL`, `X_HP_VALUE`,
-      `X_WEAPON` etc. sind handgetuned für BASE 320×200. Bei
-      `widescreen == true` ist `WIDESCREENDELTA` korrekt addiert, aber die
-      Spacing-Werte könnten im 16:9-Mode zu eng werden. Im 4:3/16:10
-      unverändert.
-- [ ] **Options-Menu-Integration**: `show_buddy_hud` ist via Config-Toggle
-      änderbar, aber nicht im Options-Menü sichtbar. Falls gewünscht, einen
-      `Messages`-Style-Eintrag im Options-Menü (`m_menu.c:1117`-Pattern)
-      hinzufügen.
-- [ ] **Consolen-Command**: ein `buddy_hud [on|off]` Command im
-      `c_console.c` für schnelles Toggle wäre nice-to-have.
-- [ ] **Visual Mode für hud-strip background**: aktuell nur dünne
-      Separator-Linien. Falls eine echte "Box" gewünscht ist (wie die
-      originale STBAR mit `STBAR`-Hintergrund-Patch), kann man den halben
-      `STBAR`-Patch (320×16 statt 320×32, subsampled) als Background
-      benutzen — erfordert aber dass `STBAR` selbst auch halbiert wird
-      (oder einen separaten `STBAR2`-Lump).
+`HU_Inventory_Drawer` is a separate bottom-center overlay controlled by `show_inventory_hud`. It shows the human player's currently selected artifact and held count when an artifact is selected/available.
 
----
+Do not confuse these two displays:
 
-## Fixes (Bugs die im Verlauf gefixt wurden)
+- buddy top-right line: the buddy's own artifact inventory;
+- human bottom-center line: the player's selected artifact.
 
-1. **`HU_FONTSIZE`/`HU_FONTSTART` undeclared**: erster Build brach ab weil
-   `hu_buddy.c` `hu_font[]` benutzte ohne `hu_stuff.h` zu inkluden. Fix:
-   `#include "hu_stuff.h"` ergänzt.
+## Configuration
 
-2. **`mobj_t->playerstate` existiert nicht**: `playerstate` ist auf
-   `player_t`, nicht auf `mobj_t`. Fix: check über `players[i].playerstate`
-   statt `lis->playerstate`.
+`files/m_misc.c` persists:
 
-3. **`show_buddy_hud` undefined reference (linker)**: Variable war `extern`
-   in `m_misc.c` aber nirgendwo definiert. Fix: `int show_buddy_hud = 1;`
-   in `hu_buddy.c` (Default ON).
+- `show_buddy_hud` — default `1`;
+- `show_inventory_hud` — default `1`.
 
-4. **`HU_Buddy_DrawNumberTall` forward-decl mit falscher Signatur**:
-   Forward-decl hatte `(int, int, int, byte)`, Definition hatte
-   `(int, int, int, byte, int width)`. Fix: forward-decl um `int width`
-   erweitert.
+Both can be changed through the current menu/config path. They are independent toggles.
 
-5. **Shadow-strip am Ende von `DrawStrip` tat nichts sinnvolles**: ein
-   Dead-Code-Block der `if (screens[0][...] == 0) screens[0][...] = 0`
-   machte (set 0 auf 0). Fix: entfernt.
+## Assets
 
-6. **xvfb-Screenshots verfehlten das Fenster**: aiDoom-Fenster war 1776×1000
-   auf negativen Koordinaten (-376,-116) weil SDL3 HiDPI-Scaling machte,
-   `import -window root` schoss nur den schwarzen Xvfb-Hintergrund. Fix:
-   vor jedem Test `xdotool windowmove 0 0` + `windowsize 320 200` +
-   `windowactivate` + `windowraise`, dann `import -window <id>`.
+The HUD uses the current WAD/image assets loaded through the normal patch system:
 
-7. **Falsche Palette für "weiß"-Debug**: `palette[0xff]` ist `#a76b6b`
-   (gedämpftes Rosa), NICHT Weiß. Weiß-Pixel sind `palette[4]`/`[168]`/
-   `[208]`/`[224]`. Beim ersten Patch-Renderer-Test hatte ich `0xff` als
-   "helles Weiß" benutzt und gedacht mein Code rendert nicht — der
-   rendert schon, ich hatte nur die falsche Farbe. Debug-Pixel auf
-   `palette[4]` umgestellt, dann war's klar sichtbar… als plötzlich
-   DOOM's eigener 3D-Render darüber malte (siehe unten).
+- `BUF*` buddy face animation frames;
+- `RARR*` directional arrows;
+- the Doom HUD/message font and inventory icon assets where available.
 
----
+If an asset is missing, the drawer should fail gracefully according to its lookup guards. A visually missing element should be debugged by checking the WAD lump name and the draw gate, not by reintroducing the deleted TTF-atlas implementation.
 
-## History (Iteration-Verlauf)
+## Draw integration
 
-### v1: erste Implementierung (rechtbündig, TTF-only, mit BG-Box)
+The HUD is initialized/drawn from the normal engine overlay path. The relevant integrations are:
 
-- Status-Bar-artiger HUD oben rechts, kleiner TTF-Text in einer Zeile.
-- V_DrawBlock-basierter BG-Streifen mit `BUDDY_BG_PAL` (rosa, weil
-  PLAYPAL[16]).
-- Rosa Hintergrund zu auffällig, User wollte transparent.
+- initialization in startup/HU setup;
+- per-frame draw from the HUD/video path after the 3D view is available;
+- resolution-aware patch drawing through the existing `V_*` routines;
+- live player/buddy state from `P_AICoop_Slot()` and `players[]`.
 
-### v2: rosa BG raus, TTF-atlas statt V_DrawPatch, Shadow-Trick
+The 2D routines use the engine's 320×200-authored coordinate convention and scale through the current high-resolution video layer.
 
-- `V_DrawBlock`-BG komplett entfernt — transparent.
-- Eigener TTF-Glyph-Renderer (`HU_Buddy_DrawChar`) gegen den
-  `font_alpha[]`-Atlas, der bereits für die Console benutzt wird.
-- 1-Pixel-schwarzer Schatten 1px down/right für Lesbarkeit auf Lava.
-- Eine Zeile, rechtsbündig ausgerichtet.
-- **Erfolgreich getestet** in Xvfb (Screenshot zeigte gelben Text
-  `[BUDDY] HP 100 ARM 7 PISTOL 50 12U FOLLOW` oben rechts).
+## Debugging checklist
 
-### v3: User wollte links frei für DOOM-Messages → rechtsbündig (done)
+1. Confirm `-coop` or `-aicoop` created the buddy slot.
+2. Confirm `show_buddy_hud 1` / `show_inventory_hud 1` in the active config.
+3. Confirm the game is in `GS_LEVEL` and the expected player slot is active.
+4. Confirm the required face/arrow/icon lumps exist in the loaded WADs.
+5. Confirm the overlay draw happens after the 3D view and before final presentation.
+6. Use a known visible PLAYPAL index when drawing temporary debug pixels; palette index `255` is not guaranteed white.
+7. Treat Xvfb-only rendering oddities as a separate verification concern and still test in the real game.
 
-- Position von links nach rechts verschoben: erst pro-Spalte-x-offset,
-  dann komplett auf `x = BASE_WIDTH - 2 + WIDESCREENDELTA - total_width`
-  umgestellt (eine Zeile, alle Felder zu einem String konkat-en,
-  Gesamtlänge messen, von rechts aus rendern).
+## Historical note
 
-### v4: User wollte STBAR-Look (echte Patches, halbe Größe, zentriert)
+Earlier iterations experimented with a centered strip, TTF atlas rendering, background boxes and half-scale patch helpers. Those functions are not the current implementation and have been removed from this document to avoid turning design archaeology into fake API documentation. Git history remains the correct place to inspect those experiments.
 
-- Komplettes Rewrite von `hu_buddy.c`:
-  - Eigener `HU_Buddy_DrawPatchHalf` für column-major Patch-Rendering
-    mit nearest-neighbour 2×2 → 1 Sub-Sampling.
-  - TTF bleibt für Waffen-Name und State (gibt's nicht als WAD-Patches).
-  - Layout komplett neu: 160 BASE-Pixel breit, zentriert in 320.
-  - Separator-Linien oben/unten (statt BG-Box).
-- **Visuelles Problem in Xvfb**: `HU_Buddy_Drawer` läuft, schreibt in
-  `screens[0]`, aber das Resultat kommt im Screenshot nicht an.
-  Debug-Block (großes 120×50 weißes V_DrawBlock bei x=100,y=50)
-  ebenfalls nicht sichtbar → deutet auf Xvfb-Renderer-Disconnect,
-  nicht auf Code-Bug.
+## Source map
 
----
-
-## Bekanntes Problem: Xvfb-Renderer-Disconnect
-
-**Symptom**: `HU_Buddy_Drawer` läuft jeden Frame (`[bh] drew` im stderr),
-schreibt Pixel in `screens[0]` (verifiziert via Debug-Prints). Aber
-`import -window root` zeigt diese Pixel nicht.
-
-**Verifikation**:
-- Eigener Code (`screens[0][...] = 4`) → 0 helle Pixel im Screenshot
-- Original STBAR (über `ST_Drawer`/`V_DrawPatch`) → sichtbar im Screenshot
-- Original DOOM-Messages (über `HUlib_drawSText`) → sichtbar im Screenshot
-
-**Hypothese**: Xvfb rendert SDL-Texturen anders als ein echter X-Server,
-möglicherweise wird `SDL_RenderPresent`'s Present-Rect nicht zuverlässig
-geflusht. Im echten Run mit normalem Window-Manager (KDE, GNOME, etc.)
-oder direkt auf dem TTY sollte das HUD erscheinen.
-
-**Workaround für Remote-Test**: nicht möglich — bitte selbst im echten
-Game verifizieren.
-
----
-
-## Umsetzung im Code (Schritt-für-Schritt Anleitung für Maintainer)
-
-Falls jemand das ganze nachvollziehen oder erweitern will:
-
-### Datei-Layout
-
-```
-files/
-├── hu_buddy.h       (neu)  ~40 Zeilen   — Public API + show_buddy_hud decl
-├── hu_buddy.c       (neu)  ~460 Zeilen  — Renderer + Layout
-├── hu_stuff.c       (mod)  +6 Zeilen    — HU_Buddy_Drawer Hook
-├── d_main.c         (mod)  +4 Zeilen    — HU_Buddy_Init Hook
-├── i_video.c        (mod)  +6 Zeilen    — HU_Buddy_SetRes Hook
-└── m_misc.c         (mod)  +4 Zeilen    — show_buddy_hud extern + config
-```
-
-### Hook-Pattern
-
-Alle Hooks sind symmetrisch zu den existierenden `HU_*` und `ST_*` Hooks:
-
-```c
-// hu_stuff.c:486
-void HU_Drawer(void)
-{
-    HUlib_drawSText(&w_message);
-    HUlib_drawIText(&w_chat);
-    if (automapactive)
-        HUlib_drawTextLine(&w_title, false);
-
-    HU_Buddy_Drawer ();   // ← hier, am Ende von HU_Drawer
-}
-```
-
-```c
-// d_main.c:1218
-HU_Init ();
-C_Init ();
-HU_Buddy_Init ();   // ← hier, vor ST_Init
-ST_Init ();
-```
-
-```c
-// i_video.c:506, 545
-void ST_SetRes (void);
-void HU_Buddy_SetRes (void);   // ← forward decl
-...
-ST_SetRes();
-HU_Buddy_SetRes();   // ← nach ST_SetRes
-R_SetViewSize(...);
-```
-
-```c
-// m_misc.c:208, 241
-extern int show_buddy_hud;
-...
-{"show_buddy_hud", &show_buddy_hud, 1},
-```
-
-### Build
-
-Beide Build-Systeme greifen `files/*.c` automatisch:
-- `build.sh` (Linux/macOS): `cd files && gcc ... *.c -o aidoom ...`
-- `CMakeLists.txt`: `file(GLOB AIDOOM_SRC CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/files/*.c)`
-
-→ Neue `files/hu_buddy.c` wird ohne weitere Makefile-Änderungen
-aufgegriffen.
-
-### Erweiterungs-Pattern
-
-**Neues Buddy-Stat anzeigen** (z.B. Buddy-Armor-Type):
-
-1. Erweitere `struct player_t` ist nicht nötig — `armortype` ist schon da.
-2. In `HU_Buddy_DrawStrip` (kurz vor dem State-Block) eine Zeile wie:
-   ```c
-   HU_Buddy_DrawTtfString (X_STATE_LBL - 20, Y_LABEL, "T1", 231);
-   ```
-3. Optional: `X_*`-Define am Anfang der Funktion neu berechnen wenn der
-   Strip zu lang wird.
-
-**Patch durch TTF ersetzen** (z.B. wenn `STYSNUM` zu klein zum Lesen ist):
-
-```c
-// alt:
-HU_Buddy_DrawNumberTall (X_AMMO_VALUE, Y_DIGITS, ammo, 231, 3);
-// neu:
-char cell[8]; sprintf(cell, "%d", ammo);
-HU_Buddy_DrawTtfString (X_AMMO_VALUE - 12, Y_LABEL, cell, 231);
-```
-
-**Eigenes Panel mit echtem STBAR-Hintergrund**:
-
-```c
-// STBAR ist 320x32, bei halber Höhe wär's 320x16.  Patch-Half-Renderer
-// macht aus 320x32 pixel-exakt ein 160x16-Block (das Layout ist
-// aktuell aber 160x16 zentriert, also 80..240 horizontal).  Einfach:
-HU_Buddy_DrawPatchHalf (BUDDY_BAR_X, BUDDY_BAR_Y, p_stbar);
-```
-
----
-
-## Siehe auch
-
-- `CLAUDE.md` — Engine-Architecture-Übersicht (i_*, p_*, r_*, hu_* Module).
-- `AGENT_CONTROL.md` §12-13 — LLM-Director-Protocol (nicht direkt
-  relevant fürs HUD aber Kontext warum der Buddy existiert).
-- `tools/font_atlas.h` — gebackener DejaVuSansMono-Atlas (shared mit
-  Console-Overlay).
-- `files/st_stuff.c` — Original-STBAR als Referenz-Implementation.
+- `files/hu_buddy.c`, `files/hu_buddy.h` — current drawers, text helpers, face/arrow assets and toggles.
+- `files/p_ai_coop.c` — buddy slot/state/artifact data.
+- `files/m_misc.c` — persistent config defaults.
+- `files/hu_stuff.c`, `files/i_video.c`, `files/v_video.c` — HUD/video integration.
+- `docs/INVENTORY.md` — artifact behavior and current key defaults.

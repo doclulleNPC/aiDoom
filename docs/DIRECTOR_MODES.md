@@ -1,96 +1,76 @@
-# Director: LLM vs rule-based — what differs, and rule-based tactics
+# Director: LLM vs. rule-based — what actually differs
 
-## 1. Does behaviour differ with vs without the LLM?
+## 1. Two director modes
 
-Yes, but it's narrower than it looks, and there's a fallback gotcha.
+aiDoom has two distinct director paths:
 
-### Different WITH the LLM (`-aidirector`, or `-aicoop` + a connected director)
+- `-director` — the offline/rule-based L4D-style director.
+- `-aidirector [port]` — a TCP client drives pacing/spawn commands; the rule layer supplies fallback behavior.
+- `-aidemo` — built-in director demo/stress tracking; it uses the same LLM-mode pacing semantics without requiring a remote client.
 
-| Aspect | With LLM | Without (rule `-director`) |
-|---|---|---|
-| **Monster tactics** | Squad orders — flank / ambush / focus-fire / fall-back — issued over TCP (`p_ai_llm.c`: `act order=…`); `A_Chase` diverts to `A_LLMChase` for directed monsters. | **Same order set, rule-assigned** (`P_AI_RuleTactics`): flank / focus / ambush / fall-back by geometry + LOS. The LLM *replaces* this when actively issuing orders. |
-| **Spawn policy** | The model decides what / when / how many from the live state (`spawn type=… count=…`, `director relax`). | Fixed stress→spawn FSM curves (BUILDUP→SUSTAIN→FADE). |
-| **Buddy orders** | LLM gives the buddy high-level orders (engage/defend/regroup/goto/…). | Buddy runs purely on its built-in bot. |
-| **Director voice** | `dir:flank/ambush/focus/fallback` lines fire (from tactics). | Phase/spawn/relax/item lines, plus `dir:flank` narrated by the rule tactician (`P_AI_RuleTactics`); ambush/focus/fallback voice lines are LLM-only. |
+The monster tactic layer in `files/p_ai_llm.c` and the pacing/spawn layer in `files/p_ai_director.c` are related but not identical. A connected client can issue monster `act` or buddy commands without automatically taking over pacing.
 
-### The SAME in both modes
-Intensity/stress tracking, objective seeding + idle guards, periodic objective top-up,
-emergency medkit/ammo drops, exit-proximity pressure, the `doom2stuff` overlay, and the
-buddy's core bot (acquire/fire/follow/heal).
+## 2. LLM-mode semantics
 
-### Fallback gotcha
-`-aidirector` *layers on top of* the rule director; it doesn't replace it. The FSM is
-suppressed only while the LLM is **actively** issuing commands
-(`runfsm = gametic - dir_llmlast > 15 s`). So:
-- LLM connected & busy → LLM tactics + LLM spawns (+ periodic hordes).
-- **No director client connected / it crashed / the watchdog killed it** → `dir_llmlast`
-  never updates → `runfsm` always true → **`-aidirector` behaves like `-director`**
-  (rule FSM only, no tactics). If the `director` sidecar window isn't showing live
-  "round N … orders=K", the tactical layer isn't firing.
+The LLM path can issue:
 
-## 2. Rule-based coordinated tactics — DONE (`P_AI_RuleTactics`)
+- monster tactic directives (`act order=...`);
+- buddy directives (`buddy order=...`);
+- pacing spawns (`spawn type=... count=...`);
+- item drops (`spawn item=medkit|ammo`);
+- `director relax`.
 
-**Implemented and at parity with the LLM's `act` order set.** The tactical *execution*
-layer (`A_LLMChase`, the `aient[]` side-table) is LLM-agnostic; the LLM only *decides
-which monster gets which order*. `P_AI_RuleTactics` (`p_ai_llm.c`) now makes those same
-decisions by C heuristics every ~1 s:
+The rule FSM watchdog is updated only by the pacing commands: monster spawn, item spawn and relax. It is **not** reset by ordinary `act` or `buddy` lines. After roughly `15*TICRATE` without a pacing command, the rule FSM is eligible to resume.
 
-- **focus-fire** (`AIO_FOCUS`) — any monster with LOS to the player presses the attack.
-- **flank** (`AIO_FLANK_L/R`) — when ≥4 are visible, ~⅓ peel off (alternating L/R) for a
-  pincer (skips point-blank ones).
-- **ambush** (`AIO_AMBUSH`) — a hidden monster already camped on the player's *nearest
-  objective* (exit/key, passed in from the director) lies in wait there.
-- **fall-back** (`AIO_FALLBACK`) — a badly-wounded monster (≤¼ HP) with LOS kites/retreats
-  instead of suiciding.
+While the FSM is suppressed, the LLM path is not a fully autonomous pacing engine: the client must decide what to spawn, and the source contains a periodic horde safeguard that can still fire after its own gap and stress checks.
 
-Orders auto-expire (`for_tics`) back to vanilla; unassigned monsters stay on `A_Chase`.
-It's **deterministic** (geometry only — demo/netplay-safe), unlike the LLM path. Called
-from the director ticker whenever the rule layer is in charge (pure `-director`, or the
-LLM has gone quiet), and **the LLM replaces it** while actively issuing orders (`runfsm`
-false → the ticker returns before the rule call, so they never fight).
+## 3. Rule mode
 
-### How it was built (kept for reference)
-The tactical *execution* layer is completely LLM-agnostic; the LLM only *decides which
-monster gets which order*. Replacing that one decision step with C heuristics gave
-rule-based squad tactics.
+Pure `-director` always runs the rule FSM. It maintains a stress/intensity model and build-up → sustain/peak → fade/relax phases. It can:
 
-### What's already there (shared, reusable)
-- **Order verbs** (`p_ai_llm.c`): `AIO_FLANK_L/R`, `AIO_AMBUSH`, `AIO_FOCUS`,
-  `AIO_FALLBACK`, `AIO_HOLD`, `AIO_USEDOOR`, `AIO_CHASE`.
-- **Directive side-table** keyed by `mobj_t*` (`aient[]`) + `AI_BuildRegistry()` (ids) +
-  `AI_Apply(order, ids, …)` (assign) — no struct/savegame change.
-- **Executor** `A_LLMChase(actor)` — runs the assigned order each tic (`A_Chase` diverts
-  to it for directed monsters). This is what actually makes a monster flank/hold/etc.
-- **Proof it works without an LLM**: `AI_DemoDirector()` (`-aidemo`) already assigns
-  flank/fallback orders algorithmically every ~3 s — a crude rule-based tactician.
+- validate hidden spawn positions against survivors;
+- bias pressure toward the exit route and objective rooms;
+- seed and top up guards near exits/keys;
+- wake non-objective monsters while leaving objective guards as ambush-style sleepers;
+- apply focus/flank/fallback rule tactics;
+- resurrect corpses under the implemented chance/rules;
+- use DOOM1-safe remapping and overlay-aware Doom/FreeDoom/Heretic/Hexen pools;
+- place Hexen stalkers only under the current liquid/placement constraints;
+- cap live monsters and avoid spawning into walls/invalid sectors;
+- provide emergency medkits/ammo;
+- suppress hordes and special/boss pressure when the survivor is critically low on health or ammo;
+- announce events on the HUD and through the separate director voice stream.
 
-### So the gap is just a smarter rule-based "tactician"
-A per-N-tic function (call it `P_Director_Tactics`, runs under `-director`) that:
-1. `AI_BuildRegistry()` → the live directable monsters + the player/buddy positions.
-2. Classify each monster by geometry/LOS/distance and assign an order:
-   - **Flank**: a monster with LOS to the player but off to a side → `AIO_FLANK_L/R`
-     (the side away from where the player is facing / where allies already are).
-   - **Focus-fire**: when several monsters can see the player, point the pack at the
-     player (or the most-wounded survivor) → `AIO_FOCUS`.
-   - **Ambush**: freshly-spawned monsters near the player's *path ahead* (toward the
-     exit/key — we already track objectives) → `AIO_AMBUSH` until the player is close.
-   - **Fall-back / regroup**: a lone monster far from allies → `AIO_FALLBACK` so the
-     pack gathers before assaulting (mirrors L4D "build the horde, then commit").
-3. Re-evaluate every ~1 s; orders auto-expire back to vanilla (`for_tics`), exactly as
-   the LLM path does.
+The rule tactics themselves assign only the current focus, left/right flank and fallback orders. Objective guards waiting near keys/exits are a separate mechanism; do not call that an `AIO_AMBUSH` command emitted by the rule tactic selector.
 
-This reuses `AI_Apply` + `A_LLMChase` unchanged — only the *assignment heuristics* are
-new. Effort: ~moderate (the heuristic pass; the hard part — execution — is done). It's
-essentially porting the LLM's "decide orders" step into deterministic C, which also keeps
-demos/netplay in sync (the LLM path is non-deterministic and stays outside the tic lock).
+## 4. What is shared
 
-### Remaining LLM functions vs the rule director (parity status)
-- **Monster tactics (`act`)** — ✅ at parity (`P_AI_RuleTactics`, above).
-- **Spawning (`spawn type/count`)** — ✅ the rule FSM spawns richly (buildup/sustain,
-  hordes, behind-player, objective seeding/guards, exit pressure).
-- **Items (`spawn item`)** — ✅ rule FSM drops (emergency medkit/ammo, relax gifts).
-- **Pacing (`director relax`)** — ✅ rule FSM (BUILDUP→SUSTAIN→FADE).
-- **Buddy orders (`buddy order=…`)** — ⚠️ the buddy runs on its own autonomous bot in
-  both modes (engage/defend/follow/heal), so it's *functionally* covered, but the rule
-  director does not yet *issue* explicit buddy directives the way the LLM can. Lowest-
-  value gap (the bot already self-manages); a small follow-up if desired.
+Both paths use:
+
+- the same tic-locked game simulation;
+- the same hidden-spawn validation and checked actor spawning;
+- the same actor pools and overlay detection;
+- the same player stress/health/ammo safety gates;
+- the same buddy navigation helper where a route to the exit/objective is required;
+- the same monster directive side table and `A_Chase` integration for tactics;
+- the same director HUD/voice announcements where the event path is active.
+
+## 5. What is not shared
+
+- LLM mode can receive remote orders and choose exact spawn/item commands.
+- Rule mode chooses pacing, spawn type/count and phase transitions locally.
+- LLM monster tactics do not, by themselves, suppress the rule spawn FSM.
+- Rule tactics do not currently reproduce the complete LLM order vocabulary.
+- There is one fixed buddy slot; no `-aicoop N` multi-buddy mode exists.
+
+## 6. Voice timing
+
+Director voice is not the same as buddy voice. Director ambient lines require a `16` second gap. Forced/event lines still obey a `6` second hard floor between any two director lines. Buddy voice has its own busy gate and does not self-preempt; see `docs/BUDDY_VOICE.md`.
+
+## 7. Source map
+
+- Stress/director state, spawns, safety gates and voice: `files/p_ai_director.c`, `files/p_ai_director.h`.
+- Monster protocol and directive application: `files/p_ai_llm.c`, `files/p_ai_llm.h`.
+- Monster chase hook: `files/p_enemy.c`.
+- Buddy directive/reflex layer: `files/p_ai_coop.c`.
+- Operational protocol: `docs/MONSTER_AGENT_GUIDE.md`.

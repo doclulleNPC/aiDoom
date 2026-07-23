@@ -1,127 +1,116 @@
-# API Architecture for an Agent to Play Classic Doom
+# API architecture for an agent to play classic Doom
 
-To build an API for an AI agent to play classic Doom, modifying the source code from scratch is unnecessary. The optimal approach is to fork **`doomgeneric`** (the stripped-down, highly portable C implementation of the original source code) or build on top of **`ViZDoom`** (the established standard for RL research). 
+> **Design proposal, not an as-built aiDoom API.** The current engine ships TCP line protocols for `-aiplayer` and `-aidirector`; it does not ship the HTTP `/v1/game/init`/`step` server, headless mode, reward endpoint or MCP server described here. See `docs/AIPLAYER.md` and `docs/MONSTER_AGENT_GUIDE.md` for the implemented interfaces.
 
-The architecture must solve two fundamental engineering problems: exposing the game state to the agent and receiving actions back, all while decoupling the game’s internal tick rate from the API's execution speed.
+## 1. Core architecture and synchronization
 
----
+aiDoom is a fork of the SDL Doom 1.10 line, not `doomgeneric`. The engine advances game state at 35 Hz through its normal tic loop. A future agent environment should preserve that boundary:
 
-## 1. Core Architecture & Synchronization
-
-The classic Doom engine targets 35 frames per second (ticks). For an AI agent—especially one utilizing Deep Reinforcement Learning (DRL) or a Vision-Language Model (VLM)—running the engine in real-time is impossible. The system requires **virtual time**.
-
-* **Execution Loop:** The engine must be modified to block and wait for an API command before advancing the game state. 
-* **The "Step" Paradigm:** Instead of a traditional REST API with asynchronous CRUD endpoints, an RPC or IPC protocol is required to handle atomic state-action steps (similar to the OpenAI Gym / Farama Gymnasium interface).
-
-```
-[ Agent ]  ---( POST /step {actions} )--->  [ API Server / Wrapper ]
-    ^                                                    | (Blocks Engine)
-    |                                                    v
-[ Returns: Frame Buffer + Game Vars ]  <---  [ Doom Engine Tick (+1) ]
+```text
+agent client -> transport -> queued high-level action
+                               |
+                         game tic boundary
+                               |
+                ticcmd/reflex -> playsim -> observation
 ```
 
----
+The current player agent already uses the safe part of this shape: `G_BuildTiccmd` delegates to `G_AgentBuildTiccmd` when active. A future HTTP environment would need a separate lifecycle/step wrapper rather than pretending the current TCP listener is an HTTP server.
 
-## 2. API Schema Design
+## 2. Proposed API schema
 
-The API requires two primary endpoints: initialization and the state-action step loop.
+The following is a proposed HTTP/RL shape only.
 
 ### `POST /v1/game/init`
-Configures the environment before execution begins.
 
 ```json
 {
-  "wad_path": "/data/doom1.wad",
-  "map": "E1M1",
-  "difficulty": 3,
-  "render_modes": ["screen", "depth", "labels"]
+  "iwad": "DOOM2.WAD",
+  "pwads": ["map.wad"],
+  "map": "MAP01",
+  "skill": 3,
+  "seed": 1
 }
 ```
 
-### `POST /v1/game/step`
-This is the core execution loop endpoint. It passes the agent's actions and forces the engine to calculate the next state.
+A real implementation would need to define IWAD path policy, process lifetime, reset semantics, asset isolation and whether the engine is embedded or launched as a worker.
 
-#### Request Payload (Action Space)
-Doom relies on binary inputs (buttons) and continuous inputs (turning axis).
+### `POST /v1/game/step`
+
+#### Proposed request
 
 ```json
 {
   "actions": {
-    "MOVE_FORWARD": true,
-    "MOVE_BACKWARD": false,
-    "STRAFE_LEFT": false,
-    "STRAFE_RIGHT": false,
-    "TURN_LEFT": 0.0,
-    "TURN_RIGHT": 15.5, 
-    "ATTACK": true,
-    "USE": false,
-    "SELECT_WEAPON": 3
+    "forward": 1,
+    "side": 0,
+    "turn": -20,
+    "fire": 1,
+    "use": 0,
+    "weapon": 0
   },
-  "ticks_to_advance": 4 
+  "repeat": 1
 }
 ```
 
-> **Design Note on Frame Skipping:** The `ticks_to_advance` parameter is critical. Human reaction time is slower than $1/35$th of a second. Allowing the engine to step forward 4 ticks per action mimics a human-like $\sim114\text{ms}$ reaction window and vastly accelerates training.
+The request must be converted to a `ticcmd_t` at a deterministic tic boundary. `repeat` is a proposal for frame skip, not an existing engine option.
 
-#### Response Payload (Observation Space)
-The response delivers the raw sensory data, game variables, and metadata.
+#### Proposed response
 
 ```json
 {
-  "game_variables": {
-    "health": 100,
-    "armor": 0,
-    "ammo": [50, 0, 0, 0],
-    "current_weapon": 2,
-    "kill_count": 4,
-    "secret_count": 0,
-    "user_position": [1056.4, -2048.2, 0.0]
-  },
-  "buffers": {
-    "screen": "iVBORw0KGgoAAAANSUhEUgAA...", 
-    "depth": "Data stream or base64 representation...",
-    "labels": [
-      {"id": "imp_1", "class": "enemy", "bounding_box": [120, 45, 160, 90]}
-    ]
-  },
-  "is_terminal": false,
-  "reward": 10.0
+  "tick": 1234,
+  "done": false,
+  "reward": 0,
+  "player": {},
+  "entities": [],
+  "events": []
 }
 ```
 
----
+The current engine does not emit these fields as a server contract. Reward and `done` semantics need an explicit design covering death, intermission, finale, map transitions and episode reset.
 
-## 3. Data Extraction & Interception (The C Layer)
+## 3. Data extraction/interception
 
-To populate the response payload without relying on slow OCR or computer vision hacks, you must hook directly into Doom's C internals:
+The engine already has the data needed for a useful structured observation:
 
-* **Visuals (`screen`):** Intercept the `I_FinishUpdate` function inside `i_video.c`. Instead of rendering the `dg_screen_buffer` array directly to an OS window, copy it directly into shared memory or a fast buffer.
-* **Depth & Buffers:** If targeting modern vision-based agents, patch the software renderer's column/span drawers (`r_draw.c`) to extract distances to walls (`rw_distance`) and sprites. This yields a flawless grayscale depth-map.
-* **Game State Variables:** Read directly from global variables defined in `d_player.h` (`plr->health`, `plr->readyweapon`, `plr->ammo[]`).
-* **Object Labeling / Ground Truth:** Iterate over the `thinkers` linked list (`p_tick.c`) to pull active `mobj_t` structs (monsters, items, projectiles). Map their 3D coordinates relative to the player's view vector to instantly generate 2D bounding boxes.
+- player state in `player_t`/`files/d_player.h`;
+- actors in the thinker/mobj system;
+- map geometry, sectors, lines, subsectors and regions;
+- sound events through the agent sound feed;
+- director/buddy state through their existing serializers.
 
----
+The current player and monster protocols should be reused as source material rather than adding a second conflicting representation. For reference, the player listener accepts `map`, `observe`, `goto`, `face`, `turn`, `attack`, `target`, `weapon`, `use` and `stop`; query replies are JSON, while mutation commands are silent. Any new API should define stable IDs, visibility semantics, fixed-point-to-integer conversion and map-transition behavior.
 
-## 4. Transport Protocol Selection
+## 4. Transport choices
 
-Depending on the targeted type of agent, the transport layer choice varies:
+| Transport | Suitability | Status in aiDoom |
+|---|---|---|
+| TCP newline protocol | Simple remote control with low implementation cost | Shipped for player and monster/director agents |
+| HTTP/JSON | Easy integration with RL wrappers and tools | Proposed only |
+| Shared memory | High-throughput local training | Not implemented |
+| stdin/stdout | Simple subprocess prototype | Not implemented as the current engine agent protocol |
+| MCP | Tool-oriented LLM integration | External wrapper proposal only |
 
-### Option A: gRPC / Protocol Buffers (Best for DRL Agents)
-If training reinforcement learning models (e.g., PPO, DQN in PyTorch), HTTP/JSON introduces terrible serialization overhead. 
-* **Why:** Protobuf handles raw byte arrays (the frame buffer) with virtually zero overhead. 
-* **Performance:** Low latency, typed contracts, natively streams inputs/outputs over HTTP/2.
+## 5. Determinism and reset
 
-### Option B: MCP (Model Context Protocol) (Best for LLM/VLM Agents)
-If the goal is to let a Multi-Modal LLM or coding assistant play Doom, exposing the API over the **Model Context Protocol (MCP)** via `stdio` or SSE is the modern standard.
-* **Why:** LLM tools rely on specific JSON-RPC schemas.
-* **Implementation:** The MCP server wraps the underlying game process, exposes `doom_start` and `doom_action` as standard tools, and translates the frame buffer/labels array into something text-based or multi-modal that the model can ingest natively.
+A real step server must own the simulation clock. It cannot merely sleep and sample the renderer. It should:
 
----
+1. accept an action at a tic boundary;
+2. build a `ticcmd_t` or equivalent input;
+3. advance exactly the requested number of tics;
+4. collect observations/events after simulation;
+5. return reward/done and the next state;
+6. reset all thinkers, RNG/seed policy, player state, map state and external AI state on episode reset.
 
-## 5. Reward Shaping Engine (Server-Side)
+The current `-aiplayer` TCP client does not provide this reset/step contract.
 
-If building this for RL, the API should allow server-side reward customization. Calculating rewards exclusively on the client side leads to sluggish iterations. The server should calculate the delta ($\Delta$) between frames:
+## 6. Security and process boundaries
 
-$$\text{Reward} = \Delta\text{Kills} \times 100 + \Delta\text{Secrets} \times 50 + \Delta\text{Health} \times 1 - \text{TickPenalty}$$
+If the proposal is implemented, do not let an HTTP client write arbitrary filesystem paths or run arbitrary console commands. Use an allowlisted IWAD/PWAD root, bounded action values and a worker/process boundary for untrusted clients.
 
-Injecting this logic into the engine step ensures the environment is fully self-contained and behaves exactly like a traditional OpenAI Gym environment.
+## 7. Relationship to current docs
+
+- Actual player agent: `docs/AIPLAYER.md`.
+- Actual monster/director API: `docs/MONSTER_AGENT_GUIDE.md`.
+- Design rationale for all AI control: `docs/AGENT_CONTROL.md`.
+- ViZDoom comparison: `docs/doom_agent_api_vizdoom.md`.
