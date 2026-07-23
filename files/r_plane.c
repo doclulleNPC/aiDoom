@@ -535,11 +535,13 @@ void R_DrawPlanes (void)
 	      dc_skyheight = (sd && sd->type == 1 && sd->firebuf) ? sd->fireh
 			   : (textureheight[texture] >> FRACBITS); }
 
-	    // Sky is allways drawn full bright,
-	    //  i.e. colormaps[0] is used.
-	    // Because of this hack, sky is not affected
-	    //  by INVUL inverse mapping.
-	    dc_colormap = colormaps;
+	    // Sky brightness: normally full bright (colormaps[0]).  But HONOUR an active
+	    // fixedcolormap -- the invulnerability inverse map (INVERSECOLORMAP) -- so the
+	    // sky inverts along with the rest of the view.  Vanilla hardcoded colormaps[0]
+	    // here, leaving the sky in normal colours during INVUL: the "invulnerability
+	    // colormap bug" (doomwiki.org/wiki/Invulnerability_colormap_bug).  fixedcolormap
+	    // is colormaps+0 for the light-amp visor, so infrared is unchanged.
+	    dc_colormap = fixedcolormap ? fixedcolormap : colormaps;
 	    for (x=pl->minx ; x <= pl->maxx ; x++)
 	    {
 		dc_yl = pl->top[x];
@@ -571,7 +573,7 @@ void R_DrawPlanes (void)
 		    dc_texturemid = skytexturemid + (fixed_t)(sd->fgmid * FRACUNIT)
 				  + (fixed_t)(sd->fgscrolly * t * (double)FRACUNIT);
 		    dc_skyheight  = textureheight[fgtex] >> FRACBITS;
-		    dc_colormap   = colormaps;
+		    dc_colormap   = fixedcolormap ? fixedcolormap : colormaps;	// INVUL inverts the fg sky too
 		    for (x = pl->minx; x <= pl->maxx; x++)
 		    {
 			dc_yl = pl->top[x]; dc_yh = pl->bottom[x];
