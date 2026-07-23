@@ -274,7 +274,7 @@ boolean PIT_CheckLine (line_t* ld)
     
     if (!ld->backsector)
 	return false;		// one sided line
-		
+
     if (!(tmthing->flags & MF_MISSILE) )
     {
 	if ( ld->flags & ML_BLOCKING )
@@ -363,7 +363,14 @@ boolean PIT_CheckThing (mobj_t* thing)
     // don't clip against self
     if (thing == tmthing)
 	return true;
-    
+
+    // A player never collides with a friendly deployed turret.  The turret is tossed
+    // out at the player's feet on deploy and thrown forward; if a wall (or a scramble)
+    // stops it on top of you it would otherwise wedge you in place permanently.  It
+    // stays MF_SOLID to monsters, so it still works as a barricade.
+    if (tmthing->player && thing->type == MT_TURRET)
+	return true;
+
     // check for skulls slamming into things
     if (tmthing->flags & MF_SKULLFLY)
     {
