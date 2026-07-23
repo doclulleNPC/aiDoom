@@ -322,6 +322,7 @@ bugs are kept** (see §9 — changing them desyncs demos and the maps that explo
 | **Sidedef/blockmap 16-bit caps** | limit-removing maps (LoR MAP13: 60423 sidedefs) overflowed `short` indices → crash | `int` sidenum + int blockmap / `P_CreateBlockMap` rebuild + ZNOD nodes | §see extended-nodes work, `p_setup.c` |
 | **Wall "wiggle"** | tall walls visibly rippled/wobbled as you moved (fixed-point scale precision) | WiggleHack II (per-sector scale clamp + vertical precision) | §16.2, `r_segs.c`/`r_main.c` |
 | **"…REALLY need!" medikit message** | heal applied before the low-health test, so the message was unreachable | health sampled before healing | §15, `p_inter.c` |
+| **Invulnerability colormap bug** | the sky kept its normal colours during INVUL (view inverted, sky did not) -- the sky drawer hardcoded colormap 0 | sky honours `fixedcolormap` like the wall/floor drawers | `r_plane.c` |
 
 ### Raised-but-still-capped (watch these)
 
