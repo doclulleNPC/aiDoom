@@ -277,6 +277,14 @@ terminator, so a larger cap is safe). File: `p_spec.h`.
 
 ---
 
+## 15. Medikit "…that you REALLY need!" pickup message never showed
+
+| Symptom | Root cause | Fix | Files |
+|---|---|---|---|
+| Picking up a medikit at low health always printed the normal "Picked up a medikit." — the "…that you REALLY need!" variant never appeared | id's original `P_TouchSpecialThing` gives the +25 HP (`P_GiveBody`) **before** testing `player->health < 25`, so the medikit's own 25 HP pushes health to ≥25 first and the special message is unreachable (the classic doomwiki bug) | Sample the health into a local **before** healing, then pick the message from that. Message-only / HUD-only, so demos and the playsim are unaffected (unlike the §9 bugs we keep) | `p_inter.c` (`SPR_MEDI` case) |
+
+---
+
 ## How to spot the next one
 
 - Compiler warnings `-Wpointer-to-int-cast` / `-Wint-to-pointer-cast` → §1.

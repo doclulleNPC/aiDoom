@@ -568,17 +568,19 @@ P_TouchSpecialThing
 	break;
 
       case SPR_MEDI:
+      {
+	// id's original bug: the "...that you REALLY need!" test read player->health AFTER
+	// the +25 heal, so with the medikit's own 25 HP the health was practically always
+	// >= 25 and the special message never showed.  Sample the health BEFORE healing.
+	boolean reallyneeded = (player->health < 25);
 	if (P_HoardHealth (player) || !P_GiveBody (player, 25))
 	{
 	    if (!P_StoreOverflow (player, arti_medikit, 1))
 		return;
 	}
-
-	if (player->health < 25)
-	    player->message = deh_GOTMEDINEED;
-	else
-	    player->message = deh_GOTMEDIKIT;
+	player->message = reallyneeded ? deh_GOTMEDINEED : deh_GOTMEDIKIT;
 	break;
+      }
 
 	
 	// power ups
