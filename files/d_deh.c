@@ -510,7 +510,7 @@ typedef struct {
   char *lookup;  // mnemonic lookup string to be specified in BEX
 } deh_bexptr;
 
-void A_SpawnObject(), A_MonsterProjectile(), A_MonsterMeleeAttack(), A_RadiusDamage(),
+void A_SpawnObject(), A_MonsterProjectile(), A_MonsterMeleeAttack(), A_RadiusDamage(), A_MonsterBulletAttack(), A_Stop(),
      A_NoiseAlert(), A_HealChase(), A_SeekTracer(), A_FindTracer(), A_ClearTracer(),
      A_AddFlags(), A_RemoveFlags(), A_JumpIfFlagsSet(), A_JumpIfHealthBelow(),
      A_JumpIfTargetInSight(), A_JumpIfTargetCloser(), A_JumpIfTracerInSight(), A_JumpIfTracerCloser(),
@@ -607,6 +607,8 @@ deh_bexptr deh_bexptrs[] =
   // This NULL entry must be the last in the list
    {A_SpawnObject,         "A_SpawnObject"},
    {A_MonsterProjectile,   "A_MonsterProjectile"},
+   {A_MonsterBulletAttack, "A_MonsterBulletAttack"},
+   {A_Stop,                "A_Stop"},
    {A_MonsterMeleeAttack,  "A_MonsterMeleeAttack"},
    {A_RadiusDamage,        "A_RadiusDamage"},
    {A_NoiseAlert,          "A_NoiseAlert"},

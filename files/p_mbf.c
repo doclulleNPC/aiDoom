@@ -105,6 +105,34 @@ void A_MonsterMeleeAttack (mobj_t *actor)
   damage = (P_Random() % dmod + 1) * dbase;
   P_DamageMobj (actor->target, actor, actor, damage);
 }
+// MBF21: monster hitscan attack -- args: hspread, vspread, numbullets, damagebase,
+// damagemod.  Mirrors A_WeaponBulletAttack's spread so weapon + monster bullets match.
+void A_MonsterBulletAttack (mobj_t *actor)
+{
+  extern fixed_t P_AimLineAttack (mobj_t*, angle_t, fixed_t);
+  int hspread, vspread, numbullets, dbase, dmod, i, damage, angle, slope, aimslope;
+  if (!actor->target || !actor->state) return;
+  hspread    = (int)actor->state->args[0];
+  vspread    = (int)actor->state->args[1];
+  numbullets = (int)actor->state->args[2];
+  dbase      = (int)actor->state->args[3];
+  dmod       = (int)actor->state->args[4];
+  if (numbullets <= 0) numbullets = 1;
+  if (dbase <= 0) dbase = 3;
+  if (dmod  <= 0) dmod  = 5;
+  A_FaceTarget (actor);
+  if (actor->info->attacksound) S_StartSound (actor, actor->info->attacksound);
+  aimslope = P_AimLineAttack (actor, actor->angle, MISSILERANGE);
+  for (i = 0; i < numbullets; i++)
+  {
+    damage = (P_Random() % dmod + 1) * dbase;
+    angle  = (int)actor->angle + ((P_Random() - P_Random()) * (hspread << 8) / 255);
+    slope  = aimslope + (P_Random() - P_Random()) * (vspread << 8) / 255;
+    P_LineAttack (actor, (angle_t)angle, MISSILERANGE, slope, damage);
+  }
+}
+// MBF21: halt the actor.
+void A_Stop (mobj_t *actor) { actor->momx = actor->momy = actor->momz = 0; }
 void A_RadiusDamage (mobj_t *actor)
 {
   if (actor->state) P_RadiusAttack (actor, actor->target, (int)actor->state->args[0]);

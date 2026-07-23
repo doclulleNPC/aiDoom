@@ -138,6 +138,10 @@ typedef struct
 // line placed right in front of a door, so the door can still be used).  jff 3/21/98.
 #define ML_PASSUSE		512
 
+// MBF21: block only land (non-floating) monsters / block only players.
+#define ML_BLOCKLANDMONSTERS	0x1000
+#define ML_BLOCKPLAYERS		0x2000
+
 
 
 

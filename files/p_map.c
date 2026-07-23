@@ -280,8 +280,17 @@ boolean PIT_CheckLine (line_t* ld)
 	if ( ld->flags & ML_BLOCKING )
 	    return false;	// explicitly blocking everything
 
+	// mbf21: block players only
+	if ( tmthing->player && (ld->flags & ML_BLOCKPLAYERS) )
+	    return false;
+
 	if ( !tmthing->player && ld->flags & ML_BLOCKMONSTERS )
 	    return false;	// block monsters only
+
+	// mbf21: block land (non-floating) monsters
+	if ( !tmthing->player && (ld->flags & ML_BLOCKLANDMONSTERS)
+	     && !(tmthing->flags & MF_FLOAT) )
+	    return false;
     }
 
     // set openrange, opentop, openbottom
