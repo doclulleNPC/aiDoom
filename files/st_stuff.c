@@ -1189,7 +1189,14 @@ void ST_DrawScaled (void)
 
     memcpy (vsave, screens[0] + top*SCREENWIDTH, strip);	// 1) snapshot the view
     ST_doPaletteStuff ();
-    ST_doRefresh ();						// 2) full vanilla bar -> screens[0]
+    // 2) full bar -> screens[0].  When the ID24 data-driven bar is active (Legacy of
+    // Rust), draw THAT -- the classic ST_doRefresh lays vanilla widgets over LoR's own
+    // STBAR lump at the wrong positions (looked like a broken/"deathmatch" bar in the
+    // Small style).  SBARDEF draws to screen 0 at the bar Y, which is what we capture.
+    if (ST_SBARDEF_Active ())
+	ST_SBARDEF_Draw (false);				// classic (non-fullscreen) bar
+    else
+	ST_doRefresh ();
     for (y = 0; y < hh; y++)					// 3) capture the bar
 	memcpy (bcap + y*bw, screens[0] + (top+y)*SCREENWIDTH + bx, bw);
     memcpy (screens[0] + top*SCREENWIDTH, vsave, strip);	// 4) put the view back
