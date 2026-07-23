@@ -659,16 +659,23 @@ void P_LoadSideDefs (int lump)
 
 typedef struct linelist_s { long num; struct linelist_s* next; } linelist_t;
 
+// `done[blockno]` is a GENERATION stamp, not a 0/1 flag: it holds the `blockdone_gen`
+// of the line currently being distributed, so "already added this line to this block"
+// is a single compare with no per-line array clear.  (Was memset(blockdone, NBlocks)
+// once per linedef -> O(numlines * NBlocks); a big limit-removing map turned that into
+// seconds of memset at load.  Woof/DSDA/PrBoom+ use exactly this generation trick.)
+// A file-static gen keeps every call site untouched -- the caller just bumps it per line.
+static int blockdone_gen;
 static void AddBlockLine (linelist_t** lists, int* count, int* done, int blockno, long lineno)
 {
     linelist_t* l;
-    if (done[blockno]) return;
+    if (done[blockno] == blockdone_gen) return;
     l = Z_Malloc (sizeof(linelist_t), PU_STATIC, 0);
     l->num = lineno;
     l->next = lists[blockno];
     lists[blockno] = l;
     count[blockno]++;
-    done[blockno] = 1;
+    done[blockno] = blockdone_gen;
 }
 
 static void P_CreateBlockMap (void)
@@ -701,6 +708,7 @@ static void P_CreateBlockMap (void)
     blockdone  = Z_Malloc (NBlocks * sizeof(*blockdone),  PU_STATIC, 0);
     memset (blocklists, 0, NBlocks * sizeof(*blocklists));
     memset (blockcount, 0, NBlocks * sizeof(*blockcount));
+    memset (blockdone,  0, NBlocks * sizeof(*blockdone));	// gen stamps: 0 = "no line yet" (gens start at 1)
 
     for (i = 0; i < NBlocks; i++)
     { blocklists[i] = Z_Malloc (sizeof(linelist_t), PU_STATIC, 0);
@@ -717,7 +725,7 @@ static void P_CreateBlockMap (void)
 	int minx = x1 > x2 ? x2 : x1, maxx = x1 > x2 ? x1 : x2;
 	int miny = y1 > y2 ? y2 : y1, maxy = y1 > y2 ? y1 : y2;
 
-	memset (blockdone, 0, NBlocks * sizeof(int));
+	blockdone_gen = i + 1;		// new generation for this line (gens are 1..numlines)
 
 	bx = (x1 - xorg) >> blkshift; by = (y1 - yorg) >> blkshift;
 	AddBlockLine (blocklists, blockcount, blockdone, by * ncols + bx, i);
@@ -761,7 +769,7 @@ static void P_CreateBlockMap (void)
 	  }
     }
 
-    memset (blockdone, 0, NBlocks * sizeof(int));
+    blockdone_gen = numlines + 1;	// distinct from every per-line gen; each block visited once here
     for (i = 0, linetotal = 0; i < NBlocks; i++)
     { AddBlockLine (blocklists, blockcount, blockdone, i, 0); linetotal += blockcount[i]; }
 

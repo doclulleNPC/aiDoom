@@ -120,6 +120,8 @@ static int	ai_port = 31666;
 // Registry: rebuilt on each observe (and by the demo director). Assigns each
 // live monster a small stable id (= slot+1) until the next rebuild / reset.
 // ---------------------------------------------------------------------------
+static void AI_RehashRegistry (void);	// refresh mobj->entry hash after a rebuild (defined below)
+
 static void AI_BuildRegistry (void)
 {
     thinker_t*	th;
@@ -164,14 +166,50 @@ static void AI_BuildRegistry (void)
 	    }
 	aient_count++;
     }
+    AI_RehashRegistry ();	// refresh the mobj->entry hash for this registry generation
+}
+
+// O(1) mobj -> entry lookup for the per-tic A_Chase path.  Both P_AI_Active and
+// A_LLMChase look up every directed monster every tic; the old linear scan was O(n)
+// each -> O(n^2)/tic across a directed pack.  Open-addressed hash keyed on the mobj
+// pointer, slot value = entry index + 1 (0 = empty, so the zero-initialised BSS array
+// reads as "empty" before the first AI_BuildRegistry).
+#define AI_HASH		(AI_MAX * 2)		// power of two -> load factor <= 0.5
+static int		ai_hash[AI_HASH];
+
+static unsigned AI_HashSlot (mobj_t* mo)
+{
+    uintptr_t h = (uintptr_t)mo >> 4;		// drop pointer alignment bits
+    h *= 2654435761u;				// Knuth multiplicative hash
+    return (unsigned)h & (AI_HASH - 1);
+}
+
+static void AI_RehashRegistry (void)
+{
+    int i;
+    memset (ai_hash, 0, sizeof(ai_hash));
+    for (i = 0; i < aient_count; i++)
+    {
+	unsigned k = AI_HashSlot (aient[i].mo);
+	while (ai_hash[k]) k = (k + 1) & (AI_HASH - 1);	// linear probe
+	ai_hash[k] = i + 1;
+    }
 }
 
 static aientry_t* AI_FindByMobj (mobj_t* mo)
 {
-    int i;
-    for (i = 0; i < aient_count; i++)
-	if (aient[i].mo == mo)
-	    return &aient[i];
+    unsigned k = AI_HashSlot (mo);
+    unsigned probes = 0;
+    while (ai_hash[k])
+    {
+	int idx = ai_hash[k] - 1;
+	// idx < aient_count guards a stale hash after aient_count was zeroed without a
+	// rehash (director toggle/reset): those slots point past the live entries.
+	if (idx < aient_count && aient[idx].mo == mo)
+	    return &aient[idx];
+	k = (k + 1) & (AI_HASH - 1);
+	if (++probes >= AI_HASH) break;
+    }
     return NULL;
 }
 

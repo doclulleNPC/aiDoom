@@ -416,6 +416,19 @@ void P_AICoop_MaybeSpawnDrone (player_t* bot)
 	return;
     b = bot->mo;
 
+    // Cheap gates BEFORE the per-tic threat scan (SecDrone_CountThreats is a full
+    // thinker walk + a P_CheckSight per monster -- previously paid every single tic
+    // even with a drone already out).  Only a critically hurt buddy (health <=
+    // DRONE_LOW_HP) may redeploy mid-cooldown, and only it needs the threat count:
+    //  1) on cooldown and healthy -> nothing to decide, just tick the cooldown down;
+    //  2) healthy and off cooldown -> a drone deploy isn't a 35 Hz decision, so
+    //     evaluate only a few times a second.  Both skip the scan; low-HP falls through.
+    if (bot->health > DRONE_LOW_HP)
+    {
+	if (cooldown > 0)  { cooldown--; return; }
+	if (gametic & 7)   return;			// ~4-5 Hz deploy evaluation
+    }
+
     // Critically hurt AND something is actually shooting at us -> last-resort
     // mode: worth a drone even mid-cooldown / past the usual single-drone cap.
     threats = SecDrone_CountThreats (b, DRONE_ENEMY_RANGE);

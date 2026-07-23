@@ -894,54 +894,42 @@ void R_DrawPlayerSprites (void)
 vissprite_t	vsprsortedhead;
 
 
+// Ascending by scale (far -> near = painter's order); ties broken by array address so
+// equal-scale sprites keep insertion order -- identical result to the old stable
+// selection sort, but O(n log n) instead of O(n^2) (which spiked with director hordes).
+static int R_VisSpriteCmp (const void* a, const void* b)
+{
+    const vissprite_t* sa = *(vissprite_t* const*)a;
+    const vissprite_t* sb = *(vissprite_t* const*)b;
+    if (sa->scale < sb->scale) return -1;
+    if (sa->scale > sb->scale) return  1;
+    return (sa < sb) ? -1 : (sa > sb);		// tie -> lower index (contiguous vissprites[]) first
+}
+
 void R_SortVisSprites (void)
 {
-    int			i;
-    int			count;
-    vissprite_t*	ds;
-    vissprite_t*	best;
-    vissprite_t		unsorted;
-    fixed_t		bestscale;
+    static vissprite_t*	order[MAXVISSPRITES];	// no per-frame alloc: vissprites[] is capped at this
+    int			i, count = vissprite_p - vissprites;
+    vissprite_t*	prev;
 
-    count = vissprite_p - vissprites;
-	
-    unsorted.next = unsorted.prev = &unsorted;
-
+    vsprsortedhead.next = vsprsortedhead.prev = &vsprsortedhead;
     if (!count)
 	return;
-		
-    for (ds=vissprites ; ds<vissprite_p ; ds++)
+
+    for (i = 0 ; i < count ; i++)
+	order[i] = &vissprites[i];
+    qsort (order, count, sizeof(order[0]), R_VisSpriteCmp);
+
+    // relink into vsprsortedhead in ascending-scale order (R_DrawMasked walks .next)
+    prev = &vsprsortedhead;
+    for (i = 0 ; i < count ; i++)
     {
-	ds->next = ds+1;
-	ds->prev = ds-1;
+	order[i]->prev = prev;
+	prev->next = order[i];
+	prev = order[i];
     }
-    
-    vissprites[0].prev = &unsorted;
-    unsorted.next = &vissprites[0];
-    (vissprite_p-1)->next = &unsorted;
-    unsorted.prev = vissprite_p-1;
-    
-    // pull the vissprites out by scale
-    //best = 0;		// shut up the compiler warning
-    vsprsortedhead.next = vsprsortedhead.prev = &vsprsortedhead;
-    for (i=0 ; i<count ; i++)
-    {
-	bestscale = MAXINT;
-	for (ds=unsorted.next ; ds!= &unsorted ; ds=ds->next)
-	{
-	    if (ds->scale < bestscale)
-	    {
-		bestscale = ds->scale;
-		best = ds;
-	    }
-	}
-	best->next->prev = best->prev;
-	best->prev->next = best->next;
-	best->next = &vsprsortedhead;
-	best->prev = vsprsortedhead.prev;
-	vsprsortedhead.prev->next = best;
-	vsprsortedhead.prev = best;
-    }
+    prev->next = &vsprsortedhead;
+    vsprsortedhead.prev = prev;
 }
 
 
