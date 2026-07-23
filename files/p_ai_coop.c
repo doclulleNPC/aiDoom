@@ -97,7 +97,9 @@ static void AICoop_CrumbAdd (fixed_t x, fixed_t y)
 #define COOP_RUN	0x32		// forwardmove "run" magnitude
 #define COOP_HEAL_HP	50		// seek a med-pack below this health
 #define COOP_SAFE_HP	40		// below this HP the buddy routes home the low-danger way
-#define COOP_REVIVE_RANGE (64*FRACUNIT)	// human must stand this close (and press USE) to revive
+#define COOP_REVIVE_RANGE (96*FRACUNIT)	// human must stand this close (and press USE) to revive
+					// (64 was too tight -- a corpse slid into a corner/onto
+					// a ledge couldn't be reached; sight check guards walls)
 #define COOP_HEAL_RANGE	(1024*FRACUNIT)	// how far to look for one
 #define COOP_ITEM_RANGE	(128*FRACUNIT)	// idle pickups only when right nearby (not "miles away")
 #define COOP_GRAB_NEAR	(512*FRACUNIT)	// only grab items while still near the human (else follow)
@@ -1946,8 +1948,21 @@ boolean P_AICoop_RevivePress (player_t* presser)
     if (!dmo || !presser->mo) return false;
     if (P_AproxDistance (presser->mo->x - dmo->x, presser->mo->y - dmo->y) >= COOP_REVIVE_RANGE)
 	return false;
-    if (!P_CheckSight (presser->mo, dmo))
-	return false;
+    // Line-of-sight so you can't revive through a closed door/wall -- but check it
+    // against the buddy's FULL STANDING height, not the squashed corpse.  P_CheckSight
+    // seeds its slope window from (t2->z .. t2->z+t2->height); a floor-level downed
+    // corpse gives a near-zero window that any step/opening in complex (LoR) geometry
+    // closes, so sight failed even point-blank and the USE silently fell through to a
+    // door.  Restoring the living height makes LOS behave as it did to the marine you
+    // were just following.
+    {
+	fixed_t	savedh = dmo->height;
+	boolean	seen;
+	dmo->height = dmo->info->height;
+	seen = P_CheckSight (presser->mo, dmo);
+	dmo->height = savedh;
+	if (!seen) return false;
+    }
     // Reviving costs a health artifact from the human's pack -- a Stimpack or a Medikit (prefer
     // the smaller Stimpack so the Medikit is saved).  The buddy comes back up on that item's heal
     // value.  With neither in the inventory, the buddy can't be revived: say so and bail.
