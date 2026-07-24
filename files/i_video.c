@@ -38,6 +38,7 @@
 #include "buddydoom_version.h"		// BUDDYDOOM_VERSION (auto-bumped by build.sh)
 #include "c_console.h"			// console overlay state (C_Active / C_GetLine)
 #include "m_controls.h"			// in-game key-bindings screen (overlay drawn here)
+#include "m_menu.h"			// M_Video_* -- the Video settings overlay (drawn here)
 #include "../tools/font_atlas.h"		// baked DejaVuSansMono atlas (TTF console font)
 
 
@@ -52,7 +53,23 @@ static Uint32		palette[256];
 int			scale_mode = 0;       // 0 = Nearest, 1 = Linear
 int			vsync = 1;            // 0 = Off, 1 = On (default On)
 int			integer_scale = 0;    // 0 = Letterbox, 1 = Integer Scale
-int			render_backend = 0;   // 0 = Auto, 1 = Vulkan, 2 = OpenGL, 3 = D3D12, 4 = D3D11, 5 = Metal, 6 = Software
+int			render_backend = 0;   // 0 = Auto; 1..N = SDL render driver by name (I_RenderBackendName)
+
+// Options -> Video -> Backend: enumerate the SDL render drivers at runtime, so the
+// menu only lists drivers this SDL build/platform actually has (index 0 = "Auto").
+int I_RenderBackendCount (void)
+{
+    int nd = SDL_GetNumRenderDrivers();
+    return (nd > 0 ? nd : 0) + 1;		// + the "Auto" entry at index 0
+}
+const char* I_RenderBackendName (int i)
+{
+    const char* n;
+    if (i <= 0)
+	return "Auto";
+    n = SDL_GetRenderDriver (i - 1);
+    return n ? n : "Auto";
+}
 
 // Gamepad integration
 float gamepad_left_x = 0.0f;
@@ -533,7 +550,8 @@ static void I_DrawControlsOverlay (void)
     { SDL_FRect p = {0, 0, W, H}; SDL_RenderFillRect (renderer, &p); }
 
     // rows fill ~82% of the height between a title band and a footer -> adapts to any res
-    rowh = (H * 0.82f) / (float)n;
+    // (+1 for the "Reset all to defaults" row below the bindings)
+    rowh = (H * 0.82f) / (float)(n + 1);
     ch   = rowh * 0.74f; if (ch < 6) ch = 6;
     cw   = FONT_CW * (ch / FONT_CH);
     lx   = W * 0.20f;			// label column
@@ -570,10 +588,83 @@ static void I_DrawControlsOverlay (void)
 	}
     }
 
+    // "Reset all to defaults" row (virtual index n)
+    {
+	boolean issel = (sel == n);
+	if (issel)
+	{
+	    SDL_SetRenderDrawColor (renderer, 70, 30, 30, 235);
+	    { SDL_FRect hb = { lx - cw, y - rowh*0.12f, (kx + W*0.16f) - (lx - cw), rowh }; SDL_RenderFillRect (renderer, &hb); }
+	}
+	SDL_SetTextureColorMod (confont, issel?255:210, issel?150:120, issel?150:120);
+	I_ConDrawText (lx, y, "Reset all to defaults", cw, ch);
+    }
+
     // footer hint
     SDL_SetTextureColorMod (confont, 150, 160, 180);
     I_ConDrawText (lx, H*0.955f,
 		   "Up/Down: move   Enter: rebind   Bksp: clear   Esc: back",
+		   cw*0.85f, ch*0.85f);
+}
+
+// Options -> Video: the settings screen, same TTF-overlay style as Controls.
+static void I_DrawVideoOverlay (void)
+{
+    float	W, H, ch, cw, rowh, lx, vx, y, tw;
+    int		n, i, sel;
+    char	valbuf[40];
+    const char*	title = "VIDEO";
+
+    if (!M_Video_Active())
+	return;
+
+    I_EnsureConFont ();
+
+    W = SCREENWIDTH; H = SCREENHEIGHT;
+    n   = M_Video_Count ();
+    sel = M_Video_Sel ();
+
+    SDL_SetRenderDrawBlendMode (renderer, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor (renderer, 6, 8, 14, 234);
+    { SDL_FRect p = {0, 0, W, H}; SDL_RenderFillRect (renderer, &p); }
+
+    rowh = (H * 0.74f) / (float)n;		// fewer rows than Controls -> a bit larger
+    ch   = rowh * 0.72f; if (ch < 6) ch = 6;
+    cw   = FONT_CW * (ch / FONT_CH);
+    lx   = W * 0.22f;
+    vx   = W * 0.60f;
+
+    tw = (float)strlen(title) * (cw*1.7f);
+    SDL_SetTextureColorMod (confont, 255, 205, 110);
+    I_ConDrawText ((W - tw)*0.5f, H*0.05f, title, cw*1.7f, ch*1.7f);
+
+    y = H * 0.17f;
+    for (i = 0; i < n; i++, y += rowh)
+    {
+	boolean issel = (i == sel);
+	if (issel)
+	{
+	    SDL_SetRenderDrawColor (renderer, 70, 58, 22, 235);
+	    { SDL_FRect hb = { lx - cw, y - rowh*0.12f, (vx + W*0.20f) - (lx - cw), rowh }; SDL_RenderFillRect (renderer, &hb); }
+	}
+	SDL_SetTextureColorMod (confont, issel?255:198, issel?236:205, issel?165:216);
+	I_ConDrawText (lx, y, M_Video_Label (i), cw, ch);
+
+	M_Video_Value (i, valbuf, sizeof valbuf);
+	SDL_SetTextureColorMod (confont, 255, 220, 150);
+	if (issel)		// draw < value > to hint left/right cycling
+	{
+	    char withar[48];
+	    snprintf (withar, sizeof withar, "< %s >", valbuf);
+	    I_ConDrawText (vx - cw*2, y, withar, cw, ch);
+	}
+	else
+	    I_ConDrawText (vx, y, valbuf, cw, ch);
+    }
+
+    SDL_SetTextureColorMod (confont, 150, 160, 180);
+    I_ConDrawText (lx, H*0.955f,
+		   "Up/Down: move   Left/Right: change   Esc: back",
 		   cw*0.85f, ch*0.85f);
 }
 
@@ -620,6 +711,7 @@ void I_FinishUpdate (void)
     SDL_RenderClear(renderer);
     SDL_RenderTexture(renderer, texture, NULL, NULL);
     I_DrawControlsOverlay();		// Options -> Controls key-bindings screen
+    I_DrawVideoOverlay();		// Options -> Video settings screen
     I_DrawConsoleOverlay();		// crisp SDL/TTF console on top of the frame
     SDL_RenderPresent(renderer);
 }
@@ -814,18 +906,11 @@ void I_InitGraphics(void)
 	}
     }
 
-    const char* driver_name = NULL;
-    static const char* backend_names[] = {
-	NULL,          // Auto
-	"vulkan",
-	"opengl",
-	"direct3d12",
-	"direct3d11",
-	"metal",
-	"software"
-    };
-    if (render_backend >= 1 && render_backend <= 6)
-	driver_name = backend_names[render_backend];
+    // render_backend: 0 = Auto (let SDL choose), 1..N = the Nth SDL render driver
+    // that actually exists on this build/platform (see I_RenderBackendName).
+    const char* driver_name =
+	(render_backend >= 1 && render_backend < SDL_GetNumRenderDrivers()+1)
+	    ? SDL_GetRenderDriver(render_backend-1) : NULL;
 
     renderer = SDL_CreateRenderer(window, driver_name);
     if ( renderer == NULL )

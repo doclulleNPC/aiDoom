@@ -21,8 +21,10 @@
 #include "d_event.h"
 #include "m_controls.h"
 
-// From m_misc.c / m_menu.c: persist to buddydoom.cfg, and the menu-active flag.
+// From m_misc.c / m_menu.c: persist to buddydoom.cfg, reset one value to its
+// compiled-in default, and the menu-active flag.
 extern void	M_SaveDefaults (void);
+extern void	M_ResetDefault (int* location);
 extern boolean	menuactive;
 
 // The rebindable key globals (g_game.c).  We store the game's internal KEY_*
@@ -143,19 +145,32 @@ boolean M_Controls_Responder (event_t* ev)
 	return true;
     }
 
-    switch (k)
+    // NBIND action rows + one virtual "Reset all to defaults" row (index NBIND).
     {
-      case KEY_UPARROW:   sel = (sel - 1 + NBIND) % NBIND; break;
-      case KEY_DOWNARROW: sel = (sel + 1)         % NBIND; break;
-      case KEY_ENTER:     capturing = true;               break;	// rebind the selected action
-      case KEY_BACKSPACE:						// clear the binding
-	*bindings[sel].key = 0;
-	M_SaveDefaults ();
-	break;
-      case KEY_ESCAPE:							// back to the Options menu
-	active = false;
-	break;
-      default: break;
+	int total = NBIND + 1;
+	switch (k)
+	{
+	  case KEY_UPARROW:   sel = (sel - 1 + total) % total; break;
+	  case KEY_DOWNARROW: sel = (sel + 1)         % total; break;
+	  case KEY_ENTER:
+	    if (sel == NBIND)						// reset every binding
+	    {
+		int i;
+		for (i = 0; i < NBIND; i++)
+		    M_ResetDefault (bindings[i].key);
+		M_SaveDefaults ();
+	    }
+	    else
+		capturing = true;					// rebind the selected action
+	    break;
+	  case KEY_BACKSPACE:						// clear the binding
+	    if (sel < NBIND) { *bindings[sel].key = 0; M_SaveDefaults (); }
+	    break;
+	  case KEY_ESCAPE:						// back to the Options menu
+	    active = false;
+	    break;
+	  default: break;
+	}
     }
     return true;
 }

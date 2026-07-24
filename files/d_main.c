@@ -212,6 +212,8 @@ void D_ProcessEvents (void)
 	    continue;               // console ate the event
 	if (M_Controls_Responder (ev))
 	    continue;               // the Controls (key-bindings) screen ate the event
+	if (M_Video_Responder (ev))
+	    continue;               // the Video settings screen ate the event
 	if (M_Responder (ev))
 	    continue;               // menu ate the event
 	G_Responder (ev);

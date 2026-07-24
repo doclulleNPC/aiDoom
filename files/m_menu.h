@@ -54,7 +54,15 @@ void M_Init (void);
 // does nothing if menu is already up.
 void M_StartControlPanel (void);
 
-
+// Options -> Video: TTF-overlay screen (same style as Controls).  State/input live
+// in m_menu.c; i_video.c draws it via these accessors.
+void	M_Video_Open (void);
+boolean	M_Video_Active (void);
+boolean	M_Video_Responder (event_t* ev);
+int	M_Video_Count (void);
+const char* M_Video_Label (int i);
+void	M_Video_Value (int i, char* out, int n);
+int	M_Video_Sel (void);
 
 
 

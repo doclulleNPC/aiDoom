@@ -353,6 +353,23 @@ char*	defaultfile;
 //
 // M_SaveDefaults
 //
+//
+// M_ResetDefault
+// Restore a single config value to its compiled-in default (the Controls screen's
+// "reset to defaults" uses this per key).  No-op if `location` isn't a known default.
+//
+void M_ResetDefault (int* location)
+{
+    int i;
+    for (i = 0; i < numdefaults; i++)
+	if (defaults[i].location == location)
+	{
+	    *location = defaults[i].defaultvalue;
+	    return;
+	}
+}
+
+
 void M_SaveDefaults (void)
 {
     int		i;

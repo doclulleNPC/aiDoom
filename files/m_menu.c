@@ -1116,6 +1116,81 @@ void M_DrawVideo(void)
 		automap_textured ? "On" : "Off");
 }
 
+// ---------------------------------------------------------------------------
+// Options -> Video, rendered as the same crisp TTF overlay as Controls.
+// State + input live here (next to the value tables and the M_Video* handlers);
+// i_video.c draws it (I_DrawVideoOverlay) via the accessors below.
+// ---------------------------------------------------------------------------
+void M_SpriteShadow (int choice);		// (defined below; used in the cycle table)
+void M_AutomapTextured (int choice);
+extern void M_SaveDefaults (void);
+extern int  I_RenderBackendCount (void);	// i_video.c: available SDL render drivers (+ Auto)
+extern const char* I_RenderBackendName (int i);
+
+static int	mvid_active, mvid_sel;
+
+static const char* const M_VideoLabels[vid_end] =
+{
+    "Resolution", "Fullscreen", "Aspect", "Filter", "VSync",
+    "Scaling", "Backend (restart)", "Status Bar", "Light Dither",
+    "Sprite Shadows", "Textured Map"
+};
+static void (* const M_VideoCycle[vid_end])(int) =
+{
+    M_VideoRes, M_VideoFullscreen, M_VideoAspect, M_VideoFilter, M_VideoVSync,
+    M_VideoScale, M_VideoBackend, M_StatusBarStyle, M_LightDither,
+    M_SpriteShadow, M_AutomapTextured
+};
+
+void	M_Video_Open (void)    { mvid_active = 1; mvid_sel = 0; }
+boolean	M_Video_Active (void)  { return mvid_active; }
+int	M_Video_Count (void)   { return vid_end; }
+int	M_Video_Sel (void)     { return mvid_sel; }
+
+const char* M_Video_Label (int i)
+{
+    return (i >= 0 && i < vid_end) ? M_VideoLabels[i] : "";
+}
+
+void M_Video_Value (int i, char* b, int n)
+{
+    if (!n) return;
+    switch (i)
+    {
+      case vid_res:        snprintf (b, n, "%dx%d", SCREENWIDTH, SCREENHEIGHT); break;
+      case vid_fullscreen: snprintf (b, n, "%s", I_GetFullscreen() ? "On" : "Off"); break;
+      case vid_widescreen: snprintf (b, n, "%s", M_AspectNames[(aspect>=0&&aspect<=2)?aspect:2]); break;
+      case vid_filter:     snprintf (b, n, "%s", M_FilterNames[(scale_mode>=0&&scale_mode<=1)?scale_mode:0]); break;
+      case vid_vsync:      snprintf (b, n, "%s", vsync ? "On" : "Off"); break;
+      case vid_scale:      snprintf (b, n, "%s", M_ScaleNames[(integer_scale>=0&&integer_scale<=1)?integer_scale:0]); break;
+      case vid_backend:    snprintf (b, n, "%s", I_RenderBackendName (render_backend)); break;
+      case vid_statusbar:  snprintf (b, n, "%s", M_StatusBarNames[(statusbar_style>=0&&statusbar_style<=2)?statusbar_style:0]); break;
+      case vid_dither:     snprintf (b, n, "%s", dither_lighting ? "On" : "Off"); break;
+      case vid_shadow:     snprintf (b, n, "%s", r_shadows ? "On" : "Off"); break;
+      case vid_automap:    snprintf (b, n, "%s", automap_textured ? "On" : "Off"); break;
+      default:             b[0] = 0;
+    }
+}
+
+boolean M_Video_Responder (event_t* ev)
+{
+    if (!mvid_active)
+	return false;
+    if (ev->type != ev_keydown)
+	return true;
+    switch (ev->data1)
+    {
+      case KEY_UPARROW:   mvid_sel = (mvid_sel - 1 + vid_end) % vid_end; break;
+      case KEY_DOWNARROW: mvid_sel = (mvid_sel + 1)          % vid_end; break;
+      case KEY_LEFTARROW: M_VideoCycle[mvid_sel](0); M_SaveDefaults(); break;
+      case KEY_RIGHTARROW:
+      case KEY_ENTER:     M_VideoCycle[mvid_sel](1); M_SaveDefaults(); break;
+      case KEY_ESCAPE:    mvid_active = 0; break;
+      default: break;
+    }
+    return true;
+}
+
 void M_LightDither(int choice)
 {
     dither_lighting = !dither_lighting;
@@ -1193,13 +1268,16 @@ void M_VideoScale(int choice)
 
 void M_VideoBackend(int choice)
 {
-    render_backend = choice ? (render_backend+1)%7 : (render_backend+6)%7;
+    extern int I_RenderBackendCount (void);	// i_video.c: Auto + the real SDL drivers
+    int nb = I_RenderBackendCount ();
+    if (nb < 1) nb = 1;
+    render_backend = choice ? (render_backend+1)%nb : (render_backend+nb-1)%nb;
     M_SaveDefaults();
 }
 
 void M_Video(int choice)
 {
-    M_SetupNextMenu(&VideoDef);
+    M_Video_Open ();		// TTF-overlay video screen (same style as Controls)
 }
 
 void M_Options(int choice)
@@ -1996,9 +2074,9 @@ void M_Drawer (void)
     char		string[40];
     int			start;
 
-    // The Controls (key-bindings) screen replaces the classic menu with its own
-    // crisp SDL/TTF overlay (drawn in i_video.c) -- don't draw the paletted menu under it.
-    if (M_Controls_Active ())
+    // The Controls / Video screens replace the classic menu with their own crisp
+    // SDL/TTF overlay (drawn in i_video.c) -- don't draw the paletted menu under them.
+    if (M_Controls_Active () || M_Video_Active ())
 	return;
 
     inhelpscreens = false;
