@@ -1,7 +1,7 @@
 @echo off
 REM ===========================================================================
 REM build_all_win.bat -- build EVERYTHING on Windows (MSVC + SDL3):
-REM   files\aidoom.exe   +   tools\aidoom_config.exe   +   tools\gpumon.exe
+REM   files\buddydoom.exe   +   tools\buddydoom_config.exe   +   tools\gpumon.exe
 REM   +   tools\director.exe
 REM   +   tools\launcher.exe
 REM   +   tools\extractor.exe
@@ -20,7 +20,7 @@ for /f "usebackq tokens=*" %%i in (`"%VSWHERE%" -latest -requires Microsoft.Visu
 if not defined VSDIR ( echo [build] VC++ tools not found & exit /b 1 )
 call "%VSDIR%\VC\Auxiliary\Build\vcvars32.bat" >nul || ( echo [build] vcvars32 failed & exit /b 1 )
 
-echo [build] === aiDoom ===
+echo [build] === BuddyDoom ===
 cd /d "%ROOT%files"
 REM ALWAYS clean-build the engine: the generated deps have NO header tracking, so
 REM after any .h edit (e.g. NUMSTATES in info.h) nmake would keep stale .obj files
@@ -36,12 +36,12 @@ REM that nmake would otherwise consider up-to-date and skip -> arch mismatch.
 nmake /nologo /f Makefile.msvc clean >nul
 nmake /nologo /f Makefile.msvc %* || exit /b 1
 
-REM --- copy the aiDoom engine + tool binaries (+SDL3.dll) into run\ ---
+REM --- copy the BuddyDoom engine + tool binaries (+SDL3.dll) into run\ ---
 echo [build] === copy outputs to run\ ===
-copy /Y "%ROOT%files\aidoom.exe"      "%ROOT%run\aidoom.exe"      >nul || exit /b 1
-if exist "%ROOT%files\aidoom.pdb" copy /Y "%ROOT%files\aidoom.pdb" "%ROOT%run\aidoom.pdb" >nul
+copy /Y "%ROOT%files\buddydoom.exe"      "%ROOT%run\buddydoom.exe"      >nul || exit /b 1
+if exist "%ROOT%files\buddydoom.pdb" copy /Y "%ROOT%files\buddydoom.pdb" "%ROOT%run\buddydoom.pdb" >nul
 
-copy /Y "%ROOT%tools\aidoom_config.exe" "%ROOT%run\aidoom_config.exe" >nul || exit /b 1
+copy /Y "%ROOT%tools\buddydoom_config.exe" "%ROOT%run\buddydoom_config.exe" >nul || exit /b 1
 copy /Y "%ROOT%tools\gpumon.exe"      "%ROOT%run\gpumon.exe"      >nul || exit /b 1
 copy /Y "%ROOT%tools\launcher.exe"    "%ROOT%run\launcher.exe"    >nul || exit /b 1
 copy /Y "%ROOT%tools\director.exe"    "%ROOT%run\director.exe"    >nul || exit /b 1
@@ -49,5 +49,5 @@ copy /Y "%ROOT%tools\extractor.exe"   "%ROOT%run\extractor.exe"   >nul || exit /
 if exist "%ROOT%files\SDL3.dll" copy /Y "%ROOT%files\SDL3.dll" "%ROOT%run\SDL3.dll" >nul
 
 echo.
-echo [build] OK -- aidoom.exe + aidoom_config.exe + gpumon.exe + launcher.exe + director.exe + extractor.exe built and copied to run\.
+echo [build] OK -- buddydoom.exe + buddydoom_config.exe + gpumon.exe + launcher.exe + director.exe + extractor.exe built and copied to run\.
 endlocal

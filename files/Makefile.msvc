@@ -1,16 +1,16 @@
-# Makefile.msvc -- native Windows build of aiDoom with Visual Studio 2019 (NMake).
+# Makefile.msvc -- native Windows build of BuddyDoom with Visual Studio 2019 (NMake).
 #
 # Usage (from a "x86 Native Tools Command Prompt for VS 2019", in files\):
 #     nmake /f Makefile.msvc
 # or override the SDL location:
 #     nmake /f Makefile.msvc SDL=C:\path\to\SDL-1.2.15
 #
-# Produces aidoom.exe (Win32/x86, SDL3) and copies SDL3.dll next to it.
+# Produces buddydoom.exe (Win32/x86, SDL3) and copies SDL3.dll next to it.
 
 SDL = C:\Source\SDL3
 
 CC = cl
-# /Zi + /DEBUG (below): emit aidoom.pdb.  Codegen is unchanged from plain /O2, but a
+# /Zi + /DEBUG (below): emit buddydoom.pdb.  Codegen is unchanged from plain /O2, but a
 # shipped PDB lets the crash handler's minidump (i_main.c) symbolise to exact
 # functions/lines instead of guessing against a mismatched build.
 CFLAGS = /nologo /O2 /Zi /MD /W3 /I"$(SDL)\include" \
@@ -21,7 +21,7 @@ CFLAGS = /nologo /O2 /Zi /MD /W3 /I"$(SDL)\include" \
 LIBS = "$(SDL)\lib\x86\SDL3.lib" ws2_32.lib dbghelp.lib
 LDFLAGS = /link /SUBSYSTEM:CONSOLE /DEBUG
 
-RES = aidoom.res
+RES = buddydoom.res
 
 OBJS = \
 	am_map.obj c_console.obj c_llm.obj d_deh.obj d_items.obj d_main.obj d_net.obj d_netcl.obj doomdef.obj doomstat.obj \
@@ -37,17 +37,17 @@ OBJS = \
 	s_sound.obj sounds.obj stb_vorbis.obj st_lib.obj st_stuff.obj st_sbardef.obj tables.obj u_mapinfo.obj v_png.obj v_video.obj \
 	w_wad.obj wi_stuff.obj w_json.obj w_inflate.obj z_zone.obj miniz.obj
 
-all: aidoom.exe
+all: buddydoom.exe
 
-aidoom.exe: $(OBJS) $(RES)
-	$(CC) $(CFLAGS) /Fe:aidoom.exe $(OBJS) $(RES) $(LDFLAGS) $(LIBS)
+buddydoom.exe: $(OBJS) $(RES)
+	$(CC) $(CFLAGS) /Fe:buddydoom.exe $(OBJS) $(RES) $(LDFLAGS) $(LIBS)
 	@if exist "$(SDL)\lib\x86\SDL3.dll" copy /Y "$(SDL)\lib\x86\SDL3.dll" SDL3.dll >nul
 
-$(RES): aidoom.rc ..\aidoom.ico
-	rc /nologo /fo $(RES) aidoom.rc
+$(RES): buddydoom.rc ..\buddydoom.ico
+	rc /nologo /fo $(RES) buddydoom.rc
 
 .c.obj:
 	$(CC) $(CFLAGS) /c $<
 
 clean:
-	-del *.obj *.res aidoom.exe SDL.dll SDL3.dll 2>nul
+	-del *.obj *.res buddydoom.exe SDL.dll SDL3.dll 2>nul

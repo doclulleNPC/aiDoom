@@ -1,2 +1,2 @@
-/* launcher exe icon -- shared with the game (files/aidoom.ico) */
-1 ICON "../aidoom.ico"
+/* launcher exe icon -- shared with the game (files/buddydoom.ico) */
+1 ICON "../buddydoom.ico"
