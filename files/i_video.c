@@ -53,22 +53,48 @@ static Uint32		palette[256];
 int			scale_mode = 0;       // 0 = Nearest, 1 = Linear
 int			vsync = 1;            // 0 = Off, 1 = On (default On)
 int			integer_scale = 0;    // 0 = Letterbox, 1 = Integer Scale
-int			render_backend = 0;   // 0 = Auto; 1..N = SDL render driver by name (I_RenderBackendName)
+int			render_backend = 0;   // 0 = Auto; 1..N = the Nth VERIFIED render driver
 
-// Options -> Video -> Backend: enumerate the SDL render drivers at runtime, so the
-// menu only lists drivers this SDL build/platform actually has (index 0 = "Auto").
-int I_RenderBackendCount (void)
+// Options -> Video -> Backend.  SDL_GetRenderDriver() lists the drivers SDL was
+// *built* with, but selecting one doesn't guarantee it actually creates a renderer on
+// this machine (e.g. "vulkan"/"direct3d12" with no working ICD).  So at startup we
+// PROBE each driver on a hidden window and keep only the ones that really create a
+// renderer -- that verified list is what the menu offers and what the real renderer is
+// built from, so a listed backend is always one that works here.  Index 0 = "Auto".
+#define MAX_BACKENDS	16
+static const char*	ok_backends[MAX_BACKENDS];
+static int		ok_backend_count = -1;	// -1 = not probed yet
+
+static void I_ProbeBackends (void)
 {
-    int nd = SDL_GetNumRenderDrivers();
-    return (nd > 0 ? nd : 0) + 1;		// + the "Auto" entry at index 0
+    int i, n;
+    if (ok_backend_count >= 0)
+	return;					// probe once
+    ok_backend_count = 0;
+    n = SDL_GetNumRenderDrivers ();
+    for (i = 0; i < n && ok_backend_count < MAX_BACKENDS; i++)
+    {
+	const char*	d = SDL_GetRenderDriver (i);
+	SDL_Window*	w = SDL_CreateWindow ("probe", 64, 64, SDL_WINDOW_HIDDEN);
+	if (w)
+	{
+	    SDL_Renderer* r = SDL_CreateRenderer (w, d);
+	    if (r) { ok_backends[ok_backend_count++] = d; SDL_DestroyRenderer (r); }
+	    SDL_DestroyWindow (w);
+	}
+    }
+}
+
+int I_RenderBackendCount (void)			// verified drivers + the Auto entry
+{
+    I_ProbeBackends ();
+    return ok_backend_count + 1;
 }
 const char* I_RenderBackendName (int i)
 {
-    const char* n;
-    if (i <= 0)
-	return "Auto";
-    n = SDL_GetRenderDriver (i - 1);
-    return n ? n : "Auto";
+    if (i <= 0) return "Auto";
+    I_ProbeBackends ();
+    return (i - 1 < ok_backend_count) ? ok_backends[i - 1] : "Auto";
 }
 
 // Gamepad integration
@@ -906,13 +932,19 @@ void I_InitGraphics(void)
 	}
     }
 
-    // render_backend: 0 = Auto (let SDL choose), 1..N = the Nth SDL render driver
-    // that actually exists on this build/platform (see I_RenderBackendName).
+    // render_backend: 0 = Auto (let SDL choose), 1..N = the Nth VERIFIED driver
+    // (I_RenderBackendName; the list was probed above so every entry created OK).
     const char* driver_name =
-	(render_backend >= 1 && render_backend < SDL_GetNumRenderDrivers()+1)
-	    ? SDL_GetRenderDriver(render_backend-1) : NULL;
+	(render_backend >= 1 && render_backend <= I_RenderBackendCount()-1)
+	    ? I_RenderBackendName(render_backend) : NULL;
 
     renderer = SDL_CreateRenderer(window, driver_name);
+    if ( renderer == NULL && driver_name )		// chosen driver failed anyway -> Auto
+    {
+	fprintf (stderr, "I_InitGraphics: render backend '%s' failed (%s) -- falling back to Auto\n",
+		 driver_name, SDL_GetError());
+	renderer = SDL_CreateRenderer(window, NULL);
+    }
     if ( renderer == NULL )
 	I_Error("Could not create renderer: %s", SDL_GetError());
 
