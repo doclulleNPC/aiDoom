@@ -24,11 +24,11 @@ config.status
 # IWADs are copyrighted id Software data -- bring your own, never commit them.
 *.wad
 *.WAD
-# Exception: run/aidoom.wad is OUR voice asset (pre-rendered OGG phrases in a
+# Exception: run/buddydoom.wad is OUR voice asset (pre-rendered OGG phrases in a
 # Doom PWAD), not a game IWAD.  It must be in the repo so the engine can
 # play the buddy voice offline without anyone re-running the ElevenLabs
 # baker.  Listed AFTER the general *.wad rule so it takes precedence.
-!run/ID0/aidoom.wad
+!run/ID0/buddydoom.wad
 # Exception: BOOMEDIT.WAD is TeamTNT's freely-distributable Boom demonstration
 # map (ships with the Boom source), kept as a Boom-compat test asset -- not
 # copyrighted id IWAD data.
@@ -64,21 +64,21 @@ Thumbs.db
 *.err
 
 # bare (extensionless) build outputs
-files/aidoom
+files/buddydoom
 files/doom
 # build.sh copies the binary here too
-run/aidoom
+run/buddydoom
 run/doom
 # SDL3 config tool binary (built by tools/build_config.sh, copied to run/)
-tools/aidoom_config
-run/aidoom_config
+tools/buddydoom_config
+run/buddydoom_config
 # runtime config (written by the game / config app; user-specific).
-# NOTE: run/aidoom.cfg.local IS tracked -- it's the shipped default/template config
-# (localhost, no SSH user/keys); only the live aidoom.cfg is per-user and ignored.
-aidoom.cfg
-run/aidoom.cfg
-aidoom2.cfg
-run/aidoom2.cfg
+# NOTE: run/buddydoom.cfg.local IS tracked -- it's the shipped default/template config
+# (localhost, no SSH user/keys); only the live buddydoom.cfg is per-user and ignored.
+buddydoom.cfg
+run/buddydoom.cfg
+buddydoom2.cfg
+run/buddydoom2.cfg
 
 # local debug screenshots (not part of the repo; hero.png is the only tracked image)
 Bildschirmfoto_*.png
@@ -90,8 +90,8 @@ buddy_say.txt
 run/buddy_say.txt
 # regenerable ElevenLabs voice bake cache (don't delete -- avoids re-running paid TTS)
 .buddy_voice_cache/
-tools/aidoom_config.exe
-run/aidoom_config.exe
+tools/buddydoom_config.exe
+run/buddydoom_config.exe
 tools/gpumon_sdl
 run/gpumon_sdl
 tools/gpumon_sdl.exe
@@ -127,7 +127,7 @@ run/ID0/*.TXT
 run/ID0/*.DAT
 run/ID0/*.rar
 run/ID0/*.pdf
-run/aidoom.cfg.mini
+run/buddydoom.cfg.mini
 run/e1-arenas.dbs
 run/launcher.ini
 run/smk.txt

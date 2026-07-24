@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-bake_buddy_voice.py -- pre-render the aiDoom AI co-op buddy's spoken lines
-from ElevenLabs TTS, and pack them into a Doom PWAD (`aidoom.wad`) so the
+bake_buddy_voice.py -- pre-render the BuddyDoom AI co-op buddy's spoken lines
+from ElevenLabs TTS, and pack them into a Doom PWAD (`buddydoom.wad`) so the
 engine can play them offline with no network at runtime.
 
 Why a WAD: the engine already has a single-file lump archive loader
@@ -11,16 +11,16 @@ to distribute than 37 loose .ogg files.  See CLAUDE.md / LEGACY_FIXES.md
 ("offline buddy voice via stb_vorbis + dedicated SDL audio stream").
 
 Output:
-    run/aidoom.wad              (PWAD with ~130 DS* OGG/Vorbis lumps + a VOICEMAP
-                                text lump carrying the lump<->phrase mapping)
-    run/aidoom_voice_manifest.txt  (same mapping, as a loose file)
+    run/buddydoom.wad              (PWAD with ~130 DS* OGG/Vorbis lumps + a VOICEMAP
+                                 text lump carrying the lump<->phrase mapping)
+    run/buddydoom_voice_manifest.txt  (same mapping, as a loose file)
 
 Phrases: the original 37 (callouts/state/replies/status) PLUS event callouts
 (kill/dodge/dry/barrel/crit/taunt/bigmon/edge/jump/door/stuck/lost/ff/plhurt/
 pldown/healed/god/arm/lvlstart/lvlclear/idle/...), Joker-HL voice.
 
 Pipeline: ElevenLabs returns MP3 -> ffmpeg transcodes to OGG/Vorbis -> packed into
-the WAD.  API key from ~/.hermes/.env (or --key / $ELEVENLABS_API_KEY), NEVER aidoom.cfg.
+the WAD.  API key from ~/.hermes/.env (or --key / $ELEVENLABS_API_KEY), NEVER buddydoom.cfg.
 
 ElevenLabs:
     - voice id        configurable; default Joker-HL (matches in-game default)
@@ -32,7 +32,7 @@ Usage:
     export ELEVENLABS_API_KEY=sk_...
     python3 tools/bake_buddy_voice.py                       # full bake
     python3 tools/bake_buddy_voice.py --voice zmclHrhV...   # different voice
-    python3 tools/bake_buddy_voice.py --out run/aidoom.wad   # custom path
+    python3 tools/bake_buddy_voice.py --out run/buddydoom.wad   # custom path
     python3 tools/bake_buddy_voice.py --dry-run             # print phrases, no API
 
 Idempotent: skips phrases whose OGG already exists in a cache directory,
@@ -55,8 +55,8 @@ from pathlib import Path
 
 # Lump names are exactly 8 ASCII chars (Doom WAD limit); we use the same `DS` prefix
 # as the engine's existing SFX lumps so the i_voice.c loader can range over `ds*`
-# lumps in the aidoom.wad namespace without colliding with game-SFX lumps (which
-# live in the IWAD, not in aidoom.wad).
+# lumps in the buddydoom.wad namespace without colliding with game-SFX lumps (which
+# live in the IWAD, not in buddydoom.wad).
 def _lump(name: str) -> str:
     """Truncate/pad to exactly 8 chars (uppercase ASCII) per Doom WAD spec.
     Truncation silently merges lumps -- this raises instead so the bake
@@ -327,7 +327,7 @@ API_URL = "https://api.elevenlabs.io/v1/text-to-speech/{voice}" \
 
 
 def cfg_value(cfg_path, key):
-    """Read a 'key value' / 'key \"value\"' line from aidoom.cfg."""
+    """Read a 'key value' / 'key \"value\"' line from buddydoom.cfg."""
     try:
         with open(cfg_path) as f:
             for line in f:
@@ -341,7 +341,7 @@ def cfg_value(cfg_path, key):
 
 def load_face_lumps():
     """Buddy HUD mugshots (tools/buddyface/BUF*.lmp -- the source of truth).  ALWAYS
-    packed into aidoom.wad so a voice re-bake never drops the BUF* faces the HUD needs
+    packed into buddydoom.wad so a voice re-bake never drops the BUF* faces the HUD needs
     (hu_buddy.c); you don't have to run bake_buddy_face.py separately."""
     faces_dir = Path(__file__).resolve().parent / "buddyface"
     lumps = [(f.stem.upper(), f.read_bytes()) for f in sorted(faces_dir.glob("BUF*.lmp"))]
@@ -354,7 +354,7 @@ def load_face_lumps():
 
 
 def load_arrow_lumps():
-    """UI compass arrows (tools/arrows/*.png).  Packed RAW (PNG bytes) into aidoom.wad;
+    """UI compass arrows (tools/arrows/*.png).  Packed RAW (PNG bytes) into buddydoom.wad;
     the engine decodes them via V_CachePNG (light PNG->patch support, v_png.c).  Used by
     hu_buddy.c to point the player at a downed buddy.  Lump name = filename stem upper
     (e.g. RARRA0)."""
@@ -370,7 +370,7 @@ def load_arrow_lumps():
 
 def env_file_value(path, *names):
     """Read KEY=VALUE from a dotenv file (e.g. ~/.hermes/.env), trying each name.
-    Secrets (the ElevenLabs key) live HERE, never in aidoom.cfg."""
+    Secrets (the ElevenLabs key) live HERE, never in buddydoom.cfg."""
     try:
         with open(os.path.expanduser(path)) as f:
             env = {}
@@ -474,7 +474,7 @@ def fetch_ogg(phrase, voice, model, key, ffmpeg, trim_silence=True):
 #   directory:   per-lump entry = filepos (4) + size (4) + name (8)    = 16 bytes
 # Directory is at the END of the file, not after the header.  Many loaders
 # accept both, but the Doom spec is unambiguous and `W_CheckNumForName` in
-# aiDoom's w_wad.c reads the directory from the file end (it was written
+# BuddyDoom's w_wad.c reads the directory from the file end (it was written
 # that way originally because files were streamed in order).
 def write_wad(out_path, lumps):
     """`lumps` is a list of (8-char-name, bytes); writes a Doom PWAD."""
@@ -503,7 +503,7 @@ def write_wad(out_path, lumps):
 # ---------- main ----------
 
 def main():
-    ap = argparse.ArgumentParser(description="Bake aiDoom buddy voice into aidoom.wad")
+    ap = argparse.ArgumentParser(description="Bake BuddyDoom buddy voice into buddydoom.wad")
     ap.add_argument("--voice", default=None,
                     help="ElevenLabs voice id override (default: DEFAULT_VOICE in this "
                          "tool -- Joker-HL)")
@@ -512,9 +512,9 @@ def main():
                          "(default: DIRECTOR_VOICE in this tool -- 'UT')")
     ap.add_argument("--model", default=DEFAULT_MODEL)
     ap.add_argument("--key",   default=None)
-    ap.add_argument("--cfg",   default="aidoom.cfg")
-    ap.add_argument("--out",   default="run/ID0/aidoom.wad",
-                    help="output PWAD path (default: run/aidoom.wad)")
+    ap.add_argument("--cfg",   default="buddydoom.cfg")
+    ap.add_argument("--out",   default="run/ID0/buddydoom.wad",
+                    help="output PWAD path (default: run/buddydoom.wad)")
     ap.add_argument("--cache", default=".buddy_voice_cache",
                     help="dir for raw OGGs (skips re-download on rerun)")
     ap.add_argument("--force", action="store_true",
@@ -530,8 +530,8 @@ def main():
     args = ap.parse_args()
 
     # Voice id lives in tools/ (DEFAULT_VOICE below) -- it's only used here, offline,
-    # when baking aidoom.wad; the game just plays the pre-baked OGGs, never live TTS.
-    # NOT in aidoom.cfg.  --voice can override for a one-off bake.
+    # when baking buddydoom.wad; the game just plays the pre-baked OGGs, never live TTS.
+    # NOT in buddydoom.cfg.  --voice can override for a one-off bake.
     args.voice = args.voice or DEFAULT_VOICE
 
     out_path = Path(args.out).resolve()
@@ -586,12 +586,12 @@ def main():
                         + "".join(manifest_lines))
         lumps.append(("VOICEMAP", manifest_txt.encode("utf-8")))
         write_wad(out_path, lumps)
-        (out_path.parent / "aidoom_voice_manifest.txt").write_text(manifest_txt)
+        (out_path.parent / "buddydoom_voice_manifest.txt").write_text(manifest_txt)
         total = sum(len(d) for _n, d in lumps)
         print(f"\nbake_buddy_voice: wrote {out_path}  ({len(lumps)} lumps, {total} bytes)")
         return 0
 
-    # Key precedence: --key > env var > ~/.hermes/.env.  NEVER aidoom.cfg -- secrets
+    # Key precedence: --key > env var > ~/.hermes/.env.  NEVER buddydoom.cfg -- secrets
     # don't belong in the game config (which can be shared / committed by accident).
     key = args.key or os.environ.get("ELEVENLABS_API_KEY") \
           or env_file_value("~/.hermes/.env",
@@ -664,7 +664,7 @@ def main():
     write_wad(out_path, lumps)
 
     # ... and a copy next to the WAD for reproducibility/grep.
-    (out_path.parent / "aidoom_voice_manifest.txt").write_text(manifest_txt)
+    (out_path.parent / "buddydoom_voice_manifest.txt").write_text(manifest_txt)
 
     total = sum(len(d) for _n, d in lumps)
     print(f"\nbake_buddy_voice: wrote {out_path}  ({len(lumps)} lumps, {total} bytes)")

@@ -1,10 +1,10 @@
-// Generated from aidoom.ico (largest frame -> 64x64 RGBA) -- embedded window icon.
-// Regenerate: magick 'aidoom.ico[5]' -resize 64x64 -depth 8 RGBA:- then re-emit.
-#ifndef __AIDOOM_ICON__
-#define __AIDOOM_ICON__
-#define AIDOOM_ICON_W 64
-#define AIDOOM_ICON_H 64
-static const unsigned char aidoom_icon_rgba[16384] = {
+// Generated from buddydoom.ico (largest frame -> 64x64 RGBA) -- embedded window icon.
+// Regenerate: magick 'buddydoom.ico[5]' -resize 64x64 -depth 8 RGBA:- then re-emit.
+#ifndef __BUDDYDOOM_ICON__
+#define __BUDDYDOOM_ICON__
+#define BUDDYDOOM_ICON_W 64
+#define BUDDYDOOM_ICON_H 64
+static const unsigned char buddydoom_icon_rgba[16384] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,

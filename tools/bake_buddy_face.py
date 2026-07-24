@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
 """
-bake_buddy_face.py -- pack the AI co-op buddy's mugshot graphics into aidoom.wad.
+bake_buddy_face.py -- pack the AI co-op buddy's mugshot graphics into buddydoom.wad.
 
 The buddy STBAR shows its own face (a distinct mugshot set from the player's), so
 the lumps are named BUF* (BUFST00.. / BUFDEAD0 / BUFEVL* / ...) instead of the
 IWAD's STF* -- different names so they don't collide with the player face and so
-W_CacheLumpName resolves them straight out of aidoom.wad.
+W_CacheLumpName resolves them straight out of buddydoom.wad.
 
 Source: run/buddyface/BUF*.lmp (already in Doom patch_t format -- raw lumps, copied
-verbatim).  This script merges them into the existing run/aidoom.wad (which also holds
+verbatim).  This script merges them into the existing run/buddydoom.wad (which also holds
 the DS* voice lumps) and is idempotent: re-running overwrites the BUF* lumps in place
 and leaves every other lump untouched, so it can run after bake_buddy_voice.py.
 
 Usage:
     python3 tools/bake_buddy_face.py
-    python3 tools/bake_buddy_face.py --wad run/aidoom.wad --faces run/buddyface
+    python3 tools/bake_buddy_face.py --wad run/buddydoom.wad --faces run/buddyface
 """
 
 import argparse
@@ -57,7 +57,7 @@ def write_wad(path: Path, lumps):
 def main():
     here = Path(__file__).resolve().parent.parent
     ap = argparse.ArgumentParser()
-    ap.add_argument("--wad", default=str(here / "run" / "aidoom.wad"))
+    ap.add_argument("--wad", default=str(here / "run" / "buddydoom.wad"))
     ap.add_argument("--faces", default=str(here / "tools" / "buddyface"))
     args = ap.parse_args()
 

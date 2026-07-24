@@ -33,8 +33,8 @@
 
 #include "doomdef.h"
 
-#include "aidoom_icon.h"
-#include "aidoom_version.h"		// AIDOOM_VERSION (auto-bumped by build.sh)
+#include "buddydoom_icon.h"
+#include "buddydoom_version.h"		// BUDDYDOOM_VERSION (auto-bumped by build.sh)
 #include "c_console.h"			// console overlay state (C_Active / C_GetLine)
 #include "../tools/font_atlas.h"		// baked DejaVuSansMono atlas (TTF console font)
 
@@ -716,19 +716,19 @@ void I_InitGraphics(void)
 	fullscreen_mode = 1;
     }
 
-    window = SDL_CreateWindow("aiDoom " AIDOOM_VERSION,
+    window = SDL_CreateWindow("BuddyDoom " BUDDYDOOM_VERSION,
 			      BASE_WIDTH*startscale, BASE_HEIGHT*startscale,
 			      window_flags);
     if ( window == NULL )
 	I_Error("Could not create window: %s", SDL_GetError());
 
-    // Application/window icon (embedded from aidoom.ico; see aidoom_icon.h).
-    // On Windows the .exe icon comes from aidoom.rc; this sets the live
+    // Application/window icon (embedded from buddydoom.ico; see buddydoom_icon.h).
+    // On Windows the .exe icon comes from buddydoom.rc; this sets the live
     // window/taskbar icon on every platform.
     {
 	SDL_Surface* icon = SDL_CreateSurfaceFrom(
-	    AIDOOM_ICON_W, AIDOOM_ICON_H, SDL_PIXELFORMAT_RGBA32,
-	    (void *)aidoom_icon_rgba, AIDOOM_ICON_W*4);
+	    BUDDYDOOM_ICON_W, BUDDYDOOM_ICON_H, SDL_PIXELFORMAT_RGBA32,
+	    (void *)buddydoom_icon_rgba, BUDDYDOOM_ICON_W*4);
 	if (icon)
 	{
 	    SDL_SetWindowIcon(window, icon);

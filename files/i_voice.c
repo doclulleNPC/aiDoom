@@ -52,10 +52,10 @@
 #include "doomdef.h"
 
 // W_AddFile lives in w_wad.c but isn't in w_wad.h (it's only called from
-// D_DoomMain at startup).  Forward-declare so we can add aidoom.wad.
+// D_DoomMain at startup).  Forward-declare so we can add buddydoom.wad.
 extern void   W_AddFile (char *filename);
 // w_wad.c internals: lumpcache is malloc'd ONCE in W_InitMultipleFiles, sized to
-// numlumps at that moment.  Adding aidoom.wad later grows numlumps but NOT
+// numlumps at that moment.  Adding buddydoom.wad later grows numlumps but NOT
 // lumpcache, so we must grow it ourselves (see I_Voice_Init) -- otherwise
 // W_CacheLumpNum on a buddy lump writes past the array and corrupts the heap.
 extern void** lumpcache;
@@ -64,7 +64,7 @@ extern int    numlumps;
 
 // ----- lump-name -> "tag" mapping (must match tools/bake_buddy_voice.py) ---
 
-// Read a value for "key" from aidoom.cfg (working dir).  Local copy of the
+// Read a value for "key" from buddydoom.cfg (working dir).  Local copy of the
 // pattern used in d_main.c::IWAD_CfgGet -- we don't want to expose that as
 // public API for a single caller.  Returns 1 if found, copies into `out`.
 //
@@ -74,7 +74,7 @@ extern int    numlumps;
 // it.  WAD APIs and SDL3 want plain `char*` anyway.
 static int Buddy_CfgGet (char* key, char* out, int n)
 {
-    FILE* f = fopen ("aidoom.cfg", "r");
+    FILE* f = fopen ("buddydoom.cfg", "r");
     char  line[256], k[64], v[192];
     int   found = 0;
     if (!f) return 0;
@@ -92,7 +92,7 @@ static int Buddy_CfgGet (char* key, char* out, int n)
     return found;
 }
 // The buddy speaks by *tag* from the playsim, never by lump name directly.
-// This table maps each tag to the 8-char lump name baked into aidoom.wad.
+// This table maps each tag to the 8-char lump name baked into buddydoom.wad.
 // Adding a new spoken phrase means (1) add an entry to bake_buddy_voice.py's
 // PHRASES list, (2) add a row here.  Keep them in sync.
 
@@ -221,7 +221,7 @@ static const voicemap_t VOICE_MAP[] =
 #define NUM_VOICE_MAP ((int)(sizeof(VOICE_MAP)/sizeof(VOICE_MAP[0])))
 
 
-// ----- lump cache (all ds* lumps from aidoom.wad, decoded once on demand) --
+// ----- lump cache (all ds* lumps from buddydoom.wad, decoded once on demand) --
 
 typedef struct voicecache_s
 {
@@ -275,7 +275,7 @@ static voicecache_t* find_cache (const char* lumpname)
 
 static voicecache_t* load_lump (const char* lumpname)
 {
-    // Try the WAD first (aidoom.wad as added by D_DoomMain).
+    // Try the WAD first (buddydoom.wad as added by D_DoomMain).
     // W_CheckNumForName takes char* (legacy API), so copy the const name.
     char namebuf[9];
     strncpy (namebuf, lumpname, 8); namebuf[8] = '\0';
@@ -452,16 +452,16 @@ void I_Voice_Stop (void)
 }
 
 
-// Resolve the aidoom asset/voice WAD path: aidoom.cfg `aidoom_wad` (legacy
-// `buddy_wad` still honoured), else the default "aidoom.wad" (W_AddFile resolves
+// Resolve the buddydoom asset/voice WAD path: buddydoom.cfg `buddydoom_wad` (legacy
+// `buddy_wad` still honoured), else the default "buddydoom.wad" (W_AddFile resolves
 // the bare name under ID0/).  Shared by the EARLY loader in D_DoomMain (so sprites
-// baked into aidoom.wad, e.g. the turret MTUR*, register with R_InitSprites) and
+// baked into buddydoom.wad, e.g. the turret MTUR*, register with R_InitSprites) and
 // by I_Voice_Init below.
 void I_Voice_ResolveWad (char* buf, int n)
 {
-    if ((!Buddy_CfgGet ("aidoom_wad", buf, n) || !*buf) &&
+    if ((!Buddy_CfgGet ("buddydoom_wad", buf, n) || !*buf) &&
         (!Buddy_CfgGet ("buddy_wad",  buf, n) || !*buf))
-        strncpy (buf, "aidoom.wad", n);
+        strncpy (buf, "buddydoom.wad", n);
 }
 
 void I_Voice_Init (void)
@@ -469,7 +469,7 @@ void I_Voice_Init (void)
     char wadpath[256];
     I_Voice_ResolveWad (wadpath, sizeof(wadpath));
 
-    // aidoom.wad is normally added EARLY (D_DoomMain, before W_Init/R_InitSprites) so
+    // buddydoom.wad is normally added EARLY (D_DoomMain, before W_Init/R_InitSprites) so
     // its sprites register with the sprite system.  If that already loaded it (DS* lump
     // present), don't add it again.  Otherwise (e.g. a custom path missing from disk at
     // that point) fall back to the old late add + manual lumpcache grow so the voice
@@ -478,7 +478,7 @@ void I_Voice_Init (void)
     {
         int oldnumlumps = numlumps;
         W_AddFile (wadpath);
-        // Grow lumpcache to cover the lumps aidoom.wad just added (W_AddFile doesn't),
+        // Grow lumpcache to cover the lumps buddydoom.wad just added (W_AddFile doesn't),
         // and zero the new slots so W_CacheLumpNum sees them as not-yet-cached.
         if (numlumps > oldnumlumps && lumpcache)
         {

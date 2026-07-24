@@ -35,7 +35,7 @@ static void llm_load_cfg (void)
     if (done) return;
     done = 1;
     // the config lives next to the game data; try run/ID0-relative and cwd
-    const char* paths[] = { "aidoom.cfg", "run/aidoom.cfg", "../aidoom.cfg", NULL };
+    const char* paths[] = { "buddydoom.cfg", "run/buddydoom.cfg", "../buddydoom.cfg", NULL };
     FILE* f = NULL; int i;
     for (i = 0; paths[i] && !f; i++) f = fopen (paths[i], "r");
     if (!f) return;

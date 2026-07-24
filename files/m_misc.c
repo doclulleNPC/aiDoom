@@ -359,7 +359,7 @@ void M_SaveDefaults (void)
     int		v;
     FILE*	f;
     // Preserve config lines we don't manage (e.g. ollama_* written by the SDL3
-    // config app) so quitting the game doesn't wipe them from aidoom.cfg.
+    // config app) so quitting the game doesn't wipe them from buddydoom.cfg.
     char	keep[64][256];
     int		nkeep = 0;
 

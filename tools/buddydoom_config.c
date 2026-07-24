@@ -1,6 +1,6 @@
-// aidoom_config -- tiny SDL3 settings editor for aiDoom.
+// buddydoom_config -- tiny SDL3 settings editor for BuddyDoom.
 //
-// Edits the single game/tools config file aidoom.cfg (in the run/ folder): action
+// Edits the single game/tools config file buddydoom.cfg (in the run/ folder): action
 // keys, mouse, video, IWAD, the Ollama AI-Director host/port/model and the GPU
 // monitor's SSH settings. No deps beyond SDL3; text is drawn from a baked
 // DejaVuSansMono atlas (tools/font_atlas.h).
@@ -24,7 +24,7 @@
 #endif
 
 #include "font_atlas.h"
-#include "../files/aidoom_icon.h"	// shared 64x64 RGBA window icon (from aidoom.ico)
+#include "../files/buddydoom_icon.h"	// shared 64x64 RGBA window icon (from buddydoom.ico)
 
 // Two-column layout: each column is COLW wide (label at LABELX, value at VALX,
 // both column-relative).  Wider + shorter so it fits a normal-height screen.
@@ -44,7 +44,7 @@ enum { K_RIGHT=0xae,K_LEFT=0xac,K_UP=0xad,K_DOWN=0xaf,
        K_F11=0xd7,K_F12=0xd8 };
 
 enum { T_KEY, T_INT, T_TOGGLE, T_TEXT, T_CHOICE };
-enum { F_DOOMRC, F_AIDOOM };
+enum { F_DOOMRC, F_BUDDYDOOM };
 
 typedef struct {
     const char* section;
@@ -93,13 +93,13 @@ static setting_t settings[] = {
 
     {"Game","IWAD",                      "iwad",             T_CHOICE,0,0,F_DOOMRC},
 
-    {"AI Director (Ollama)","Ollama host", "ollama_host",  T_TEXT,0,0,F_AIDOOM},
-    {"AI Director (Ollama)","Ollama port", "ollama_port",  T_TEXT,0,0,F_AIDOOM},
-    {"AI Director (Ollama)","Ollama model","ollama_model", T_TEXT,0,0,F_AIDOOM},
+    {"AI Director (Ollama)","Ollama host", "ollama_host",  T_TEXT,0,0,F_BUDDYDOOM},
+    {"AI Director (Ollama)","Ollama port", "ollama_port",  T_TEXT,0,0,F_BUDDYDOOM},
+    {"AI Director (Ollama)","Ollama model","ollama_model", T_TEXT,0,0,F_BUDDYDOOM},
 
-    {"GPU monitor (SSH)","SSH host", "gpu_host",     T_TEXT,0,0,F_AIDOOM},
-    {"GPU monitor (SSH)","SSH user", "gpu_user",     T_TEXT,0,0,F_AIDOOM},
-    {"GPU monitor (SSH)","SSH port", "gpu_ssh_port", T_TEXT,0,0,F_AIDOOM},
+    {"GPU monitor (SSH)","SSH host", "gpu_host",     T_TEXT,0,0,F_BUDDYDOOM},
+    {"GPU monitor (SSH)","SSH user", "gpu_user",     T_TEXT,0,0,F_BUDDYDOOM},
+    {"GPU monitor (SSH)","SSH port", "gpu_ssh_port", T_TEXT,0,0,F_BUDDYDOOM},
 };
 #define NSET ((int)(sizeof(settings)/sizeof(settings[0])))
 
@@ -196,7 +196,7 @@ static void set_default_text(setting_t* s)
 }
 
 // Built-in defaults matching the engine's m_misc.c defaults[] -- used when no
-// aidoom.cfg exists yet, so a first save doesn't zero the bindings.
+// buddydoom.cfg exists yet, so a first save doesn't zero the bindings.
 static void set_default_int(setting_t* s)
 {
     const char* n = s->name; int v = 0;
@@ -295,11 +295,11 @@ static void iwad_sync_selection(const char* val)
     iwad_add(val); iwadsel = niwad-1;
 }
 
-// Single config file "aidoom.cfg" next to this binary (the run/ folder).
+// Single config file "buddydoom.cfg" next to this binary (the run/ folder).
 static void cfg_path(char* out, int n)
 {
     const char* base = SDL_GetBasePath();	// exe dir (trailing sep), cached by SDL
-    snprintf(out, n, "%saidoom.cfg", base ? base : "./");
+    snprintf(out, n, "%sbuddydoom.cfg", base ? base : "./");
 }
 
 static void load_cfg(void)
@@ -321,7 +321,7 @@ static void load_cfg(void)
     fclose(f);
 }
 
-// Rewrite aidoom.cfg preserving lines we don't manage (engine-only keys);
+// Rewrite buddydoom.cfg preserving lines we don't manage (engine-only keys);
 // update/append the ones we do.
 static void save_cfg(void)
 {
@@ -378,7 +378,7 @@ static void copy_ssh_key(const char* host, const char* user, const char* port)
     if (!port || !port[0]) port = "22";
 #ifdef _WIN32
     const char* tmp = getenv("TEMP"); if (!tmp) tmp = ".";
-    char bat[700]; snprintf(bat,sizeof(bat),"%s\\aidoom_sshkey.bat", tmp);
+    char bat[700]; snprintf(bat,sizeof(bat),"%s\\buddydoom_sshkey.bat", tmp);
     FILE* f = fopen(bat,"w");
     if (!f) { snprintf(status,sizeof(status),"could not write %s", bat); return; }
     fprintf(f,"@echo off\r\n");
@@ -390,7 +390,7 @@ static void copy_ssh_key(const char* host, const char* user, const char* port)
     fprintf(f,"if errorlevel 1 (echo. & echo FAILED.) else (echo. & echo OK - key installed.)\r\n");
     fprintf(f,"echo. & pause\r\n");
     fclose(f);
-    char cmd[800]; snprintf(cmd,sizeof(cmd),"start \"aiDoom SSH key copy\" cmd /c \"%s\"", bat);
+    char cmd[800]; snprintf(cmd,sizeof(cmd),"start \"BuddyDoom SSH key copy\" cmd /c \"%s\"", bat);
     system(cmd);
     snprintf(status,sizeof(status),"Launched key copy to %s@%s -- enter the password in the console", user, host);
 #else
@@ -479,7 +479,7 @@ static int setting_at(float mx,float my)
 
 static void click(float mx,float my)
 {
-    if (hit(mx,my,btn_save)) { save_cfg(); snprintf(status,sizeof(status),"Saved aidoom.cfg (next to the binary)"); return; }
+    if (hit(mx,my,btn_save)) { save_cfg(); snprintf(status,sizeof(status),"Saved buddydoom.cfg (next to the binary)"); return; }
     if (hit(mx,my,btn_quit)) { SDL_Event q={.type=SDL_EVENT_QUIT}; SDL_PushEvent(&q); return; }
     if (hit(mx,my,btn_sshkey)) { copy_ssh_key(find_sval("gpu_host"), find_sval("gpu_user"), find_sval("gpu_ssh_port")); return; }
     for (int i=0;i<NSET;i++) {
@@ -528,12 +528,12 @@ int main(int argc, char** argv)
         if (settings[i].type==T_CHOICE) iwad_sync_selection(settings[i].sval);
 
     if (!SDL_Init(SDL_INIT_VIDEO)) { fprintf(stderr,"SDL_Init: %s\n",SDL_GetError()); return 1; }
-    win = SDL_CreateWindow("aiDoom Config", WINW, WINH, 0);
+    win = SDL_CreateWindow("BuddyDoom Config", WINW, WINH, 0);
     {
-        // Window/taskbar icon from the shared aidoom.ico (same as the game).
+        // Window/taskbar icon from the shared buddydoom.ico (same as the game).
         SDL_Surface* icon = SDL_CreateSurfaceFrom(
-            AIDOOM_ICON_W, AIDOOM_ICON_H, SDL_PIXELFORMAT_RGBA32,
-            (void *)aidoom_icon_rgba, AIDOOM_ICON_W*4);
+            BUDDYDOOM_ICON_W, BUDDYDOOM_ICON_H, SDL_PIXELFORMAT_RGBA32,
+            (void *)buddydoom_icon_rgba, BUDDYDOOM_ICON_W*4);
         if (icon) { SDL_SetWindowIcon(win, icon); SDL_DestroySurface(icon); }
     }
     ren = SDL_CreateRenderer(win, NULL);

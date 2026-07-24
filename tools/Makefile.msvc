@@ -1,5 +1,5 @@
-# Makefile.msvc -- build aiDoom's SDL3 tools with Visual Studio 2019 (MSVC).
-#   aidoom_config.exe  (settings editor)   gpumon.exe (GPU monitor)
+# Makefile.msvc -- build BuddyDoom's SDL3 tools with Visual Studio 2019 (MSVC).
+#   buddydoom_config.exe  (settings editor)   gpumon.exe (GPU monitor)
 #   launcher.exe       (IWAD / mode picker GUI)
 #   extractor.exe      (Heretic/Hexen/FreeDoom2 asset extractor GUI)
 #
@@ -9,7 +9,7 @@
 #
 # All are SDL3 GUI apps that own main() (SDL_MAIN_HANDLED), so we link the
 # WINDOWS subsystem (no console window) with the CRT's mainCRTStartup entry.
-# Binaries are copied into ..\run\ next to aidoom.exe.
+# Binaries are copied into ..\run\ next to buddydoom.exe.
 
 SDL = C:\Source\SDL3
 
@@ -19,48 +19,48 @@ CFLAGS = /nologo /O2 /MD /W3 /I. /I"$(SDL)\include" /DSDL_MAIN_HANDLED \
 LIBS = "$(SDL)\lib\x86\SDL3.lib"
 LDFLAGS = /link /SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup
 
-all: aidoom_config.exe gpumon.exe launcher.exe director.exe extractor.exe
+all: buddydoom_config.exe gpumon.exe launcher.exe director.exe extractor.exe
 
-aidoom_config.res: aidoom_config.rc ..\aidoom.ico
-	rc /nologo /fo aidoom_config.res aidoom_config.rc
+buddydoom_config.res: buddydoom_config.rc ..\buddydoom.ico
+	rc /nologo /fo buddydoom_config.res buddydoom_config.rc
 
-aidoom_config.exe: aidoom_config.c aidoom_config.res font_atlas.h ..\files\aidoom_icon.h
-	$(CC) $(CFLAGS) /Fe:aidoom_config.exe aidoom_config.c aidoom_config.res $(LDFLAGS) $(LIBS)
+buddydoom_config.exe: buddydoom_config.c buddydoom_config.res font_atlas.h ..\files\buddydoom_icon.h
+	$(CC) $(CFLAGS) /Fe:buddydoom_config.exe buddydoom_config.c buddydoom_config.res $(LDFLAGS) $(LIBS)
 	@if not exist ..\run mkdir ..\run
-	@copy /Y aidoom_config.exe ..\run\aidoom_config.exe >nul
+	@copy /Y buddydoom_config.exe ..\run\buddydoom_config.exe >nul
 	@if exist "$(SDL)\lib\x86\SDL3.dll" copy /Y "$(SDL)\lib\x86\SDL3.dll" ..\run\SDL3.dll >nul
 
-gpumon.res: gpumon.rc ..\aidoom.ico
+gpumon.res: gpumon.rc ..\buddydoom.ico
 	rc /nologo /fo gpumon.res gpumon.rc
 
-gpumon.exe: gpumon_sdl.c gpumon.res font_atlas.h ..\files\aidoom_icon.h
+gpumon.exe: gpumon_sdl.c gpumon.res font_atlas.h ..\files\buddydoom_icon.h
 	$(CC) $(CFLAGS) /Fe:gpumon.exe gpumon_sdl.c gpumon.res $(LDFLAGS) $(LIBS)
 	@if not exist ..\run mkdir ..\run
 	@copy /Y gpumon.exe ..\run\gpumon.exe >nul
 
-launcher.res: launcher.rc ..\aidoom.ico
+launcher.res: launcher.rc ..\buddydoom.ico
 	rc /nologo /fo launcher.res launcher.rc
 
-launcher.exe: launcher.c launcher.res font_atlas.h ..\files\aidoom_icon.h
+launcher.exe: launcher.c launcher.res font_atlas.h ..\files\buddydoom_icon.h
 	$(CC) $(CFLAGS) /Fe:launcher.exe launcher.c launcher.res $(LDFLAGS) $(LIBS)
 	@if not exist ..\run mkdir ..\run
 	@copy /Y launcher.exe ..\run\launcher.exe >nul
 
-director.res: director.rc ..\aidoom.ico
+director.res: director.rc ..\buddydoom.ico
 	rc /nologo /fo director.res director.rc
 
-director.exe: director.c director.res font_atlas.h ..\files\aidoom_icon.h
+director.exe: director.c director.res font_atlas.h ..\files\buddydoom_icon.h
 	$(CC) $(CFLAGS) /Fe:director.exe director.c director.res $(LDFLAGS) $(LIBS) psapi.lib
 	@if not exist ..\run mkdir ..\run
 	@copy /Y director.exe ..\run\director.exe >nul
 
-extractor.res: extractor.rc ..\aidoom.ico
+extractor.res: extractor.rc ..\buddydoom.ico
 	rc /nologo /fo extractor.res extractor.rc
 
-extractor.exe: extractor.c extractor.res font_atlas.h ..\files\aidoom_icon.h
+extractor.exe: extractor.c extractor.res font_atlas.h ..\files\buddydoom_icon.h
 	$(CC) $(CFLAGS) /Fe:extractor.exe extractor.c extractor.res $(LDFLAGS) $(LIBS)
 	@if not exist ..\run mkdir ..\run
 	@copy /Y extractor.exe ..\run\extractor.exe >nul
 
 clean:
-	-del *.obj *.res aidoom_config.exe gpumon.exe gpumon_sdl.exe launcher.exe director.exe extractor.exe 2>nul
+	-del *.obj *.res buddydoom_config.exe gpumon.exe gpumon_sdl.exe launcher.exe director.exe extractor.exe 2>nul

@@ -122,7 +122,7 @@ boolean deh_pars = FALSE; // in wi_stuff to allow pars in modified games
 #include "dstrings_bex.h"
 typedef struct { char **ppstr; char *lookup; } deh_strs;
 
-// BEX [STRINGS]: aiDoom's HUD strings are compile-time #defines, so we keep a runtime
+// BEX [STRINGS]: BuddyDoom's HUD strings are compile-time #defines, so we keep a runtime
 // char* per pickup message (initialised from the #define) and register it by mnemonic.
 // A DEHACKED "GOTPLASMA = ..." now actually replaces the message (Legacy of Rust renames
 // the cell/plasma/BFG pickups).  p_inter.c uses these deh_* pointers instead of the raw

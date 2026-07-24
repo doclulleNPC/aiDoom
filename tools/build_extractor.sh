@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build the SDL3 asset extractor for aiDoom (tools/extractor.c).
+# Build the SDL3 asset extractor for BuddyDoom (tools/extractor.c).
 # Replaces the extract_heretic_monsters.py / extract_hexen.py /
 # extract_freedoom2.py scripts with a GUI: pick a source IWAD, hit Extract.
 set -eu

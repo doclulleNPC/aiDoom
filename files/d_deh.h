@@ -1,4 +1,4 @@
-// DeHackEd / BEX / MBF21 patch support (ported from ../winmbf, adapted to aiDoom).
+// DeHackEd / BEX / MBF21 patch support (ported from ../winmbf, adapted to BuddyDoom).
 #ifndef __D_DEH__
 #define __D_DEH__
 void ProcessDehFile(char *filename, char *outfilename, int lumpnum);

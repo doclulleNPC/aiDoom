@@ -1,9 +1,9 @@
-# aiDoom run folder (`run/`)
+# BuddyDoom run folder (`run/`)
 
-**The `launcher` GUI is the way to start aiDoom.** Run `run/launcher` (or
+**The `launcher` GUI is the way to start BuddyDoom.** Run `run/launcher` (or
 `launcher.exe`): pick the IWAD, optionally an extra **PWAD** (the dropdown below
 IWAD lists every other wad here — freedoomstuff/hereticstuff/hexenstuff/… and any
-PWAD you drop in, minus the IWADs and aidoom.wad — and adds it as `-file`), the
+PWAD you drop in, minus the IWADs and buddydoom.wad — and adds it as `-file`), the
 Buddy mode (off / `-coop` / `-aicoop`), the Monster mode (vanilla / L4D /
 `-aidirector`), and the Skill, then hit **Launch** — it starts the game with the
 right flags and auto-starts the native `director` sidecar when an AI mode is chosen.
@@ -15,7 +15,7 @@ right flags and auto-starts the native `director` sidecar when an AI mode is cho
 > `SIGIL_COMPAT` → **E3M1**, `SIGIL II` → **E6M1**; a SIGIL-named file with the wrong checksum
 > is ignored (not loaded).
 
-> **Game WADs live in `run/ID0/`** (DOOM.WAD, doom2.wad, aidoom.wad,
+> **Game WADs live in `run/ID0/`** (DOOM.WAD, doom2.wad, buddydoom.wad,
 > doom2stuff.wad, heretic.wad, …). The engine, launcher and tools search there
 > automatically, so bare names (`-iwad DOOM.WAD`, `-file doom2stuff.wad`) resolve
 > without a path. **Savegames** are written to `run/ID0/` too.
@@ -30,16 +30,16 @@ right flags and auto-starts the native `director` sidecar when an AI mode is cho
 
 | File | Platform | Purpose |
 |------|----------|---------|
-| `ID0/` | all | **Game WADs + savegames** (IWADs, aidoom.wad, doom2stuff.wad, doomsav*.dsg). |
+| `ID0/` | all | **Game WADs + savegames** (IWADs, buddydoom.wad, doom2stuff.wad, doomsav*.dsg). |
 | `director` / `director.exe` | Linux / Windows | **Native SDL3 AI director** (C) — the no-Python LLM monster director: a small window showing live status + a scrolling log, talks to Ollama + the game. Used by the launchers for `--director`. Build: `tools/build_director.sh` (Linux) / `tools/build_director_win.sh` (Windows). |
-| (`../tools/buddy_voice.py`) | all | **Legacy** live-TTS buddy voice (ElevenLabs, Joker-HL) that tailed `buddy_say.txt`. The buddy now speaks from **pre-baked OGG clips in `ID0/aidoom.wad`** (`files/i_voice.c`), so the game no longer writes `buddy_say.txt`; this script is kept only for the old live-TTS path. |
+| (`../tools/buddy_voice.py`) | all | **Legacy** live-TTS buddy voice (ElevenLabs, Joker-HL) that tailed `buddy_say.txt`. The buddy now speaks from **pre-baked OGG clips in `ID0/buddydoom.wad`** (`files/i_voice.c`), so the game no longer writes `buddy_say.txt`; this script is kept only for the old live-TTS path. |
 | `gpumon` / `gpumon.exe` | Linux / Windows | GPU monitor as a small **SDL window** (bars for load / memory / temp / power). **Auto-detects the tool**: `nvidia-smi` (NVIDIA) or `macmon` (Apple Silicon). On error it stops and shows a **Reconnect** button (no auto-retry). Build: Linux `tools/build_gpumon.sh`; Windows via CMake or `build_all_win.bat`. See **`../GPUMON.md`**. |
-| `aidoom_config` / `aidoom_config.exe` | Linux / Windows | SDL3 settings editor; reads/writes `aidoom.cfg` here. Build: Linux `tools/build_config.sh`; Windows via CMake or `build_all_win.bat`. |
+| `buddydoom_config` / `buddydoom_config.exe` | Linux / Windows | SDL3 settings editor; reads/writes `buddydoom.cfg` here. Build: Linux `tools/build_config.sh`; Windows via CMake or `build_all_win.bat`. |
 | `launcher` / `launcher.exe` | Linux / Windows | SDL3 **launcher GUI**: scans this folder (+ `~/.doom`) for IWADs, lets you pick the IWAD and the Buddy (off / `-coop` / `-aicoop`) and Monster (vanilla / L4D / `-aidirector`) modes, then launches the game with the right flags (auto-starting the native `director` sidecar when AI monsters are picked). Build: Linux `tools/build_launcher.sh`; Windows via CMake or `build_all_win.bat`. |
 | `extractor` / `extractor.exe` | Linux / Windows | SDL3 **asset-extractor GUI**: scans `ID0/` + this folder for `heretic.wad` / `hexen.wad` / `freedoom2.wad`, shows them in a **dropdown** with an **Extract** button, and builds the palette-converted, renamed monster PWADs into `ID0/` (`hereticstuff.wad` / `hexenstuff.wad` / `freedoomstuff.wad`). Replaces the `extract_heretic_monsters.py` / `extract_hexen.py` / `extract_freedoom2.py` scripts (byte-identical output). Also has a headless `extractor --cli [outdir]` batch mode. Build: Linux `tools/build_extractor.sh`; Windows via CMake or `build_all_win.bat`. |
-| `aidoom.cfg` | all | The single config file (game keys/video + Ollama), read by the game and all tools from this folder. |
+| `buddydoom.cfg` | all | The single config file (game keys/video + Ollama), read by the game and all tools from this folder. |
 
-(The source `aidoom.ico` lives one level up, in the repo root.)
+(The source `buddydoom.ico` lives one level up, in the repo root.)
 
 ## What the launcher does
 
@@ -47,7 +47,7 @@ right flags and auto-starts the native `director` sidecar when an AI mode is cho
 2. **Check the model** is pulled (`/api/tags`); warns (doesn't abort) if missing.
 3. **Warm the model** into memory (`/api/generate` with a tiny prompt) so the
    first in-game planning round isn't slow. Skip with `--no-warm` / `-NoWarm`.
-4. **Start aiDoom** with `-aidirector <port>` (and `-warp`, `-skill`, the AI co-op
+4. **Start BuddyDoom** with `-aidirector <port>` (and `-warp`, `-skill`, the AI co-op
    companion `-aicoop` by default, optional `-nofriendlyfire` / `-infight`).
 5. **Start the native director** (`run/director`, a small SDL3 window), which loops
    observe → ask the LLM → issue squad orders and shows live status + a log. The
@@ -56,19 +56,19 @@ right flags and auto-starts the native `director` sidecar when an AI mode is cho
 
 ## Requirements
 
-- A built **aidoom** binary (the launcher looks in `run/`, then `../files/`).
+- A built **buddydoom** binary (the launcher looks in `run/`, then `../files/`).
   - Linux/macOS: run **`../build.sh`** — it compiles against system SDL3 and
-    copies the `aidoom` binary into `run/`. (SDL3 is linked from the system, so
+    copies the `buddydoom` binary into `run/`. (SDL3 is linked from the system, so
     there's no library to copy alongside it.)
   - Windows (MSVC + the SDL3 SDK): run **`..\build_all_win.bat`** — it builds
-    `aidoom.exe` **and** the tools (config, gpumon, launcher, director, extractor)
+    `buddydoom.exe` **and** the tools (config, gpumon, launcher, director, extractor)
     and copies them + `SDL3.dll` into `run/`.
     Equivalently with CMake (finds a sibling `../SDL3` SDK automatically, also
     stages everything into `run/`): `cmake -B build && cmake --build build`.
     (The legacy `tools/build_*_win.sh` are MinGW cross-builds needing a MinGW SDL3
     package; the MSVC path above is preferred on Windows.)
 - A DOOM **IWAD**, placed in **`run/ID0/`**. The engine finds one via `-iwad <file>`
-  → the `iwad` key in `aidoom.cfg` → **`run/ID0/`** → `iwads/` → `run/` → `$DOOMWADDIR`
+  → the `iwad` key in `buddydoom.cfg` → **`run/ID0/`** → `iwads/` → `run/` → `$DOOMWADDIR`
   → a Steam install. Bare names resolve under `ID0/` automatically. Pick which to use
   in the launcher/config app. **Bring your own** — IWADs are not shipped.
 - An **Ollama** server reachable over HTTP, with the chosen model pulled
@@ -92,14 +92,14 @@ Run them from there if you want a scripted launch — they still work:
 
 ```sh
 cd run
-../tools/scripts/start_aidoom.sh                    # FULL LLM: AI buddy (-aicoop) + director (default)
-../tools/scripts/start_aidoom.sh --buddy                           # rule-based buddy instead of the AI buddy
-../tools/scripts/start_aidoom.sh --offline                         # plain aidoom, no LLM/Ollama
-../tools/scripts/start_aidoom.sh --model qwen3:8b --skill 4 --nofriendlyfire
-../tools/scripts/start_aidoom.sh --ollama http://localhost:11434   # override the server
+../tools/scripts/start_buddydoom.sh                    # FULL LLM: AI buddy (-aicoop) + director (default)
+../tools/scripts/start_buddydoom.sh --buddy                           # rule-based buddy instead of the AI buddy
+../tools/scripts/start_buddydoom.sh --offline                         # plain buddydoom, no LLM/Ollama
+../tools/scripts/start_buddydoom.sh --model qwen3:8b --skill 4 --nofriendlyfire
+../tools/scripts/start_buddydoom.sh --ollama http://localhost:11434   # override the server
 ```
 
-Flags (unrecognized args are passed straight through to `aidoom`):
+Flags (unrecognized args are passed straight through to `buddydoom`):
 
 | Flag | Default | Meaning |
 |------|---------|---------|
@@ -121,13 +121,13 @@ directs the enemy squad *and* the ally buddy from the same observation.
 ## Usage — Windows
 
 Prefer **`launcher.exe`**. The backup scripts now live in **`tools\scripts\`**:
-double-click **`tools\scripts\start_aidoom.bat`**, or run the PowerShell script:
+double-click **`tools\scripts\start_buddydoom.bat`**, or run the PowerShell script:
 
 ```powershell
-tools\scripts\start_aidoom.ps1      # FULL LLM: AI buddy (-aicoop) + director (default)
-.\start_aidoom.ps1 -RuleCoop        # rule-based buddy instead of the AI buddy
-.\start_aidoom.ps1 -NoDirector      # just the game, no LLM director
-.\start_aidoom.ps1 -Model qwen2.5-coder:1.5b -Skill 4 -NoFriendlyFire
+tools\scripts\start_buddydoom.ps1      # FULL LLM: AI buddy (-aicoop) + director (default)
+.\start_buddydoom.ps1 -RuleCoop        # rule-based buddy instead of the AI buddy
+.\start_buddydoom.ps1 -NoDirector      # just the game, no LLM director
+.\start_buddydoom.ps1 -Model qwen2.5-coder:1.5b -Skill 4 -NoFriendlyFire
 ```
 
 Params: `-Model -Port -Episode -Map -Skill -Ollama -NoFriendlyFire -Infight -RuleCoop -NoCoop -NoDirector -NoWarm`.
@@ -139,25 +139,25 @@ The **AI co-op companion** (player 2) is launched **by default**; pass `--no-coo
 
 The server URL is configurable and defaults differ by platform:
 
-- **`start_aidoom.sh`** defaults to **`http://localhost:11434`** (from
-  `aidoom.cfg`). Override with `--ollama`.
-- **`start_aidoom.ps1`** defaults to `http://localhost:11434`. Override with `-Ollama`.
+- **`start_buddydoom.sh`** defaults to **`http://localhost:11434`** (from
+  `buddydoom.cfg`). Override with `--ollama`.
+- **`start_buddydoom.ps1`** defaults to `http://localhost:11434`. Override with `-Ollama`.
 
 The **`director`** binary itself takes `--host` / `--ollama-port`, or a full
-`--ollama` URL (which the launchers pass through), and reads `aidoom.cfg` next to it
+`--ollama` URL (which the launchers pass through), and reads `buddydoom.cfg` next to it
 on startup.
 
-**`aidoom.cfg`** (in this folder, written by the SDL3 config app `aidoom_config`)
+**`buddydoom.cfg`** (in this folder, written by the SDL3 config app `buddydoom_config`)
 sets `ollama_host` / `ollama_port` / `ollama_model`, the chosen `iwad`, and the GPU
 monitor's `gpu_host` / `gpu_user` / `gpu_ssh_port`. The `director` and
-`start_aidoom.sh`/`.ps1` read it (next to themselves) on startup; CLI flags still
+`start_buddydoom.sh`/`.ps1` read it (next to themselves) on startup; CLI flags still
 override. It's the same file the game uses for keys/video.
 
 ## GPU monitor
 
 While the AI Director runs, watch the Ollama machine's GPU with **`gpumon`** (an SDL3
 window, built into this folder).
-It reads `gpu_host` / `gpu_user` / `gpu_ssh_port` from `aidoom.cfg` here and
+It reads `gpu_host` / `gpu_user` / `gpu_ssh_port` from `buddydoom.cfg` here and
 **auto-detects the GPU tool** — `nvidia-smi` (NVIDIA) or `macmon` (Apple Silicon) —
 over SSH (or directly for `localhost`); the window has a **Reconnect** button. Full
 docs: **`../GPUMON.md`**.
@@ -165,7 +165,7 @@ docs: **`../GPUMON.md`**.
 ## Without the launcher (manual)
 
 ```sh
-cd run && ./aidoom -warp 1 1 -skill 4 -aidirector 31666 &
+cd run && ./buddydoom -warp 1 1 -skill 4 -aidirector 31666 &
 ./director --port 31666 --model ministral-3:8b
 ```
 
@@ -174,7 +174,7 @@ director protocol and order vocabulary.
 
 ## Full LLM mode (marine + buddy + monsters)
 
-`./start_llm_player.sh [IWAD] [E M]` runs aiDoom **fully LLM-driven** -- the LLM controls
+`./start_llm_player.sh [IWAD] [E M]` runs BuddyDoom **fully LLM-driven** -- the LLM controls
 the marine, the AI buddy AND the monsters:
 
 - **marine** -- `-aiplayer <port>` (`files/g_agent.c`) exposes an `observe` JSON state and

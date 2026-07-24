@@ -1,8 +1,8 @@
-# CMakeLists.txt -- unified cross-platform build for aiDoom (SDL3).
+# CMakeLists.txt -- unified cross-platform build for BuddyDoom (SDL3).
 #
 # Builds these targets and stages them into run/ :
-#   aidoom          - the game (console subsystem; keeps stdout for AI director logs)
-#   aidoom_config   - SDL3 settings editor (GUI)
+#   buddydoom       - the game (console subsystem; keeps stdout for AI director logs)
+#   buddydoom_config - SDL3 settings editor (GUI)
 #   gpumon_sdl      - SDL3 GPU monitor (GUI)
 #   launcher        - SDL3 IWAD / mode picker (GUI)
 #   extractor       - SDL3 Heretic/Hexen/FreeDoom2 asset extractor (GUI)
@@ -14,7 +14,7 @@
 #   cmake --build build      # Linux/macOS: uses system SDL3
 #
 cmake_minimum_required(VERSION 3.16)
-project(aiDoom C)
+project(BuddyDoom C)
 
 set(CMAKE_C_STANDARD 11)
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -34,7 +34,7 @@ set(RUNDIR ${CMAKE_SOURCE_DIR}/run)
 #     type-punning) and a few -Wno-* on modern gcc/clang
 #   - MSVC just needs the CRT deprecation defines
 # ---------------------------------------------------------------------------
-function(aidoom_common tgt)
+function(buddydoom_common tgt)
     target_compile_definitions(${tgt} PRIVATE SDL_MAIN_HANDLED)
     target_link_libraries(${tgt} PRIVATE SDL3::SDL3)
     if(MSVC)
@@ -54,30 +54,30 @@ function(aidoom_common tgt)
 endfunction()
 
 # ---------------------------------------------------------------------------
-# aidoom -- the game
+# buddydoom -- the game
 # ---------------------------------------------------------------------------
-file(GLOB AIDOOM_SRC CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/files/*.c)
-add_executable(aidoom ${AIDOOM_SRC})
-target_include_directories(aidoom PRIVATE ${CMAKE_SOURCE_DIR}/files)
-aidoom_common(aidoom)
+file(GLOB BUDDYDOOM_SRC CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/files/*.c)
+add_executable(buddydoom ${BUDDYDOOM_SRC})
+target_include_directories(buddydoom PRIVATE ${CMAKE_SOURCE_DIR}/files)
+buddydoom_common(buddydoom)
 if(WIN32)
-    target_sources(aidoom PRIVATE ${CMAKE_SOURCE_DIR}/files/aidoom.rc)
-    target_link_libraries(aidoom PRIVATE ws2_32)           # i_net.c / p_ai_llm.c
+    target_sources(buddydoom PRIVATE ${CMAKE_SOURCE_DIR}/files/buddydoom.rc)
+    target_link_libraries(buddydoom PRIVATE ws2_32)           # i_net.c / p_ai_llm.c
     # copy the SDL3 runtime DLL next to the exe + into run/
-    add_custom_command(TARGET aidoom POST_BUILD
+    add_custom_command(TARGET buddydoom POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                $<TARGET_FILE:SDL3::SDL3> $<TARGET_FILE_DIR:aidoom>
+                $<TARGET_FILE:SDL3::SDL3> $<TARGET_FILE_DIR:buddydoom>
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 $<TARGET_FILE:SDL3::SDL3> ${RUNDIR}/)
 endif()
 
 # -------------------------------------------------------------------
-# tools -- aidoom_config + gpumon_sdl + launcher (SDL3 GUI apps that own main())
+# tools -- buddydoom_config + gpumon_sdl + launcher (SDL3 GUI apps that own main())
 # -------------------------------------------------------------------
-foreach(tool aidoom_config gpumon_sdl launcher extractor)
+foreach(tool buddydoom_config gpumon_sdl launcher extractor)
     add_executable(${tool} ${CMAKE_SOURCE_DIR}/tools/${tool}.c)
     target_include_directories(${tool} PRIVATE ${CMAKE_SOURCE_DIR}/tools)
-    aidoom_common(${tool})
+    buddydoom_common(${tool})
     set_target_properties(${tool} PROPERTIES WIN32_EXECUTABLE TRUE)  # GUI, no console
     if(MSVC)
         # WIN32_EXECUTABLE -> WINDOWS subsystem; our entry is main(), so override.
@@ -91,10 +91,10 @@ set_target_properties(gpumon_sdl PROPERTIES OUTPUT_NAME gpumon)
 # Launcher ships as plain "launcher" (source file is launcher.c).
 set_target_properties(launcher PROPERTIES OUTPUT_NAME launcher)
 
-# tools: embed the shared aidoom.ico as the .exe icon on Windows.
+# tools: embed the shared buddydoom.ico as the .exe icon on Windows.
 if(WIN32)
     target_sources(gpumon_sdl    PRIVATE ${CMAKE_SOURCE_DIR}/tools/gpumon.rc)
-    target_sources(aidoom_config PRIVATE ${CMAKE_SOURCE_DIR}/tools/aidoom_config.rc)
+    target_sources(buddydoom_config PRIVATE ${CMAKE_SOURCE_DIR}/tools/buddydoom_config.rc)
     target_sources(launcher     PRIVATE ${CMAKE_SOURCE_DIR}/tools/launcher.rc)
     target_sources(extractor    PRIVATE ${CMAKE_SOURCE_DIR}/tools/extractor.rc)
 endif()

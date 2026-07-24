@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# build_config_win.sh -- cross-build the SDL3 settings editor (aidoom_config.exe)
+# build_config_win.sh -- cross-build the SDL3 settings editor (buddydoom_config.exe)
 # for Windows with MinGW-w64.  Point SDL3 at a MinGW SDL3 dev package (same as
 # build_win.sh):
 #
@@ -18,11 +18,11 @@ command -v "$CC" >/dev/null 2>&1 || { echo "[build] $CC not found" >&2; exit 1; 
 
 # -mwindows: GUI subsystem (no console window). SDL_MAIN_HANDLED: we own main().
 "$CC" -O2 -DSDL_MAIN_HANDLED -I"$here" -I"$SDL3/include" \
-    "$here/aidoom_config.c" \
+    "$here/buddydoom_config.c" \
     -L"$SDL3/lib" -lSDL3 -mwindows -static-libgcc \
-    -o "$here/aidoom_config.exe"
+    -o "$here/buddydoom_config.exe"
 
 mkdir -p "$here/../run"
-cp -f "$here/aidoom_config.exe" "$here/../run/aidoom_config.exe"
+cp -f "$here/buddydoom_config.exe" "$here/../run/buddydoom_config.exe"
 [ -f "$SDL3/bin/SDL3.dll" ] && cp -f "$SDL3/bin/SDL3.dll" "$here/../run/SDL3.dll" || true
-echo "built $here/aidoom_config.exe (copied to run/aidoom_config.exe)"
+echo "built $here/buddydoom_config.exe (copied to run/buddydoom_config.exe)"

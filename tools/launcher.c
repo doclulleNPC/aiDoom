@@ -54,7 +54,7 @@
 #endif
 
 #include "font_atlas.h"
-#include "../files/aidoom_icon.h"	// shared 64x64 RGBA window icon
+#include "../files/buddydoom_icon.h"	// shared 64x64 RGBA window icon
 #include "hero_launcher_img.h"		// 560x100 RGBA hero banner (replaces the text banner)
 #include "md5.h"			// SIGIL PWAD checksum verification
 
@@ -1390,17 +1390,17 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    win = SDL_CreateWindow("aiDoom Launcher", WINW, WINH,
-                           SDL_WINDOW_HIGH_PIXEL_DENSITY);	// fixed size (no SDL_WINDOW_RESIZABLE)
+    win = SDL_CreateWindow("BuddyDoom Launcher", WINW, WINH,
+                           SDL_WINDOW_HIDDEN);
     if (!win) {
         fprintf(stderr, "SDL_CreateWindow failed: %s\n", SDL_GetError());
         SDL_Quit();
         return 1;
     }
 
-    // Window icon from the shared aidoom.ico atlas.
+    // Window icon from the shared buddydoom.ico atlas.
     SDL_Surface* icon = SDL_CreateSurfaceFrom(64, 64, SDL_PIXELFORMAT_RGBA32,
-                                              (void*)aidoom_icon_rgba, 64*4);
+                                              (void*)buddydoom_icon_rgba, 64*4);
     if (icon) {
         SDL_SetWindowIcon(win, icon);
         SDL_DestroySurface(icon);

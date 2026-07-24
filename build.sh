@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 #
-# build.sh -- build aiDoom (Linux/macOS, SDL3) and copy the artifact into run/.
+# build.sh -- build BuddyDoom (Linux/macOS, SDL3) and copy the artifact into run/.
 #
 # The 1996 id source needs permissive flags for a modern compiler; SDL3 comes
 # from the system (pkg-config). On Windows use files/Makefile.msvc instead (it
-# produces aidoom.exe and copies SDL3.dll next to it).
+# produces buddydoom.exe and copies SDL3.dll next to it).
 #
 # Usage:  ./build.sh
 set -eu
@@ -17,18 +17,18 @@ command -v gcc >/dev/null 2>&1 || { echo "[build] gcc not found" >&2; exit 1; }
 pkg-config --exists sdl3 || { echo "[build] SDL3 dev package not found (pkg-config sdl3)" >&2; exit 1; }
 
 # --- (A) fork version: bump the patch (+0.0.1) on every recompile -------------
-verf="$src/aidoom_version.h"
-fork="$(sed -n 's/.*AIDOOM_VERSION[[:space:]]*"\([0-9.]*\)".*/\1/p' "$verf" 2>/dev/null || true)"
+verf="$src/buddydoom_version.h"
+fork="$(sed -n 's/.*BUDDYDOOM_VERSION[[:space:]]*"\([0-9.]*\)".*/\1/p' "$verf" 2>/dev/null || true)"
 [ -n "$fork" ] || fork="0.2.0"
 vmaj="${fork%%.*}"; vrest="${fork#*.}"; vmin="${vrest%%.*}"; vpat="${vrest##*.}"
 vpat=$((vpat + 1)); fork="$vmaj.$vmin.$vpat"
 cat > "$verf" <<EOF
-// aiDoom fork version.  AUTO-MANAGED by build.sh -- the patch field is bumped
+// BuddyDoom fork version.  AUTO-MANAGED by build.sh -- the patch field is bumped
 // +0.0.1 on every recompile.  Bump the major/minor by hand when you cut a release
 // tag (and the patch keeps counting builds from there).
-#ifndef __AIDOOM_VERSION__
-#define __AIDOOM_VERSION__
-#define AIDOOM_VERSION "$fork"
+#ifndef __BUDDYDOOM_VERSION__
+#define __BUDDYDOOM_VERSION__
+#define BUDDYDOOM_VERSION "$fork"
 #endif
 EOF
 
@@ -37,8 +37,8 @@ EOF
 # the old saves become incompatible.  We fingerprint the sizes of every struct the
 # savegame memcpy's (p_saveg.c) and, when that fingerprint changes, bump VERSION_NUM
 # so stale saves are cleanly REJECTED ("bad version") instead of crashing on load.
-sigf="$src/aidoom_saveg.sig"
-probe="$(mktemp /tmp/aidoom_sgprobe.XXXXXX.c)"; probebin="${probe%.c}"
+sigf="$src/buddydoom_saveg.sig"
+probe="$(mktemp /tmp/buddydoom_sgprobe.XXXXXX.c)"; probebin="${probe%.c}"
 cat > "$probe" <<'EOF'
 #include "i_system.h"
 #include "z_zone.h"
@@ -73,16 +73,16 @@ else
     echo "[build] (warning: savegame-layout probe didn't compile; engine version unchanged)" >&2
 fi
 
-echo "[build] compiling aidoom $fork (SDL3 $(pkg-config --modversion sdl3)) ..."
+echo "[build] compiling buddydoom $fork (SDL3 $(pkg-config --modversion sdl3)) ..."
 ( cd "$src" && gcc -O2 -g -fcommon -rdynamic -fno-strict-aliasing -std=gnu11 \
     -Wno-implicit-int -Wno-implicit-function-declaration \
     -Wno-int-conversion -Wno-return-mismatch \
     -DSDL_MAIN_HANDLED $(pkg-config --cflags sdl3) \
-    *.c -o aidoom $(pkg-config --libs sdl3) -lm )
+    *.c -o buddydoom $(pkg-config --libs sdl3) -lm )
 
 # Always copy the artifact(s) into run/ so the launcher finds them there.
 # (Linux/macOS link SDL3 from the system, so there is no DLL to copy here;
-#  on Windows the MSVC build copies SDL3.dll next to aidoom.exe.)
+#  on Windows the MSVC build copies SDL3.dll next to buddydoom.exe.)
 mkdir -p "$run"
-cp -f "$src/aidoom" "$run/aidoom"
-echo "[build] done -> $src/aidoom  (copied to $run/aidoom)"
+cp -f "$src/buddydoom" "$run/buddydoom"
+echo "[build] done -> $src/buddydoom  (copied to $run/buddydoom)"

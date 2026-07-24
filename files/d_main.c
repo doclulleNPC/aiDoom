@@ -74,7 +74,7 @@ static int access(char *file, int mode)
 #include "m_menu.h"
 
 #include "i_system.h"
-#include "i_voice.h"		// I_Voice_ResolveWad (add aidoom.wad early for its sprites)
+#include "i_voice.h"		// I_Voice_ResolveWad (add buddydoom.wad early for its sprites)
 #include "i_sound.h"
 #include "i_video.h"
 
@@ -774,10 +774,10 @@ static char* IWAD_Strdup (const char* s)
     return d;
 }
 
-// Read a value for "key" from aidoom.cfg (working dir). Returns 1 if found.
+// Read a value for "key" from buddydoom.cfg (working dir). Returns 1 if found.
 static int IWAD_CfgGet (const char* key, char* out, int n)
 {
-    FILE* f = fopen("aidoom.cfg", "r");
+    FILE* f = fopen("buddydoom.cfg", "r");
     char line[256], k[64], v[192];
     int found = 0;
     if (!f) return 0;
@@ -843,7 +843,7 @@ static int IWAD_FileHasLump (const char* path, const char* lump)
 //
 // IdentifyVersion
 // Locate an IWAD and set the game mode.  Search order:
-//   -iwad <file>  >  "iwad" in aidoom.cfg  >  iwads/  >  .  >  $DOOMWADDIR  >  Steam
+//   -iwad <file>  >  "iwad" in buddydoom.cfg  >  iwads/  >  .  >  $DOOMWADDIR  >  Steam
 //
 void IdentifyVersion (void)
 {
@@ -857,7 +857,7 @@ void IdentifyVersion (void)
     doomwaddir = getenv("DOOMWADDIR");
 
     // Single config file in the working directory (next to the binary).
-    strcpy (basedefault, "aidoom.cfg");
+    strcpy (basedefault, "buddydoom.cfg");
 
     if (M_CheckParm ("-shdev"))
     {
@@ -899,7 +899,7 @@ void IdentifyVersion (void)
 	if (found) mode = IWAD_ModeFromName (found);
     }
 
-    // 2) "iwad <path>" from aidoom.cfg (written by the config app)
+    // 2) "iwad <path>" from buddydoom.cfg (written by the config app)
     if (!found && IWAD_CfgGet ("iwad", cfgval, sizeof(cfgval)) && cfgval[0])
     {
 	char id0[1024];
@@ -1097,14 +1097,14 @@ void FindResponseFile (void)
 //
 //
 // D_PrintHelp
-// Print every command-line flag aidoom understands, grouped, then the caller
-// exits.  Triggered by -help / -h / -? / /?.  Keep in sync with AIDOOM_PARAMETERS.md.
+// Print every command-line flag buddydoom understands, grouped, then the caller
+// exits.  Triggered by -help / -h / -? / /?.  Keep in sync with BUDDYDOOM_PARAMETERS.md.
 //
 static void D_PrintHelp (void)
 {
     puts (
-"aidoom -- SDL3 DOOM with an AI co-op buddy + LLM monster director.\n"
-"Usage: aidoom [options]   (bring your own IWAD)\n"
+"buddydoom -- SDL3 DOOM with an AI co-op buddy + LLM monster director.\n"
+"Usage: buddydoom [options]   (bring your own IWAD)\n"
 "\n"
 "GAME / LEVEL\n"
 "  -iwad <file>      IWAD to use (doom/doom2/plutonia/tnt/freedoom*); else auto-detect\n"
@@ -1155,8 +1155,8 @@ static void D_PrintHelp (void)
 "  -cdrom            CD-ROM save paths\n"
 "  -help / -h / -?   show this help and exit\n"
 "\n"
-"See AIDOOM_PARAMETERS.md for the full reference, and run/README.md for the\n"
-"launchers (start_aidoom.sh / start_aibuddy.sh) and the GUI launcher."
+"See BUDDYDOOM_PARAMETERS.md for the full reference, and run/README.md for the\n"
+"launchers (start_buddydoom.sh / start_aibuddy.sh) and the GUI launcher."
     );
 }
 
@@ -1434,10 +1434,10 @@ void D_DoomMain (void)
     printf ("Z_Init: Init zone memory allocation daemon. \n");
     Z_Init ();
 
-    // Add aidoom.wad EARLY -- before W_Init/R_InitSprites -- so any sprites baked into it
+    // Add buddydoom.wad EARLY -- before W_Init/R_InitSprites -- so any sprites baked into it
     // (e.g. the deployable turret's MTUR* frames) are picked up by the sprite frame table.
     // The voice code (I_Voice_Init) then sees it's already loaded and skips re-adding it.
-    // (Previously aidoom.wad was added late, for voice/HUD only, so its actor sprites never
+    // (Previously buddydoom.wad was added late, for voice/HUD only, so its actor sprites never
     // registered; the turret art shipped in a separate early turret.wad.)
     {
 	char aw[256], id0[300];
@@ -1446,7 +1446,7 @@ void D_DoomMain (void)
 	if (aw[0] && (!access (aw, R_OK) || !access (id0, R_OK)))
 	{
 	    D_AddFile (aw);
-	    printf ("aiDoom asset WAD: %s -> loaded early (sprites register with the sprite system)\n", aw);
+	    printf ("BuddyDoom asset WAD: %s -> loaded early (sprites register with the sprite system)\n", aw);
 	}
     }
 
@@ -1461,7 +1461,7 @@ void D_DoomMain (void)
 
     printf ("W_Init: Init WADfiles.\n");
     W_InitMultipleFiles (wadfiles);
-    {   // Fill aiDoom's *appended* builtin mobjtypes (Heretic/Hexen/Freedoom/RevMarine/
+    {   // Fill BuddyDoom's *appended* builtin mobjtypes (Heretic/Hexen/Freedoom/RevMarine/
 	// Morph/HereticInv) BEFORE applying the DEHACKED.  A DSDHacked patch (e.g. Legacy
 	// of Rust's id1.wad) numbers its new things from the vanilla+MBF boundary (~Thing
 	// 151), which lands directly on these appended builtin slots.  Running the installers

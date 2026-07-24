@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# buddy_voice.py -- speaks the aiDoom AI co-op buddy's lines with ElevenLabs TTS.
+# buddy_voice.py -- speaks the BuddyDoom AI co-op buddy's lines with ElevenLabs TTS.
 #
 # The game (files/p_ai_coop.c) appends each spoken line to buddy_say.txt in its
 # working dir (run/).  This helper tails that file and, for every new line, calls
@@ -11,7 +11,7 @@
 #
 # API key (keep it secret -- never commit it):
 #     export ELEVENLABS_API_KEY=sk_...                 # or
-#     put 'elevenlabs_api_key  sk_...' in aidoom.cfg   # (gitignored)
+#     put 'elevenlabs_api_key  sk_...' in buddydoom.cfg   # (gitignored)
 #
 # Stdlib only -- no pip install needed.
 
@@ -23,7 +23,7 @@ API = "https://api.elevenlabs.io/v1/text-to-speech/{vid}"
 
 
 def cfg_value(cfg_path, key):
-    """Read a 'key value' / 'key "value"' line from an aidoom.cfg-style file."""
+    """Read a 'key value' / 'key "value"' line from a buddydoom.cfg-style file."""
     try:
         with open(cfg_path) as f:
             for line in f:
@@ -61,9 +61,9 @@ def tts(text, key, voice, model):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Speak aiDoom buddy lines via ElevenLabs.")
+    ap = argparse.ArgumentParser(description="Speak BuddyDoom buddy lines via ElevenLabs.")
     ap.add_argument("--file", default="buddy_say.txt", help="line file the game writes")
-    ap.add_argument("--cfg", default="aidoom.cfg", help="config to read the API key from")
+    ap.add_argument("--cfg", default="buddydoom.cfg", help="config to read the API key from")
     ap.add_argument("--voice", default=DEFAULT_VOICE)
     ap.add_argument("--model", default=DEFAULT_MODEL)
     ap.add_argument("--key", default=None, help="ElevenLabs API key (else env/cfg)")
@@ -73,7 +73,7 @@ def main():
     player = find_player()
     if not key:
         print("buddy_voice: no API key (set ELEVENLABS_API_KEY or elevenlabs_api_key in "
-              "aidoom.cfg) -- printing lines only.", file=sys.stderr)
+              "buddydoom.cfg) -- printing lines only.", file=sys.stderr)
     if not player:
         print("buddy_voice: no audio player found (install ffmpeg/ffplay or mpg123).", file=sys.stderr)
 

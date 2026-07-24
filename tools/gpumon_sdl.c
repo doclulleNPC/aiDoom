@@ -15,7 +15,7 @@
 #include <string.h>
 
 #include "font_atlas.h"
-#include "../files/aidoom_icon.h"	// shared 64x64 RGBA window icon (from aidoom.ico)
+#include "../files/buddydoom_icon.h"	// shared 64x64 RGBA window icon (from buddydoom.ico)
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -542,12 +542,12 @@ int main(int argc, char** argv)
     }
 
     if (!SDL_Init(SDL_INIT_VIDEO)) { fprintf(stderr,"SDL_Init: %s\n",SDL_GetError()); return 1; }
-    win = SDL_CreateWindow("aiDoom GPU monitor", WINW, WINH, 0);
+    win = SDL_CreateWindow("BuddyDoom GPU monitor", WINW, WINH, 0);
     {
-        // Window/taskbar icon from the shared aidoom.ico (same as the game).
+        // Window/taskbar icon from the shared buddydoom.ico (same as the game).
         SDL_Surface* icon = SDL_CreateSurfaceFrom(
-            AIDOOM_ICON_W, AIDOOM_ICON_H, SDL_PIXELFORMAT_RGBA32,
-            (void *)aidoom_icon_rgba, AIDOOM_ICON_W*4);
+            BUDDYDOOM_ICON_W, BUDDYDOOM_ICON_H, SDL_PIXELFORMAT_RGBA32,
+            (void *)buddydoom_icon_rgba, BUDDYDOOM_ICON_W*4);
         if (icon) { SDL_SetWindowIcon(win, icon); SDL_DestroySurface(icon); }
     }
     ren = SDL_CreateRenderer(win, NULL);

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # bake_secdrone.py -- add the Security Drone assets (from run/ID0/SecurityDrone.pk3)
-# into run/ID0/aidoom.wad, IN PLACE and idempotently:
+# into run/ID0/buddydoom.wad, IN PLACE and idempotently:
 #   * sprites  MNDR*/SHT1*/POW1*  (PNG in the pk3) -> DOOM patch_t, inserted into
-#     aidoom.wad's S_START..S_END sprite namespace so R_InitSprites picks them up.
+#     buddydoom.wad's S_START..S_END sprite namespace so R_InitSprites picks them up.
 #   * sounds   SECDRON1..4        (OGG in the pk3) -> DMX (11025 Hz, 8-bit mono),
 #     added as lumps DSSECDR1..4 so the engine's getsfx() ("ds"+name) finds them.
 #
-# Re-run after any rebuild of aidoom.wad.  Existing lumps are overwritten in place;
+# Re-run after any rebuild of buddydoom.wad.  Existing lumps are overwritten in place;
 # new ones are inserted.
 #
 #   python3 tools/bake_secdrone.py
@@ -17,7 +17,7 @@ from PIL import Image
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 PK3  = os.path.join(ROOT, "run", "ID0", "SecurityDrone.pk3")
-WAD  = os.path.join(ROOT, "run", "ID0", "aidoom.wad")
+WAD  = os.path.join(ROOT, "run", "ID0", "buddydoom.wad")
 
 # (pk3 sprite lump, aidoom.wad lump).  DOOM sprite frames must be contiguous from
 # frame 'A'; the pk3's POW1 impact frames are F..J, so remap them to A..E.
@@ -167,7 +167,7 @@ def main():
         send=None
         for idx,[n,_] in enumerate(lumps):
             if n.upper()=="S_END": send=idx
-        if send is None: sys.exit("bake_secdrone: no S_END marker in aidoom.wad")
+        if send is None: sys.exit("bake_secdrone: no S_END marker in buddydoom.wad")
         lumps[send:send]=ins_spr
     # New sounds: append at the very end (order doesn't matter for by-name lookup).
     if ins_snd:

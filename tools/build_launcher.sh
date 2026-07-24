@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build the SDL3 launcher for aiDoom (tools/launcher.c).
+# Build the SDL3 launcher for BuddyDoom (tools/launcher.c).
 set -eu
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 [ -f "$here/font_atlas.h" ] || python3 "$here/bake_font.py"

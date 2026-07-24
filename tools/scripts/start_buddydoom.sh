@@ -1,27 +1,27 @@
 #!/usr/bin/env bash
 #
-# start_aidoom.sh -- launch aiDoom (optionally with the LLM director and/or
-# the AI co-op companion).  Linux/macOS counterpart of start_aidoom.bat /
-# start_aidoom.ps1.
+# start_buddydoom.sh -- launch BuddyDoom (optionally with the LLM director and/or
+# the AI co-op companion).  Linux/macOS counterpart of start_buddydoom.bat /
+# start_buddydoom.ps1.
 #
 # DEFAULT = FULL LLM: the AI co-op buddy (-aicoop) PLUS the LLM director (monsters +
-# the L4D stress/spawn pacing).  Just run ./start_aidoom.sh -- it waits for Ollama,
+# the L4D stress/spawn pacing).  Just run ./start_buddydoom.sh -- it waits for Ollama,
 # warms the model, launches the game + the native director.  Opt out with the flags:
 #   (default)     : -aicoop + -aidirector + director  (AI buddy + LLM monsters/spawns).
 #   --buddy       : rule-based companion (-coop) instead of the AI buddy (still LLM monsters
 #                   unless --no-director).  Local + deterministic.
 #   --no-buddy    : no companion at all (LLM monsters only).
 #   --no-director : no LLM director (the AI buddy then runs autonomously / rule-based).
-#   --offline     : plain aiDoom -- no LLM, no buddy, no Ollama check (fastest).
+#   --offline     : plain BuddyDoom -- no LLM, no buddy, no Ollama check (fastest).
 #
 # Usage:
-#   ./start_aidoom.sh                          # FULL LLM: AI buddy + director (default)
-#   ./start_aidoom.sh --buddy                  # rule-based buddy + LLM monsters
-#   ./start_aidoom.sh --offline                # plain aidoom (offline, fast)
-#   ./start_aidoom.sh --model qwen3:8b --skill 4 --nofriendlyfire
-#   ./start_aidoom.sh --ollama http://localhost:11434
+#   ./start_buddydoom.sh                          # FULL LLM: AI buddy + director (default)
+#   ./start_buddydoom.sh --buddy                  # rule-based buddy + LLM monsters
+#   ./start_buddydoom.sh --offline                # plain buddydoom (offline, fast)
+#   ./start_buddydoom.sh --model qwen3:8b --skill 4 --nofriendlyfire
+#   ./start_buddydoom.sh --ollama http://localhost:11434
 #
-# Requires: SDL3 installed (to run the binaries) and the aidoom binary built
+# Requires: SDL3 installed (to run the binaries) and the buddydoom binary built
 # (see README).  For --director: the native director binary (tools/build_director.sh)
 # and a reachable Ollama server.  No Python needed.
 
@@ -43,13 +43,13 @@ AIBUDDY=1			# default ON -- AI/LLM co-op buddy (-aicoop)
 DIRECTOR=1		# default ON -- LLM monster director
 GAME_EXTRA=()
 
-# aidoom.cfg (next to this script, written by the SDL3 config app) overrides the
+# buddydoom.cfg (next to this script, written by the SDL3 config app) overrides the
 # built-in defaults; explicit CLI flags below still win. Format: "key<ws>value".
 _here_pre="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [ -f "$_here_pre/aidoom.cfg" ]; then
-    _h=$(awk '$1=="ollama_host"{print $2}'  "$_here_pre/aidoom.cfg" | tail -1)
-    _p=$(awk '$1=="ollama_port"{print $2}'  "$_here_pre/aidoom.cfg" | tail -1)
-    _m=$(awk '$1=="ollama_model"{print $2}' "$_here_pre/aidoom.cfg" | tail -1)
+if [ -f "$_here_pre/buddydoom.cfg" ]; then
+    _h=$(awk '$1=="ollama_host"{print $2}'  "$_here_pre/buddydoom.cfg" | tail -1)
+    _p=$(awk '$1=="ollama_port"{print $2}'  "$_here_pre/buddydoom.cfg" | tail -1)
+    _m=$(awk '$1=="ollama_model"{print $2}' "$_here_pre/buddydoom.cfg" | tail -1)
     [ -n "$_h" ] && OLLAMA="http://${_h}:${_p:-11434}"
     [ -n "$_m" ] && MODEL="$_m"
 fi
@@ -73,7 +73,7 @@ while [ $# -gt 0 ]; do
         --no-director)  NODIRECTOR=1; shift;;
         --buddy)        BUDDY=1; AIBUDDY=0; shift;;        # rule-based companion instead of the AI buddy
         --no-buddy)     BUDDY=0; AIBUDDY=0; shift;;        # no companion at all
-        --offline)      AIBUDDY=0; BUDDY=0; NODIRECTOR=1; shift;;   # plain aidoom, no LLM/Ollama
+        --offline)      AIBUDDY=0; BUDDY=0; NODIRECTOR=1; shift;;   # plain buddydoom, no LLM/Ollama
         --aicoop)       AIBUDDY=1; NODIRECTOR=0; shift;;   # AI/LLM buddy (-aicoop): needs the director, so enable it too
         --no-coop)      warn "--no-coop is deprecated, use --no-buddy"; BUDDY=0; shift;;
         --coop)         warn "--coop is deprecated, use --buddy"; BUDDY=1; shift;;
@@ -88,15 +88,15 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 command -v curl >/dev/null 2>&1 || die "curl is required."
 
-# --- locate the aidoom binary (run dir, or the files/ build dir) ---
-AIDOOM=""
-for c in "$here/aidoom" "$here/../files/aidoom" "$here/aidoom.exe"; do
-    [ -x "$c" ] && { AIDOOM="$c"; break; }
+# --- locate the buddydoom binary (run dir, or the files/ build dir) ---
+BUDDYDOOM=""
+for c in "$here/buddydoom" "$here/../files/buddydoom" "$here/buddydoom.exe"; do
+    [ -x "$c" ] && { BUDDYDOOM="$c"; break; }
 done
-[ -n "$AIDOOM" ] || die "aidoom binary not found. Build it first (see README), e.g. in files/."
-GAMEDIR="$(cd "$(dirname "$AIDOOM")" && pwd)"
+[ -n "$BUDDYDOOM" ] || die "buddydoom binary not found. Build it first (see README), e.g. in files/."
+GAMEDIR="$(cd "$(dirname "$BUDDYDOOM")" && pwd)"
 
-# IWAD selection is handled by the engine: -iwad / aidoom.cfg "iwad" / iwads\/ /
+# IWAD selection is handled by the engine: -iwad / buddydoom.cfg "iwad" / iwads\/ /
 # the game folder / Steam (see IdentifyVersion). The game runs from GAMEDIR below.
 
 # --- 1. wait for the Ollama server ---
@@ -135,8 +135,8 @@ else
     fi
 fi
 
-# --- 4. start aiDoom ---
-# Default: nothing extra -- vanilla aiDoom, no -aidirector (no TCP server), no
+# --- 4. start BuddyDoom ---
+# Default: nothing extra -- vanilla BuddyDoom, no -aidirector (no TCP server), no
 # buddy.  Pass --director to add -aidirector + the native director (run/director);
 # pass --buddy to add -coop (rule-based companion) or --aicoop (AI/LLM companion).
 gameargs=( -warp "$EPISODE" "$MAP" -skill "$SKILL" )
@@ -147,8 +147,8 @@ gameargs=( -warp "$EPISODE" "$MAP" -skill "$SKILL" )
 [ "$INFIGHT" = 1 ]      && gameargs+=( -infight )
 [ ${#GAME_EXTRA[@]} -gt 0 ] && gameargs+=( "${GAME_EXTRA[@]}" )
 
-info "launching: $AIDOOM ${gameargs[*]}"
-( cd "$GAMEDIR" && exec "$AIDOOM" "${gameargs[@]}" ) &
+info "launching: $BUDDYDOOM ${gameargs[*]}"
+( cd "$GAMEDIR" && exec "$BUDDYDOOM" "${gameargs[@]}" ) &
 GAME_PID=$!
 # stop the game if this launcher is interrupted or the director exits
 trap 'kill "$GAME_PID" 2>/dev/null' EXIT INT TERM

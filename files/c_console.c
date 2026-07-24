@@ -145,7 +145,7 @@ void C_Init (void)
 {
     con_head = con_count = con_inlen = con_open = con_shift = con_scroll = 0;
     con_input[0] = '\0';
-    C_Printf ("aiDoom console.  Type 'help'.  Open/close with ` (backquote).");
+    C_Printf ("BuddyDoom console.  Type 'help'.  Open/close with ` (backquote).");
     C_Printf ("Ask the LLM: llm <message>  (alias tellme / buddy)");
 }
 

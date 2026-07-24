@@ -1,17 +1,17 @@
 <#
-  start_aidoom.ps1 -- wait for Ollama, then launch aiDoom with FULL LLM support.
+  start_buddydoom.ps1 -- wait for Ollama, then launch BuddyDoom with FULL LLM support.
 
   DEFAULT = the AI co-op buddy (-aicoop) PLUS the LLM director (-aidirector +
   director.exe): the model drives the monsters, the L4D stress/spawn pacing, and the
   buddy's tactics in one loop.  Checks Ollama is up, warms the model, then launches
   the game + the native director.exe (no Python).
 
-  Usage (or just double-click start_aidoom.bat):
-    .\start_aidoom.ps1                    # FULL LLM: AI buddy + director (default)
-    .\start_aidoom.ps1 -RuleCoop          # rule-based companion instead of the AI buddy
-    .\start_aidoom.ps1 -NoCoop            # no companion at all
-    .\start_aidoom.ps1 -NoDirector        # just the game, no LLM director
-    .\start_aidoom.ps1 -Model qwen2.5-coder:1.5b -Skill 4 -NoFriendlyFire
+  Usage (or just double-click start_buddydoom.bat):
+    .\start_buddydoom.ps1                    # FULL LLM: AI buddy + director (default)
+    .\start_buddydoom.ps1 -RuleCoop          # rule-based companion instead of the AI buddy
+    .\start_buddydoom.ps1 -NoCoop            # no companion at all
+    .\start_buddydoom.ps1 -NoDirector        # just the game, no LLM director
+    .\start_buddydoom.ps1 -Model qwen2.5-coder:1.5b -Skill 4 -NoFriendlyFire
 #>
 param(
     [string]$Model     = "ministral-3:8b",
@@ -32,10 +32,10 @@ $ErrorActionPreference = "Stop"
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $here
 
-# aidoom.cfg (next to this script, written by the SDL3 config app) sets the
+# buddydoom.cfg (next to this script, written by the SDL3 config app) sets the
 # defaults for host/port/model; explicit -Ollama / -Model still win.
 # Format: "key<whitespace>value".
-$cfgFile = Join-Path $here "aidoom.cfg"
+$cfgFile = Join-Path $here "buddydoom.cfg"
 if (Test-Path $cfgFile) {
     $cfg = @{}
     foreach ($line in Get-Content $cfgFile) {
@@ -94,19 +94,19 @@ if (-not $NoDirector) {
     }
 }
 
-# --- 4. start aiDoom with the AI director TCP server ---
-if (-not (Test-Path (Join-Path $here "SDL3.dll"))) { Die "SDL3.dll missing next to aidoom.exe in $here" }
+# --- 4. start BuddyDoom with the AI director TCP server ---
+if (-not (Test-Path (Join-Path $here "SDL3.dll"))) { Die "SDL3.dll missing next to buddydoom.exe in $here" }
 
 # IWAD selection is handled by the engine itself, in this order:
-#   -iwad <file>  >  aidoom.cfg "iwad"  >  iwads\  >  this folder  >  Steam.
+#   -iwad <file>  >  buddydoom.cfg "iwad"  >  iwads\  >  this folder  >  Steam.
 $gameArgs = @("-warp","$Episode","$Map","-skill","$Skill","-aidirector","$Port")
 if     ($NoCoop)   { }                        # no companion
 elseif ($RuleCoop) { $gameArgs += "-coop" }   # rule-based companion instead of the AI buddy
 else               { $gameArgs += "-aicoop" } # default: AI/LLM co-op buddy (full LLM)
 if ($NoFriendlyFire) { $gameArgs += "-nofriendlyfire" }
 if ($Infight)        { $gameArgs += "-infight" }
-Info "launching aidoom.exe $($gameArgs -join ' ')"
-Start-Process -FilePath (Join-Path $here "aidoom.exe") -ArgumentList $gameArgs -WorkingDirectory $here
+Info "launching buddydoom.exe $($gameArgs -join ' ')"
+Start-Process -FilePath (Join-Path $here "buddydoom.exe") -ArgumentList $gameArgs -WorkingDirectory $here
 
 if ($NoDirector) {
     Info "no director (just the game). done."
