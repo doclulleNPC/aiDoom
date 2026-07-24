@@ -917,7 +917,7 @@ int main (int argc, char** argv)
     strncpy (opt_model, cfg_model, sizeof opt_model - 1);
     opt_oport = cfg_oport;
 
-    // load aidoom.cfg from the binary's directory first
+    // load buddydoom.cfg from the binary's directory first
     {
         const char* base = SDL_GetBasePath ();
         if (base) { load_cfg (base); }

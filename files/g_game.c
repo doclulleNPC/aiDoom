@@ -169,7 +169,7 @@ int		key_use;
 int		key_strafe;
 int		key_speed;
 
-int		key_buddy_come;		// co-op buddy orders -- one bind each, set in aidoom.cfg
+int		key_buddy_come;		// co-op buddy orders -- one bind each, set in buddydoom.cfg
 int		key_buddy_attack;	//   (defaults ',' '.' '-'; see m_misc.c defaults[])
 int		key_buddy_stay;
 int		key_buddy_mode;		// (F) one-button mode cycle; default right mouse (KEY_MOUSE2)
@@ -712,7 +712,7 @@ boolean G_Responder (event_t* ev)
 	    players[consoleplayer].message = autorun ? "Always run ON" : "Always run OFF";
 	    return true;
 	}
-	// Co-op buddy order keys (one bind each, configurable in aidoom.cfg): come /
+	// Co-op buddy order keys (one bind each, configurable in buddydoom.cfg): come /
 	// attack / stay(toggle hold).  Always bound while in a level -- the order funcs
 	// themselves report "(no companion)" when no buddy is active.
 	if (gamestate == GS_LEVEL)

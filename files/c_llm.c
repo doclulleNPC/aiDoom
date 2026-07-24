@@ -24,7 +24,7 @@
 
 void C_Printf (const char* fmt, ...);
 
-// --- Ollama config (read once from run/aidoom.cfg, with sane defaults) ---
+// --- Ollama config (read once from run/buddydoom.cfg, with sane defaults) ---
 static char llm_host[128] = "127.0.0.1";
 static int  llm_port = 11434;
 static char llm_model[128] = "mistral";

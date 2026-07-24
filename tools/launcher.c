@@ -586,7 +586,7 @@ static void pwad_add(const char* dir, const char* fname)
 
     if (is_wad) {
         if (is_known_iwad(fname) >= 0)                return;   // known DOOM IWADs are the OTHER dropdown
-        if (strcasecmp(fname, "aidoom.wad") == 0)     return;   // our voice PWAD -- never list it
+        if (strcasecmp(fname, "buddydoom.wad") == 0)  return;   // our voice PWAD -- never list it
         if (wad_is_iwad(dir, fname))                  return;   // a full IWAD (hexen/heretic/...) -> not a PWAD
         if (wad_has_lump(dir, fname, "AISTUFF"))      return;   // aiDoom-internal asset pack -> not a user PWAD
     }
@@ -1023,7 +1023,7 @@ static int launcher_sigil_classify(const char* fname, int* ep)
 
 // --- Launcher preference persistence ------------------------------------------------------------
 // The launcher remembers the last selection in its OWN file (run/launcher.ini) rather than
-// aidoom.cfg -- the game rewrites aidoom.cfg on exit and would strip unknown keys.  Value is the
+// buddydoom.cfg -- the game rewrites buddydoom.cfg on exit and would strip unknown keys.  Value is the
 // rest of the line, so names with spaces (IWAD/PWAD) survive.
 static const char* prefs_path(void)
 {
@@ -1084,7 +1084,7 @@ static void load_launcher_prefs(void)
 static void build_command(char* out, int n, const char* iwad_path)
 {
     int off = 0;
-    off += snprintf(out + off, n - off, "\"%s/aidoom\" -iwad \"%s\"",
+    off += snprintf(out + off, n - off, "\"%s/buddydoom\" -iwad \"%s\"",
                     run_dir(), iwad_path);
 
     // Buddy mode
@@ -1270,7 +1270,7 @@ static void do_launch(void)
     // from popping up a console/cmd window.  The game's stdout+stderr are redirected to
     // run/aidoom_stderr.log so a fatal I_Error is still recoverable after the window closes.
     char gamexe[300], logpath[320];
-    snprintf(gamexe,  sizeof gamexe,  "%s/aidoom.exe",        run_dir());
+    snprintf(gamexe,  sizeof gamexe,  "%s/buddydoom.exe",     run_dir());
     snprintf(logpath, sizeof logpath, "%s/aidoom_stderr.log", run_dir());
 
     if (start_director)
@@ -1301,7 +1301,7 @@ static void do_launch(void)
     if (!ok)
     {
         snprintf(g_status, sizeof g_status,
-                 "failed to launch aidoom.exe (error %lu)", (unsigned long)GetLastError());
+                 "failed to launch buddydoom.exe (error %lu)", (unsigned long)GetLastError());
         g_status_err = 1;
         return;
     }
@@ -1391,7 +1391,7 @@ int main(int argc, char** argv)
     }
 
     win = SDL_CreateWindow("BuddyDoom Launcher", WINW, WINH,
-                           SDL_WINDOW_HIDDEN);
+                           SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
     if (!win) {
         fprintf(stderr, "SDL_CreateWindow failed: %s\n", SDL_GetError());
         SDL_Quit();

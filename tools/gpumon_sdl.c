@@ -2,7 +2,7 @@
 //
 // Same data source as gpumon.py: it runs `nvidia-smi` over SSH and shows live
 // bars for GPU utilisation, VRAM, temperature and power.  Host/user come from
-// aidoom.cfg (gpu_host/gpu_user/gpu_ssh_port, falling back to ollama_host) next
+// buddydoom.cfg (gpu_host/gpu_user/gpu_ssh_port, falling back to ollama_host) next
 // to the binary, or from --host/--user.  Text is drawn from the baked font atlas
 // (tools/font_atlas.h), so there are no deps beyond SDL3.
 //
@@ -59,7 +59,7 @@ static const SDL_FRect btn_reconnect = { WINW/2.0f-70, WINH-66, 140, 28 };
 static void load_cfg(void)
 {
     char path[1024]; const char* base = SDL_GetBasePath();
-    snprintf(path, sizeof(path), "%saidoom.cfg", base ? base : "./");
+    snprintf(path, sizeof(path), "%sbuddydoom.cfg", base ? base : "./");
     FILE* f = fopen(path, "r"); if (!f) return;
     char line[256], k[64], v[160];
     char ollama[128] = "";
@@ -494,7 +494,7 @@ static void draw(void)
     if (s.err[0]) {
         text(16, 60, "disconnected:", 220,80,70);
         text(16, 80, s.err, 200,160,160);
-        text(16, 110, "(host/user from aidoom.cfg)", 120,120,130);
+        text(16, 110, "(host/user from buddydoom.cfg)", 120,120,130);
         fillrect(btn_reconnect.x,btn_reconnect.y,btn_reconnect.w,btn_reconnect.h, 40,80,120);
         text(btn_reconnect.x+24, btn_reconnect.y+6, "Reconnect", 210,230,255);
         SDL_RenderPresent(ren);
