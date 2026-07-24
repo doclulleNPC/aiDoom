@@ -86,3 +86,13 @@ echo "[build] compiling buddydoom $fork (SDL3 $(pkg-config --modversion sdl3)) .
 mkdir -p "$run"
 cp -f "$src/buddydoom" "$run/buddydoom"
 echo "[build] done -> $src/buddydoom  (copied to $run/buddydoom)"
+
+# Also compile the BuddyDoom tools (config app, director, launcher, extractor, gpumon)
+echo "[build] compiling BuddyDoom tools..."
+"$here/tools/build_config.sh"
+"$here/tools/build_director.sh"
+"$here/tools/build_launcher.sh"
+"$here/tools/build_extractor.sh"
+"$here/tools/build_gpumon.sh"
+echo "[build] all BuddyDoom executables built and staged in run/"
+

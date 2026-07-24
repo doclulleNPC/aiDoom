@@ -74,7 +74,7 @@ endif()
 # -------------------------------------------------------------------
 # tools -- buddydoom_config + gpumon_sdl + launcher (SDL3 GUI apps that own main())
 # -------------------------------------------------------------------
-foreach(tool buddydoom_config gpumon_sdl launcher extractor)
+foreach(tool buddydoom_config gpumon_sdl launcher extractor director)
     add_executable(${tool} ${CMAKE_SOURCE_DIR}/tools/${tool}.c)
     target_include_directories(${tool} PRIVATE ${CMAKE_SOURCE_DIR}/tools)
     buddydoom_common(${tool})
@@ -84,6 +84,10 @@ foreach(tool buddydoom_config gpumon_sdl launcher extractor)
         target_link_options(${tool} PRIVATE /ENTRY:mainCRTStartup)
     endif()
 endforeach()
+
+if(WIN32)
+    target_link_libraries(director PRIVATE ws2_32 psapi)
+endif()
 
 # The GPU monitor ships as plain "gpumon" (source file is gpumon_sdl.c).
 set_target_properties(gpumon_sdl PROPERTIES OUTPUT_NAME gpumon)
@@ -104,7 +108,7 @@ if(APPLE)
     set_source_files_properties(${CMAKE_SOURCE_DIR}/buddydoom.icns PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
     target_sources(buddydoom PRIVATE ${CMAKE_SOURCE_DIR}/buddydoom.icns)
     set_target_properties(buddydoom PROPERTIES MACOSX_BUNDLE_ICON_FILE buddydoom.icns)
-    foreach(tool buddydoom_config gpumon_sdl launcher extractor)
+    foreach(tool buddydoom_config gpumon_sdl launcher extractor director)
         target_sources(${tool} PRIVATE ${CMAKE_SOURCE_DIR}/buddydoom.icns)
         set_target_properties(${tool} PROPERTIES MACOSX_BUNDLE_ICON_FILE buddydoom.icns)
     endforeach()
