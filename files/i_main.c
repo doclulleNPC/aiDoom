@@ -26,6 +26,19 @@ rcsid[] = "$Id: i_main.c,v 1.4 1997/02/03 22:45:10 b1 Exp $";
 
 
 #include <SDL3/SDL.h>
+#include <stdlib.h>	// exit()
+
+// Minimum SDL version.  Older SDL3 (<= 3.2.x) has an audio-stream regression where
+// SDL_GetAudioStreamQueued never drains to 0, which permanently latched the buddy
+// voice silent after one line (worked around in i_voice.c, but the runtime is only
+// validated against 3.4.12+).  Enforce it at BOTH build time (headers / dev package)
+// and run time (the loaded SDL3.dll) so an old DLL dropped next to the exe can't be used.
+#define BUDDYDOOM_SDL_MIN_MAJOR 3
+#define BUDDYDOOM_SDL_MIN_MINOR 4
+#define BUDDYDOOM_SDL_MIN_MICRO 12
+#if !SDL_VERSION_ATLEAST(BUDDYDOOM_SDL_MIN_MAJOR, BUDDYDOOM_SDL_MIN_MINOR, BUDDYDOOM_SDL_MIN_MICRO)
+#error "BuddyDoom requires SDL 3.4.12 or newer -- build against SDL3-devel-3.4.12+ (older SDL3 silences the buddy voice)."
+#endif
 
 // The build defines SDL_MAIN_HANDLED, so SDL does not hijack main(); we own the
 // console entry point (keeps stdout for the AI director logs) and just tell SDL
@@ -50,7 +63,7 @@ static void I_CrashHandler (int sig)
     void* bt[64];
     int   n = backtrace (bt, 64);
     fflush (NULL);				// flush buffered [INVIS]/debug logs before the backtrace
-    static const char hdr[] = "\n*** aiDoom CRASH (signal ";
+    static const char hdr[] = "\n*** BuddyDoom CRASH (signal ";
     char  num[4] = { (char)('0' + (sig/10)%10), (char)('0' + sig%10), ')', '\n' };
     write (2, hdr, sizeof hdr - 1);
     write (2, num, 4);
@@ -148,12 +161,36 @@ static void I_InstallCrashHandler (void)
 static void I_InstallCrashHandler (void) {}
 #endif
 
+// Refuse to run against an SDL3.dll older than the minimum (the compile-time #error
+// only covers the headers we built against; a stale DLL next to the exe is a runtime
+// thing).  SDL_GetVersion() needs no SDL_Init.  Reports via stderr AND a message box
+// (works with no window yet, same as the crash handler), then exits.
+static void I_RequireSDL (void)
+{
+    int have = SDL_GetVersion ();
+    int need = SDL_VERSIONNUM (BUDDYDOOM_SDL_MIN_MAJOR, BUDDYDOOM_SDL_MIN_MINOR, BUDDYDOOM_SDL_MIN_MICRO);
+    if (have >= need)
+	return;
+
+    char msg[256];
+    SDL_snprintf (msg, sizeof msg,
+	"BuddyDoom needs SDL %d.%d.%d or newer, but the loaded SDL3 library is %d.%d.%d.\n\n"
+	"Replace SDL3.dll (next to the game) with the bundled 3.4.12+ version.",
+	BUDDYDOOM_SDL_MIN_MAJOR, BUDDYDOOM_SDL_MIN_MINOR, BUDDYDOOM_SDL_MIN_MICRO,
+	SDL_VERSIONNUM_MAJOR (have), SDL_VERSIONNUM_MINOR (have), SDL_VERSIONNUM_MICRO (have));
+    fprintf (stderr, "\n*** %s\n", msg);
+    fflush (stderr);
+    SDL_ShowSimpleMessageBox (SDL_MESSAGEBOX_ERROR, "BuddyDoom: SDL too old", msg, NULL);
+    exit (1);
+}
+
 int
 main
 ( int		argc,
   char**	argv )
 {
     SDL_SetMainReady();
+    I_RequireSDL ();		// bail early if the SDL3.dll is older than we support
     I_InstallCrashHandler ();
 
     myargc = argc;
