@@ -245,6 +245,15 @@ static SDL_AudioStream* voice_stream = NULL;
 // the buddy can talk at the same time without clearing each other's queue.
 static SDL_AudioStream* director_stream = NULL;
 
+// "Still talking until" wall-clock (SDL_GetTicks ms).  The busy check used to read
+// SDL_GetAudioStreamQueued(), but on some SDL3 builds (notably the older 3.2.x shipped
+// with the Windows package vs 3.4.x on Linux) the queued count never drained back to 0
+// after the first clip, so I_Voice_Busy() latched true forever -- the buddy spoke
+// exactly once at startup and then went silent.  A nominal-duration timer can't latch
+// and is SDL-version-independent.
+static Uint64	voice_busy_until    = 0;
+static Uint64	director_busy_until = 0;
+
 static void SDLCALL I_VoiceAudioCallback (void* userdata, SDL_AudioStream* stream,
                                           int additional_amount, int total_amount)
 {
@@ -339,7 +348,7 @@ static short clamp16 (int v)
 // Decode `lumpname` and queue it (panned by lvol/rvol, 0..127) on `stream`.
 // `bound` tracks whether this stream's format has been bound yet (each stream
 // binds once on its first line).  Shared by the buddy and Director paths.
-static void play_on_stream (SDL_AudioStream* stream, int* bound,
+static void play_on_stream (SDL_AudioStream* stream, int* bound, Uint64* busy_until,
                             const char* lumpname, int lvol, int rvol)
 {
     if (!stream || !lumpname) return;       // init failed/skipped or no name
@@ -373,8 +382,20 @@ static void play_on_stream (SDL_AudioStream* stream, int* bound,
         out[2*i]   = clamp16 (sl * lvol / 127);
         out[2*i+1] = clamp16 (sr * rvol / 127);
     }
+    // Defensive: on some backends (Windows/WASAPI) the device stream appears to stop
+    // pulling once its queue drains to empty; re-resume before every put so a second
+    // line after a gap still plays.  Harmless if it's already running.
+    SDL_ResumeAudioStreamDevice (stream);
     SDL_PutAudioStreamData (stream, out, frames * 2 * (int)sizeof(short));
     free (out);
+
+    // Mark "still talking" for this clip's nominal duration (SDL-version-independent;
+    // replaces the SDL_GetAudioStreamQueued() check that latched on older SDL3).
+    if (busy_until)
+    {
+        int rate = v->samplerate > 0 ? v->samplerate : 11025;
+        *busy_until = SDL_GetTicks () + (Uint64)frames * 1000 / (Uint64)rate;
+    }
 }
 
 void I_Voice_SayByName (const char* lumpname, int lvol, int rvol)
@@ -385,7 +406,7 @@ void I_Voice_SayByName (const char* lumpname, int lvol, int rvol)
     // Director, or the buddy goes fully silent whenever the Director has audio queued
     // (the -director "buddy isn't talking" bug).  Buddy still can't overlap itself.
     if (I_Voice_Busy ()) return;
-    play_on_stream (voice_stream, &bound, lumpname, lvol, rvol);
+    play_on_stream (voice_stream, &bound, &voice_busy_until, lumpname, lvol, rvol);
 }
 
 // ----- AI Director persona (own stream, own voice) --------------------------
@@ -395,18 +416,18 @@ void I_Director_Say (const char* tag, int lvol, int rvol)
     static int bound = 0;
     const char* lumpname = tag_to_lumpname (tag);
     if (!lumpname) return;                  // unknown tag -> silent
-    play_on_stream (director_stream, &bound, lumpname, lvol, rvol);
+    play_on_stream (director_stream, &bound, &director_busy_until, lumpname, lvol, rvol);
 }
 
 int I_Director_Busy (void)
 {
     if (!director_stream) return 0;
-    return SDL_GetAudioStreamQueued (director_stream) > 0;
+    return SDL_GetTicks () < director_busy_until;   // nominal-duration timer (see voice_busy_until)
 }
 
 void I_Director_Stop (void)
 {
-    if (director_stream) SDL_ClearAudioStream (director_stream);
+    if (director_stream) { SDL_ClearAudioStream (director_stream); director_busy_until = 0; }
 }
 
 void I_Voice_Say (const char* tag, int lvol, int rvol)
@@ -419,13 +440,15 @@ void I_Voice_Say (const char* tag, int lvol, int rvol)
 int I_Voice_Busy (void)
 {
     if (!voice_stream) return 0;
-    // Bytes still queued for the device == the buddy is still talking.
-    return SDL_GetAudioStreamQueued (voice_stream) > 0;
+    // Still talking until the current clip's nominal end (SDL_GetTicks, ms).  Using a
+    // timer rather than SDL_GetAudioStreamQueued() -- which never drained to 0 on the
+    // Windows SDL3 build, latching the buddy silent after one line.
+    return SDL_GetTicks () < voice_busy_until;
 }
 
 void I_Voice_Stop (void)
 {
-    if (voice_stream) SDL_ClearAudioStream (voice_stream);
+    if (voice_stream) { SDL_ClearAudioStream (voice_stream); voice_busy_until = 0; }
 }
 
 
