@@ -194,7 +194,6 @@ void M_ChangeMessages(int choice);
 void M_ChangeSensitivity(int choice);
 void M_SfxVol(int choice);
 void M_MusicVol(int choice);
-void M_ChangeDetail(int choice);
 void M_StartGame(int choice);
 void M_Sound(int choice);
 
@@ -351,7 +350,6 @@ enum
 {
     endgame,
     messages,
-    detail,
     mousesens,
     option_empty2,
     soundvol,
@@ -366,9 +364,10 @@ menuitem_t OptionsMenu[]=
 {
     // All text-drawn at the small (hu_font) size by M_DrawOptions -- empty names
     // so M_Drawer doesn't blit the big graphic lumps.
+    // (Vanilla's "Graphic Detail" High/Low was removed -- low-detail mode is a
+    //  dead no-op in this hi-res renderer; see the old M_ChangeDetail.)
     {1,"",	M_EndGame,'e'},
     {1,"",	M_ChangeMessages,'m'},
-    {1,"",	M_ChangeDetail,'g'},
     {2,"",	M_ChangeSensitivity,'m'},
     {-1,"",0},
     {1,"",	M_Sound,'s'},
@@ -1014,9 +1013,6 @@ void M_DrawOptions(void)
     M_WriteText (x, y+LINEHEIGHT*messages, "Messages");
     M_WriteText (x+130, y+LINEHEIGHT*messages, showMessages ? "On" : "Off");
 
-    M_WriteText (x, y+LINEHEIGHT*detail,   "Graphic Detail");
-    M_WriteText (x+130, y+LINEHEIGHT*detail, detailLevel ? "Low" : "High");
-
     M_WriteText (x, y+LINEHEIGHT*mousesens, "Mouse Sensitivity");
     M_DrawThermo (x, y+LINEHEIGHT*(mousesens+1), 10, mouseSensitivity);
 
@@ -1445,23 +1441,9 @@ void M_ChangeSensitivity(int choice)
 
 
 
-void M_ChangeDetail(int choice)
-{
-    choice = 0;
-    detailLevel = 1 - detailLevel;
-
-    // FIXME - does not work. Remove anyway?
-    fprintf( stderr, "M_ChangeDetail: low detail mode n.a.\n");
-
-    return;
-    
-    /*R_SetViewSize (screenblocks, detailLevel);
-
-    if (!detailLevel)
-	players[consoleplayer].message = DETAILHI;
-    else
-	players[consoleplayer].message = DETAILLO;*/
-}
+// M_ChangeDetail removed: vanilla's low-detail (half-horizontal-res) mode is a dead
+// no-op in this hi-res renderer -- R_ExecuteSetViewSize forces detailshift=0.  The
+// `detailLevel` config value is kept (harmless) so old configs still load.
 
 
 
@@ -1892,10 +1874,7 @@ boolean M_Responder (event_t* ev)
 	    S_StartSound(NULL,sfx_swtchn);
 	    return true;
 				
-	  case KEY_F5:            // Detail toggle
-	    M_ChangeDetail(0);
-	    S_StartSound(NULL,sfx_swtchn);
-	    return true;
+	    // (KEY_F5 "Detail toggle" removed -- low-detail mode is a dead no-op here.)
 				
 	  case KEY_F6:            // Quicksave
 	    S_StartSound(NULL,sfx_swtchn);
