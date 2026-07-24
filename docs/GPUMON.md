@@ -5,12 +5,12 @@ A small live monitor for the GPU that runs your Ollama models — handy while th
 (`run/gpumon` / `run\gpumon.exe`, source `tools/gpumon_sdl.c`) with live bars, the
 currently-loaded Ollama model, and a **Reconnect** button. No Python.
 
-**Naming note:** The parent project was previously known as `aiDoom` and is now
-**BuddyDoom**. The config filename and the `aidoom_config` tool keep the legacy
+**Naming note:** The parent project was previously known as `BuddyDoom` and is now
+**BuddyDoom**. The config filename and the `buddydoom_config` tool keep the legacy
 token until the source rename lands; this document does not pre-rename them.
 
 It shows **GPU load %, memory, temperature and power**, reading its target from
-`aidoom.cfg`. The monitoring tool is **auto-detected**, so the same binary works
+`buddydoom.cfg`. The monitoring tool is **auto-detected**, so the same binary works
 against an NVIDIA box or an Apple-Silicon Mac.
 
 ---
@@ -64,7 +64,7 @@ The detected tool is cached; clicking **Reconnect** re-probes (so you can instal
 
 ## Configuration
 
-Reads **`aidoom.cfg`** (written by the `aidoom_config` settings app, in the `run/`
+Reads **`buddydoom.cfg`** (written by the `buddydoom_config` settings app, in the `run/`
 folder). Keys used:
 
 | Key | Meaning | Default |
@@ -117,7 +117,7 @@ Also enable **Remote Login** so gpumon can SSH in:
 For a remote host gpumon SSHes in, so it needs your **public key installed there**
 (passwordless — gpumon uses `BatchMode=yes` and never prompts for a password).
 
-Easiest: open **`aidoom_config`** and click **"Copy SSH key"** (it generates a key if
+Easiest: open **`buddydoom_config`** and click **"Copy SSH key"** (it generates a key if
 needed and installs it on `gpu_user@gpu_host`). Or manually:
 
 ```sh
@@ -176,7 +176,7 @@ tools/build_gpumon.sh                       # Linux only (gcc + pkg-config sdl3)
 
 | Symptom | Cause / fix |
 |---|---|
-| `ssh failed (user@host)` | SSH can't connect non-interactively. Test `ssh -o BatchMode=yes user@host echo ok`; fix the key (see SSH setup) or the host/port in `aidoom.cfg`. |
+| `ssh failed (user@host)` | SSH can't connect non-interactively. Test `ssh -o BatchMode=yes user@host echo ok`; fix the key (see SSH setup) or the host/port in `buddydoom.cfg`. |
 | `Host key verification failed` / `known_hosts: Permission denied` | On Windows, `%USERPROFILE%\.ssh\known_hosts` is unreadable or its ACL is broken. Fix with `icacls "%USERPROFILE%\.ssh\known_hosts" /grant "%USERNAME%:F"` (or delete the file — gpumon's `accept-new` recreates it). |
 | `macmon not installed — run: brew install macmon` | The Mac was detected but `macmon` isn't installed at all. `brew install macmon` (gpumon finds it in Homebrew's bin automatically), then click **Reconnect**. |
 | `no GPU tool found` | Neither `nvidia-smi` nor `macmon` is on the target's `PATH` for the SSH user. |

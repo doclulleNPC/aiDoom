@@ -17,7 +17,7 @@ freedoom2 uses the DOOM palette, so sprite pixels are copied verbatim (no remap)
 
 Usage:
     python3 tools/extract_freedoom2.py                 # ID0/freedoom2.wad
-    ./aidoom -iwad DOOM.WAD -file freedoomstuff.wad -director ...
+    ./buddydoom -iwad DOOM.WAD -file freedoomstuff.wad -director ...
 """
 
 import argparse
@@ -112,8 +112,8 @@ def main():
         if (nm.startswith("DS") or nm.startswith("DP")) and is_dmx(raw):
             out.append((nm, raw)); n_snd += 1
 
-    # tag as an aiDoom-internal asset pack so the launcher hides it from the user PWAD list
-    out.insert(0, ("AISTUFF", b"aiDoom internal asset pack -- loaded by the game, not a user PWAD\n"))
+    # tag as an BuddyDoom-internal asset pack so the launcher hides it from the user PWAD list
+    out.insert(0, ("AISTUFF", b"BuddyDoom internal asset pack -- loaded by the game, not a user PWAD\n"))
     outp.parent.mkdir(parents=True, exist_ok=True)
     write_wad(outp, out)
     total = sum(len(d) for _n, d in out)

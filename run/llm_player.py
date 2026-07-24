@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-llm_player.py -- the brain for aiDoom's full-LLM player mode (-aiplayer).
+llm_player.py -- the brain for BuddyDoom's full-LLM player mode (-aiplayer).
 
 Connects to the game's agent socket, polls observations at 10 Hz, triggers
 the LLM only on key events (e.g. taking damage, new visible monsters, stuck,

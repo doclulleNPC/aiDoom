@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # patch_turret_sprites.py -- convert the turret sprite lumps (MTUR*) inside
-# run/ID0/aidoom.wad from PNG to real DOOM patch_t format, IN PLACE.
+# run/ID0/buddydoom.wad from PNG to real DOOM patch_t format, IN PLACE.
 #
 # Actor sprites are drawn by the software sprite renderer, which reads patch_t
 # column data directly (patch->width, patch->columnofs, posts).  The buddy HUD's
 # BUF*/RARR* lumps can stay PNG because hu_buddy decodes them at runtime via
 # V_CachePNG, but an *actor* sprite (MT_TURRET -> SPR_MTUR) must be patch_t.
 #
-# Re-run this after any rebuild of aidoom.wad that re-introduces the MTUR PNGs.
+# Re-run this after any rebuild of buddydoom.wad that re-introduces the MTUR PNGs.
 # It is idempotent: lumps already in patch format are left untouched.
 #
 #   python3 tools/patch_turret_sprites.py
@@ -17,7 +17,7 @@ from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
-WAD  = os.path.join(ROOT, "run", "ID0", "aidoom.wad")
+WAD  = os.path.join(ROOT, "run", "ID0", "buddydoom.wad")
 
 def find_iwad():
     for p in ["run/ID0/DOOM.WAD", "run/ID0/DOOM2.WAD", "run/ID0/doom.wad",

@@ -9,7 +9,7 @@
 #   ./start_llm_player.sh [IWAD] [E M]      e.g.  ./start_llm_player.sh DOOM.WAD 1 1
 #
 # Env: PLAYER_PORT (31700), DIRECTOR_PORT (31666), OLLAMA_URL/OLLAMA_MODEL (player brain),
-#      DECISION_SECS.  The director sidecar reads its Ollama host/model from run/aidoom.cfg
+#      DECISION_SECS.  The director sidecar reads its Ollama host/model from run/buddydoom.cfg
 #      (or its own defaults: localhost / ministral-3:8b).
 cd "$(dirname "$0")" || exit 1
 
@@ -20,14 +20,14 @@ PPORT="${PLAYER_PORT:-31700}"
 DPORT="${DIRECTOR_PORT:-31666}"
 export AIPLAYER_PORT="$PPORT"
 
-[ -x ./aidoom ] || { echo "aidoom not found in run/ -- build it first (./build.sh)"; exit 1; }
+[ -x ./buddydoom ] || { echo "buddydoom not found in run/ -- build it first (./build.sh)"; exit 1; }
 
 # director sidecar (LLM monsters + buddy).  Optional: without it the engine still runs
 # its built-in rule director (FSM) for monsters, but the LLM won't drive them or the buddy.
 DIRBIN=./director; [ -x ./director.exe ] && DIRBIN=./director.exe
 HAVE_DIR=0; [ -x "$DIRBIN" ] && HAVE_DIR=1
 
-echo "=== aiDoom FULL LLM mode (E${EP}M${MAP}) ==="
+echo "=== BuddyDoom FULL LLM mode (E${EP}M${MAP}) ==="
 echo "  marine : -aiplayer $PPORT  + llm_player.py   (ollama ${OLLAMA_URL:-http://localhost:11434})"
 if [ "$HAVE_DIR" = 1 ]; then
   echo "  buddy + monsters : -aidirector $DPORT -aicoop + $DIRBIN"
@@ -36,7 +36,7 @@ else
 fi
 
 # The game: marine socket + (LLM) director socket + an AI buddy to command.
-./aidoom -iwad "$IWAD" -warp "$EP" "$MAP" -skill 3 \
+./buddydoom -iwad "$IWAD" -warp "$EP" "$MAP" -skill 3 \
          -aiplayer "$PPORT" -aidirector "$DPORT" -aicoop -nofriendlyfire &
 GAME=$!
 

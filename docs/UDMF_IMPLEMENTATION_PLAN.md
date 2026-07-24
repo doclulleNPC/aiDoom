@@ -279,7 +279,7 @@ Only needed once we want line/thing **specials with parameters** or ACS:
 - **Savegame impact (CLAUDE.md auto-versioning):** `line_t`/`sector_t` are **not**
   in the `p_saveg.c` memcpy signature list, so changing them does **not** bump
   `VERSION_NUM`. But if the Hexen work touches `mobj_t` (e.g. to store thing
-  special/args on the actor), that **will** re-fingerprint `files/aidoom_saveg.sig`
+  special/args on the actor), that **will** re-fingerprint `files/buddydoom_saveg.sig`
   and auto-bump the engine version — expected, not a bug.
 - Phase 1 changes **no** saved struct, so **no savegame break**.
 

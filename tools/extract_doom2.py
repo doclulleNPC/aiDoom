@@ -26,7 +26,7 @@ Usage:
     python3 tools/extract_doom2.py --doom2 X.wad --doom1 Y.wad --out run/doom2stuff.wad
 
 Then play DOOM1 with it:
-    ./aidoom -iwad DOOM.WAD -file doom2stuff.wad -aidirector 31666 ...
+    ./buddydoom -iwad DOOM.WAD -file doom2stuff.wad -aidirector 31666 ...
 The engine auto-detects the DOOM2 sprites and lets the director spawn DOOM2
 monsters (P_Director_SafeType).  `give supershotgun` (or the buddy loadout) hands
 out the SSG.
@@ -117,8 +117,8 @@ def main():
             sound_lumps.append((nm, data2[fp: fp + sz]))
 
     lumps = sprite_lumps + sound_lumps
-    # tag as an aiDoom-internal asset pack so the launcher hides it from the user PWAD list
-    lumps.insert(0, ("AISTUFF", b"aiDoom internal asset pack -- loaded by the game, not a user PWAD\n"))
+    # tag as an BuddyDoom-internal asset pack so the launcher hides it from the user PWAD list
+    lumps.insert(0, ("AISTUFF", b"BuddyDoom internal asset pack -- loaded by the game, not a user PWAD\n"))
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     write_wad(out, lumps)
@@ -127,7 +127,7 @@ def main():
     print(f"  sprites: {len(sprite_lumps)} lumps (full S_START..S_END namespace)")
     print(f"  sounds : {len(sound_lumps)} DOOM2-exclusive DS*/DP* lumps")
     print(f"  total  : {len(lumps)} lumps, {total/1024/1024:.1f} MB")
-    print(f"  play:  ./aidoom -iwad DOOM.WAD -file {out.name} -aidirector 31666 ...")
+    print(f"  play:  ./buddydoom -iwad DOOM.WAD -file {out.name} -aidirector 31666 ...")
     return 0
 
 

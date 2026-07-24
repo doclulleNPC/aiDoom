@@ -27,7 +27,7 @@
 
 set -u
 
-# --- defaults (Ollama IP; overridden by aidoom.cfg below) ---
+# --- defaults (Ollama IP; overridden by buddydoom.cfg below) ---
 MODEL="ministral-3:8b"
 PORT=31666
 EPISODE=1

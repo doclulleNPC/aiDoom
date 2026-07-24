@@ -9,6 +9,6 @@ REM ---------------------------------------------------------------------------
 setlocal
 cd /d "%~dp0"
 
-if not exist "aidoom.exe" ( echo [connect] aidoom.exe not found -- build it first ^(see README^). & pause & exit /b 1 )
+if not exist "buddydoom.exe" ( echo [connect] buddydoom.exe not found -- build it first ^(see README^). & pause & exit /b 1 )
 
-aidoom.exe -connect 192.168.2.10:2342 -netplayers 2 -warp 1 1 %*
+buddydoom.exe -connect 192.168.2.10:2342 -netplayers 2 -warp 1 1 %*

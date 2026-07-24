@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate aidoom.ico -- a stylized DOOM demon/imp face on a dark badge."""
+"""Generate buddydoom.ico -- a stylized DOOM demon/imp face on a dark badge."""
 from PIL import Image, ImageDraw
 
 S = 256
@@ -63,5 +63,5 @@ for i, x in enumerate(range(110, 150, 13)):
 
 # --- save multi-resolution .ico ---
 sizes = [(256, 256), (128, 128), (64, 64), (48, 48), (32, 32), (16, 16)]
-img.save("../aidoom.ico", sizes=sizes)
-print("wrote ../aidoom.ico", sizes)
+img.save("../buddydoom.ico", sizes=sizes)
+print("wrote ../buddydoom.ico", sizes)

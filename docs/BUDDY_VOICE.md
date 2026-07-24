@@ -6,9 +6,9 @@ The voice system is pre-baked. `files/i_voice.c` maps short tags to WAD lumps an
 
 - Buddy persona: `DS*` lumps in the voice PWAD, played through the buddy/positional stream.
 - Director persona: `DD*` lumps, played through the separate director stream.
-- The source voice map currently contains **168 buddy entries**, **52 director entries**, **220 mapped entries total**. The total physical lump count in a particular `aidoom.wad` is an asset snapshot and should be regenerated/checked after a rebake; it is not a source invariant.
+- The source voice map currently contains **168 buddy entries**, **52 director entries**, **220 mapped entries total**. The total physical lump count in a particular `buddydoom.wad` is an asset snapshot and should be regenerated/checked after a rebake; it is not a source invariant.
 
-The WAD is configured with `aidoom_wad`; the legacy `buddy_wad` setting remains accepted. Default lookup uses the normal ID0 path. Lump names are limited to eight bytes; keep the source tag/lump spelling byte-compatible.
+The WAD is configured with `buddydoom_wad`; the legacy `buddy_wad` setting remains accepted. Default lookup uses the normal ID0 path. Lump names are limited to eight bytes; keep the source tag/lump spelling byte-compatible.
 
 ## Two independent streams
 
@@ -75,7 +75,7 @@ Do not infer a tag from prose. Add it to `VOICE_MAP`, ensure the WAD lump is eig
 
 ## Failure modes
 
-- **No audio:** verify `aidoom_wad`, the ID0 search path and the physical lump name.
+- **No audio:** verify `buddydoom_wad`, the ID0 search path and the physical lump name.
 - **One line silently missing:** check `I_Voice_Busy()` and the tier/cooldown gate before blaming the WAD.
 - **Buddy seems to talk over itself:** verify that the observation is not actually Director audio; they use different streams.
 - **Seven/eight character mismatch:** inspect the WAD directory bytes; embedded-NUL padding matters to `W_CheckNumForName`.

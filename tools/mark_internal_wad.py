@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-mark_internal_wad.py -- tag aiDoom's internal asset PWADs with a marker lump so the
+mark_internal_wad.py -- tag BuddyDoom's internal asset PWADs with a marker lump so the
 launcher hides them from the user PWAD dropdown.
 
 freedoomstuff / hereticstuff / hexenstuff / doom2stuff.wad are loaded by the game (or the
@@ -21,7 +21,7 @@ import sys
 from pathlib import Path
 
 MARKER_LUMP = "AISTUFF"
-MARKER_DATA = b"aiDoom internal asset pack -- loaded by the game, not a user PWAD\n"
+MARKER_DATA = b"BuddyDoom internal asset pack -- loaded by the game, not a user PWAD\n"
 
 
 def add_marker(path):

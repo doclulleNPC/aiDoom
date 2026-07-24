@@ -19,7 +19,7 @@ ROOT = os.path.dirname(HERE)
 PK3  = os.path.join(ROOT, "run", "ID0", "SecurityDrone.pk3")
 WAD  = os.path.join(ROOT, "run", "ID0", "buddydoom.wad")
 
-# (pk3 sprite lump, aidoom.wad lump).  DOOM sprite frames must be contiguous from
+# (pk3 sprite lump, buddydoom.wad lump).  DOOM sprite frames must be contiguous from
 # frame 'A'; the pk3's POW1 impact frames are F..J, so remap them to A..E.
 SPRITES = [(n, n) for n in
            ["MNDRA1","MNDRA2","MNDRA3","MNDRA4","MNDRA5","MNDRA6","MNDRA7","MNDRA8",
@@ -27,7 +27,7 @@ SPRITES = [(n, n) for n in
             "MNDRC0","MNDRD0","MNDRE0","MNDRF0","MNDRG0","MNDRH0","SHT1A0","SHT1B0"]] + \
           [("POW1F0","POW1A0"),("POW1G0","POW1B0"),("POW1H0","POW1C0"),
            ("POW1I0","POW1D0"),("POW1J0","POW1E0")]
-# (pk3 sound name, aidoom.wad lump name)  -- lump = "ds"+sfxname, sfxname<=6 chars.
+# (pk3 sound name, buddydoom.wad lump name)  -- lump = "ds"+sfxname, sfxname<=6 chars.
 SOUNDS = [("SECDRON1","DSSECDR1"), ("SECDRON2","DSSECDR2"),
           ("SECDRON3","DSSECDR3"), ("SECDRON4","DSSECDR4")]
 

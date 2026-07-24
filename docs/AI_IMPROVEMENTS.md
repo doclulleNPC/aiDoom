@@ -57,7 +57,7 @@ The rule director also uses objective/exit detection and shared navigation to bi
 
 ## 4. Persistent learning
 
-Not implemented. A file such as `~/.aidoom/ai_memory.dat` remains a proposal and is not part of the current runtime.
+Not implemented. A file such as `~/.buddydoom/ai_memory.dat` remains a proposal and is not part of the current runtime.
 
 If added later, keep learned state out of deterministic gameplay unless it is explicitly versioned/seeded. Prefer a tool-side analytics file first.
 

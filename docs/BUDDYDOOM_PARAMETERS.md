@@ -2,7 +2,7 @@
 
 **Source audit:** 2026-07-22. This file covers the engine options that are actually parsed in the current tree plus persistent keys consumed by the SDL3 tools. Old launcher options are not silently treated as supported.
 
-**Naming note:** The project was previously known as `aiDoom` and has been renamed to **BuddyDoom**. The binary, persistent config filename and voice WAD still use the legacy `aidoom` token until the matching source/build rename lands: `./aidoom` (binary), `run/aidoom.cfg` (config), `aidoom.wad`/`aidoom_wad` (voice asset), `aidoom_config` (config tool), `AIDOOM_VERSION` (version macro, `files/aidoom_version.h`), `~/.aidoom/` (hypothetical user state). Each identifier is listed below with the same spelling the engine uses today.
+**Naming note:** The project was previously known as `BuddyDoom` and has been renamed to **BuddyDoom**. The binary, persistent config filename and voice WAD still use the legacy `buddydoom` token until the matching source/build rename lands: `./buddydoom` (binary), `run/buddydoom.cfg` (config), `buddydoom.wad`/`buddydoom_wad` (voice asset), `buddydoom_config` (config tool), `BUDDYDOOM_VERSION` (version macro, `files/buddydoom_version.h`), `~/.buddydoom/` (hypothetical user state). Each identifier is listed below with the same spelling the engine uses today.
 
 ## Important distinction
 
@@ -90,7 +90,7 @@ Always check `files/d_main.c` and the relevant subsystem before copying a flag i
 
 ## Persistent configuration
 
-The game reads and writes `run/aidoom.cfg` through `files/m_misc.c`. Relevant current keys include:
+The game reads and writes `run/buddydoom.cfg` through `files/m_misc.c`. Relevant current keys include:
 
 ### Buddy and HUD
 
@@ -116,17 +116,17 @@ The current defaults are arrow keys, not the historical bracket/Enter/`d` table:
 
 - `monster_pack` — pack-hunt toggle; default `0`.
 - `monster_pack_range` — pack range; default `2048`.
-- `aidoom_wad` — voice/asset WAD path; the legacy `buddy_wad` key is accepted for compatibility. Default is `aidoom.wad`, resolved through `I_Voice_ResolveWad` and the ID0 lookup.
+- `buddydoom_wad` — voice/asset WAD path; the legacy `buddy_wad` key is accepted for compatibility. Default is `buddydoom.wad`, resolved through `I_Voice_ResolveWad` and the ID0 lookup.
 
 ### Tool-side Ollama/GPU settings
 
-The following are read and written by SDL3 tools such as `tools/aidoom_config.c`, `tools/director.c`, and `tools/gpumon_sdl.c`; the engine preserves them when saving the config but does not use them as gameplay settings:
+The following are read and written by SDL3 tools such as `tools/buddydoom_config.c` (renamed source), `tools/director.c`, and `tools/gpumon_sdl.c`; the engine preserves them when saving the config but does not use them as gameplay settings. The shipped tool binaries still answer to their original names (`buddydoom_config`/`buddydoom_config`, `gpumon`) until the launcher glue is renamed alongside them:
 
 - `ollama_host` — config-app default `localhost`.
 - `ollama_port` — default `11434`.
 - `ollama_model` — config-app default `ministral-3:8b`.
 - `gpu_host` — default `localhost`.
-- `gpu_user` — gpumon's built-in fallback is `lubee`; `aidoom_config` may write an empty value for the user to fill in. Do not assume the two tools have the same default.
+- `gpu_user` — gpumon's built-in fallback is `lubee`; `buddydoom_config` may write an empty value for the user to fill in. Do not assume the two tools have the same default.
 - `gpu_ssh_port` — SSH port used by gpumon.
 
 ## Historical or unsupported options

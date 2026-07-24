@@ -317,7 +317,7 @@ assert len(_dirnames) == len(set(_dirnames)), "duplicate lump name in DIRECTOR"
 # ---------- ElevenLabs API ----------
 
 # Buddy voice id ("Joker-HL").  Stored HERE in tools/ -- it's only needed for the
-# offline bake; the game ships pre-baked OGGs (aidoom.wad) and never does live TTS.
+# offline bake; the game ships pre-baked OGGs (buddydoom.wad) and never does live TTS.
 DEFAULT_VOICE = "wJmFT75XSkFKaBF1R0rX"
 DEFAULT_MODEL = "eleven_turbo_v2_5"
 # ElevenLabs does NOT support ogg_vorbis (their docs say so; we tried).

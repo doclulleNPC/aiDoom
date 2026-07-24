@@ -1,7 +1,7 @@
 // Minimal public-domain MD5 (RFC 1321) -- used by the launcher to verify SIGIL PWADs by
 // checksum.  Self-contained; md5_file_hex() hashes a whole file to a lowercase hex string.
-#ifndef AIDOOM_MD5_H
-#define AIDOOM_MD5_H
+#ifndef BUDDYDOOM_MD5_H
+#define BUDDYDOOM_MD5_H
 
 #include <stdint.h>
 #include <stdio.h>

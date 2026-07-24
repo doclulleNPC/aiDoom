@@ -4,12 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-`aiDoom` (originally `sdldoom-1.10-mod`) — a fork of Sam Lantinga's 1998 SDL port
+`BuddyDoom` (originally `sdldoom-1.10-mod`) — a fork of Sam Lantinga's 1998 SDL port
 of id Software's DOOM (the original 1993 C engine, id Tech 1). The goal of the
 fork is to make the old SDL Doom build and run on modern 64-bit Linux with current
 SDL, then add modifications (hi-res rendering, a video-options menu, …). All source
-lives in `files/`. The window title / app name is set to "aiDoom" in
-`i_video.c` (`SDL_WM_SetCaption`); the build produces a binary named `aidoom`
+lives in `files/`. The window title / app name is set to "BuddyDoom" in
+`i_video.c` (`SDL_WM_SetCaption`); the build produces a binary named `buddydoom`
 (`bin_PROGRAMS` in the Makefile).
 
 ## Build & run
@@ -19,21 +19,21 @@ autotools files (`configure.in`, `Makefile.am/.in`) are **stale** — they targe
 SDL 1.x and won't link SDL3. Use one of:
 
 - **Linux/macOS:** `./build.sh` — compiles `files/*.c` against system SDL3
-  (pkg-config) and **copies the `aidoom` binary into `run/`** (so the launcher
+  (pkg-config) and **copies the `buddydoom` binary into `run/`** (so the launcher
   finds it there). Requires the SDL3 dev package.
-- **Windows:** `nmake /f files\Makefile.msvc` (VS 2019 + SDL3 SDK) → `aidoom.exe`
-  + `SDL3.dll`, with the exe icon from `files/aidoom.rc`. Or
+- **Windows:** `nmake /f files\Makefile.msvc` (VS 2019 + SDL3 SDK) → `buddydoom.exe`
+  + `SDL3.dll`, with the exe icon from `files/buddydoom.rc`. Or
   **`build_all_win.bat`** (repo root) which finds VS via `vswhere`, sets up the
-  **x86** env, and builds the game **plus** the `tools/` apps (`aidoom_config`,
+  **x86** env, and builds the game **plus** the `tools/` apps (`buddydoom_config`,
   `gpumon`, `launcher`), copying every exe + `SDL3.dll` into `run/`.
 - **Any platform (CMake):** `cmake -B build && cmake --build build` —
-  `CMakeLists.txt` builds the game and the `aidoom_config`/`gpumon` tools, finds
+  `CMakeLists.txt` builds the game and the `buddydoom_config`/`gpumon` tools, finds
   SDL3 via `find_package` (a sibling `../SDL3` SDK on Windows, else a system
   install), and stages all binaries + `SDL3.dll` into `run/`.
 
-The game and the **`tools/`** apps (`launcher`, `aidoom_config`, `gpumon_sdl`,
+The game and the **`tools/`** apps (`launcher`, `buddydoom_config`, `gpumon_sdl`,
 `director`) are **separate SDL3 programs**, each with its own `tools/Makefile.msvc`
-target and `tools/build_*_{win,}.sh` script. They share `run/aidoom.cfg` and are
+target and `tools/build_*_{win,}.sh` script. They share `run/buddydoom.cfg` and are
 staged into `run/`; see `run/README.md` for what each one does and how the
 launchers wire the game to the AI director.
 
@@ -44,7 +44,7 @@ cd files && gcc -O2 -g -fcommon -fno-strict-aliasing -std=gnu11 \
   -Wno-implicit-int -Wno-implicit-function-declaration \
   -Wno-int-conversion -Wno-return-mismatch \
   -DSDL_MAIN_HANDLED $(pkg-config --cflags sdl3) \
-  *.c -o aidoom $(pkg-config --libs sdl3) -lm
+  *.c -o buddydoom $(pkg-config --libs sdl3) -lm
 ```
 
 Why the odd flags: the 1996 id source is K&R-ish, so modern gcc needs the
@@ -56,7 +56,7 @@ because `i_main.c` owns `main()`. `build.sh` recompiles every `.c`, so there's n
 header-dependency-tracking pitfall.
 
 **Auto-versioning (in `build.sh`).** Two version numbers bump automatically:
-- **Fork version** (`files/aidoom_version.h`, `AIDOOM_VERSION`, shown in the window
+- **Fork version** (`files/buddydoom_version.h`, `BUDDYDOOM_VERSION`, shown in the window
   title) — the patch field is bumped **+0.0.1 on every build**. Bump major/minor by
   hand when cutting a release tag. The file is auto-generated; expect it dirty after
   every build.
@@ -64,16 +64,16 @@ header-dependency-tracking pitfall.
   headers) — `build.sh` fingerprints the sizes of every struct the savegame
   memcpy's (`p_saveg.c`: `player_t`, `mobj_t`, `ceiling_t`, `vldoor_t`,
   `floormove_t`, `plat_t`, `lightflash_t`, `strobe_t`, `glow_t`) into
-  `files/aidoom_saveg.sig`; when that changes it bumps `VERSION_NUM` **+1 (=+0.01)**
+  `files/buddydoom_saveg.sig`; when that changes it bumps `VERSION_NUM` **+1 (=+0.01)**
   so stale saves are cleanly **rejected** ("bad version") instead of crashing on
   load. So: change any of those structs → engine version auto-bumps.
 
-**App icon:** the live window/taskbar icon is embedded from `files/aidoom.ico`
-into `files/aidoom_icon.h` (a 64×64 RGBA array) and set via `SDL_SetWindowIcon`
-in `i_video.c`; the Windows `.exe` icon comes from `files/aidoom.rc`. Regenerate
+**App icon:** the live window/taskbar icon is embedded from `files/buddydoom.ico`
+into `files/buddydoom_icon.h` (a 64×64 RGBA array) and set via `SDL_SetWindowIcon`
+in `i_video.c`; the Windows `.exe` icon comes from `files/buddydoom.rc`. Regenerate
 the header from the `.ico` with ImageMagick if the icon art changes.
 
-Output binary is `aidoom` (`-iwad <wad>` / auto-detected IWAD; **bring your own**
+Output binary is `buddydoom` (`-iwad <wad>` / auto-detected IWAD; **bring your own**
 IWAD). **Game WADs + savegames live in `run/ID0/`** — the engine/launcher/tools
 search there first, so bare names (`-iwad DOOM.WAD`, `-file doom2stuff.wad`)
 resolve without a path (`d_main.c` IWAD dirs + `w_wad.c` `W_AddFile` ID0/ fallback;
@@ -116,9 +116,9 @@ hi-res port: a `visplane_t` struct change in `r_defs.h` silently didn't take.)
 Run it from a directory containing an IWAD, or point `DOOMWADDIR`/`-iwad` at one:
 
 ```sh
-./aidoom               # auto-detects doom.wad/doom1.wad/doom2.wad/plutonia.wad/tnt.wad
-DOOMWADDIR=/path/to/wads ./aidoom
-./aidoom -iwad DOOM1.WAD -warp 1 1 -skill 4 -fullscreen
+./buddydoom               # auto-detects doom.wad/doom1.wad/doom2.wad/plutonia.wad/tnt.wad
+DOOMWADDIR=/path/to/wads ./buddydoom
+./buddydoom -iwad DOOM1.WAD -warp 1 1 -skill 4 -fullscreen
 ```
 
 Only the stock commercial/shareware IWADs are supported; this port does **not**
@@ -199,7 +199,7 @@ so shots can be placed/headshot; the AI buddy keeps autoaim), plus free-look (mo
   ZMusic/external dep). `MUS_Render` mixes into the same SDL audio path as SFX and
   the OGG music in `i_sound.c`. Output is 11025 Hz stereo S16.
 - **AI buddy + Director voice** — pre-baked ElevenLabs clips packed into the
-  `run/aidoom.wad` PWAD by `tools/bake_buddy_voice.py` (one bake, two personas:
+  `run/buddydoom.wad` PWAD by `tools/bake_buddy_voice.py` (one bake, two personas:
   buddy = **Joker-HL** `DS*` lumps, AI Director = **UT** `DD*` lumps). `i_voice.c`
   plays them by tag on **two separate SDL streams** (buddy positional via
   `I_Voice_Say`; Director "voice of god" via `I_Director_Say`), so both can talk at
@@ -213,7 +213,7 @@ so shots can be placed/headshot; the AI buddy keeps autoaim), plus free-look (mo
 
 There is a large set of design docs at the repo root (one per feature):
 `docs/AGENT_CONTROL.md` (agent/LLM control *design*) and `docs/AIPLAYER.md` (the shipped `-aiplayer`
-*as-built*), `docs/AIDOOM_PARAMETERS.md`, `BUDDY_*.md`, `docs/GPUMON.md`,
+*as-built*), `docs/BUDDYDOOM_PARAMETERS.md`, `BUDDY_*.md`, `docs/GPUMON.md`,
 `docs/Pathfinding.md`, `docs/VISIBILITY_CACHE.md`, `docs/YAPB_ARCHITECTURE.md`, `docs/Collision.md`,
 `docs/HD_TEXTURES.md` (how the `../sdldoom-sdl3` sibling does true-color PNG texture/
 sprite/voxel replacement — a porting reference, not yet implemented here),
@@ -335,7 +335,7 @@ portable game code that calls into them through the `I_*` interface.
   this SDL build — trust the actual `files/*.c` set, not those lists.
 - **WAD lump names are 8 bytes max, with the trailing byte as NUL.** When you
   bake an asset into `*.wad` (e.g. via `tools/bake_buddy_voice.py` for the buddy
-  voice PWAD in `run/aidoom.wad`), every lump name is stored as exactly 8 bytes;
+  voice PWAD in `run/buddydoom.wad`), every lump name is stored as exactly 8 bytes;
   if the human-readable name is shorter than 8 chars, the remaining bytes must be
   `\0`. A 7-char name in the WAD and the same 7-char name as a C string literal
   in the lookup table are equivalent (both pad with NUL), but an **8-char C

@@ -6,7 +6,7 @@ This is the operational reference for the line protocol implemented by `files/p_
 Start BuddyDoom with the director listener:
 
 ```sh
-./run/aidoom -aidirector 31666 -warp 1 1
+./run/buddydoom -aidirector 31666 -warp 1 1
 ```
 
 The port is optional; the default is `31666`. The protocol is plain newline-delimited text over TCP. Queries (`map`, `observe`) receive JSON; mutation commands (`act`, `spawn`, `director`, `buddy`, `reset`, `wake`) receive `ok` when a client is connected. The client polls observations and sends intents; the game loop continues at 35 Hz.

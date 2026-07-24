@@ -189,8 +189,8 @@ def main():
         if is_dmx(raw) and any(k in nm.lower() for k in want):
             out.append(("DS" + nm[:6], raw)); n_snd += 1
 
-    # tag as an aiDoom-internal asset pack so the launcher hides it from the user PWAD list
-    out.insert(0, ("AISTUFF", b"aiDoom internal asset pack -- loaded by the game, not a user PWAD\n"))
+    # tag as an BuddyDoom-internal asset pack so the launcher hides it from the user PWAD list
+    out.insert(0, ("AISTUFF", b"BuddyDoom internal asset pack -- loaded by the game, not a user PWAD\n"))
     op.parent.mkdir(parents=True, exist_ok=True)
     write_wad(op, out)
     total = sum(len(d) for _n, d in out)

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # gen_id24.py -- generate files/id24_gen.h from the official ID24 data tables
-# (docs/ID24 0.99.1/.../id24data.cpp).  Emits aiDoom-format sprite/sound/state/
+# (docs/ID24 0.99.1/.../id24data.cpp).  Emits BuddyDoom-format sprite/sound/state/
 # mobj tables with cross-references self-describingly ENCODED so the runtime
 # installer (files/id24.c) can resolve them against the dynamically-grown tables.
 #

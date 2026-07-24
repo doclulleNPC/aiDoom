@@ -1,4 +1,4 @@
-# aiDoom
+# BuddyDoom
 
 A modernized fork of **SDL DOOM** (Sam Lantinga's 1998 SDL port of id Software's
 1993 DOOM engine, *id Tech 1*), brought up to **64-bit, SDL3, and Windows-native**,
@@ -9,7 +9,7 @@ a language model drive monster tactics in real time.
 > the new work lives in the platform layer (`files/i_*.c`) and a few self-contained
 > modules.
 
-![aiDoom — hi-res DOOM with the LLM AI Director and GPU monitor](hero2.png)
+![BuddyDoom — hi-res DOOM with the LLM AI Director and GPU monitor](hero2.png)
 
 ## Features
 
@@ -46,7 +46,7 @@ a language model drive monster tactics in real time.
   *SecurityDrone.pk3*). It aggressively charges and lasers everything nearby; one at a time.
 - **Pack-hunt monster AI** (`p_enemy.c`, `monster_pack`) — an optional aggressive mode,
   **off by default** (a no-argument launch is plain **vanilla 1993 DOOM** AI): set
-  `monster_pack 1` in `aidoom.cfg` to enable it — then monsters acquire the player the
+  `monster_pack 1` in `buddydoom.cfg` to enable it — then monsters acquire the player the
   instant they spawn (searching even with no line of sight) and steer toward nearby
   allies en route, so they gather and assault in groups.
 - **LLM AI Director** (`files/p_ai_llm.c`) — an external director drives monster
@@ -87,7 +87,7 @@ a language model drive monster tactics in real time.
 
 ### Everything at once (CMake — any platform/toolchain)
 
-One `CMakeLists.txt` builds the game **and** both tools (`aidoom_config`,
+One `CMakeLists.txt` builds the game **and** both tools (`buddydoom_config`,
 `gpumon`), finds SDL3 via `find_package` (defaults to a sibling `../SDL3` SDK on
 Windows, else a system install), and stages every binary + `SDL3.dll` into `run/`:
 
@@ -119,12 +119,12 @@ nmake /f Makefile.msvc                 REM SDL = C:\Source\SDL3 by default
 nmake /f Makefile.msvc SDL=C:\path\to\SDL3
 ```
 
-This produces `aidoom.exe` (with the app icon embedded from `aidoom.rc`/`aidoom.ico`)
+This produces `buddydoom.exe` (with the app icon embedded from `buddydoom.rc`/`buddydoom.ico`)
 and copies `SDL3.dll` next to it.
 
-To build the game **and** both tools (`aidoom_config`, `gpumon`) in one go and stage
+To build the game **and** both tools (`buddydoom_config`, `gpumon`) in one go and stage
 everything into `run\`, run **`build_all_win.bat`** from the repo root (it locates VS
-2019 automatically). All three exes embed the aiDoom icon.
+2019 automatically). All three exes embed the BuddyDoom icon.
 
 Alternatively, build with **MinGW-w64** (on Windows in MSYS2, or cross-compiling from
 Linux) — this also embeds the icon, via `windres`:
@@ -135,7 +135,7 @@ SDL3=/path/to/SDL3-devel-3.x.y-mingw/x86_64-w64-mingw32 ./build_win.sh
 
 ## Run
 
-aiDoom needs a DOOM **IWAD** (`doom1.wad`, `doom.wad`, `doom2.wad`, `tnt.wad`,
+BuddyDoom needs a DOOM **IWAD** (`doom1.wad`, `doom.wad`, `doom2.wad`, `tnt.wad`,
 `plutonia.wad`, Freedoom, …) — **bring your own**; IWADs are copyrighted id Software
 data and are not distributed here. The shareware `doom1.wad` is freely available.
 
@@ -144,21 +144,21 @@ bare names resolve without a path). Savegames are written there too. The engine
 looks for an IWAD in this order:
 
 1. **`-iwad <file>`** on the command line (also tried under `ID0/`)
-2. the **`iwad`** value in `aidoom.cfg` (set it in the config/launcher app)
+2. the **`iwad`** value in `buddydoom.cfg` (set it in the config/launcher app)
 3. **`ID0/`** → an **`iwads/`** subfolder → the working directory (and `$DOOMWADDIR`)
 4. a **Steam** install (Ultimate Doom / Doom 2 / Final Doom, Linux & Windows paths)
 
 ```bat
-aidoom.exe -warp 1 1 -skill 4
-aidoom.exe -warp 1 1 -skill 4 -aidemo            REM built-in scripted director
-aidoom.exe -warp 1 1 -skill 4 -aidirector 31666  REM open the TCP director server
+buddydoom.exe -warp 1 1 -skill 4
+buddydoom.exe -warp 1 1 -skill 4 -aidemo            REM built-in scripted director
+buddydoom.exe -warp 1 1 -skill 4 -aidirector 31666  REM open the TCP director server
 ```
 
-On Linux/macOS it's the same flags, `./aidoom` (the binary `build.sh` puts in `run/`):
+On Linux/macOS it's the same flags, `./buddydoom` (the binary `build.sh` puts in `run/`):
 
 ```sh
-./aidoom -warp 1 1 -skill 4 -aidemo
-./aidoom -warp 1 1 -skill 3 -aicoop          # add an AI-controlled co-op buddy
+./buddydoom -warp 1 1 -skill 4 -aidemo
+./buddydoom -warp 1 1 -skill 3 -aicoop          # add an AI-controlled co-op buddy
 ```
 
 ### LLM-driven monsters (Ollama)
@@ -172,15 +172,15 @@ and kept as a backup in **`tools/scripts/`**:
 
 ```sh
 run/launcher                               # preferred: GUI launcher
-tools/scripts/start_aidoom.sh              # backup: scripted launch (default ministral-3:8b)
-tools/scripts/start_aidoom.sh --offline    # just the game, no LLM
+tools/scripts/start_buddydoom.sh              # backup: scripted launch (default ministral-3:8b)
+tools/scripts/start_buddydoom.sh --offline    # just the game, no LLM
 ```
 
-On Linux/macOS use `run/start_aidoom.sh` (same idea — waits for Ollama, then starts
+On Linux/macOS use `run/start_buddydoom.sh` (same idea — waits for Ollama, then starts
 game + director; see `run/README.md`):
 
 ```sh
-run/start_aidoom.sh --skill 4 --infight
+run/start_buddydoom.sh --skill 4 --infight
 ```
 
 The director protocol (`observe` / `act` / `wake`) and design rationale are documented
@@ -190,7 +190,7 @@ in **AGENT_CONTROL.md** §12–13 and **MONSTER_AGENT_GUIDE.md**.
 
 ## Networked multiplayer (Chocolate/Crispy-compatible)
 
-aiDoom speaks the **Chocolate-Doom network protocol** (a clean-room reimplementation
+BuddyDoom speaks the **Chocolate-Doom network protocol** (a clean-room reimplementation
 in `files/i_udp.c` + `files/d_netcl.c` — packet/UDP layer and the client connection
 state machine: SYN → lobby → launch → gamestart → lockstep GAMEDATA). It connects as
 a **client to a `chocolate-server`** (the relay shipped with Chocolate Doom), so it
@@ -198,21 +198,21 @@ can play alongside Chocolate/Crispy Doom peers.
 
 ```sh
 chocolate-server &                                   # the relay (UDP :2342)
-./aidoom -connect <host[:port]> -warp 1 1 -skill 3   # join and play
-./aidoom -connect host "Chocolate Doom 3.1.0"        # match the server's version string
-./aidoom -connect host -netplayers 2                 # wait for N players before launch (default 1)
+./buddydoom -connect <host[:port]> -warp 1 1 -skill 3   # join and play
+./buddydoom -connect host "Chocolate Doom 3.1.0"        # match the server's version string
+./buddydoom -connect host -netplayers 2                 # wait for N players before launch (default 1)
 ```
 
 **AI co-op buddy:** single-player only. `-aicoop` is **ignored in netgames** — network
 games run without the buddy (clean lockstep, no extra player slot). Use the buddy in
-solo play (`./aidoom -aicoop -warp 1 1`).
+solo play (`./buddydoom -aicoop -warp 1 1`).
 
 Diagnostics (connect, print, exit — no game):
 
 ```sh
-./aidoom -querychoc <host[:port]>          # query a server (name/version/players)
-./aidoom -chocsyn   <host[:port]> [ver]    # SYN handshake test
-./aidoom -netclient <host[:port]> [ver]    # full connect→launch→gamestart→GAMEDATA self-test
+./buddydoom -querychoc <host[:port]>          # query a server (name/version/players)
+./buddydoom -chocsyn   <host[:port]> [ver]    # SYN handshake test
+./buddydoom -netclient <host[:port]> [ver]    # full connect→launch→gamestart→GAMEDATA self-test
 ```
 
 Verified against the real `chocolate-server` (wire query, full join, and a clean
@@ -225,7 +225,7 @@ Adds a second marine (player 2) controlled by a built-in bot — a real co-op pe
 so weapons, damage, item pickups and respawning all work.
 
 ```sh
-./aidoom -warp 1 1 -skill 3 -aicoop      # or run/start_aidoom.sh (on by default)
+./buddydoom -warp 1 1 -skill 3 -aicoop      # or run/start_buddydoom.sh (on by default)
 ```
 
 Behaviour (intentionally simple — straight-line movement, no pathfinding):
@@ -277,12 +277,12 @@ companion) can be toggled live from the console: `director on` / `director off` 
 
 ## Configuration
 
-Everything lives in **one file, `aidoom.cfg`, in the working folder** (next to the
+Everything lives in **one file, `buddydoom.cfg`, in the working folder** (next to the
 binary — i.e. `run/`). A small **SDL3 settings editor** edits it in a window:
 
 ```sh
-tools/build_config.sh        # Linux: builds tools/aidoom_config and copies it into run/
-run/aidoom_config            # run it from run/ (reads/writes run/aidoom.cfg)
+tools/build_config.sh        # Linux: builds tools/buddydoom_config and copies it into run/
+run/buddydoom_config            # run it from run/ (reads/writes run/buddydoom.cfg)
 ```
 
 On Windows the config editor (and the GPU monitor) are built by the CMake build or
@@ -294,7 +294,7 @@ On Windows the config editor (and the GPU monitor) are built by the CMake build 
 - **IWAD** — pick which WAD to play from the ones it finds (`iwads/`, the folder,
   Steam) or leave it on *auto*; the choice is saved as `iwad` and the game uses it.
 - **Ollama host / port / model** — read by the AI-Director tools
-  (`director`, `gpumon`, `run/start_aidoom.{sh,ps1}`).
+  (`director`, `gpumon`, `run/start_buddydoom.{sh,ps1}`).
 - **GPU monitor (SSH)** — host / user / port of the (remote) Ollama machine, plus a
   **Copy SSH key** button that installs your public key there (so the GPU monitor's
   `nvidia-smi`-over-SSH works without a password).
@@ -306,9 +306,9 @@ See **GPUMON.md**.
 
 ![The GPU monitor — live load / VRAM / temperature / power of the Ollama box over SSH](gpumon.png)
 
-The **game** reads/writes the same `aidoom.cfg` from its working directory, and the
+The **game** reads/writes the same `buddydoom.cfg` from its working directory, and the
 config app preserves any keys it doesn't manage (so neither side clobbers the
-other). If `aidoom.cfg` is missing, the game starts with built-in defaults and
+other). If `buddydoom.cfg` is missing, the game starts with built-in defaults and
 writes one on exit; the editor shows those defaults too.
 
 ## Documentation

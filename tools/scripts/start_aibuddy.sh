@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# start_aibuddy.sh -- launch aiDoom with the AI/LLM co-op buddy.
+# start_aibuddy.sh -- launch BuddyDoom with the AI/LLM co-op buddy.
 #
 # Starts BOTH halves: the game with -aicoop + the AI-director TCP server, and the
 # native director (run/director) that drives the buddy's (and the monsters')
@@ -8,13 +8,13 @@
 # Ctrl-C) stops the game.
 #
 #   offline rule-based buddy instead?   ./start_buddy.sh        (no LLM)
-#   full launcher (model warmup, etc.)? ./start_aidoom.sh --aicoop
+#   full launcher (model warmup, etc.)? ./start_buddydoom.sh --aicoop
 #
 # Default IWAD is doom.wad (DOOM1, Registered/Retail format).  Override with:
 #   ./start_aibuddy.sh -iwad doom2.wad
 #   ./start_aibuddy.sh -iwad /path/to/some.wad
 #
-# Ollama host/port/model come from aidoom.cfg; override with:
+# Ollama host/port/model come from buddydoom.cfg; override with:
 #   ./start_aibuddy.sh --ollama http://localhost:11434 --model qwen3:8b
 # Any other args pass straight to the game (default warp: E1M1 in doom.wad):
 #   ./start_aibuddy.sh -warp 3 1 -skill 4
@@ -34,10 +34,10 @@ for c in ./doom.wad ../files/doom.wad; do
     [ -f "$c" ] && { IWAD="$c"; break; }
 done
 
-# Ollama defaults from aidoom.cfg (next to this script), then built-in fallbacks.
-HOST=$(awk '$1=="ollama_host"{print $2}'  aidoom.cfg 2>/dev/null | tail -1)
-OPORT=$(awk '$1=="ollama_port"{print $2}' aidoom.cfg 2>/dev/null | tail -1)
-MODEL=$(awk '$1=="ollama_model"{print $2}' aidoom.cfg 2>/dev/null | tail -1)
+# Ollama defaults from buddydoom.cfg (next to this script), then built-in fallbacks.
+HOST=$(awk '$1=="ollama_host"{print $2}'  buddydoom.cfg 2>/dev/null | tail -1)
+OPORT=$(awk '$1=="ollama_port"{print $2}' buddydoom.cfg 2>/dev/null | tail -1)
+MODEL=$(awk '$1=="ollama_model"{print $2}' buddydoom.cfg 2>/dev/null | tail -1)
 [ -n "$HOST" ]  || HOST=localhost
 [ -n "$OPORT" ] || OPORT=11434
 [ -n "$MODEL" ] || MODEL=ministral-3:8b
@@ -63,8 +63,8 @@ if [ -n "$IWAD" ]; then
 fi
 
 # Locate the binaries (run/ first, then the build dirs).
-for c in ./aidoom ../files/aidoom; do [ -x "$c" ] && { AIDOOM="$c"; break; }; done
-[ -n "${AIDOOM:-}" ] || { echo "[aibuddy] aidoom not found -- build it: ./build.sh" >&2; exit 1; }
+for c in ./buddydoom ../files/buddydoom; do [ -x "$c" ] && { BUDDYDOOM="$c"; break; }; done
+[ -n "${BUDDYDOOM:-}" ] || { echo "[aibuddy] buddydoom not found -- build it: ./build.sh" >&2; exit 1; }
 DIRBIN=./director; [ -x "$DIRBIN" ] || DIRBIN=../tools/director
 [ -x "$DIRBIN" ]   || { echo "[aibuddy] director not found -- build it: tools/build_director.sh" >&2; exit 1; }
 
@@ -78,8 +78,8 @@ done
 [ "$skill" = 1 ] || GAME_ARGS=(-skill 4 ${GAME_ARGS[@]+"${GAME_ARGS[@]}"})
 [ "$warp"  = 1 ] || GAME_ARGS=(-warp 1 1 ${GAME_ARGS[@]+"${GAME_ARGS[@]}"})
 
-echo "[aibuddy] game:     $AIDOOM -aicoop -aidirector $PORT ${GAME_ARGS[*]}"
-"$AIDOOM" -aicoop -aidirector "$PORT" "${GAME_ARGS[@]}" &
+echo "[aibuddy] game:     $BUDDYDOOM -aicoop -aidirector $PORT ${GAME_ARGS[*]}"
+"$BUDDYDOOM" -aicoop -aidirector "$PORT" "${GAME_ARGS[@]}" &
 GAME_PID=$!
 trap 'kill "$GAME_PID" 2>/dev/null' EXIT INT TERM
 

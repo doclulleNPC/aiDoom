@@ -8,11 +8,11 @@ The agent drives player 1 in single-player mode. It is deterministic and tic-loc
 
 ## 1. Startup and modes
 
-The `-aiplayer` mode currently listens as `./aidoom` (the legacy binary name; the project was renamed from `aiDoom` to **BuddyDoom** but the binary path was not changed in the same patch). The launch examples below will become `./buddydoom` once the matching source/build rename lands.
+The `-aiplayer` mode currently listens as `./buddydoom` (the legacy binary name; the project was renamed from `BuddyDoom` to **BuddyDoom** but the binary path was not changed in the same patch). The launch examples below will become `./buddydoom` once the matching source/build rename lands.
 
 ```sh
-./aidoom -aiplayer 31700
-./aidoom -aiplayer demo
+./buddydoom -aiplayer 31700
+./buddydoom -aiplayer demo
 ```
 
 The argument is optional: omitted/invalid port syntax uses the default TCP port `31700`; `demo` selects the built-in scripted brain. Startup is initialized from `files/d_main.c` through `G_AgentInit`.
