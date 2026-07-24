@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=BuddyDoom
+Comment=DOOM with LLM AI Director & AI Co-op Buddy
+Exec=/home/dulli/Source/aidoom/run/launcher
+Icon=/home/dulli/Source/aidoom/icon.png
+Terminal=false
+Type=Application
+Categories=Game;ActionGame;
+StartupNotify=true
