@@ -3,5 +3,5 @@
 // tag (and the patch keeps counting builds from there).
 #ifndef __BUDDYDOOM_VERSION__
 #define __BUDDYDOOM_VERSION__
-#define BUDDYDOOM_VERSION "0.11.6"
+#define BUDDYDOOM_VERSION "0.11.7"
 #endif

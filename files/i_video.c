@@ -572,7 +572,7 @@ static void I_DrawControlsOverlay (void)
 
     // dim the whole frame
     SDL_SetRenderDrawBlendMode (renderer, SDL_BLENDMODE_BLEND);
-    SDL_SetRenderDrawColor (renderer, 6, 8, 14, 234);
+    SDL_SetRenderDrawColor (renderer, 12, 6, 6, 236);	// warm near-black dim panel
     { SDL_FRect p = {0, 0, W, H}; SDL_RenderFillRect (renderer, &p); }
 
     // rows fill ~82% of the height between a title band and a footer -> adapts to any res
@@ -585,7 +585,7 @@ static void I_DrawControlsOverlay (void)
 
     // title, centred and a bit larger
     tw = (float)strlen(title) * (cw*1.7f);
-    SDL_SetTextureColorMod (confont, 255, 205, 110);
+    SDL_SetTextureColorMod (confont, 216, 44, 28);	// DOOM-red title
     I_ConDrawText ((W - tw)*0.5f, H*0.03f, title, cw*1.7f, ch*1.7f);
 
     y = H * 0.12f;
@@ -594,22 +594,22 @@ static void I_DrawControlsOverlay (void)
 	boolean issel = (i == sel);
 	if (issel)
 	{
-	    SDL_SetRenderDrawColor (renderer, 70, 58, 22, 235);
+	    SDL_SetRenderDrawColor (renderer, 78, 14, 14, 235);	// dark-red highlight bar
 	    { SDL_FRect hb = { lx - cw, y - rowh*0.12f, (kx + W*0.16f) - (lx - cw), rowh }; SDL_RenderFillRect (renderer, &hb); }
 	}
-	SDL_SetTextureColorMod (confont, issel?255:198, issel?236:205, issel?165:216);
+	SDL_SetTextureColorMod (confont, issel?255:184, issel?96:34, issel?64:24);	// DOOM red (bright when selected)
 	I_ConDrawText (lx, y, M_Controls_Label (i), cw, ch);
 
 	if (issel && M_Controls_Capturing ())
 	{
-	    SDL_SetTextureColorMod (confont, 120, 240, 120);
+	    SDL_SetTextureColorMod (confont, 255, 132, 84);	// "< press a key >" -- bright red, active
 	    I_ConDrawText (kx, y, "< press a key >", cw, ch);
 	}
 	else
 	{
 	    M_Controls_KeyName (i, keybuf, sizeof keybuf);
 	    if (!keybuf[0]) { keybuf[0]='-'; keybuf[1]='-'; keybuf[2]='-'; keybuf[3]=0; }
-	    SDL_SetTextureColorMod (confont, 255, 220, 150);
+	    SDL_SetTextureColorMod (confont, 236, 104, 64);	// value: warmer/lighter red
 	    I_ConDrawText (kx, y, keybuf, cw, ch);
 	}
     }
@@ -619,15 +619,15 @@ static void I_DrawControlsOverlay (void)
 	boolean issel = (sel == n);
 	if (issel)
 	{
-	    SDL_SetRenderDrawColor (renderer, 70, 30, 30, 235);
+	    SDL_SetRenderDrawColor (renderer, 90, 16, 16, 235);	// reset row: dark-red bar
 	    { SDL_FRect hb = { lx - cw, y - rowh*0.12f, (kx + W*0.16f) - (lx - cw), rowh }; SDL_RenderFillRect (renderer, &hb); }
 	}
-	SDL_SetTextureColorMod (confont, issel?255:210, issel?150:120, issel?150:120);
+	SDL_SetTextureColorMod (confont, issel?255:206, issel?96:48, issel?64:34);	// reset row: red
 	I_ConDrawText (lx, y, "Reset all to defaults", cw, ch);
     }
 
     // footer hint
-    SDL_SetTextureColorMod (confont, 150, 160, 180);
+    SDL_SetTextureColorMod (confont, 156, 78, 66);	// dim red footer
     I_ConDrawText (lx, H*0.955f,
 		   "Up/Down: move   Enter: rebind   Bksp: clear   Esc: back",
 		   cw*0.85f, ch*0.85f);
@@ -651,7 +651,7 @@ static void I_DrawVideoOverlay (void)
     sel = M_Video_Sel ();
 
     SDL_SetRenderDrawBlendMode (renderer, SDL_BLENDMODE_BLEND);
-    SDL_SetRenderDrawColor (renderer, 6, 8, 14, 234);
+    SDL_SetRenderDrawColor (renderer, 12, 6, 6, 236);	// warm near-black dim panel
     { SDL_FRect p = {0, 0, W, H}; SDL_RenderFillRect (renderer, &p); }
 
     rowh = (H * 0.74f) / (float)n;		// fewer rows than Controls -> a bit larger
@@ -661,7 +661,7 @@ static void I_DrawVideoOverlay (void)
     vx   = W * 0.60f;
 
     tw = (float)strlen(title) * (cw*1.7f);
-    SDL_SetTextureColorMod (confont, 255, 205, 110);
+    SDL_SetTextureColorMod (confont, 216, 44, 28);	// DOOM-red title
     I_ConDrawText ((W - tw)*0.5f, H*0.05f, title, cw*1.7f, ch*1.7f);
 
     y = H * 0.17f;
@@ -670,14 +670,14 @@ static void I_DrawVideoOverlay (void)
 	boolean issel = (i == sel);
 	if (issel)
 	{
-	    SDL_SetRenderDrawColor (renderer, 70, 58, 22, 235);
+	    SDL_SetRenderDrawColor (renderer, 78, 14, 14, 235);	// dark-red highlight bar
 	    { SDL_FRect hb = { lx - cw, y - rowh*0.12f, (vx + W*0.20f) - (lx - cw), rowh }; SDL_RenderFillRect (renderer, &hb); }
 	}
-	SDL_SetTextureColorMod (confont, issel?255:198, issel?236:205, issel?165:216);
+	SDL_SetTextureColorMod (confont, issel?255:184, issel?96:34, issel?64:24);	// DOOM red (bright when selected)
 	I_ConDrawText (lx, y, M_Video_Label (i), cw, ch);
 
 	M_Video_Value (i, valbuf, sizeof valbuf);
-	SDL_SetTextureColorMod (confont, 255, 220, 150);
+	SDL_SetTextureColorMod (confont, 236, 104, 64);	// value: warmer/lighter red
 	if (issel)		// draw < value > to hint left/right cycling
 	{
 	    char withar[48];
@@ -688,7 +688,7 @@ static void I_DrawVideoOverlay (void)
 	    I_ConDrawText (vx, y, valbuf, cw, ch);
     }
 
-    SDL_SetTextureColorMod (confont, 150, 160, 180);
+    SDL_SetTextureColorMod (confont, 156, 78, 66);	// dim red footer
     I_ConDrawText (lx, H*0.955f,
 		   "Up/Down: move   Left/Right: change   Esc: back",
 		   cw*0.85f, ch*0.85f);
