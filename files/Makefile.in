@@ -68,12 +68,12 @@ VERSION = @VERSION@
 EXTRA_DIST =  	Changelog			DOOMLIC.TXT			FILES				FILES2				README.SDL			README.asm			README.b			README.book			README.gl			TODO
 
 
-bin_PROGRAMS = aidoom
+bin_PROGRAMS = buddydoom
 
-aidoom_SOURCES =  	am_map.c			am_map.h			d_englsh.h			d_event.h			d_french.h			d_items.c			d_items.h			d_main.c			d_main.h			d_net.c				d_net.h				d_player.h			d_textur.h			d_think.h			d_ticcmd.h			doomdata.h			doomdef.c			doomdef.h			doomstat.c			doomstat.h			doomtype.h			dstrings.c			dstrings.h			f_finale.c			f_finale.h			f_wipe.c			f_wipe.h			g_game.c			g_game.h			hu_lib.c			hu_lib.h			hu_stuff.c			hu_stuff.h			i_main.c			i_net.c				i_net.h				i_sound.c			i_sound.h			i_system.c			i_system.h			i_video.c			i_video.h			info.c				info.h				m_argv.c			m_argv.h			m_bbox.c			m_bbox.h			m_cheat.c			m_cheat.h			m_fixed.c			m_fixed.h			m_menu.c			m_menu.h			m_misc.c			m_misc.h			m_random.c			m_random.h			m_swap.c			m_swap.h			p_ceilng.c			p_doors.c			p_enemy.c			p_floor.c			p_inter.c						p_ai_llm.c			p_ai_llm.h			p_inter.h			p_lights.c			p_local.h			p_map.c				p_maputl.c			p_mobj.c			p_mobj.h			p_plats.c			p_pspr.c			p_pspr.h			p_saveg.c			p_saveg.h			p_setup.c			p_setup.h			p_sight.c			p_spec.c			p_spec.h			p_switch.c			p_telept.c			p_tick.c			p_tick.h			p_user.c			r_bsp.c				r_bsp.h				r_data.c			r_data.h			r_defs.h			r_draw.c			r_draw.h			r_local.h			r_main.c			r_main.h			r_plane.c			r_plane.h			r_segs.c			r_segs.h			r_sky.c				r_sky.h				r_state.h			r_things.c			r_things.h			s_sound.c			s_sound.h			sounds.c			sounds.h			st_lib.c			st_lib.h			st_stuff.c			st_stuff.h			tables.c			tables.h			v_video.c			v_video.h			w_wad.c				w_wad.h				wi_stuff.c			wi_stuff.h			z_zone.c			z_zone.h
+buddydoom_SOURCES =  	am_map.c			am_map.h			d_englsh.h			d_event.h			d_french.h			d_items.c			d_items.h			d_main.c			d_main.h			d_net.c				d_net.h				d_player.h			d_textur.h			d_think.h			d_ticcmd.h			doomdata.h			doomdef.c			doomdef.h			doomstat.c			doomstat.h			doomtype.h			dstrings.c			dstrings.h			f_finale.c			f_finale.h			f_wipe.c			f_wipe.h			g_game.c			g_game.h			hu_lib.c			hu_lib.h			hu_stuff.c			hu_stuff.h			i_main.c			i_net.c				i_net.h				i_sound.c			i_sound.h			i_system.c			i_system.h			i_video.c			i_video.h			info.c				info.h				m_argv.c			m_argv.h			m_bbox.c			m_bbox.h			m_cheat.c			m_cheat.h			m_fixed.c			m_fixed.h			m_menu.c			m_menu.h			m_misc.c			m_misc.h			m_random.c			m_random.h			m_swap.c			m_swap.h			p_ceilng.c			p_doors.c			p_enemy.c			p_floor.c			p_inter.c						p_ai_llm.c			p_ai_llm.h			p_inter.h			p_lights.c			p_local.h			p_map.c				p_maputl.c			p_mobj.c			p_mobj.h			p_plats.c			p_pspr.c			p_pspr.h			p_saveg.c			p_saveg.h			p_setup.c			p_setup.h			p_sight.c			p_spec.c			p_spec.h			p_switch.c			p_telept.c			p_tick.c			p_tick.h			p_user.c			r_bsp.c				r_bsp.h				r_data.c			r_data.h			r_defs.h			r_draw.c			r_draw.h			r_local.h			r_main.c			r_main.h			r_plane.c			r_plane.h			r_segs.c			r_segs.h			r_sky.c				r_sky.h				r_state.h			r_things.c			r_things.h			s_sound.c			s_sound.h			sounds.c			sounds.h			st_lib.c			st_lib.h			st_stuff.c			st_stuff.h			tables.c			tables.h			v_video.c			v_video.h			w_wad.c				w_wad.h				wi_stuff.c			wi_stuff.h			z_zone.c			z_zone.h
 
 
-aidoom_LDADD = -lm
+buddydoom_LDADD = -lm
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 mkinstalldirs = $(SHELL) $(top_srcdir)/mkinstalldirs
 CONFIG_CLEAN_FILES = 
@@ -84,7 +84,7 @@ DEFS = @DEFS@ -I. -I$(srcdir)
 CPPFLAGS = @CPPFLAGS@
 LDFLAGS = @LDFLAGS@
 LIBS = @LIBS@
-aidoom_OBJECTS =  am_map.o d_items.o d_main.o d_net.o doomdef.o doomstat.o \
+buddydoom_OBJECTS =  am_map.o d_items.o d_main.o d_net.o doomdef.o doomstat.o \
 dstrings.o f_finale.o f_wipe.o g_game.o hu_lib.o hu_stuff.o i_main.o \
 i_net.o i_sound.o i_system.o i_video.o info.o m_argv.o m_bbox.o \
 m_cheat.o m_fixed.o m_menu.o m_misc.o m_random.o m_swap.o p_ceilng.o \
@@ -93,8 +93,8 @@ p_mobj.o p_plats.o p_pspr.o p_saveg.o p_setup.o p_sight.o p_spec.o \
 p_switch.o p_telept.o p_tick.o p_user.o r_bsp.o r_data.o r_draw.o \
 r_main.o r_plane.o r_segs.o r_sky.o r_things.o s_sound.o sounds.o \
 st_lib.o st_stuff.o tables.o v_video.o w_wad.o wi_stuff.o z_zone.o
-aidoom_DEPENDENCIES = 
-aidoom_LDFLAGS = 
+buddydoom_DEPENDENCIES = 
+buddydoom_LDFLAGS = 
 CFLAGS = @CFLAGS@
 COMPILE = $(CC) $(DEFS) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
 CCLD = $(CC)
@@ -107,8 +107,8 @@ DISTFILES = $(DIST_COMMON) $(SOURCES) $(HEADERS) $(TEXINFOS) $(EXTRA_DIST)
 
 TAR = gtar
 GZIP_ENV = --best
-SOURCES = $(aidoom_SOURCES)
-OBJECTS = $(aidoom_OBJECTS)
+SOURCES = $(buddydoom_SOURCES)
+OBJECTS = $(buddydoom_OBJECTS)
 
 all: all-redirect
 .SUFFIXES:
@@ -172,9 +172,9 @@ distclean-compile:
 
 maintainer-clean-compile:
 
-aidoom: $(aidoom_OBJECTS) $(aidoom_DEPENDENCIES)
+buddydoom: $(buddydoom_OBJECTS) $(buddydoom_DEPENDENCIES)
 	@rm -f doom
-	$(LINK) $(aidoom_LDFLAGS) $(aidoom_OBJECTS) $(aidoom_LDADD) $(LIBS)
+	$(LINK) $(buddydoom_LDFLAGS) $(buddydoom_OBJECTS) $(buddydoom_LDADD) $(LIBS)
 
 tags: TAGS
 
