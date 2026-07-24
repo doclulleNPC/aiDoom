@@ -59,6 +59,7 @@ extern int key_buddy_stay;	// '-' defers to this buddy bind (G_Responder) instea
 #include "sounds.h"
 
 #include "m_menu.h"
+#include "m_controls.h"		// Options -> Controls (in-game key bindings)
 
 
 
@@ -355,8 +356,11 @@ enum
     option_empty2,
     soundvol,
     vidoption,
+    controls,
     opt_end
 } options_e;
+
+void M_ControlsMenu(int choice);
 
 menuitem_t OptionsMenu[]=
 {
@@ -368,7 +372,8 @@ menuitem_t OptionsMenu[]=
     {2,"",	M_ChangeSensitivity,'m'},
     {-1,"",0},
     {1,"",	M_Sound,'s'},
-    {1,"",	M_Video,'v'}
+    {1,"",	M_Video,'v'},
+    {1,"",	M_ControlsMenu,'c'}
 };
 
 menu_t  OptionsDef =
@@ -1018,6 +1023,18 @@ void M_DrawOptions(void)
     M_WriteText (x, y+LINEHEIGHT*soundvol, "Sound Volume");
 
     M_WriteText (x, y+LINEHEIGHT*vidoption, "Video");
+
+    M_WriteText (x, y+LINEHEIGHT*controls, "Controls");
+}
+
+//
+// Options -> Controls: hand off to the SDL-overlay key-bindings screen
+// (m_controls.c owns state/input; i_video.c draws it with the TTF atlas).
+//
+void M_ControlsMenu(int choice)
+{
+    choice = 0;
+    M_Controls_Open ();
 }
 
 
@@ -1978,6 +1995,11 @@ void M_Drawer (void)
     short		max;
     char		string[40];
     int			start;
+
+    // The Controls (key-bindings) screen replaces the classic menu with its own
+    // crisp SDL/TTF overlay (drawn in i_video.c) -- don't draw the paletted menu under it.
+    if (M_Controls_Active ())
+	return;
 
     inhelpscreens = false;
 

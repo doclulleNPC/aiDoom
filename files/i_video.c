@@ -21,6 +21,7 @@
 //-----------------------------------------------------------------------------
 
 #include <stdlib.h>
+#include <string.h>
 
 #include <SDL3/SDL.h>
 
@@ -36,6 +37,7 @@
 #include "buddydoom_icon.h"
 #include "buddydoom_version.h"		// BUDDYDOOM_VERSION (auto-bumped by build.sh)
 #include "c_console.h"			// console overlay state (C_Active / C_GetLine)
+#include "m_controls.h"			// in-game key-bindings screen (overlay drawn here)
 #include "../tools/font_atlas.h"		// baked DejaVuSansMono atlas (TTF console font)
 
 
@@ -451,6 +453,24 @@ static void I_ConDrawText (float x, float y, const char* s, float cw, float ch)
     }
 }
 
+// Build the baked-atlas font texture once (shared by the console + the Controls screen).
+static void I_EnsureConFont (void)
+{
+    Uint32*	px;
+    SDL_Surface* s;
+    int		i;
+    if (confont)
+	return;
+    px = malloc (FONT_AW*FONT_CH*4);
+    for (i=0 ; i<FONT_AW*FONT_CH ; i++)
+	px[i] = 0x00FFFFFFu | ((Uint32)font_alpha[i] << 24);	// white, alpha=coverage
+    s = SDL_CreateSurfaceFrom (FONT_AW, FONT_CH, SDL_PIXELFORMAT_ARGB8888, px, FONT_AW*4);
+    confont = SDL_CreateTextureFromSurface (renderer, s);
+    SDL_SetTextureBlendMode (confont, SDL_BLENDMODE_BLEND);
+    SDL_SetTextureScaleMode (confont, SDL_SCALEMODE_LINEAR);
+    SDL_DestroySurface (s); free (px);
+}
+
 static void I_DrawConsoleOverlay (void)
 {
     float	W, H, conH, fs, cw, ch, y;
@@ -460,18 +480,7 @@ static void I_DrawConsoleOverlay (void)
     if (!C_Active())
 	return;
 
-    if (!confont)
-    {
-	Uint32* px = malloc (FONT_AW*FONT_CH*4);
-	int i;
-	for (i=0 ; i<FONT_AW*FONT_CH ; i++)
-	    px[i] = 0x00FFFFFFu | ((Uint32)font_alpha[i] << 24);	// white, alpha=coverage
-	SDL_Surface* s = SDL_CreateSurfaceFrom (FONT_AW, FONT_CH, SDL_PIXELFORMAT_ARGB8888, px, FONT_AW*4);
-	confont = SDL_CreateTextureFromSurface (renderer, s);
-	SDL_SetTextureBlendMode (confont, SDL_BLENDMODE_BLEND);
-	SDL_SetTextureScaleMode (confont, SDL_SCALEMODE_LINEAR);
-	SDL_DestroySurface (s); free (px);
-    }
+    I_EnsureConFont ();
 
     W = SCREENWIDTH; H = SCREENHEIGHT;
     conH = H * 0.55f;
@@ -498,6 +507,74 @@ static void I_DrawConsoleOverlay (void)
 	if (!line) break;
 	I_ConDrawText (cw*0.5f, y, line, cw, ch);
     }
+}
+
+// Options -> Controls: the key-bindings screen, drawn with the baked TTF atlas
+// (state/input live in m_controls.c).  Logical space is SCREENWIDTH x SCREENHEIGHT.
+static void I_DrawControlsOverlay (void)
+{
+    float	W, H, ch, cw, rowh, lx, kx, y, tw;
+    int		n, i, sel;
+    char	keybuf[32];
+    const char*	title = "CONTROLS";
+
+    if (!M_Controls_Active())
+	return;
+
+    I_EnsureConFont ();
+
+    W = SCREENWIDTH; H = SCREENHEIGHT;
+    n   = M_Controls_Count ();
+    sel = M_Controls_Sel ();
+
+    // dim the whole frame
+    SDL_SetRenderDrawBlendMode (renderer, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor (renderer, 6, 8, 14, 234);
+    { SDL_FRect p = {0, 0, W, H}; SDL_RenderFillRect (renderer, &p); }
+
+    // rows fill ~82% of the height between a title band and a footer -> adapts to any res
+    rowh = (H * 0.82f) / (float)n;
+    ch   = rowh * 0.74f; if (ch < 6) ch = 6;
+    cw   = FONT_CW * (ch / FONT_CH);
+    lx   = W * 0.20f;			// label column
+    kx   = W * 0.60f;			// key column
+
+    // title, centred and a bit larger
+    tw = (float)strlen(title) * (cw*1.7f);
+    SDL_SetTextureColorMod (confont, 255, 205, 110);
+    I_ConDrawText ((W - tw)*0.5f, H*0.03f, title, cw*1.7f, ch*1.7f);
+
+    y = H * 0.12f;
+    for (i = 0; i < n; i++, y += rowh)
+    {
+	boolean issel = (i == sel);
+	if (issel)
+	{
+	    SDL_SetRenderDrawColor (renderer, 70, 58, 22, 235);
+	    { SDL_FRect hb = { lx - cw, y - rowh*0.12f, (kx + W*0.16f) - (lx - cw), rowh }; SDL_RenderFillRect (renderer, &hb); }
+	}
+	SDL_SetTextureColorMod (confont, issel?255:198, issel?236:205, issel?165:216);
+	I_ConDrawText (lx, y, M_Controls_Label (i), cw, ch);
+
+	if (issel && M_Controls_Capturing ())
+	{
+	    SDL_SetTextureColorMod (confont, 120, 240, 120);
+	    I_ConDrawText (kx, y, "< press a key >", cw, ch);
+	}
+	else
+	{
+	    M_Controls_KeyName (i, keybuf, sizeof keybuf);
+	    if (!keybuf[0]) { keybuf[0]='-'; keybuf[1]='-'; keybuf[2]='-'; keybuf[3]=0; }
+	    SDL_SetTextureColorMod (confont, 255, 220, 150);
+	    I_ConDrawText (kx, y, keybuf, cw, ch);
+	}
+    }
+
+    // footer hint
+    SDL_SetTextureColorMod (confont, 150, 160, 180);
+    I_ConDrawText (lx, H*0.955f,
+		   "Up/Down: move   Enter: rebind   Bksp: clear   Esc: back",
+		   cw*0.85f, ch*0.85f);
 }
 
 void I_FinishUpdate (void)
@@ -542,6 +619,7 @@ void I_FinishUpdate (void)
 
     SDL_RenderClear(renderer);
     SDL_RenderTexture(renderer, texture, NULL, NULL);
+    I_DrawControlsOverlay();		// Options -> Controls key-bindings screen
     I_DrawConsoleOverlay();		// crisp SDL/TTF console on top of the frame
     SDL_RenderPresent(renderer);
 }

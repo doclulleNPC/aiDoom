@@ -72,6 +72,7 @@ static int access(char *file, int mode)
 #include "m_argv.h"
 #include "m_misc.h"
 #include "m_menu.h"
+#include "m_controls.h"		// in-game key-bindings screen (Options -> Controls)
 
 #include "i_system.h"
 #include "i_voice.h"		// I_Voice_ResolveWad (add buddydoom.wad early for its sprites)
@@ -209,6 +210,8 @@ void D_ProcessEvents (void)
 	ev = &events[eventtail];
 	if (C_Responder (ev))
 	    continue;               // console ate the event
+	if (M_Controls_Responder (ev))
+	    continue;               // the Controls (key-bindings) screen ate the event
 	if (M_Responder (ev))
 	    continue;               // menu ate the event
 	G_Responder (ev);
