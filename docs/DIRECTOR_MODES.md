@@ -2,7 +2,7 @@
 
 ## 1. Two director modes
 
-aiDoom has two distinct director paths:
+BuddyDoom has two distinct director paths:
 
 - `-director` — the offline/rule-based L4D-style director.
 - `-aidirector [port]` — a TCP client drives pacing/spawn commands; the rule layer supplies fallback behavior.

@@ -3,7 +3,7 @@
 **Status:** proposal / not yet implemented.
 **Spec:** `docs/udmf11.txt` (UDMF v1.1, Quasar 2009).
 **Scope of this plan:** add read support for **UDMF maps in the `Doom` namespace**
-to aiDoom's software renderer, reusing the existing binary-map runtime as much as
+to BuddyDoom's software renderer, reusing the existing binary-map runtime as much as
 possible. Hexen/ZDoom/Strife namespaces (thing specials, `args[5]`, SPAC flags,
 scripting) are called out as follow-on work but are **out of scope** for phase 1.
 
@@ -11,7 +11,7 @@ scripting) are called out as follow-on work but are **out of scope** for phase 1
 
 ## 0. Current state (audit summary)
 
-aiDoom has **no UDMF code at all**. `docs/udmf11.txt` is the only trace.
+BuddyDoom has **no UDMF code at all**. `docs/udmf11.txt` is the only trace.
 
 - `P_SetupLevel` (`files/p_setup.c:988`) is hard-wired to the 1993 binary format:
   it does `lumpnum = W_GetNumForName(label)` then reads geometry from **fixed lump
@@ -233,7 +233,7 @@ renderer (`r_bsp.c`) and sight/collision need a BSP tree. Two options:
 UDMF maps almost always ship a nodes lump between `TEXTMAP` and `ENDMAP`, named
 **`ZNODES`** (occasionally the raw lump). BUT modern node builders (ZDBSP) emit
 **GL nodes** in one of the `XGLN` / `XGL2` / `XGL3` (and zlib `ZGLN`/`ZGL2`/`ZGL3`)
-formats — which aiDoom's `P_LoadNodes_Extended` **does not parse** (it only does
+formats — which BuddyDoom's `P_LoadNodes_Extended` **does not parse** (it only does
 non-GL `XNOD`/`ZNOD`, and even says so at `p_setup.c:273`). So phase 1 needs:
 
 1. Locate the node lump: scan lumps from `lumpnum+1` to `ENDMAP` for `ZNODES`
@@ -258,7 +258,7 @@ than crash.
 
 ## 5. Blockmap & reject
 
-- **Blockmap:** UDMF need not carry one. aiDoom already has a **from-scratch
+- **Blockmap:** UDMF need not carry one. BuddyDoom already has a **from-scratch
   blockmap generator** (`P_CreateBlockMap`, invoked by `P_LoadBlockMap` when the
   lump is absent/empty — see `p_setup.c:776`). Wire the UDMF path to force
   generation (pass a sentinel or call the generator directly) instead of reading a

@@ -1,6 +1,6 @@
 # Legacy fixes — making 1996 DOOM behave on 2020s hardware
 
-This is the source-backed running log of portability fixes in the current aiDoom tree. The entries cover 64-bit layout, modern compilers, variable internal resolution, large modern WADs, SDL3 tooling and the new AI/asset subsystems. It is a historical fix log: an entry can describe a bug that is already fixed, while the final section gives the current diagnostic symptom.
+This is the source-backed running log of portability fixes in the current BuddyDoom tree. The entries cover 64-bit layout, modern compilers, variable internal resolution, large modern WADs, SDL3 tooling and the new AI/asset subsystems. It is a historical fix log: an entry can describe a bug that is already fixed, while the final section gives the current diagnostic symptom.
 
 **Last source audit:** 2026-07-22. When adding a new entry, record symptom → root cause → fix → files and distinguish a historical regression from a still-open limitation.
 
@@ -207,7 +207,7 @@ flag — this is exactly what Boom's `comp_stairs` does — and never change the
     when one tag fires **several disjoint** staircases, the later ones build from the
     wrong place or get skipped. (Boom saves+restores `secnum` to fix this; vanilla
     doesn't, and neither do we.)
-  aiDoom ships this code **unchanged on purpose.** Don't "tidy" the increment order or
+  BuddyDoom ships this code **unchanged on purpose.** Don't "tidy" the increment order or
     the `secnum` reuse — both are load-bearing for compatibility.
 
 - **Pain Elemental 20-lost-soul cap** (`A_PainShootSkull`, `p_enemy.c`, `if (count > 20)
@@ -262,11 +262,11 @@ streaks** (see the LoR MAP01 gate).
 
 ---
 
-## 13. DSDHacked thing numbers collide with aiDoom's appended builtin mobjtypes
+## 13. DSDHacked thing numbers collide with BuddyDoom's appended builtin mobjtypes
 
 A DSDHacked/DECOHack patch (Legacy of Rust's `id1.wad`) defines its new things
 starting at **Thing 151** — the vanilla+MBF boundary in dsda-doom, where the patch
-author assumed free slots. aiDoom instead packs Heretic/Hexen/Freedoom/etc. monsters
+author assumed free slots. BuddyDoom instead packs Heretic/Hexen/Freedoom/etc. monsters
 into builtin `mobjinfo[]` indices 138–208, so `Thing 151` lands on `MT_HMINOTAURFX`
 and friends. Symptom: **LoR's Ghouls and 3100-range scenery all spawn as
 `P_SpawnMapThing: unknown type` and vanish**, because the DEH set (e.g.)
@@ -302,7 +302,7 @@ terminator, so a larger cap is safe). File: `p_spec.h`.
 
 ---
 
-## 16. Vanilla-bug audit (what aiDoom fixes vs keeps)
+## 16. Vanilla-bug audit (what BuddyDoom fixes vs keeps)
 
 A sweep of the well-known 1993/94 DOOM bugs against the current source. The rule of
 thumb: **crash / overflow / rendering-corruption bugs are fixed** (they never affected
@@ -311,7 +311,7 @@ bugs are kept** (see §9 — changing them desyncs demos and the maps that explo
 
 ### Fixed (crash / overflow / corruption — safe to correct)
 
-| Vanilla bug | What went wrong | aiDoom | Where |
+| Vanilla bug | What went wrong | BuddyDoom | Where |
 |---|---|---|---|
 | **spechit overflow** | crossing >8 specials in one `P_TryMove` smashed a fixed `spechit[8]` (the famous Doom II MAP… "linedef deletion"/reboot glitch) | `spechit[]` grows dynamically (`numspechit`) | `p_map.c` |
 | **intercepts overflow** | `P_PathTraverse` overran a fixed `intercepts[]` (blockmap/hitscan corruption on dense maps) | grows via realloc from `MAXINTERCEPTS` | `p_maputl.c` |
@@ -326,7 +326,7 @@ bugs are kept** (see §9 — changing them desyncs demos and the maps that explo
 
 ### Raised-but-still-capped (watch these)
 
-| Limit | Vanilla | aiDoom | Note |
+| Limit | Vanilla | BuddyDoom | Note |
 |---|---|---|---|
 | drawsegs (`MAXDRAWSEGS`) | 256 | grows dynamically | ok |
 | vissprites | 128 | grows dynamically | ok |
@@ -391,7 +391,7 @@ change — no playsim effect.
   (`dc_texheight`).
 - **A modern (DSDHacked/ID24) PWAD's new monsters/scenery spawn as
   `unknown type … skipped`** while its remapped vanilla things are fine → the new
-  Thing numbers collide with aiDoom's appended builtin mobjtypes, §13.
+  Thing numbers collide with BuddyDoom's appended builtin mobjtypes, §13.
 - **A wall switch triggers its action but its graphic never flips** → the switch
   pair fell off the end of a `SWITCHES` lump bigger than `MAXSWITCHES`, §14.
 - **`R_DrawPlanes: opening overflow`** (a huge, seg-dense view) → the one renderer

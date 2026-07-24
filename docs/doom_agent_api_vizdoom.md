@@ -1,14 +1,14 @@
 # API for an agent to play classic Doom — ViZDoom / LLM perspective
 
-> **Proposal/comparison document.** This is not the shipped aiDoom API. Current as-built references are `docs/AIPLAYER.md` (player agent), `docs/MONSTER_AGENT_GUIDE.md` (monster/director) and `docs/BUDDY_PORTING.md` (buddy). The HTTP/headless/RL/MCP interfaces below are design options.
+> **Proposal/comparison document.** This is not the shipped BuddyDoom API. Current as-built references are `docs/AIPLAYER.md` (player agent), `docs/MONSTER_AGENT_GUIDE.md` (monster/director) and `docs/BUDDY_PORTING.md` (buddy). The HTTP/headless/RL/MCP interfaces below are design options.
 
 ## 0. The real options
 
 There are four practical ways to let an agent play Doom:
 
 1. use an existing environment such as ViZDoom;
-2. wrap the current aiDoom TCP player-agent listener;
-3. add a native headless/step API to aiDoom;
+2. wrap the current BuddyDoom TCP player-agent listener;
+3. add a native headless/step API to BuddyDoom;
 4. build a separate tool process that captures the SDL window and sends input.
 
 The current tree implements option 2 for high-level player control (`-aiplayer [port|demo]`). It does not implement a ViZDoom-compatible HTTP or Gym server.
@@ -53,7 +53,7 @@ A future API must define stable entity IDs. Current monster IDs are registry-der
 
 ### Damage tracking
 
-A future reward layer can derive damage/kills/secrets from state deltas or explicit engine events, but this is not currently returned by aiDoom's TCP API.
+A future reward layer can derive damage/kills/secrets from state deltas or explicit engine events, but this is not currently returned by BuddyDoom's TCP API.
 
 ## 4. Layer 3 — action space
 
@@ -101,11 +101,11 @@ Possible wrappers include:
 - an MCP server exposing start/observe/act tools;
 - a vision capture/input process.
 
-These are external/tooling projects until code lands in the repository. Do not document them as installed aiDoom binaries.
+These are external/tooling projects until code lands in the repository. Do not document them as installed BuddyDoom binaries.
 
 ## 7. ViZDoom comparison
 
-| Concern | Current aiDoom tree | ViZDoom-style environment |
+| Concern | Current BuddyDoom tree | ViZDoom-style environment |
 |---|---|---|
 | Simulation | Native SDL3 Doom fork | Dedicated environment wrapper |
 | Raw screen API | SDL window/tool capture | First-class observation API |

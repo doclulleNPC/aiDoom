@@ -1,4 +1,4 @@
-# Visibility cache for the aiDoom buddy
+# Visibility cache for the BuddyDoom buddy
 
 ## Decision
 

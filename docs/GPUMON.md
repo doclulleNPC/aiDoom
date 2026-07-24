@@ -5,6 +5,10 @@ A small live monitor for the GPU that runs your Ollama models — handy while th
 (`run/gpumon` / `run\gpumon.exe`, source `tools/gpumon_sdl.c`) with live bars, the
 currently-loaded Ollama model, and a **Reconnect** button. No Python.
 
+**Naming note:** The parent project was previously known as `aiDoom` and is now
+**BuddyDoom**. The config filename and the `aidoom_config` tool keep the legacy
+token until the source rename lands; this document does not pre-rename them.
+
 It shows **GPU load %, memory, temperature and power**, reading its target from
 `aidoom.cfg`. The monitoring tool is **auto-detected**, so the same binary works
 against an NVIDIA box or an Apple-Silicon Mac.

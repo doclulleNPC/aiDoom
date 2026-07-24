@@ -56,7 +56,7 @@ The exact enum/field names are `h_arti_flask` through `h_arti_egg` in `files/d_p
 - Morph Ovum calls the generic morph subsystem (`P_MorphMonster` in `files/p_morph.c`) and turns eligible monsters into the current supported morph form.
 - True invisibility changes monster target acquisition/visibility behavior through the player/mobj and enemy paths.
 
-This is additive content support, not a promise that aiDoom is a complete Heretic game mode. Full Corvus weapons, Heretic status-bar behavior, level progression and all original artifacts remain part of `docs/HERETIC_SUPPORT_PLAN.md`.
+This is additive content support, not a promise that BuddyDoom is a complete Heretic game mode. Full Corvus weapons, Heretic status-bar behavior, level progression and all original artifacts remain part of `docs/HERETIC_SUPPORT_PLAN.md`.
 
 ## 3. Hexen artifacts
 

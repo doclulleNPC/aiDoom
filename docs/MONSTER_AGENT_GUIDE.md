@@ -3,7 +3,7 @@
 This is the operational reference for the line protocol implemented by `files/p_ai_llm.c`. It drives monster directives, the optional buddy directive layer, and LLM-director pacing commands. It is separate from the player-1 protocol in `docs/AIPLAYER.md`.
 ## 1. Connect
 
-Start aiDoom with the director listener:
+Start BuddyDoom with the director listener:
 
 ```sh
 ./run/aidoom -aidirector 31666 -warp 1 1

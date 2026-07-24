@@ -1,13 +1,13 @@
-# Source-audit snapshot: aiDoom / Woof / ZDoom
+# Source-audit snapshot: BuddyDoom / Woof / ZDoom
 
-This document is a source-backed audit snapshot, not a dated generated report. It compares the current aiDoom tree with the external Woof/ZDoom references named in the table; external version cells are intentionally qualified because they were not re-audited in this pass.
+This document is a source-backed audit snapshot, not a dated generated report. It compares the current BuddyDoom tree with the external Woof/ZDoom references named in the table; external version cells are intentionally qualified because they were not re-audited in this pass.
 
 - `AIDOOM_VERSION "0.10.26"` (`files/aidoom_version.h`);
 - `VERSION_NUM = 118` and `DEMOVERSION = 109` (`files/doomdef.h`).
 
 The comparison rows below retain the useful audit conclusions while correcting the old version metadata and the extended-node boundary.
 
-| Category | aiDoom `files/` | Woof `src/` | ZDoom `src/` |
+| Category | BuddyDoom `files/` | Woof `src/` | ZDoom `src/` |
 |---|---|---|---|
 | Stand/version | Current tree: `AIDOOM_VERSION 0.10.26`; savegame version `118`; stock demo version `109`. | External comparison snapshot; refresh independently. | External comparison snapshot; refresh independently. |
 | MBF21 | DeHackEd/DSDHacked runtime growth and several MBF/MBF21 codepointers are present. `A_SpawnObject`, weapon sound/alert and related pointers are implemented; `A_LineEffect` remains a stub. Flags2/group gameplay effects and the full MBF21 surface are not complete. | External comparison snapshot. | External comparison snapshot. |
@@ -30,6 +30,6 @@ The comparison rows below retain the useful audit conclusions while correcting t
 
 1. Run `git describe --always --dirty` from the repository root.
 2. Read `files/aidoom_version.h` and `files/doomdef.h`.
-3. Re-check every source symbol named in the aiDoom column with `search_files`/`read_file`.
+3. Re-check every source symbol named in the BuddyDoom column with `search_files`/`read_file`.
 4. Keep external Woof/ZDoom versions qualified unless their source trees were audited in the same pass.
 5. Do not copy a generated version number from a previous build: `build.sh` increments the fork patch field on rebuild.

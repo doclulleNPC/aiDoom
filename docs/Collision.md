@@ -1,6 +1,6 @@
 # Doom collision: background reading
 
-This is a short background note about the collision architecture inherited from classic Doom. It is not a complete description of every aiDoom collision extension; for implementation details, read `files/p_map.c`, `files/p_maputl.c`, `files/p_sight.c` and the relevant docs under `docs/`.
+This is a short background note about the collision architecture inherited from classic Doom. It is not a complete description of every BuddyDoom collision extension; for implementation details, read `files/p_map.c`, `files/p_maputl.c`, `files/p_sight.c` and the relevant docs under `docs/`.
 
 ## 1. The two spatial systems in classic Doom
 
@@ -8,13 +8,13 @@ This is a short background note about the collision architecture inherited from 
 
 The blockmap divides the map into fixed-size square cells. Each cell stores references to lines and things that overlap it. During movement or hitscan, Doom visits the cells crossed by the query and tests only the nearby candidates.
 
-In aiDoom, the blockmap remains the main broad-phase collision/index structure. The code walks blockmap lines/things through the `PIT_*` and `P_BlockThingsIterator` paths in `files/p_map.c` and `files/p_maputl.c`.
+In BuddyDoom, the blockmap remains the main broad-phase collision/index structure. The code walks blockmap lines/things through the `PIT_*` and `P_BlockThingsIterator` paths in `files/p_map.c` and `files/p_maputl.c`.
 
 ### BSP tree
 
 The BSP tree partitions the map into subsectors for rendering and spatial lookup. It is excellent for deciding which sectors/segments are visible and for locating the subsector containing an actor. It is not, by itself, a full swept-volume collision solver.
 
-aiDoom also uses the BSP subsector graph for buddy/agent navigation (`files/p_ai_coop.c`), but that is path planning, not a replacement for physical collision.
+BuddyDoom also uses the BSP subsector graph for buddy/agent navigation (`files/p_ai_coop.c`), but that is path planning, not a replacement for physical collision.
 
 ## 2. Why Doom used the blockmap
 
@@ -32,7 +32,7 @@ Therefore the useful engineering conclusion is not "replace Doom's blockmap with
 - use BSP/subsector data where it is a good index (rendering, navigation, location);
 - improve specific collision predicates only when the gameplay contract requires it.
 
-## 4. aiDoom-specific caveats
+## 4. BuddyDoom-specific caveats
 
 The current port adds over/under actor movement by default and keeps a compatibility flag, `-infinitetall`, for vanilla infinitely-tall actor collision. `PIT_CheckThing` in `files/p_map.c` is the relevant path.
 

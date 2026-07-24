@@ -1,10 +1,10 @@
 # API architecture for an agent to play classic Doom
 
-> **Design proposal, not an as-built aiDoom API.** The current engine ships TCP line protocols for `-aiplayer` and `-aidirector`; it does not ship the HTTP `/v1/game/init`/`step` server, headless mode, reward endpoint or MCP server described here. See `docs/AIPLAYER.md` and `docs/MONSTER_AGENT_GUIDE.md` for the implemented interfaces.
+> **Design proposal, not an as-built BuddyDoom API.** The current engine ships TCP line protocols for `-aiplayer` and `-aidirector`; it does not ship the HTTP `/v1/game/init`/`step` server, headless mode, reward endpoint or MCP server described here. See `docs/AIPLAYER.md` and `docs/MONSTER_AGENT_GUIDE.md` for the implemented interfaces.
 
 ## 1. Core architecture and synchronization
 
-aiDoom is a fork of the SDL Doom 1.10 line, not `doomgeneric`. The engine advances game state at 35 Hz through its normal tic loop. A future agent environment should preserve that boundary:
+BuddyDoom is a fork of the SDL Doom 1.10 line, not `doomgeneric`. The engine advances game state at 35 Hz through its normal tic loop. A future agent environment should preserve that boundary:
 
 ```text
 agent client -> transport -> queued high-level action
@@ -83,7 +83,7 @@ The current player and monster protocols should be reused as source material rat
 
 ## 4. Transport choices
 
-| Transport | Suitability | Status in aiDoom |
+| Transport | Suitability | Status in BuddyDoom |
 |---|---|---|
 | TCP newline protocol | Simple remote control with low implementation cost | Shipped for player and monster/director agents |
 | HTTP/JSON | Easy integration with RL wrappers and tools | Proposed only |

@@ -1,4 +1,4 @@
-# AI/LLM improvements for aiDoom
+# AI/LLM improvements for BuddyDoom
 
 This file is a capability matrix plus a deliberately short backlog. Several items in the old version were already shipped but were still written as future work—the documentation equivalent of a zombie state that forgot to die.
 

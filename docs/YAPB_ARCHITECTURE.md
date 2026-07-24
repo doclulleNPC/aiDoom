@@ -1,6 +1,6 @@
-# yapb architecture for aiDoom
+# yapb architecture for BuddyDoom
 
-This document is a porting/reference note: yapb is a Half-Life bot architecture, while aiDoom has a much smaller native companion stack. The useful output is the separation of concerns, not a claim that the two engines share APIs.
+This document is a porting/reference note: yapb is a Half-Life bot architecture, while BuddyDoom has a much smaller native companion stack. The useful output is the separation of concerns, not a claim that the two engines share APIs.
 
 ## yapb's layers
 
@@ -13,11 +13,11 @@ The reference bot separates roughly into:
 - waypoint graph generation;
 - communication and debug tooling.
 
-That separation is useful in aiDoom because the game simulation is deterministic and tic-locked. Perception, decision-making and ticcmd generation must not leak wall-clock behavior into the playsim.
+That separation is useful in BuddyDoom because the game simulation is deterministic and tic-locked. Perception, decision-making and ticcmd generation must not leak wall-clock behavior into the playsim.
 
-## aiDoom mapping
+## BuddyDoom mapping
 
-| yapb concern | aiDoom location | Current status |
+| yapb concern | BuddyDoom location | Current status |
 |---|---|---|
 | Bot lifecycle | `files/p_ai_coop.c` | Implemented for one fixed buddy slot (`coop_slot=1`). |
 | Combat/aim | `files/p_ai_coop.c`, `files/p_enemy.c` | Rule-based buddy combat and shared Doom weapon/projectile logic. |

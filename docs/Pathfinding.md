@@ -1,8 +1,8 @@
 # Doom pathfinding
 
-This document contains the background theory and the current aiDoom implementation boundary. The original Doom renderer's BSP tree is useful to navigation, but classic Doom does not ship with a general-purpose A* navigation mesh.
+This document contains the background theory and the current BuddyDoom implementation boundary. The original Doom renderer's BSP tree is useful to navigation, but classic Doom does not ship with a general-purpose A* navigation mesh.
 
-## Current aiDoom pathfinder
+## Current BuddyDoom pathfinder
 
 The implemented buddy/agent pathfinder is in `files/p_ai_coop.c`. It builds a graph over BSP subsectors and portal-like connections through walkable two-sided lines. Edge costs include distance and penalties for doors or dangerous floor sectors.
 
@@ -50,4 +50,4 @@ The LLM player agent uses this shared navigation machinery, but its reflex contr
 
 ## Summary
 
-The source-backed statement is: aiDoom has a deterministic BSP-subsector graph pathfinder whose current search behaves as Dijkstra, not a fully heuristic A* implementation. It supplies waypoints; vanilla collision and tic simulation remain authoritative.
+The source-backed statement is: BuddyDoom has a deterministic BSP-subsector graph pathfinder whose current search behaves as Dijkstra, not a fully heuristic A* implementation. It supplies waypoints; vanilla collision and tic simulation remain authoritative.

@@ -2,7 +2,7 @@
 
 ## Scope
 
-aiDoom contains a substantial DeHackEd/BEX/DSDHacked/MBF21 gameplay layer. This document records the current source boundary; it is not a claim that every MBF21 or modern mod feature is complete.
+BuddyDoom contains a substantial DeHackEd/BEX/DSDHacked/MBF21 gameplay layer. This document records the current source boundary; it is not a claim that every MBF21 or modern mod feature is complete.
 
 The large fixture historically used for development is `run/ID0/Crispy and Brutal.wad`, whose embedded `DEHACKED` data exercises expanded DSDHacked frame/thing tables and MBF21 codepointers. Treat a successful run of that fixture as a project test result, not as a universal compatibility guarantee for unrelated mods.
 
@@ -60,7 +60,7 @@ The parser must remain fixed-point/tic-locked. DeHackEd changes tables and codep
 - Empty DSDHacked sprite fields must remain invisible (`SPR_TNT1`), not sprite 0.
 - Custom sound indices must be checked against runtime `num_sfx`.
 - A PWAD path containing spaces must reach the launcher/game as one quoted argument.
-- Appended aiDoom actor installers must run before DeHackEd if a patch owns the overlapping editor-number range.
+- Appended BuddyDoom actor installers must run before DeHackEd if a patch owns the overlapping editor-number range.
 
 These are implementation lessons; they should be rechecked against current source when changing the parser.
 

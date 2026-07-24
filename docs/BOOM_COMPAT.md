@@ -1,6 +1,6 @@
 # BOOM / MBF map compatibility
 
-This document describes the Boom/MBF-era map and gameplay support that is present in the current aiDoom source. It is an as-built compatibility note, not a claim of full ZDoom, UDMF, or extended-node compatibility.
+This document describes the Boom/MBF-era map and gameplay support that is present in the current BuddyDoom source. It is an as-built compatibility note, not a claim of full ZDoom, UDMF, or extended-node compatibility.
 
 ## Current state
 
@@ -24,7 +24,7 @@ This distinction matters: a map can contain Boom specials and still fail because
 
 ## Plan and implementation notes
 
-The compatibility target is the Boom/MBF style of fixed-point, tic-locked gameplay. The source does not implement a universal compatibility-level switch for every port-specific quirk. It also does not claim complete MBF21, ID24, UMAPINFO, or ZDoom behavior; see `docs/MBF21_PORT.md` and `docs/aidoom_features_report.md` for those boundaries.
+The compatibility target is the Boom/MBF style of fixed-point, tic-locked gameplay. The source does not implement a universal compatibility-level switch for every port-specific quirk. It also does not claim complete MBF21, ID24, UMAPINFO, or ZDoom behavior; see `docs/MBF21_PORT.md` and `docs/buddydoom_features_report.md` for those boundaries.
 
 ### Limits that are not vanilla hard caps anymore
 

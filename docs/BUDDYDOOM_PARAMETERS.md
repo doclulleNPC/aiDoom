@@ -1,6 +1,8 @@
-# AIDOOM_PARAMETERS.md — current CLI/config reference
+# BUDDYDOOM_PARAMETERS.md — current CLI/config reference
 
 **Source audit:** 2026-07-22. This file covers the engine options that are actually parsed in the current tree plus persistent keys consumed by the SDL3 tools. Old launcher options are not silently treated as supported.
+
+**Naming note:** The project was previously known as `aiDoom` and has been renamed to **BuddyDoom**. The binary, persistent config filename and voice WAD still use the legacy `aidoom` token until the matching source/build rename lands: `./aidoom` (binary), `run/aidoom.cfg` (config), `aidoom.wad`/`aidoom_wad` (voice asset), `aidoom_config` (config tool), `AIDOOM_VERSION` (version macro, `files/aidoom_version.h`), `~/.aidoom/` (hypothetical user state). Each identifier is listed below with the same spelling the engine uses today.
 
 ## Important distinction
 
@@ -26,7 +28,7 @@ The exact parser is `files/d_main.c`; this document deliberately does not claim 
 
 ## Network and demo compatibility
 
-aiDoom contains both the original Doom-style networking code and a separate transport-side client implementation in `files/d_netcl.c`. The latter is not a finished replacement for the main game-loop netcode. Do not infer a complete multiplayer product from the presence of the transport module.
+BuddyDoom contains both the original Doom-style networking code and a separate transport-side client implementation in `files/d_netcl.c`. The latter is not a finished replacement for the main game-loop netcode. Do not infer a complete multiplayer product from the presence of the transport module.
 
 The AI companion is currently disabled in netgames (`files/p_ai_coop.c`). AI-controlled play and LLM director modes are therefore single-player features, even though their simulation work is tic-driven.
 
@@ -80,7 +82,7 @@ Important implemented flags also include:
 
 - `-infight` — allow same-species infighting behavior.
 - `-nofriendlyfire` / `-noff` — protect player and buddy from each other.
-- `-infinitetall` — restore vanilla infinitely-tall actor collision; normal aiDoom behavior permits over/under object movement.
+- `-infinitetall` — restore vanilla infinitely-tall actor collision; normal BuddyDoom behavior permits over/under object movement.
 - `-autoaim` — restore vanilla vertical aim assist; the default player behavior uses free-look pitch.
 The engine currently exposes `monster_pack` and `monster_pack_range` as persistent configuration keys (`files/p_enemy.c`, `files/m_misc.c`); there is no separate `-monsterpack` command-line switch in the current parser.
 

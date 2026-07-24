@@ -8,6 +8,8 @@ The agent drives player 1 in single-player mode. It is deterministic and tic-loc
 
 ## 1. Startup and modes
 
+The `-aiplayer` mode currently listens as `./aidoom` (the legacy binary name; the project was renamed from `aiDoom` to **BuddyDoom** but the binary path was not changed in the same patch). The launch examples below will become `./buddydoom` once the matching source/build rename lands.
+
 ```sh
 ./aidoom -aiplayer 31700
 ./aidoom -aiplayer demo

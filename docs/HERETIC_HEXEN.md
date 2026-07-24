@@ -1,6 +1,6 @@
-# Heretic / Hexen content in aiDoom — current status
+# Heretic / Hexen content in BuddyDoom — current status
 
-**Source audit:** 2026-07-22. This document describes the additive content pack in the current DOOM engine. It is not a claim that aiDoom is a complete Heretic or Hexen game-mode port.
+**Source audit:** 2026-07-22. This document describes the additive content pack in the current DOOM engine. It is not a claim that BuddyDoom is a complete Heretic or Hexen game-mode port.
 
 ## 1. Architecture
 

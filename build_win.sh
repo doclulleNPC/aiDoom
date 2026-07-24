@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# build_win.sh -- build aidoom.exe for Windows with MinGW-w64, with the app icon
+# build_win.sh -- build buddydoom.exe for Windows with MinGW-w64, with the app icon
 # embedded in the binary (via windres). Run it on Linux (cross-compile) or inside
 # MSYS2/MinGW. For the Visual Studio build use files/Makefile.msvc instead (it
 # already links the icon resource the same way).
@@ -26,20 +26,20 @@ command -v "$WINDRES" >/dev/null 2>&1 || { echo "[build] $WINDRES not found" >&2
 [ -f "$SDL3/include/SDL3/SDL.h" ] || { echo "[build] SDL3 headers not at $SDL3/include/SDL3/SDL.h" >&2; exit 1; }
 
 echo "[build] compiling app icon resource (windres) ..."
-"$WINDRES" "$src/aidoom.rc" -O coff -o "$src/aidoom_res.o"
+"$WINDRES" "$src/buddydoom.rc" -O coff -o "$src/buddydoom_res.o"
 
-echo "[build] compiling aidoom.exe (MinGW) ..."
+echo "[build] compiling buddydoom.exe (MinGW) ..."
 ( cd "$src" && "$CC" -O2 -fcommon -fno-strict-aliasing -std=gnu11 \
     -Wno-implicit-int -Wno-implicit-function-declaration \
     -Wno-int-conversion -Wno-return-mismatch \
     -Wno-incompatible-pointer-types \
     -DSDL_MAIN_HANDLED -DWIN32 -I"$SDL3/include" \
-    *.c aidoom_res.o \
+    *.c buddydoom_res.o \
     -L"$SDL3/lib" -lSDL3 -lws2_32 -lm -ldbghelp -mconsole \
     -static-libgcc \
-    -o aidoom.exe )
+    -o buddydoom.exe )
 
 mkdir -p "$run"
-cp -f "$src/aidoom.exe" "$run/aidoom.exe"
+cp -f "$src/buddydoom.exe" "$run/buddydoom.exe"
 [ -f "$SDL3/bin/SDL3.dll" ] && cp -f "$SDL3/bin/SDL3.dll" "$run/SDL3.dll" && echo "[build] copied SDL3.dll"
-echo "[build] done -> $src/aidoom.exe  (icon embedded; copied to $run/aidoom.exe)"
+echo "[build] done -> $src/buddydoom.exe  (icon embedded; copied to $run/buddydoom.exe)"

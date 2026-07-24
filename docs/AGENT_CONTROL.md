@@ -1,10 +1,10 @@
-# Driving aiDoom with an agent / LLM
+# Driving BuddyDoom with an agent / LLM
 
 > **Status note:** This document mixes historical design rationale with implementation notes. For the shipped player-agent API use `docs/AIPLAYER.md`; for monster/director control use `docs/MONSTER_AGENT_GUIDE.md`; for the buddy use `docs/BUDDY_PORTING.md`. The headless JSON/RL API proposed in later sections does not exist in the current engine.
 
 ## 0. Current shape
 
-aiDoom has three separate external-AI surfaces:
+BuddyDoom has three separate external-AI surfaces:
 
 1. `-aiplayer [port|demo]` — an external brain controls player 1 through `files/g_agent.c`.
 2. `-aidirector [port]` / `-aidemo` — a director client controls monster tactics and pacing.
@@ -100,7 +100,7 @@ A future headless API would need to be designed explicitly. It would likely add:
 - optional frame skip;
 - a transport wrapper.
 
-None of those are current aiDoom command/API guarantees. Do not implement a client against the JSON sketches elsewhere in this document.
+None of those are current BuddyDoom command/API guarantees. Do not implement a client against the JSON sketches elsewhere in this document.
 
 ## 8. Compatibility and safety
 

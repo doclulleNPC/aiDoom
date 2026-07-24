@@ -1,6 +1,6 @@
 # HD / true-color texture support — porting reference
 
-> **Not implemented in aiDoom.** This document describes how the sibling `../sdldoom-sdl3` port approaches true-color textures, sprites and voxels. aiDoom currently uses its palette/software renderer and has no `screen32`, `hd_*` loader or `R_HDSetupWall` implementation.
+> **Not implemented in BuddyDoom.** This document describes how the sibling `../sdldoom-sdl3` port approaches true-color textures, sprites and voxels. BuddyDoom currently uses its palette/software renderer and has no `screen32`, `hd_*` loader or `R_HDSetupWall` implementation.
 
 ## TL;DR
 
@@ -17,22 +17,22 @@ This is a porting reference, not a feature list for this repository.
 
 The sibling's asset pipeline resolves replacement texture/sprite/voxel names, decodes image data and maintains per-level/cache lifetimes. It must handle missing replacements, dimensions, transparency, animation and WAD/PWAD precedence.
 
-Before porting any part here, define the aiDoom-side naming policy and memory budget. Classic WAD patch names are eight bytes; PNG replacements need a separate lookup convention.
+Before porting any part here, define the BuddyDoom-side naming policy and memory budget. Classic WAD patch names are eight bytes; PNG replacements need a separate lookup convention.
 
 ## 2. Rendering integration
 
 The difficult part is not PNG decoding. The difficult part is making every renderer primitive agree on color, lighting, transparency and clipping.
 
-The sibling uses a parallel ARGB/true-color write path and an approximate light-dimming calculation (`fc_lightdim` in the reference implementation). A future aiDoom port would need equivalent hooks in:
+The sibling uses a parallel ARGB/true-color write path and an approximate light-dimming calculation (`fc_lightdim` in the reference implementation). A future BuddyDoom port would need equivalent hooks in:
 
 - wall columns (`files/r_segs.c`, `files/r_draw.c`);
 - planes (`files/r_plane.c`);
 - sprites/masked columns (`files/r_things.c`);
 - framebuffer/present (`files/i_video.c`).
 
-The current `dc_texheight` code in aiDoom is tall-column sampling support, not HD texture support.
+The current `dc_texheight` code in BuddyDoom is tall-column sampling support, not HD texture support.
 
-## 3. What a future aiDoom port would own
+## 3. What a future BuddyDoom port would own
 
 A minimal design would likely add:
 
@@ -44,7 +44,7 @@ A minimal design would likely add:
 - SDL texture upload/composite path;
 - config/menu toggles and a bounded memory policy.
 
-Do not add the names from the sibling (`screen32`, `dc_hd*`, `R_HDSetupWall`, `hd_texture.c`, `hd_sprite.c`, `hd_voxel.c`) to aiDoom documentation until those files and symbols exist here.
+Do not add the names from the sibling (`screen32`, `dc_hd*`, `R_HDSetupWall`, `hd_texture.c`, `hd_sprite.c`, `hd_voxel.c`) to BuddyDoom documentation until those files and symbols exist here.
 
 ## 4. Lighting and special effects
 
@@ -57,7 +57,7 @@ True-color lighting is an approximation unless the complete palette/colormap sem
 
 ## 5. Sprites and voxels
 
-The sibling's voxel/replacement approach is optional future work. aiDoom's current `r_things.c` still renders Doom sprite patches through the indexed renderer. A true-color sprite path must preserve vertical clipping, fuzz/invisibility behavior, tall patches and actor scaling.
+The sibling's voxel/replacement approach is optional future work. BuddyDoom's current `r_things.c` still renders Doom sprite patches through the indexed renderer. A true-color sprite path must preserve vertical clipping, fuzz/invisibility behavior, tall patches and actor scaling.
 
 ## 6. Recommended porting order
 
@@ -72,6 +72,6 @@ Each step needs a real game run at multiple internal resolutions; a successful c
 
 ## Source boundaries
 
-- Current aiDoom indexed renderer: `files/r_draw.c`, `files/r_segs.c`, `files/r_plane.c`, `files/r_things.c`, `files/i_video.c`.
+- Current BuddyDoom indexed renderer: `files/r_draw.c`, `files/r_segs.c`, `files/r_plane.c`, `files/r_things.c`, `files/i_video.c`.
 - Current PNG/image helpers: `files/v_png.c`, `files/stb_image.h`.
 - Reference implementation: sibling project `../sdldoom-sdl3`.

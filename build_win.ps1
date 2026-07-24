@@ -1,11 +1,11 @@
-# build_win.ps1 -- native Windows build of aiDoom + all tools with MinGW gcc.
-# (game + aidoom_config, gpumon, launcher, director, extractor -- the MinGW analog
+# build_win.ps1 -- native Windows build of BuddyDoom + all tools with MinGW gcc.
+# (game + buddydoom_config, gpumon, launcher, director, extractor -- the MinGW analog
 #  of build_all_win.bat, which needs MSVC.)
 #
 # Why this exists: files\Makefile.msvc needs nmake + cl (Visual Studio), and
 # build.sh / tools\build_config.sh need pkg-config -- none of which are present
 # on a plain MinGW install. This script builds both binaries with gcc, embeds
-# the app icon via windres (so aidoom.exe / aidoom_config.exe show the icon in
+# the app icon via windres (so buddydoom.exe / buddydoom_config.exe show the icon in
 # Explorer and the taskbar), and stages everything in run\ next to SDL3.dll.
 #
 # Usage (from a PowerShell prompt with MinGW gcc/windres on PATH):
@@ -63,20 +63,20 @@ $cflags = @(
 
 New-Item -ItemType Directory -Force -Path $run | Out-Null
 
-# --- 1) game: aidoom.exe -------------------------------------------------------
-Write-Host "[build] compiling aidoom.exe ..."
-& windres (Join-Path $files "aidoom.rc") -O coff --include-dir $files `
-    @windresPP -o (Join-Path $files "aidoom_res.o")
-if ($LASTEXITCODE) { throw "windres (aidoom.rc) failed" }
+# --- 1) game: buddydoom.exe -------------------------------------------------------
+Write-Host "[build] compiling buddydoom.exe ..."
+& windres (Join-Path $files "buddydoom.rc") -O coff --include-dir $files `
+    @windresPP -o (Join-Path $files "buddydoom_res.o")
+if ($LASTEXITCODE) { throw "windres (buddydoom.rc) failed" }
 
 $gameSrc = Get-ChildItem (Join-Path $files "*.c") | ForEach-Object { $_.FullName }
-& gcc @cflags $gameSrc (Join-Path $files "aidoom_res.o") `
-    -o (Join-Path $files "aidoom.exe") $sdldll -lm -lws2_32 -ldbghelp
-if ($LASTEXITCODE) { throw "gcc (aidoom) failed" }
+& gcc @cflags $gameSrc (Join-Path $files "buddydoom_res.o") `
+    -o (Join-Path $files "buddydoom.exe") $sdldll -lm -lws2_32 -ldbghelp
+if ($LASTEXITCODE) { throw "gcc (buddydoom) failed" }
 
 # --- 2) tools: SDL3 GUI apps (config / gpumon / launcher / director / extractor) ---
-# Each owns main() (SDL_MAIN_HANDLED), has an icon .rc reusing files\aidoom.ico (via
-# --include-dir), and includes files\aidoom_icon.h for the live window icon (so add
+# Each owns main() (SDL_MAIN_HANDLED), has an icon .rc reusing files\buddydoom.ico (via
+# --include-dir), and includes files\buddydoom_icon.h for the live window icon (so add
 # -I$files). They are GUI apps -> -mwindows (WINDOWS subsystem, no console window),
 # matching tools\Makefile.msvc's /SUBSYSTEM:WINDOWS. director also links psapi (process
 # stats) + ws2_32 (TCP to Ollama).  Same as the game, they link the SDL3 import DLL.
@@ -84,7 +84,7 @@ if (-not (Test-Path (Join-Path $tools "font_atlas.h"))) {
     throw "tools\font_atlas.h missing -- run tools\bake_font.py first."
 }
 $toolTargets = @(
-    @{ name = "aidoom_config"; src = "aidoom_config.c"; libs = @() },
+    @{ name = "buddydoom_config"; src = "buddydoom_config.c"; libs = @() },
     @{ name = "gpumon";        src = "gpumon_sdl.c";    libs = @() },
     @{ name = "launcher";      src = "launcher.c";      libs = @() },
     @{ name = "director";      src = "director.c";      libs = @("-lpsapi","-lws2_32") },
@@ -102,13 +102,13 @@ foreach ($t in $toolTargets) {
 }
 
 # --- 3) stage everything in run\ ----------------------------------------------
-Copy-Item (Join-Path $files "aidoom.exe") (Join-Path $run "aidoom.exe") -Force
+Copy-Item (Join-Path $files "buddydoom.exe") (Join-Path $run "buddydoom.exe") -Force
 foreach ($t in $toolTargets) {
     Copy-Item (Join-Path $tools "$($t.name).exe") (Join-Path $run "$($t.name).exe") -Force
 }
 Copy-Item $sdldll (Join-Path $run "SDL3.dll") -Force
-if (Test-Path (Join-Path $files "aidoom.ico")) {
-    Copy-Item (Join-Path $files "aidoom.ico") (Join-Path $run "aidoom.ico") -Force
+if (Test-Path (Join-Path $files "buddydoom.ico")) {
+    Copy-Item (Join-Path $files "buddydoom.ico") (Join-Path $run "buddydoom.ico") -Force
 }
 
-Write-Host "[build] done -> run\ : aidoom.exe + $(($toolTargets | ForEach-Object { "$($_.name).exe" }) -join ' + ') + SDL3.dll"
+Write-Host "[build] done -> run\ : buddydoom.exe + $(($toolTargets | ForEach-Object { "$($_.name).exe" }) -join ' + ') + SDL3.dll"
