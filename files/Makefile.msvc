@@ -35,7 +35,7 @@ OBJS = \
 	p_switch.obj p_telept.obj p_tick.obj p_turret.obj p_user.obj revmarine.obj r_bsp.obj r_data.obj \
 	r_draw.obj r_main.obj r_plane.obj r_segs.obj r_skydefs.obj r_sky.obj r_things.obj \
 	s_sound.obj sounds.obj stb_vorbis.obj st_lib.obj st_stuff.obj st_sbardef.obj tables.obj u_mapinfo.obj v_png.obj v_video.obj \
-	w_wad.obj wi_stuff.obj w_json.obj z_zone.obj miniz.obj
+	w_wad.obj wi_stuff.obj w_json.obj w_inflate.obj z_zone.obj miniz.obj
 
 all: aidoom.exe
 
