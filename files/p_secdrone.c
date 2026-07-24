@@ -4,7 +4,7 @@
 // Copyright (C) 1993-1996 by id Software, Inc.  (fork additions, DOOM Source License)
 //
 // DESCRIPTION:
-//	Security Drone (aiDoom fork).  See p_secdrone.h.
+//	Security Drone (BuddyDoom fork).  See p_secdrone.h.
 //
 //	The MT_SECDRONE actor reuses the stock monster AI (A_Look / A_Chase /
 //	A_FaceTarget / A_Pain / A_Scream / A_Fall) for movement and targeting; only the

@@ -4,7 +4,7 @@
 // Copyright (C) 1993-1996 by id Software, Inc.  (fork additions, DOOM Source License)
 //
 // DESCRIPTION:
-//	Deployable auto-firing sentry turret (aiDoom fork).
+//	Deployable auto-firing sentry turret (BuddyDoom fork).
 //
 //	The player throws a turret in front of himself with the `key_turret` hotkey
 //	(default 'q', overridable in the config).  It costs 25 shells OR 50 bullets

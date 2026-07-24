@@ -4,7 +4,7 @@
 // DESCRIPTION:
 //   System interface for the AI co-op buddy's spoken voice lines (offline).
 //
-//   The buddy's lines are pre-rendered into a Doom PWAD (aidoom.wad, ~37 OGG
+//   The buddy's lines are pre-rendered into a Doom PWAD (buddydoom.wad, ~37 OGG
 //   lumps named DSCONTAC1 / DSHURT01 / DSSTPISTP / ...).  At startup
 //   I_Voice_Init() locates the WAD via W_AddFile() and indexes every
 //   DS*-prefixed lump.  When the buddy wants to speak, the playsim calls
@@ -25,7 +25,7 @@
 
 
 // Speak the lump with the given 8-char name (case-insensitive).  The lump is
-// loaded from the aidoom.wad PWAD added by D_DoomMain.  Returns silently if the
+// loaded from the buddydoom.wad PWAD added by D_DoomMain.  Returns silently if the
 // lump is unknown, the WAD isn't loaded, or voice init failed.  Voice init
 // failures are non-fatal -- the buddy stays silent rather than crashing.
 // lvol/rvol are 0..127 per-channel gains (Doom positional volume): the caller
@@ -33,7 +33,7 @@
 // spatialised (distance + stereo pan) instead of flat at the player.
 void I_Voice_SayByName (const char* lumpname, int lvol, int rvol);
 
-// Resolve the aidoom asset/voice WAD path (cfg override or default "aidoom.wad").
+// Resolve the buddydoom asset/voice WAD path (cfg override or default "buddydoom.wad").
 // D_DoomMain uses it to add the WAD EARLY -- before W_Init/R_InitSprites -- so any
 // sprites baked into it (e.g. the deployable turret MTUR*) register with the sprite
 // system.  I_Voice_Init then detects it's already loaded and skips re-adding it.
@@ -66,8 +66,8 @@ int  I_Director_Busy (void);
 void I_Director_Stop (void);
 
 // Init / shutdown -- called from D_DoomMain around the I_Init*/I_Shutdown*
-// pair.  Loads the buddy WAD (cwd-relative "aidoom.wad" by default, or from
-// the "buddy_wad" entry in aidoom.cfg).  Opens the dedicated audio stream.
+// pair.  Loads the buddy WAD (cwd-relative "buddydoom.wad" by default, or from
+// the "buddy_wad" entry in buddydoom.cfg).  Opens the dedicated audio stream.
 // Both are best-effort: any failure is logged but never fatal.
 void I_Voice_Init (void);
 void I_Voice_Shutdown (void);

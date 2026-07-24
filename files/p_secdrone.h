@@ -4,7 +4,7 @@
 // Copyright (C) 1993-1996 by id Software, Inc.  (fork additions, DOOM Source License)
 //
 // DESCRIPTION:
-//	Security Drone (aiDoom fork) -- a vanilla-C port of the ZDoom DECORATE actor
+//	Security Drone (BuddyDoom fork) -- a vanilla-C port of the ZDoom DECORATE actor
 //	from SecurityDrone.pk3 (Code: Gothic).  A small flying laser drone.  Here it is
 //	a FRIENDLY ally: the AI co-op buddy spawns one (costing the buddy 50 bullets or
 //	25 shells) when it is in danger -- under heavy fire or surrounded by engaged

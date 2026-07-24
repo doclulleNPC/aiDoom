@@ -50,7 +50,7 @@ rcsid[] = "$Id: i_main.c,v 1.4 1997/02/03 22:45:10 b1 Exp $";
 #include "d_main.h"
 
 // Crash diagnostics: on a fatal signal, dump a backtrace to stderr (the launcher
-// captures it to run/aidoom_stderr.log) so a silent segfault during play -- e.g. a
+// captures it to run/buddydoom_stderr.log) so a silent segfault during play -- e.g. a
 // bad sprite/sound from the doom2stuff overlay, or a playsim pointer bug -- names the
 // function that faulted instead of vanishing.  glibc/Linux only; async-signal-safe
 // (backtrace_symbols_fd, no malloc).
@@ -96,21 +96,21 @@ static void I_InstallCrashHandler (void)
 // Exception instead.  A top-level SetUnhandledExceptionFilter catches the access
 // violation (etc.) that would otherwise just close the (now windowless) game with
 // no feedback -- it names the fault + address in an SDL dialog and writes it to
-// stderr (-> run/aidoom_stderr.log via the launcher).  Best-effort: on a stack
+// stderr (-> run/buddydoom_stderr.log via the launcher).  Best-effort: on a stack
 // overflow the handler runs on a nearly-exhausted stack, so keep it minimal
 // (static buffer, no allocation).
 #define WIN32_LEAN_AND_MEAN	// keep rpcndr.h/wtypesbase.h out: their boolean/BOOLEAN clash with doomtype.h (cf. i_net.c)
 #include <windows.h>
 #include <dbghelp.h>			// MiniDumpWriteDump (links dbghelp.lib)
 #include <stdio.h>
-// Write a post-mortem minidump next to the game (run/aidoom_crash.dmp) that
+// Write a post-mortem minidump next to the game (run/buddydoom_crash.dmp) that
 // Visual Studio / WinDbg can open to see the faulting stack + registers.
 // Returns 1 on success.  MiniDumpWithThreadInfo keeps it small but useful.
 static int I_WriteMinidump (EXCEPTION_POINTERS* ep)
 {
     MINIDUMP_EXCEPTION_INFORMATION mei;
     BOOL   ok;
-    HANDLE hf = CreateFileA ("aidoom_crash.dmp", GENERIC_WRITE, 0, NULL,
+    HANDLE hf = CreateFileA ("buddydoom_crash.dmp", GENERIC_WRITE, 0, NULL,
 			     CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
     if (hf == INVALID_HANDLE_VALUE)
 	return 0;
@@ -138,19 +138,19 @@ static LONG WINAPI I_Win32CrashFilter (EXCEPTION_POINTERS* ep)
 					        "unhandled exception";
     int		dumped = I_WriteMinidump (ep);	// write the .dmp before anything else can fail
     snprintf (msg, sizeof msg,
-	      "aiDoom crashed.\n\n%s (0x%08lX) at address 0x%p.\n\n"
+	      "BuddyDoom crashed.\n\n%s (0x%08lX) at address 0x%p.\n\n"
 	      "Saved in run\\:\n"
-	      "  - aidoom_stderr.log  (console log)\n"
+	      "  - buddydoom_stderr.log  (console log)\n"
 	      "%s",
 	      name, (unsigned long)code, addr,
-	      dumped ? "  - aidoom_crash.dmp   (open in Visual Studio / WinDbg)"
+	      dumped ? "  - buddydoom_crash.dmp   (open in Visual Studio / WinDbg)"
 		     : "  (minidump could not be written)");
-    fprintf (stderr, "\n*** aiDoom CRASH: %s (0x%08lX) at 0x%p; minidump %s ***\n",
-	     name, (unsigned long)code, addr, dumped ? "aidoom_crash.dmp" : "FAILED");
+    fprintf (stderr, "\n*** BuddyDoom CRASH: %s (0x%08lX) at 0x%p; minidump %s ***\n",
+	     name, (unsigned long)code, addr, dumped ? "buddydoom_crash.dmp" : "FAILED");
     fflush (stderr);
     // SDL's message box is the native Win32 dialog underneath; safe with parent = NULL
     // even after a crash / with no game window.
-    SDL_ShowSimpleMessageBox (SDL_MESSAGEBOX_ERROR, "aiDoom crashed", msg, NULL);
+    SDL_ShowSimpleMessageBox (SDL_MESSAGEBOX_ERROR, "BuddyDoom crashed", msg, NULL);
     return EXCEPTION_EXECUTE_HANDLER;		// let the process terminate
 }
 static void I_InstallCrashHandler (void)

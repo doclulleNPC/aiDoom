@@ -3,7 +3,7 @@
 //
 // director.c -- native (C / SDL3) replacement for ollama_director.py.
 //
-//   The LLM "AI Director" for aiDoom's monsters.  Connects to the game's
+//   The LLM "AI Director" for BuddyDoom's monsters.  Connects to the game's
 //   -aidirector TCP server, observes the game state, asks a local Ollama model
 //   for tactical orders, and issues them -- exactly the protocol implemented in
 //   ollama_director.py:
@@ -986,7 +986,7 @@ int main (int argc, char** argv)
         int n = g_log_n;
         SDL_UnlockMutex (g_lock);
 
-        text (10, 8,  "aiDoom AI Director  (Ollama LLM -> monster + buddy tactics)", 120, 200, 255);
+        text (10, 8,  "BuddyDoom AI Director  (Ollama LLM -> monster + buddy tactics)", 120, 200, 255);
 
         // live memory readout (right-aligned on the title row): green when small,
         // amber/red as it grows -- a runaway leak is now obvious at a glance.

@@ -1,5 +1,5 @@
 //
-// i_opl.h -- OPL2/OPL3 music backend for aiDoom (public API).
+// i_opl.h -- OPL2/OPL3 music backend for BuddyDoom (public API).
 //
 // A self-contained passive OPL music player that drives the Nuked-OPL3
 // emulator (opl3.c) using the IWAD's GENMIDI patches. The instrument /

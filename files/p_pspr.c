@@ -904,7 +904,7 @@ void A_ConsumeAmmo (player_t *player, pspdef_t *psp)
   ammotype_t type = weaponinfo[player->readyweapon].ammo;
   int amount;
   if (!psp->state || type == am_noammo) return;
-  amount = psp->state->args[0] ? (int)psp->state->args[0] : 1;   // aiDoom has no ammopershot -> 1
+  amount = psp->state->args[0] ? (int)psp->state->args[0] : 1;   // BuddyDoom has no ammopershot -> 1
   player->ammo[type] -= amount;
   if (player->ammo[type] < 0) player->ammo[type] = 0;
 }
@@ -982,7 +982,7 @@ void A_CheckAmmo (player_t *player, pspdef_t *psp)
   ammotype_t type = weaponinfo[player->readyweapon].ammo;
   int amount;
   if (!psp->state || type == am_noammo) return;
-  amount = psp->state->args[1] ? (int)psp->state->args[1] : 1;   // aiDoom: no ammopershot -> 1
+  amount = psp->state->args[1] ? (int)psp->state->args[1] : 1;   // BuddyDoom: no ammopershot -> 1
   if (player->ammo[type] < amount)
     P_SetPsprite (player, ps_weapon, (int)psp->state->args[0]);
 }

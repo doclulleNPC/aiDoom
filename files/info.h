@@ -236,8 +236,8 @@ typedef enum
     SPR_EGGC,		// Morph Ovum pickup + egg projectile (EGGC)
     SPR_HCHK,		// morph chicken (HCHK) -- generic morph creature (files/p_morph.c)
     SPR_TNT1,		// invisible placeholder (no lumps) -- default for grown DSDHacked states
-    SPR_MTUR,		// deployable sentry turret (MTUR*) -- patch lumps in run/ID0/aidoom.wad
-    SPR_MNDR,		// Security Drone body (MNDR*) -- from SecurityDrone.pk3, in aidoom.wad
+    SPR_MTUR,		// deployable sentry turret (MTUR*) -- patch lumps in run/ID0/buddydoom.wad
+    SPR_MNDR,		// Security Drone body (MNDR*) -- from SecurityDrone.pk3, in buddydoom.wad
     SPR_SHT1,		// Security Drone laser shot (SHT1*)
     SPR_POW1,		// Security Drone laser impact (POW1*)
     SPR_XSSD,		// Hexen Serpent dive/submerge frames (XSSD*) -- from hexenstuff.wad
@@ -1214,8 +1214,8 @@ typedef enum
     S_TECH2LAMP2,
     S_TECH2LAMP3,
     S_TECH2LAMP4,
-    // === aiDoom appended actor states RELOCATED to a high base ==============
-    // Everything below (Heretic/Hexen/Freedoom/turret/drone/... states) is aiDoom's
+    // === BuddyDoom appended actor states RELOCATED to a high base ==============
+    // Everything below (Heretic/Hexen/Freedoom/turret/drone/... states) is BuddyDoom's
     // own additions.  DSDHacked WADs (Legacy of Rust defines frames 1100-1566) share
     // this state-index space; if our builtins sat there, a partial LoR "Frame N ="
     // edit (which only sets sprite/tics/next, NOT the sprite subnumber) would inherit
@@ -1616,7 +1616,7 @@ typedef enum {
     MT_MISC84,
     MT_MISC85,
     MT_MISC86,
-    // === aiDoom appended mobjtypes RELOCATED to a high base ==================
+    // === BuddyDoom appended mobjtypes RELOCATED to a high base ==================
     // Same reason as the state block above: DSDHacked WADs (Legacy of Rust numbers
     // Things up to 209) share this index space.  With our builtins sitting there, a
     // LoR "Thing N =" edit landed on OUR actor and inherited its leftover fields (the

@@ -513,7 +513,7 @@ void P_NewChaseDir (mobj_t*	actor)
 // If allaround is false, only look 180 degrees in front.
 // Returns true if a player is targeted.
 //
-// aiDoom: nearest live enemy monster to a FRIENDLY monster (summonfriend) -- a real
+// BuddyDoom: nearest live enemy monster to a FRIENDLY monster (summonfriend) -- a real
 // COUNTKILL monster, shootable, alive, and not itself friendly.  NULL if none.
 static mobj_t* P_FriendNearestEnemy (mobj_t* actor)
 {

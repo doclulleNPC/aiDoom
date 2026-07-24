@@ -35,7 +35,7 @@ int	u_next_map     = 0;	// 1-based target map
 #endif
 
 // The vanilla mobjtype_t order, addressed by name for the bossaction field.  The
-// index IS the mobjtype (aiDoom appends its extra actors AFTER this vanilla set,
+// index IS the mobjtype (BuddyDoom appends its extra actors AFTER this vanilla set,
 // so 0..N-1 line up with MT_PLAYER..MT_MSObj).  Only these (all real boss types
 // live here) are accepted; DEHEXTRA/Boom names are intentionally omitted.
 static const char* const actor_names[] =

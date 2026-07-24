@@ -1,4 +1,4 @@
-// Additive Hexen content for aiDoom (approach A in HERETIC_HEXEN.md, same as heretic.c):
+// Additive Hexen content for BuddyDoom (approach A in HERETIC_HEXEN.md, same as heretic.c):
 // Hexen monsters ported from crispy-doom's hexen/info.c + p_enemy.c, appended to the
 // engine's states[]/mobjinfo[] tables at runtime.  Sprites come from hexenstuff.wad (the
 // renamed X* sprites built by tools/extract_hexen.py); sounds reuse DOOM SFX for now.

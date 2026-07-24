@@ -592,7 +592,7 @@ void P_LoadLineDefs (int lump)
     sd_raw_top = sd_raw_bot = NULL;	// PU_LEVEL memory is reclaimed at the next level load
 
     // Boom 260 (killough 4/11/98): translucent 2S middle textures.  tag 0 -> just this linedef;
-    // tag N -> every linedef with that tag.  aiDoom uses the generated main_tranmap (tranlump 0).
+    // tag N -> every linedef with that tag.  BuddyDoom uses the generated main_tranmap (tranlump 0).
     {
 	line_t* ld = lines;
 	int i, j;

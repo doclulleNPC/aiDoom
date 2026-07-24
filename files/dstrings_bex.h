@@ -2,7 +2,7 @@
 //-----------------------------------------------------------------------------
 //
 // DESCRIPTION:
-//	BEX [STRINGS] support for the pickup messages.  aiDoom's HUD strings are
+//	BEX [STRINGS] support for the pickup messages.  BuddyDoom's HUD strings are
 //	compile-time #defines (d_englsh.h); DEHACKED/BEX patches (e.g. Legacy of
 //	Rust renames the plasma/BFG pickups) replace them at runtime by mnemonic.
 //	We keep a runtime `char* deh_<MNEMONIC>` per pickup string, registered in

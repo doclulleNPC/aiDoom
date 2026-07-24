@@ -1,4 +1,4 @@
-// MBF / MBF21 action codepointers -- ported from ../winmbf and ../Nugget-Doom, adapted to aiDoom.
+// MBF / MBF21 action codepointers -- ported from ../winmbf and ../Nugget-Doom, adapted to BuddyDoom.
 // M4a: the misc1/misc2 classics + MBF21 A_SpawnObject are real; the rest are stubs (M4b).
 #include "doomdef.h"
 #include "doomstat.h"

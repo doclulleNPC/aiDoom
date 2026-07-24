@@ -78,7 +78,7 @@ void T_Scroll(scroll_t *s)
 
       sec = sectors + s->affectee;
       height = sec->floorheight;
-      waterheight = D_MININT;   // (aiDoom: no transfer-height water yet)
+      waterheight = D_MININT;   // (BuddyDoom: no transfer-height water yet)
 
       // Move objects only if on floor or underwater,
       // non-floating, and clipped.
@@ -397,7 +397,7 @@ void T_Pusher (pusher_t *p)
     }
 
   // constant pushers (wind/current): affect players standing in the sector.
-  // (aiDoom has no transfer-height water sectors, so only the "not water" cases apply.)
+  // (BuddyDoom has no transfer-height water sectors, so only the "not water" cases apply.)
   for (thing = sec->thinglist; thing; thing = thing->snext)
     {
       if (!thing->player || (thing->flags & (MF_NOGRAVITY | MF_NOCLIP)))

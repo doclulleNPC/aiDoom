@@ -47,7 +47,7 @@ boolean P_AICoop_IsBuddy (player_t* p);
 // 4=come, 5=grab).  Exposed for the console / voice system.
 int  P_AICoop_State (void);
 
-// Speak a tagged phrase through i_voice.c (offline OGG via aidoom.wad).
+// Speak a tagged phrase through i_voice.c (offline OGG via buddydoom.wad).
 // Callers pick the exact tag (e.g. "summon_ok", "state:fighting"); the
 // tag -> lump-name mapping lives in i_voice.c.
 void P_AICoop_VoiceTag (const char* tag);

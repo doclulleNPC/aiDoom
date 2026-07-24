@@ -6,7 +6,7 @@
 //	mobjinfo slots (grown via the DSDHacked dynamic tables) from the generated
 //	files/id24_gen.h -- which is produced by tools/gen_id24.py from the official
 //	ID24 0.99.1 data tables (id24data.cpp).  Art/sounds come from id24res.wad
-//	(auto-loaded in d_main.c).  Codepointers are aiDoom's existing MBF21 set.
+//	(auto-loaded in d_main.c).  Codepointers are BuddyDoom's existing MBF21 set.
 //
 //	Cross-references in the generated tables are self-describingly ENCODED
 //	(<= -1e9, type+rel packed) so they can be resolved here against the runtime
@@ -34,7 +34,7 @@ extern void dsdh_EnsureSFXCapacity      (int limit);
 extern void dsdh_EnsureStatesCapacity   (int limit);
 extern void dsdh_EnsureMobjInfoCapacity (int limit);
 
-// Codepointers used by the ID24 states (all present in aiDoom's MBF21 layer).
+// Codepointers used by the ID24 states (all present in BuddyDoom's MBF21 layer).
 extern void A_Look(),A_Chase(),A_FaceTarget(),A_Pain(),A_Fall(),A_Scream(),
 	A_XScream(),A_BossDeath(),A_PlaySound(),A_SPosAttack(),A_CyberAttack(),
 	A_Hoof(),A_SpidRefire(),A_RandomJump(),A_MonsterProjectile(),A_SpawnObject(),

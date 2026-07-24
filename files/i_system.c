@@ -182,7 +182,7 @@ void I_Error (char *error, ...)
     fflush( stderr );
 
     // Show native message box to make errors user-friendly
-    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "aiDoom Error", buf, NULL);
+    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "BuddyDoom Error", buf, NULL);
 
     // Shutdown. Here might be other errors.
     if (demorecording)

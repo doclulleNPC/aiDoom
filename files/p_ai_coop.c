@@ -365,9 +365,9 @@ static mobj_t* AICoop_NearestHuman (fixed_t x, fixed_t y)
 
 // ----------------------------------------------------------------- voice
 // The buddy speaks through i_voice.c, which plays an offline-baked OGG from
-// aidoom.wad via a dedicated SDL3 audio stream.  We pass a "tag" (e.g.
+// buddydoom.wad via a dedicated SDL3 audio stream.  We pass a "tag" (e.g.
 // "contact:0", "state:fighting") and i_voice maps it to the right lump.
-// All best-effort: if aidoom.wad isn't present or the lump is missing, the
+// All best-effort: if buddydoom.wad isn't present or the lump is missing, the
 // call is a silent no-op and the deterministic playsim is unaffected.
 #include "i_voice.h"
 
@@ -474,7 +474,7 @@ static void AICoop_SayTagP (const char* tag, int prio)
     AICoop_SayTag (tag);
 }
 
-// Speak a tagged phrase through i_voice.c (offline OGG via aidoom.wad).
+// Speak a tagged phrase through i_voice.c (offline OGG via buddydoom.wad).
 // The "[Buddy] ..." console text is unaffected -- this is just the audio.
 // Callers pick the exact tag (e.g. "summon_ok", "state:fighting"); the
 // tag -> lump-name mapping lives in i_voice.c.  This is the console-command
@@ -2241,7 +2241,7 @@ void P_AICoop_BuildCmd (void)
 	leash_return = summon_stay && pl && (plr_d > COOP_LEASH || !P_CheckSight (mo, pl));
     }
 
-    // Voice: automatic callouts (rate-limited; tags -> OGG lumps in aidoom.wad).
+    // Voice: automatic callouts (rate-limited; tags -> OGG lumps in buddydoom.wad).
         {
     	static mobj_t*	lasttgt;
     	static int	lasthp = 100, lastplhp = 100, lastlevel = -1, lastdry = 0, lastfist = 0;

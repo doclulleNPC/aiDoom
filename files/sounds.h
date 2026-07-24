@@ -388,7 +388,7 @@ typedef enum
     sfx_x_dratk,
     sfx_x_drdth,
     sfx_x_drhit,
-    // Security Drone (files/p_secdrone.c) -- lumps DSSECDR1..4 in aidoom.wad.
+    // Security Drone (files/p_secdrone.c) -- lumps DSSECDR1..4 in buddydoom.wad.
     sfx_secdr_sight,	// SECDRON1
     sfx_secdr_active,	// SECDRON2
     sfx_secdr_detect,	// SECDRON3 (attack)

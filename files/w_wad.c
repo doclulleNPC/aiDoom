@@ -407,7 +407,7 @@ void W_AddFile (char *filename)
     if ( (handle = fopen (filename,"rb")) == NULL)
     {
 	// Game WADs live in run/ID0/ -- retry there before giving up, so bare names
-	// (aidoom.wad, -file doom2stuff.wad, ...) resolve without an explicit path.
+	// (buddydoom.wad, -file doom2stuff.wad, ...) resolve without an explicit path.
 	static char id0path[1024];
 	snprintf (id0path, sizeof(id0path), "ID0/%s", filename);
 	if ( (handle = fopen (id0path,"rb")) == NULL)

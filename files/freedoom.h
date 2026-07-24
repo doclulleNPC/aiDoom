@@ -1,4 +1,4 @@
-// Additive Freedoom DOOM2 monsters for aiDoom: runtime clones of the engine's DOOM2
+// Additive Freedoom DOOM2 monsters for BuddyDoom: runtime clones of the engine's DOOM2
 // actors (revenant, mancubus, arch-vile, ...) with sprites renamed to F* (from
 // freedoomstuff.wad) so they never collide with / override DOOM or doom2stuff.
 // See files/freedoom.c.

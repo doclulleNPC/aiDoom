@@ -1,10 +1,10 @@
-// launcher -- tiny SDL3 launcher for aiDoom.
+// launcher -- tiny SDL3 launcher for BuddyDoom.
 //
-// Pick an IWAD, choose Buddy/Monster mode, hit Launch.  Launches aidoom in the
+// Pick an IWAD, choose Buddy/Monster mode, hit Launch.  Launches buddydoom in the
 // run/ folder with the right CLI flags for the picked combination.  Scans
 // run/ and ~/.doom for IWADs at startup so the dropdown is always fresh.
 //
-// Mode mapping (the CLI flags passed to aidoom):
+// Mode mapping (the CLI flags passed to buddydoom):
 //
 //   Buddy:  off          -> no flag
 //           buddy        -> -coop
@@ -319,7 +319,7 @@ static void draw_rect_outline(float x, float y, float w, float h, Uint8 r, Uint8
 // ----------------------------------------------------------------- iwad scan
 //
 // Known IWAD names from DOOM's IdentifyVersion (d_main.c).  We use the
-// filename as the canonical match -- aidoom's autodetect walks DOOMWADDIR,
+// filename as the canonical match -- buddydoom's autodetect walks DOOMWADDIR,
 // the cwd, ~/.doom, ~/wads, Steam.  We pre-discover files in run/ so the
 // user can pick without typing a path.
 //
@@ -385,7 +385,7 @@ static void try_add_iwad(const char* dir, const char* filename, int from_steam)
     // De-dupe by file identity (case-/slash-insensitive on Windows/macOS).
     // Different copies of the same IWAD in DIFFERENT locations (run/doom2.wad
     // vs ~/.steam/.../DOOM2.WAD) are intentionally kept -- the user may want to
-    // know which one aidoom will pick if DOOMWADDIR isn't set, and Steam copies
+    // know which one buddydoom will pick if DOOMWADDIR isn't set, and Steam copies
     // get tagged "(Steam)" so they're easy to spot.  The same file probed under
     // different casing (doom1.wad / DOOM1.WAD) collapses to one entry.
     for (int i=0; i<iwad_count; i++)
@@ -489,7 +489,7 @@ static void scan_iwads(void)
     for (int d = 0; d < nd; d++) {
         for (int i = 0; KNOWN_IWADS[i].filename; i++) {
             try_add_iwad(dirs[d], KNOWN_IWADS[i].filename, 0);
-            // Also try the uppercase variant -- aidoom's run/ and Steam
+            // Also try the uppercase variant -- buddydoom's run/ and Steam
             // installs both ship DOOM2.WAD / DOOM.WAD etc.
             char upper[64];
             snprintf(upper, sizeof upper, "%s", KNOWN_IWADS[i].filename);
@@ -530,7 +530,7 @@ static void scan_iwads(void)
 }
 
 // ----------------------------------------------------------------- pwad scan
-// Every .wad in the wad dirs that ISN'T a known IWAD and isn't our own aidoom.wad
+// Every .wad in the wad dirs that ISN'T a known IWAD and isn't our own buddydoom.wad
 // voice asset -- offered as an optional extra "-file" load (freedoomstuff,
 // hereticstuff, hexenstuff, or any user PWAD dropped into run/ID0).
 
@@ -548,7 +548,7 @@ static int wad_is_iwad(const char* dir, const char* fname)
     return n == 4 && memcmp(magic, "IWAD", 4) == 0;
 }
 
-// Does the WAD contain a lump with this 8-char name?  aiDoom's own internal asset packs
+// Does the WAD contain a lump with this 8-char name?  BuddyDoom's own internal asset packs
 // (freedoomstuff/hereticstuff/hexenstuff/doom2stuff.wad) carry a marker lump "AISTUFF" so
 // the launcher can hide them from the user PWAD list -- they're loaded by the game / the
 // monster checkboxes, not picked as a "-file".  (tools/extract_*.py add it; existing wads
@@ -588,7 +588,7 @@ static void pwad_add(const char* dir, const char* fname)
         if (is_known_iwad(fname) >= 0)                return;   // known DOOM IWADs are the OTHER dropdown
         if (strcasecmp(fname, "buddydoom.wad") == 0)  return;   // our voice PWAD -- never list it
         if (wad_is_iwad(dir, fname))                  return;   // a full IWAD (hexen/heretic/...) -> not a PWAD
-        if (wad_has_lump(dir, fname, "AISTUFF"))      return;   // aiDoom-internal asset pack -> not a user PWAD
+        if (wad_has_lump(dir, fname, "AISTUFF"))      return;   // BuddyDoom-internal asset pack -> not a user PWAD
     }
     for (int i=1; i<pwad_count; i++)                        // de-dupe (same name in two dirs)
         if (strcasecmp(pwads[i], fname) == 0) return;
@@ -939,7 +939,7 @@ static int hit_launch_button(int mouse_px, int mouse_py)
 
 // ----------------------------------------------------------------- command builder
 //
-// We build the aidoom command line in `out`.  Flags are appended in the order
+// We build the buddydoom command line in `out`.  Flags are appended in the order
 // the user would type them: -iwad first, then buddy mode, then monster mode.
 // We also append -warp 1 1 so the user lands in a level rather than the
 // title-screen demo (which has no buddy to see).
@@ -1201,7 +1201,7 @@ static void build_command(char* out, int n, const char* iwad_path)
 // We launch the game (and, for any AI layer, the director sidecar) DETACHED and
 // return immediately, so the launcher's event loop keeps running -- otherwise
 // system() blocks until the game exits and the launcher window can't be closed
-// or reused.  On Linux the game's stderr is teed to run/aidoom_stderr.log so a
+// or reused.  On Linux the game's stderr is teed to run/buddydoom_stderr.log so a
 // fatal I_Error is recoverable after the window vanishes.
 //
 // Whenever ANY AI layer is picked -- AI monsters (-aidirector) OR the AI buddy
@@ -1209,7 +1209,7 @@ static void build_command(char* out, int n, const char* iwad_path)
 // talk to.  Both make the game listen on port 31666 (the game's default
 // ai_port == the director's default --port), so one director drives whichever
 // is active.  Best-effort: if the director binary isn't in run/, we warn and
-// launch aidoom alone.
+// launch buddydoom alone.
 //
 // Is a director sidecar already running?  (so a second launch doesn't start a
 // duplicate -- one director can serve whichever game is listening on port 31666).
@@ -1255,7 +1255,7 @@ static void do_launch(void)
                  exe);
         g_status_err = 1;
         fprintf(stderr, "[launcher] %s\n", g_status);
-        return;   // do NOT start aidoom
+        return;   // do NOT start buddydoom
     }
 
     // Only start a director if one isn't already running (avoid a duplicate sidecar).
@@ -1268,10 +1268,10 @@ static void do_launch(void)
     // Launch with CreateProcess (NOT system("start ...")): it returns immediately so the
     // launcher window never freezes, and CREATE_NO_WINDOW stops the CONSOLE-subsystem game
     // from popping up a console/cmd window.  The game's stdout+stderr are redirected to
-    // run/aidoom_stderr.log so a fatal I_Error is still recoverable after the window closes.
+    // run/buddydoom_stderr.log so a fatal I_Error is still recoverable after the window closes.
     char gamexe[300], logpath[320];
     snprintf(gamexe,  sizeof gamexe,  "%s/buddydoom.exe",     run_dir());
-    snprintf(logpath, sizeof logpath, "%s/aidoom_stderr.log", run_dir());
+    snprintf(logpath, sizeof logpath, "%s/buddydoom_stderr.log", run_dir());
 
     if (start_director)
     {
@@ -1312,15 +1312,15 @@ static void do_launch(void)
     char full[1400];
     if (start_director)
         snprintf(full, sizeof full,
-                 "( \"%s\" --port 31666 >/dev/null 2>&1 & ) ; ( %s >aidoom_stderr.log 2>&1 & )",
+                 "( \"%s\" --port 31666 >/dev/null 2>&1 & ) ; ( %s >buddydoom_stderr.log 2>&1 & )",
                  dir_path, cmd);
     else
-        snprintf(full, sizeof full, "( %s >aidoom_stderr.log 2>&1 & )", cmd);
+        snprintf(full, sizeof full, "( %s >buddydoom_stderr.log 2>&1 & )", cmd);
     fprintf(stderr, "[launcher] %s\n", full);
     system(full);   // returns immediately -- the launcher stays responsive
 #endif
 
-    snprintf(g_status, sizeof g_status, "launched aiDoom%s",
+    snprintf(g_status, sizeof g_status, "launched BuddyDoom%s",
              start_director ? " + director"
              : reuse_director ? " (director already running)" : "");
     g_status_err = 0;

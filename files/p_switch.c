@@ -458,7 +458,7 @@ P_UseSpecialLine
       // --- Boom extended S1 (switch, once) floor/ceiling types used by Legacy of Rust ---
       case 159:
 	// Boom S1: Floor Lower to Lowest, Change Texture and Type (the S1 form of
-	// classic 37; aiDoom's lowerAndChange uses the trigger model rather than
+	// classic 37; BuddyDoom's lowerAndChange uses the trigger model rather than
 	// Boom's numeric model, but the floor motion + texture/type change match).
 	if (EV_DoFloor(line,lowerAndChange))
 	    P_ChangeSwitchTexture(line,0);

@@ -448,7 +448,7 @@ R_GetColumn
 //
 // A single-patch texture whose patch doesn't span the full texture height gets forced through
 // the tutti-frutti composite path (R_GenerateLookup) -- but the composite is raw pixels with no
-// posts, so it can't be masked (that's why aiDoom skipped it, making transparent single-patch
+// posts, so it can't be masked (that's why BuddyDoom skipped it, making transparent single-patch
 // signs like BOOMEDIT's "250TEXT" description shields vanish).  Here we read such a column
 // straight from its source patch instead, which is already posted (transparent below the patch).
 // (Assumes the patch's originy is 0 -- true for the sign textures; a nonzero originy would shift

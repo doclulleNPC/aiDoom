@@ -1,4 +1,4 @@
-// extractor -- graphical (SDL3) asset extractor for aiDoom.
+// extractor -- graphical (SDL3) asset extractor for BuddyDoom.
 //
 // Replaces the Python asset-extraction scripts (extract_heretic_monsters.py,
 // extract_hexen.py, extract_freedoom2.py, extract_doom2.py): reads YOUR OWN
@@ -286,7 +286,7 @@ static const char* HEXEN_SND_KW[] = {
     "mghmm","mgcdth","clxdth","plrdth","plrpain","plrburn","plrcdth", NULL
 };
 
-#define AISTUFF_NOTE "aiDoom internal asset pack -- loaded by the game, not a user PWAD\n"
+#define AISTUFF_NOTE "BuddyDoom internal asset pack -- loaded by the game, not a user PWAD\n"
 
 // ================================================================= sources
 enum { K_HERETIC, K_HEXEN, K_FREEDOOM, K_DOOM2 };
@@ -800,7 +800,7 @@ static void draw(void)
     int st = SDL_GetAtomicInt(&g_status);
     fillrect(0,0,WINW,WINH, 22,22,28);
 
-    text(PAD, 16, "aiDoom Asset Extractor", 120,200,255);
+    text(PAD, 16, "BuddyDoom Asset Extractor", 120,200,255);
     text(PAD, 40, "Re-pack monster assets from your own IWADs into run/ID0/.", 150,150,160);
     fillrect(PAD, 64, WINW-2*PAD, 1, 60,60,72);
 

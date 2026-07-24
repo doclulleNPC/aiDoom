@@ -123,7 +123,7 @@ int allow_pushers     = 1;
 // P_GetFriction()  (killough 8/28/98)
 //
 // Returns the friction (and, via frictionfactor, the movefactor) for the floor mo rests on.
-// aiDoom has no msecnode touching-sector list, so we use the object's centre sector
+// BuddyDoom has no msecnode touching-sector list, so we use the object's centre sector
 // (mo->subsector->sector) -- accurate except when straddling two differently-frictioned floors.
 //
 int P_GetFriction (const mobj_t *mo, int *frictionfactor)

@@ -1,5 +1,5 @@
 //
-// i_opl.c -- OPL2 music backend for aiDoom.
+// i_opl.c -- OPL2 music backend for BuddyDoom.
 //
 // A self-contained, *passive* OPL music player. It is ported from
 // Chocolate/Crispy-Doom's i_oplmusic.c (the GENMIDI instrument parser, the

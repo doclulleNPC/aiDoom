@@ -200,7 +200,7 @@ typedef enum
     // Hmm ???.
     MF_TRANSSHIFT	= 26,
 
-    // aiDoom: a "friendly" monster (summonfriend) -- it hunts other monsters instead of
+    // BuddyDoom: a "friendly" monster (summonfriend) -- it hunts other monsters instead of
     // the player, and the player's auto-aim/buddy treat it as an ally.
     MF_FRIEND		= 0x10000000
 

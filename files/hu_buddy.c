@@ -27,7 +27,7 @@
 #include "r_defs.h"
 #include "r_main.h"                 // R_PointToAngle2
 #include "v_video.h"
-#include "w_wad.h"                  // W_CheckNumForName / W_CacheLumpNum (aidoom.wad faces)
+#include "w_wad.h"                  // W_CheckNumForName / W_CacheLumpNum (buddydoom.wad faces)
 #include "z_zone.h"                 // PU_STATIC
 
 #include "hu_stuff.h"               // HU_FONTSTART / HU_FONTSIZE + the small Doom HUD font
@@ -65,9 +65,9 @@ void HU_Buddy_SetRes (void) {}
 
 // ---------------------------------------------------------------------------
 //  Buddy mugshot faces (BUF*) -- a distinct set from the player's STF*, packed
-//  into aidoom.wad (tools/bake_buddy_face.py).  Loaded lazily: the WAD is added at
+//  into buddydoom.wad (tools/bake_buddy_face.py).  Loaded lazily: the WAD is added at
 //  startup (I_Voice_Init), so the lumps exist by the time the HUD ticks/draws; if
-//  aidoom.wad is absent the faces stay unloaded and the HUD falls back to a text
+//  buddydoom.wad is absent the faces stay unloaded and the HUD falls back to a text
 //  label.  The face is ANIMATED exactly like the player's (st_stuff.c): a flat
 //  42-entry array in the same layout, driven by a ported ST_updateFaceWidget state
 //  machine ticked once per game tic (HU_Buddy_Ticker).
@@ -390,7 +390,7 @@ static void HU_Buddy_DrawStrip (player_t* bot)
 	HU_Buddy_Text (dtx, 12, d2);
 
 	// (C) Compass in the mugshot slot: screen-relative bearing -> one of 8
-	// direction arrows (RARR* PNGs in aidoom.wad, decoded via V_CachePNG).
+	// direction arrows (RARR* PNGs in buddydoom.wad, decoded via V_CachePNG).
 	if (pl && bd)
 	{
 	    // rel: 0 ahead, ANG90 left, ANG180 behind, ANG270 right.  Octant 0..7.

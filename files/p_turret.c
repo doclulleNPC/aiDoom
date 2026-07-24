@@ -4,7 +4,7 @@
 // Copyright (C) 1993-1996 by id Software, Inc.  (fork additions, DOOM Source License)
 //
 // DESCRIPTION:
-//	Deployable auto-firing sentry turret (aiDoom fork).  See p_turret.h.
+//	Deployable auto-firing sentry turret (BuddyDoom fork).  See p_turret.h.
 //
 //	Design:
 //	- P_TurretDeploy() is called once per `key_turret` press (edge-triggered in
